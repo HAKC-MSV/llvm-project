@@ -283,9 +283,9 @@ struct yaml::MappingTraits<hakc::HAKCYAMLCustomTransferType> {
 template<>
 struct yaml::MappingTraits<hakc::HAKCYamlDatabaseConfig> {
     static void mapping(yaml::IO &io, hakc::HAKCYamlDatabaseConfig &YamlConfig) {
-        io.mapRequired("ServerURL", YamlConfig.ServerURL);
-        io.mapOptional("ServerTimeout", YamlConfig.ServerTimeout, 1000);
-        io.mapOptional("GetCompartmentEndpoint", YamlConfig.GetCompartmentEndpoint, "get-compartment");
+        io.mapRequired("server-url", YamlConfig.ServerURL);
+        io.mapOptional("server-timeout", YamlConfig.ServerTimeout, 1000);
+        io.mapOptional("get-compartment-endpoint", YamlConfig.GetCompartmentEndpoint, "get-compartment");
     }
 };
 

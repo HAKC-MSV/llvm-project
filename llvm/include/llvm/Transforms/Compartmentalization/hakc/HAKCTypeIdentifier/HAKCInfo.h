@@ -10,14 +10,13 @@
 using namespace llvm;
 
 namespace llvm::hakc {
-
     class CommonHAKCAnalysis;
 
     class HAKCInfo {
     public:
         virtual ~HAKCInfo() = default;
 
-        virtual std::string GetYaml(unsigned Indents) = 0;
+        virtual std::string GetYaml(unsigned Indents) const = 0;
 
         virtual StringRef GetYamlIdentifier() const = 0;
 
@@ -25,7 +24,9 @@ namespace llvm::hakc {
 
         virtual StringRef GetName() const;
 
-        friend raw_ostream &operator<<(raw_ostream &os, HAKCInfo &Info);
+        raw_ostream &operator>>(raw_ostream &os) const;
+
+        friend raw_ostream &operator<<(raw_ostream &os, const HAKCInfo &HAKCInfo);
 
         static unsigned int IndentSpaces();
 
@@ -39,9 +40,7 @@ namespace llvm::hakc {
         std::string Name;
 
         explicit HAKCInfo(CommonHAKCAnalysis &Analysis, StringRef Name, bool DebugActive);
-
     };
-
 } // hakc
 
 #endif //HAKC_HAKCINFO_H

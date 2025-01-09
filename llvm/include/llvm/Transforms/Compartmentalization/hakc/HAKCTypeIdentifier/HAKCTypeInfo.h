@@ -20,7 +20,7 @@ namespace llvm::hakc {
 
         void AddMember(const std::shared_ptr<HAKCTypeInfo> &TypeUse, unsigned BitOffset);
 
-        std::string GetYaml(unsigned Indents) override;
+        std::string GetYaml(unsigned Indents) const override;
 
         void SetSizeInBits(unsigned Size);
 

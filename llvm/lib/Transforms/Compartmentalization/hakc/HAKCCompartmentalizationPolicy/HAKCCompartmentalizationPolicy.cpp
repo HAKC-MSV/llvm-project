@@ -120,7 +120,7 @@ namespace llvm::hakc {
     }
 
     hakc::HAKCCompartmentDivision &HAKCCompartmentalizationPolicy::GetDivision(GlobalValue *GV) {
-        // TODO: Get
+        // TODO: Implement this end point
         return *GetDivision(0, 0);
     }
 

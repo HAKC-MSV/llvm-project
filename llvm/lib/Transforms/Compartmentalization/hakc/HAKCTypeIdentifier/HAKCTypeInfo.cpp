@@ -191,7 +191,7 @@ namespace llvm::hakc {
         return Yaml;
     }
 
-    std::string hakc::HAKCTypeInfo::GetYaml(unsigned Indents) {
+    std::string hakc::HAKCTypeInfo::GetYaml(unsigned Indents) const {
         std::string Yaml;
         llvm::raw_string_ostream sstream(Yaml);
 
@@ -206,7 +206,7 @@ namespace llvm::hakc {
             llvm::sort(SortedBitOffsets.begin(), SortedBitOffsets.end());
             sstream.indent(Indents + EntrySpaces()) << "Members:\n";
             for (auto BitOffset: SortedBitOffsets) {
-                auto MemberSet = Members[BitOffset];
+                auto MemberSet = Members.find(BitOffset)->second;
                 sstream.indent(Indents + HAKCInfo::IndentSpaces()) << "- Offset: " << BitOffset << "\n";
                 sstream.indent(Indents + HAKCInfo::IndentSpaces() + EntrySpaces()) << "Type:\n";
                 for (auto &Member: MemberSet) {

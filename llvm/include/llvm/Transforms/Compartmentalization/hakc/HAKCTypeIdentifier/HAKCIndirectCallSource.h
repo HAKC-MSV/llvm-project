@@ -26,7 +26,7 @@ namespace llvm::hakc {
 
         virtual ~HAKCIndirectCallSourceLink() = default;
 
-        std::string GetYaml(unsigned Indents) override;
+        std::string GetYaml(unsigned Indents) const override;
 
         StringRef GetYamlIdentifier() const override;
 
@@ -60,7 +60,7 @@ namespace llvm::hakc {
 
         virtual ~HAKCIndirectCallSource() = default;
 
-        std::string GetYaml(unsigned Indents) override;
+        std::string GetYaml(unsigned Indents) const override;
 
         StringRef GetYamlIdentifier() const override;
 

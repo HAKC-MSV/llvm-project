@@ -19,7 +19,7 @@ namespace llvm::hakc {
 
         void AddSymbolUse(const std::shared_ptr<HAKCSymbolInfo> &Symbol);
 
-        std::string GetYaml(unsigned Indents) override;
+        std::string GetYaml(unsigned Indents) const override;
 
         std::string GetYamlHeader(unsigned Indents) const override;
 

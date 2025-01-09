@@ -24,12 +24,12 @@ namespace llvm::hakc {
     public:
         HAKCWriter();
 
-        raw_ostream &ostream();
+        raw_ostream &ostream() const;
 
     protected:
         raw_ostream &os;
 
-        void printDIType(const DIType *type, unsigned indents);
+        void printDIType(const DIType *type, unsigned indents) const;
 
     public:
         HAKCWriter &operator<<(llvm::Value *V);
@@ -44,19 +44,19 @@ namespace llvm::hakc {
 
         HAKCWriter &operator<<(bool b);
 
-        HAKCWriter &operator<<(std::string str);
+        HAKCWriter &operator<<(const std::string &str);
 
         HAKCWriter &operator<<(const char *s);
 
-        HAKCWriter &operator<<(Function &F);
+        HAKCWriter &operator<<(const Function &F);
 
-        HAKCWriter &operator<<(Module &M);
+        HAKCWriter &operator<<(const Module &M);
 
-        HAKCWriter &operator<<(Module *M);
+        HAKCWriter &operator<<(const Module *M);
 
-        HAKCWriter &operator<<(Type *Ty);
+        HAKCWriter &operator<<(const Type *Ty);
 
-        HAKCWriter &operator<<(Type &Ty);
+        HAKCWriter &operator<<(const Type &Ty);
 
         HAKCWriter &operator<<(const DINode *DiNode);
 
@@ -66,9 +66,9 @@ namespace llvm::hakc {
 
         HAKCWriter &operator<<(const hakc::HAKCCompartment &Compartment);
 
-        HAKCWriter &operator<<(hakc::HAKCCompartmentDivision &Division);
+        HAKCWriter &operator<<(const hakc::HAKCCompartmentDivision &Division);
 
-        HAKCWriter &operator<<(hakc::HAKCTypeInfo &TypeInfo);
+        HAKCWriter &operator<<(const hakc::HAKCTypeInfo &TypeInfo);
 
         HAKCWriter &operator<<(enum HAKCAllocationTypeEnum AllocationType);
 
@@ -78,9 +78,7 @@ namespace llvm::hakc {
 
         HAKCWriter &operator<<(const HAKCPointerBaseP &ManagedPointer);
 
-        HAKCWriter &operator<<(HAKCFunctionInfo &HAKCFuncInfo);
-
-        HAKCWriter &operator<<(HTTPRequest &HTTPRequest);
+        HAKCWriter &operator<<(const HAKCFunctionInfo &HAKCFuncInfo);
     };
 } // hakc
 

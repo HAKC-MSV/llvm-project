@@ -12,7 +12,7 @@ namespace llvm::hakc {
                                                                  HAKCType(HAKCType), SourcePath(SourcePath) {
     }
 
-    std::string HAKCIndirectCallSource::GetYaml(unsigned Indents) {
+    std::string HAKCIndirectCallSource::GetYaml(unsigned Indents) const {
         std::string Yaml = HAKCInfo::GetYamlHeader(Indents);
         llvm::raw_string_ostream sstream(Yaml);
 
@@ -165,7 +165,7 @@ namespace llvm::hakc {
         LinkYamlTokens.push_back(Yaml);
     }
 
-    std::string HAKCIndirectCallSourceLink::GetYaml(unsigned int Indents) {
+    std::string HAKCIndirectCallSourceLink::GetYaml(unsigned int Indents) const {
         std::string Yaml;
         llvm::raw_string_ostream sstream(Yaml);
 

@@ -13,11 +13,11 @@ namespace llvm::hakc {
     HAKCWriter::HAKCWriter(): os(errs()) {
     }
 
-    raw_ostream &HAKCWriter::ostream() {
+    raw_ostream &HAKCWriter::ostream() const {
         return os;
     }
 
-    void HAKCWriter::printDIType(const DIType *type, unsigned indents) {
+    void HAKCWriter::printDIType(const DIType *type, unsigned indents) const {
         if (!type) {
             return;
         }
@@ -80,7 +80,7 @@ namespace llvm::hakc {
         return *this;
     }
 
-    HAKCWriter &HAKCWriter::operator<<(std::string str) {
+    HAKCWriter &HAKCWriter::operator<<(const std::string &str) {
         os << str;
         return *this;
     }
@@ -90,27 +90,27 @@ namespace llvm::hakc {
         return *this;
     }
 
-    HAKCWriter &HAKCWriter::operator<<(Function &F) {
+    HAKCWriter &HAKCWriter::operator<<(const Function &F) {
         F.print(os, nullptr);
         return *this;
     }
 
-    HAKCWriter &HAKCWriter::operator<<(Module &M) {
+    HAKCWriter &HAKCWriter::operator<<(const Module &M) {
         M.print(os, nullptr);
         return *this;
     }
 
-    HAKCWriter &HAKCWriter::operator<<(Module *M) {
+    HAKCWriter &HAKCWriter::operator<<(const Module *M) {
         *this << *M;
         return *this;
     }
 
-    HAKCWriter &HAKCWriter::operator<<(Type *Ty) {
+    HAKCWriter &HAKCWriter::operator<<(const Type *Ty) {
         *this << *Ty;
         return *this;
     }
 
-    HAKCWriter &HAKCWriter::operator<<(Type &Ty) {
+    HAKCWriter &HAKCWriter::operator<<(const Type &Ty) {
         os << Ty;
         return *this;
     }
@@ -135,14 +135,14 @@ namespace llvm::hakc {
         return *this;
     }
 
-    HAKCWriter &HAKCWriter::operator<<(hakc::HAKCCompartmentDivision &Division) {
+    HAKCWriter &HAKCWriter::operator<<(const hakc::HAKCCompartmentDivision &Division) {
         *this << Division.GetHAKCCompartment();
         os << " Division " << Division.GetDivisionID()->getZExtValue();
         return *this;
     }
 
-    HAKCWriter &HAKCWriter::operator<<(hakc::HAKCTypeInfo &TypeInfo) {
-        os << TypeInfo;
+    HAKCWriter &HAKCWriter::operator<<(const hakc::HAKCTypeInfo &TypeInfo) {
+        TypeInfo >> os;
         return *this;
     }
 
@@ -195,20 +195,8 @@ namespace llvm::hakc {
         return *this;
     }
 
-    HAKCWriter &HAKCWriter::operator<<(HAKCFunctionInfo &HAKCFuncInfo) {
-        os << HAKCFuncInfo;
-        return *this;
-    }
-
-    HAKCWriter &HAKCWriter::operator<<(HTTPRequest &HTTPRequest) {
-        switch (HTTPRequest.Method) {
-            case HTTPMethod::GET:
-                os << "GET";
-                break;
-            default:
-                os << "Unknown";
-        }
-        os << " " << HTTPRequest.Url;
+    HAKCWriter &HAKCWriter::operator<<(const HAKCFunctionInfo &HAKCFuncInfo) {
+        HAKCFuncInfo >> os;
         return *this;
     }
 } // hakc

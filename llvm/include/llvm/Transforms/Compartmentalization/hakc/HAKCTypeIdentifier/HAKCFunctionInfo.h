@@ -23,7 +23,7 @@ namespace llvm::hakc {
 
         void AddIndirectCall(const std::shared_ptr<HAKCIndirectCallSource> &Source);
 
-        std::string GetYaml(unsigned Indents) override;
+        std::string GetYaml(unsigned Indents) const override;
 
         StringRef GetYamlIdentifier() const override;
 

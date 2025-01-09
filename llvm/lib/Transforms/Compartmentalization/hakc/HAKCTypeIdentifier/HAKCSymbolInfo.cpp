@@ -111,7 +111,7 @@ std::string hakc::HAKCSymbolInfo::GetYamlHeader(unsigned int Indents) const {
     return Yaml;
 }
 
-std::string hakc::HAKCSymbolInfo::GetYaml(unsigned Indents) {
+std::string hakc::HAKCSymbolInfo::GetYaml(unsigned Indents) const {
     auto Yaml = GetYamlHeader(Indents);
     llvm::raw_string_ostream sstream(Yaml);
 

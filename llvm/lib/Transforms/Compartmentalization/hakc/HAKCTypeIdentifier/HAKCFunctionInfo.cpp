@@ -38,7 +38,7 @@ namespace llvm::hakc {
         DirectCalls.insert(DirectCall);
     }
 
-    std::string HAKCFunctionInfo::GetYaml(unsigned Indents) {
+    std::string HAKCFunctionInfo::GetYaml(unsigned Indents) const {
         auto Yaml = HAKCSymbolInfo::GetYaml(Indents);
         llvm::raw_string_ostream sstream(Yaml);
 

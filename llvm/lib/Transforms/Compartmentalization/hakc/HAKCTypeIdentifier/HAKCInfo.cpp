@@ -23,8 +23,13 @@ namespace llvm::hakc {
         return Name;
     }
 
-    raw_ostream &operator<<(raw_ostream &os, HAKCInfo &Info) {
-        os << Info.GetYaml(HAKCInfo::IndentSpaces());
+    raw_ostream &HAKCInfo::operator>>(raw_ostream &os) const {
+        os << GetYaml(HAKCInfo::IndentSpaces());
+        return os;
+    }
+
+    raw_ostream &operator<<(raw_ostream &os, const HAKCInfo &HAKCInfo) {
+        HAKCInfo >> os;
         return os;
     }
 
