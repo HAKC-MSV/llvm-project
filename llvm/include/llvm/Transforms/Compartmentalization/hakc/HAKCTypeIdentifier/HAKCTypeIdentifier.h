@@ -1,0 +1,117 @@
+//
+// Created by derrick on 9/8/21.
+//
+
+#ifndef PMC_HAKCTYPEIDENTIFIER_H
+#define PMC_HAKCTYPEIDENTIFIER_H
+
+#include "llvm/IR/Instructions.h"
+#include "llvm/IR/Module.h"
+#include "llvm/IR/DebugInfo.h"
+#include "llvm/IR/DerivedTypes.h"
+#include "llvm/Transforms/Utils/Local.h"
+
+#include "HAKCFunctionInfo.h"
+#include "HAKCGlobalInfo.h"
+
+#include <map>
+#include <set>
+
+using namespace llvm;
+
+namespace llvm::hakc {
+    typedef std::shared_ptr<HAKCFunctionInfo> HAKCFunctionP;
+    typedef std::shared_ptr<HAKCSymbolInfo> HAKCSymbolP;
+    typedef std::shared_ptr<HAKCGlobalInfo> HAKCGlobalP;
+
+    class CommonHAKCAnalysis;
+
+    class HAKCTypeIdentifier {
+    public:
+        explicit HAKCTypeIdentifier(CommonHAKCAnalysis &Analysis);
+
+        void OutputYAML(raw_ostream &out);
+
+        HAKCSymbolP FindSymbol(Value *V, bool SearchUnmapped = false);
+
+        HAKCSymbolP FindYamlSymbol(const HAKCYamlSymbol &YamlSymbol);
+
+        HAKCTypeP FindType(Type *Ty);
+
+        void ProcessDebugInfo();
+
+        Module &GetModule();
+
+        void GetHAKCTypes(SmallVectorImpl<HAKCTypeP> &Results);
+
+    protected:
+        HAKCTypeP HandleType(const DIType *type);
+
+        HAKCTypeP FindType(const DIType *type);
+
+        void AddTypeMapping(const DIType *type, const HAKCTypeP &HAKCType);
+
+        std::string GetTypeName(const DIType *type);
+
+        HAKCGlobalP HandleGlobal(const DIGlobalVariable *DIGV);
+
+        void AddGlobalMapping(const DIGlobalVariable *DIGV, const HAKCGlobalP &HAKCSymbol);
+
+        //        void AddLLVMTypeMapping(const HAKCTypeP &HAKCType, Type *Ty);
+
+        GlobalVariable *FindGlobal(const DIGlobalVariable *DIGV);
+
+        HAKCFunctionP HandleFunction(const DISubprogram *SubProg);
+
+        void AddFunctionMapping(const DISubprogram *SubProg, const HAKCFunctionP &HAKCFunction);
+
+        void FindAllGlobalsUsed(Value *V, std::set<GlobalObject *> &GlobalSet);
+
+        void FindUsesInGlobals();
+
+        void FindUsesInFunctions();
+
+        void FindTypesInFunctions();
+
+        unsigned GetAnonymousID(const DIType *type);
+
+        //        bool LLVMTypeMappingSanityCheck(const DIType *type, Type *Ty);
+
+        //        static std::string ConstructStructName(StructType *StructTy);
+
+        HAKCSymbolP AddUnmappedGlobal(GlobalObject *GlobalObj);
+
+        HAKCFunctionP AddUnmappedFunction(Function *F);
+
+        void AddUsedGlobals(std::set<GlobalObject *> &GlobalObjects,
+                            const HAKCSymbolP &UserSymbol);
+
+        static FunctionType *GetIndirectCallFunctionType(CallInst *CallI);
+
+        HAKCFunctionP FindFunction(Function *F, bool SearchUnmapped = false);
+
+        HAKCGlobalP FindGlobal(GlobalVariable *GV, bool SearchUnmapped = false);
+
+        HAKCTypeP FindCalledFunctionType(FunctionType *FunctionTy);
+
+        HAKCTypeP CreateNoDebugType(Type *Ty);
+
+        void FindIndirectCallSource(CallInst *CallI, std::vector<std::shared_ptr<HAKCIndirectCallSourceLink> > &Path);
+
+        void CreateIndirectCallSourceLink(Value *V, std::vector<std::shared_ptr<HAKCIndirectCallSourceLink> > &Path);
+
+        CommonHAKCAnalysis &AnalysisHelper;
+        DebugInfoFinder DbgInfoFinder;
+        std::map<const DIType *, HAKCTypeP> types;
+        std::map<const DIGlobalVariable *, HAKCGlobalP> globals;
+        std::map<const DISubprogram *, HAKCFunctionP> functions;
+        //        std::map<HAKCTypeP, std::vector<Type *>> LLVMTypeMapping;
+        std::map<const DIType *, unsigned> AnonymousNumberMapping;
+        std::set<HAKCGlobalP> UnmappedGlobals;
+        std::set<HAKCFunctionP> UnmappedFunctions;
+        unsigned CurrentAnonID;
+    };
+} // namespace hakc
+
+
+#endif//PMC_HAKCTYPEIDENTIFIER_H

@@ -1,0 +1,180 @@
+//
+// Created by de29664 on 3/21/23.
+//
+
+#ifndef HAKC_HAKCFUNCTIONANALYSIS_H
+#define HAKC_HAKCFUNCTIONANALYSIS_H
+
+#include "llvm/IR/Dominators.h"
+
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/CommonHAKCAnalysis.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/HAKCPointerManager.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/HAKCModuleAnalysis.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCTransformer.h"
+
+namespace llvm::hakc {
+    class HAKCModuleAnalysis;
+
+    class CommonHAKCAnalysis;
+
+    class HAKCPointerManager;
+
+    /**
+ * @brief This pass does the following:
+ * 1. Find pointers that should be authenticated, add a call to authenticate, and then transform
+ * all instructions that dereference the pointer.  Note, that the *actual* dereference might be
+ * the result of arbitrary number of GEPs, in which case all intermediate GEP computations are cloned
+ * using the authenticated pointer.
+ *
+ * 2. Insert a validity check for all indirect calls, and add a transfer of all pointer arguments to the
+ * target address before the indirect call.  Immediately after the indirect call, the pointer arguments
+ * are transferred back to their original clique.
+ *
+ * 3. Sign global variable pointers passed to functions so that subsequent authentications pass.
+ *
+ * The current policy is to pass along signed pointers to functions, which could then authenticate pointers
+ * which the caller has already authenticated.  This might be redundant, and a source of overhead.
+ */
+    class HAKCFunctionAnalysis {
+    protected:
+        HAKCModuleAnalysis &ModuleAnalysis;
+        HAKCCompartmentalizationPolicy &Policy;
+        HAKCPointerManager PointerManager;
+        bool DebugActive;
+
+        /**
+         * @brief Global variables used as function arguments
+         */
+        std::map<GlobalValue *, std::set<Instruction *> > GlobalArgumentUses;
+
+        /**
+         * @brief Used for ideal placement of authentication checks and cloned instructions
+         */
+        DominatorTree DTree;
+
+        std::set<CallInst *> NonKernelDirectFunctionCallSet;
+
+        std::set<CallInst *> HAKCFunctionCalls;
+
+        Function *CurrentFunction;
+
+        bool SetupHasRun;
+
+        /* All functions used in comparisons and function call arguments should be transfer
+         * functions, so replace direct uses with transfer functions */
+        std::set<Instruction *> directFunctionUsers;
+
+        unsigned CompartmentTransferCount;
+
+        Instruction *
+        addCompartmentTransferCall(Value *operand, const DebugLoc &debugLoc, Instruction *I, ConstantInt *Size);
+
+        bool userInFunction(Value *user);
+
+        BasicBlock *findDominatorUseBlock(Value *ptr, std::set<Instruction *> &users);
+
+        void createAllAuthenticatedPointers();
+
+        void createMissingTransfers();
+
+        void transformPointerDereferences();
+
+        bool argNeedsAuthentication(Use &arg);
+
+        bool phiNodeUsesValue(PHINode *phiNode, Value *target, std::set<PHINode *> &visited);
+
+        void HandleInstruction(Instruction *I);
+
+        Instruction *getUserInst(User *user);
+
+        bool isPHIofGlobalsOnly(Value *ptr, std::set<PHINode *> &nodes);
+
+        void RegisterPointerDereference(Use &use);
+
+        void handleLoad(LoadInst *load);
+
+        void handleComparison(CmpInst *compare);
+
+        void handleCall(CallInst *call);
+
+        void handleStore(StoreInst *store);
+
+        void handleBinaryOperator(BinaryOperator *binOp);
+
+        bool globalShouldBeTransferred(Use &globalValueArg);
+
+        void relocateFunctionSection();
+
+        virtual std::string getHAKCFunctionSectionName();
+
+        void CheckForValidCompartmentTransitionAndUpdateIntraCompartmentCalls();
+
+        HAKCTransformer &getTransformer();
+
+        void AddManagedPointer(Value *HAKCPointer);
+
+        void ReplaceInstructionOperand(Instruction *I, unsigned ArgNo, Value *OldValue, Value *NewValue);
+
+        void ReplaceDirectFunctionUsesWithTransfers();
+
+        void CheckCompareOperandForDirectFunctionUse(CmpInst *CmpI, unsigned OpNo);
+
+        void MaybeAddCompareToDirectUsers(CmpInst *CmpI);
+
+        void UpdateHAKCFunctionParameters();
+
+        void AddInstrumentation(bool RelocateSection);
+
+        void CheckAndReplaceArgument(Value *V, Instruction *I, unsigned ArgNo);
+
+        bool IsCallInIntrinsicSet(CallBase *Call, ArrayRef<Intrinsic::ID> IDs);
+
+        void UpdateHAKCFunctionParameters(CallInst *CallI, HAKCCompartment &TargetCompartment,
+                                          hakc_transfer_def_t &HAKCTransferFunction);
+
+    public:
+        virtual ~HAKCFunctionAnalysis() = default;
+
+        HAKCFunctionAnalysis(Function *F, HAKCModuleAnalysis &ModuleAnalysis, HAKCCompartmentalizationPolicy &Policy);
+
+        bool modifiedFunction();
+
+        void InstrumentCode();
+
+        void setup();
+
+        Value *getDef(Value *, bool);
+
+        Instruction *FindUseInsertionPoint(Value *v, std::set<Instruction *> &users);
+
+        Value *AddDataAuthCheckAtLocation(Value *signed_ptr, Instruction *location);
+
+        Value *AddCodeAuthCheckAtLocation(Value *SignedPtr, Instruction *Location);
+
+        Value *AddSafePointerCreationAtLocation(Value *SignedPtr, Instruction *Location);
+
+        bool isCompartmentalizedFunction();
+
+        Function &getFunction();
+
+        Instruction *CreateMissingTransfer(Instruction *PointerNeedingTransfer);
+
+        virtual Instruction *SignGlobalPointerWithColor(GlobalValue *GlobalVar);
+
+        Instruction *GetFinalAllocaDef(AllocaInst *Alloca);
+
+        bool PointerShouldBeManaged(Use &use);
+
+        bool IsPHIOfGlobalsOnly(Value *V);
+
+        HAKCModuleAnalysis &GetModuleAnalysis();
+
+        bool IsIntrinsicNeedingAuthentication(CallBase *Call);
+
+        bool IsIntrinsicNeedingCloning(CallBase *Call);
+
+        bool IsIntrinsicToSkip(CallBase *Call);
+    };
+} // namespace hakc
+
+#endif//HAKC_HAKCFUNCTIONANALYSIS_H

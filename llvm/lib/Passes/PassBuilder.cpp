@@ -316,18 +316,19 @@
 #include "llvm/Transforms/Vectorize/LoopVectorize.h"
 #include "llvm/Transforms/Vectorize/SLPVectorizer.h"
 #include "llvm/Transforms/Vectorize/VectorCombine.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCPass.h"
 #include <optional>
 
 using namespace llvm;
 
 static const Regex DefaultAliasRegex(
-    "^(default|thinlto-pre-link|thinlto|lto-pre-link|lto)<(O[0123sz])>$");
+  "^(default|thinlto-pre-link|thinlto|lto-pre-link|lto)<(O[0123sz])>$");
 
 namespace llvm {
-cl::opt<bool> PrintPipelinePasses(
+  cl::opt<bool> PrintPipelinePasses(
     "print-pipeline-passes",
     cl::desc("Print a '-passes' compatible string describing the pipeline "
-             "(best-effort only)."));
+      "(best-effort only)."));
 } // namespace llvm
 
 AnalysisKey NoOpModuleAnalysis::Key;
@@ -336,103 +337,104 @@ AnalysisKey NoOpFunctionAnalysis::Key;
 AnalysisKey NoOpLoopAnalysis::Key;
 
 namespace {
+  // Passes for testing crashes.
+  // DO NOT USE THIS EXCEPT FOR TESTING!
+  class TriggerCrashModulePass : public PassInfoMixin<TriggerCrashModulePass> {
+  public:
+    PreservedAnalyses run(Module &, ModuleAnalysisManager &) {
+      abort();
+      return PreservedAnalyses::all();
+    }
 
-// Passes for testing crashes.
-// DO NOT USE THIS EXCEPT FOR TESTING!
-class TriggerCrashModulePass : public PassInfoMixin<TriggerCrashModulePass> {
-public:
-  PreservedAnalyses run(Module &, ModuleAnalysisManager &) {
-    abort();
-    return PreservedAnalyses::all();
-  }
-  static StringRef name() { return "TriggerCrashModulePass"; }
-};
+    static StringRef name() { return "TriggerCrashModulePass"; }
+  };
 
-class TriggerCrashFunctionPass
-    : public PassInfoMixin<TriggerCrashFunctionPass> {
-public:
-  PreservedAnalyses run(Function &, FunctionAnalysisManager &) {
-    abort();
-    return PreservedAnalyses::all();
-  }
-  static StringRef name() { return "TriggerCrashFunctionPass"; }
-};
+  class TriggerCrashFunctionPass
+      : public PassInfoMixin<TriggerCrashFunctionPass> {
+  public:
+    PreservedAnalyses run(Function &, FunctionAnalysisManager &) {
+      abort();
+      return PreservedAnalyses::all();
+    }
 
-// A pass for testing message reporting of -verify-each failures.
-// DO NOT USE THIS EXCEPT FOR TESTING!
-class TriggerVerifierErrorPass
-    : public PassInfoMixin<TriggerVerifierErrorPass> {
-public:
-  PreservedAnalyses run(Module &M, ModuleAnalysisManager &) {
-    // Intentionally break the Module by creating an alias without setting the
-    // aliasee.
-    auto *PtrTy = llvm::PointerType::getUnqual(M.getContext());
-    GlobalAlias::create(PtrTy, PtrTy->getAddressSpace(),
-                        GlobalValue::LinkageTypes::InternalLinkage,
-                        "__bad_alias", nullptr, &M);
-    return PreservedAnalyses::none();
-  }
+    static StringRef name() { return "TriggerCrashFunctionPass"; }
+  };
 
-  PreservedAnalyses run(Function &F, FunctionAnalysisManager &) {
-    // Intentionally break the Function by inserting a terminator
-    // instruction in the middle of a basic block.
-    BasicBlock &BB = F.getEntryBlock();
-    new UnreachableInst(F.getContext(), BB.getTerminator()->getIterator());
-    return PreservedAnalyses::none();
-  }
+  // A pass for testing message reporting of -verify-each failures.
+  // DO NOT USE THIS EXCEPT FOR TESTING!
+  class TriggerVerifierErrorPass
+      : public PassInfoMixin<TriggerVerifierErrorPass> {
+  public:
+    PreservedAnalyses run(Module &M, ModuleAnalysisManager &) {
+      // Intentionally break the Module by creating an alias without setting the
+      // aliasee.
+      auto *PtrTy = llvm::PointerType::getUnqual(M.getContext());
+      GlobalAlias::create(PtrTy, PtrTy->getAddressSpace(),
+                          GlobalValue::LinkageTypes::InternalLinkage,
+                          "__bad_alias", nullptr, &M);
+      return PreservedAnalyses::none();
+    }
 
-  PreservedAnalyses run(MachineFunction &MF, MachineFunctionAnalysisManager &) {
-    // Intentionally create a virtual register and set NoVRegs property.
-    auto &MRI = MF.getRegInfo();
-    MRI.createGenericVirtualRegister(LLT::scalar(8));
-    MF.getProperties().set(MachineFunctionProperties::Property::NoVRegs);
-    return PreservedAnalyses::all();
-  }
+    PreservedAnalyses run(Function &F, FunctionAnalysisManager &) {
+      // Intentionally break the Function by inserting a terminator
+      // instruction in the middle of a basic block.
+      BasicBlock &BB = F.getEntryBlock();
+      new UnreachableInst(F.getContext(), BB.getTerminator()->getIterator());
+      return PreservedAnalyses::none();
+    }
 
-  static StringRef name() { return "TriggerVerifierErrorPass"; }
-};
+    PreservedAnalyses run(MachineFunction &MF, MachineFunctionAnalysisManager &) {
+      // Intentionally create a virtual register and set NoVRegs property.
+      auto &MRI = MF.getRegInfo();
+      MRI.createGenericVirtualRegister(LLT::scalar(8));
+      MF.getProperties().set(MachineFunctionProperties::Property::NoVRegs);
+      return PreservedAnalyses::all();
+    }
 
-// A pass requires all MachineFunctionProperties.
-// DO NOT USE THIS EXCEPT FOR TESTING!
-class RequireAllMachineFunctionPropertiesPass
-    : public PassInfoMixin<RequireAllMachineFunctionPropertiesPass> {
-public:
-  PreservedAnalyses run(MachineFunction &MF, MachineFunctionAnalysisManager &) {
-    MFPropsModifier _(*this, MF);
-    return PreservedAnalyses::none();
-  }
+    static StringRef name() { return "TriggerVerifierErrorPass"; }
+  };
 
-  static MachineFunctionProperties getRequiredProperties() {
-    MachineFunctionProperties MFProps;
-    MFProps.set(MachineFunctionProperties::Property::FailedISel);
-    MFProps.set(MachineFunctionProperties::Property::FailsVerification);
-    MFProps.set(MachineFunctionProperties::Property::IsSSA);
-    MFProps.set(MachineFunctionProperties::Property::Legalized);
-    MFProps.set(MachineFunctionProperties::Property::NoPHIs);
-    MFProps.set(MachineFunctionProperties::Property::NoVRegs);
-    MFProps.set(MachineFunctionProperties::Property::RegBankSelected);
-    MFProps.set(MachineFunctionProperties::Property::Selected);
-    MFProps.set(MachineFunctionProperties::Property::TiedOpsRewritten);
-    MFProps.set(MachineFunctionProperties::Property::TracksDebugUserValues);
-    MFProps.set(MachineFunctionProperties::Property::TracksLiveness);
-    return MFProps;
-  }
-  static StringRef name() { return "RequireAllMachineFunctionPropertiesPass"; }
-};
+  // A pass requires all MachineFunctionProperties.
+  // DO NOT USE THIS EXCEPT FOR TESTING!
+  class RequireAllMachineFunctionPropertiesPass
+      : public PassInfoMixin<RequireAllMachineFunctionPropertiesPass> {
+  public:
+    PreservedAnalyses run(MachineFunction &MF, MachineFunctionAnalysisManager &) {
+      MFPropsModifier _(*this, MF);
+      return PreservedAnalyses::none();
+    }
 
+    static MachineFunctionProperties getRequiredProperties() {
+      MachineFunctionProperties MFProps;
+      MFProps.set(MachineFunctionProperties::Property::FailedISel);
+      MFProps.set(MachineFunctionProperties::Property::FailsVerification);
+      MFProps.set(MachineFunctionProperties::Property::IsSSA);
+      MFProps.set(MachineFunctionProperties::Property::Legalized);
+      MFProps.set(MachineFunctionProperties::Property::NoPHIs);
+      MFProps.set(MachineFunctionProperties::Property::NoVRegs);
+      MFProps.set(MachineFunctionProperties::Property::RegBankSelected);
+      MFProps.set(MachineFunctionProperties::Property::Selected);
+      MFProps.set(MachineFunctionProperties::Property::TiedOpsRewritten);
+      MFProps.set(MachineFunctionProperties::Property::TracksDebugUserValues);
+      MFProps.set(MachineFunctionProperties::Property::TracksLiveness);
+      return MFProps;
+    }
+
+    static StringRef name() { return "RequireAllMachineFunctionPropertiesPass"; }
+  };
 } // namespace
 
 PassBuilder::PassBuilder(TargetMachine *TM, PipelineTuningOptions PTO,
                          std::optional<PGOOptions> PGOOpt,
                          PassInstrumentationCallbacks *PIC)
-    : TM(TM), PTO(PTO), PGOOpt(PGOOpt), PIC(PIC) {
+  : TM(TM), PTO(PTO), PGOOpt(PGOOpt), PIC(PIC) {
   if (TM)
     TM->registerPassBuilderCallbacks(*this);
   if (PIC) {
     PIC->registerClassToPassNameCallback([this, PIC]() {
       // MSVC requires this to be captured if it's used inside decltype.
       // Other compilers consider it an unused lambda capture.
-      (void)this;
+      (void) this;
 #define MODULE_PASS(NAME, CREATE_PASS)                                         \
   PIC->addClassToPassName(decltype(CREATE_PASS)::name(), NAME);
 #define MODULE_PASS_WITH_PARAMS(NAME, CLASS, CREATE_PASS, PARSER, PARAMS)      \
@@ -475,7 +477,7 @@ void PassBuilder::registerModuleAnalyses(ModuleAnalysisManager &MAM) {
   MAM.registerPass([&] { return CREATE_PASS; });
 #include "PassRegistry.def"
 
-  for (auto &C : ModuleAnalysisRegistrationCallbacks)
+  for (auto &C: ModuleAnalysisRegistrationCallbacks)
     C(MAM);
 }
 
@@ -484,7 +486,7 @@ void PassBuilder::registerCGSCCAnalyses(CGSCCAnalysisManager &CGAM) {
   CGAM.registerPass([&] { return CREATE_PASS; });
 #include "PassRegistry.def"
 
-  for (auto &C : CGSCCAnalysisRegistrationCallbacks)
+  for (auto &C: CGSCCAnalysisRegistrationCallbacks)
     C(CGAM);
 }
 
@@ -498,18 +500,17 @@ void PassBuilder::registerFunctionAnalyses(FunctionAnalysisManager &FAM) {
   FAM.registerPass([&] { return CREATE_PASS; });
 #include "PassRegistry.def"
 
-  for (auto &C : FunctionAnalysisRegistrationCallbacks)
+  for (auto &C: FunctionAnalysisRegistrationCallbacks)
     C(FAM);
 }
 
 void PassBuilder::registerMachineFunctionAnalyses(
-    MachineFunctionAnalysisManager &MFAM) {
-
+  MachineFunctionAnalysisManager &MFAM) {
 #define MACHINE_FUNCTION_ANALYSIS(NAME, CREATE_PASS)                           \
   MFAM.registerPass([&] { return CREATE_PASS; });
 #include "llvm/Passes/MachinePassRegistry.def"
 
-  for (auto &C : MachineFunctionAnalysisRegistrationCallbacks)
+  for (auto &C: MachineFunctionAnalysisRegistrationCallbacks)
     C(MFAM);
 }
 
@@ -518,11 +519,11 @@ void PassBuilder::registerLoopAnalyses(LoopAnalysisManager &LAM) {
   LAM.registerPass([&] { return CREATE_PASS; });
 #include "PassRegistry.def"
 
-  for (auto &C : LoopAnalysisRegistrationCallbacks)
+  for (auto &C: LoopAnalysisRegistrationCallbacks)
     C(LAM);
 }
 
-static std::optional<std::pair<bool, bool>>
+static std::optional<std::pair<bool, bool> >
 parseFunctionPipelineName(StringRef Name) {
   std::pair<bool, bool> Params;
   if (!Name.consume_front("function"))
@@ -554,7 +555,7 @@ static std::optional<int> parseDevirtPassName(StringRef Name) {
 }
 
 static std::optional<OptimizationLevel> parseOptLevel(StringRef S) {
-  return StringSwitch<std::optional<OptimizationLevel>>(S)
+  return StringSwitch<std::optional<OptimizationLevel> >(S)
       .Case("O0", OptimizationLevel::O0)
       .Case("O1", OptimizationLevel::O1)
       .Case("O2", OptimizationLevel::O2)
@@ -576,637 +577,635 @@ Expected<bool> PassBuilder::parseSinglePassOption(StringRef Params,
       Result = true;
     } else {
       return make_error<StringError>(
-          formatv("invalid {1} pass parameter '{0}' ", ParamName, PassName)
-              .str(),
-          inconvertibleErrorCode());
+        formatv("invalid {1} pass parameter '{0}' ", ParamName, PassName)
+        .str(),
+        inconvertibleErrorCode());
     }
   }
   return Result;
 }
 
 namespace {
+  /// Parser of parameters for HardwareLoops  pass.
+  Expected<HardwareLoopOptions> parseHardwareLoopOptions(StringRef Params) {
+    HardwareLoopOptions HardwareLoopOpts;
 
-/// Parser of parameters for HardwareLoops  pass.
-Expected<HardwareLoopOptions> parseHardwareLoopOptions(StringRef Params) {
-  HardwareLoopOptions HardwareLoopOpts;
-
-  while (!Params.empty()) {
-    StringRef ParamName;
-    std::tie(ParamName, Params) = Params.split(';');
-    if (ParamName.consume_front("hardware-loop-decrement=")) {
-      int Count;
-      if (ParamName.getAsInteger(0, Count))
-        return make_error<StringError>(
+    while (!Params.empty()) {
+      StringRef ParamName;
+      std::tie(ParamName, Params) = Params.split(';');
+      if (ParamName.consume_front("hardware-loop-decrement=")) {
+        int Count;
+        if (ParamName.getAsInteger(0, Count))
+          return make_error<StringError>(
             formatv("invalid HardwareLoopPass parameter '{0}' ", ParamName).str(),
             inconvertibleErrorCode());
-      HardwareLoopOpts.setDecrement(Count);
-      continue;
-    }
-    if (ParamName.consume_front("hardware-loop-counter-bitwidth=")) {
-      int Count;
-      if (ParamName.getAsInteger(0, Count))
-        return make_error<StringError>(
+        HardwareLoopOpts.setDecrement(Count);
+        continue;
+      }
+      if (ParamName.consume_front("hardware-loop-counter-bitwidth=")) {
+        int Count;
+        if (ParamName.getAsInteger(0, Count))
+          return make_error<StringError>(
             formatv("invalid HardwareLoopPass parameter '{0}' ", ParamName).str(),
             inconvertibleErrorCode());
-      HardwareLoopOpts.setCounterBitwidth(Count);
-      continue;
-    }
-    if (ParamName == "force-hardware-loops") {
-      HardwareLoopOpts.setForce(true);
-    } else if (ParamName == "force-hardware-loop-phi") {
-      HardwareLoopOpts.setForcePhi(true);
-    } else if (ParamName == "force-nested-hardware-loop") {
-      HardwareLoopOpts.setForceNested(true);
-    } else if (ParamName == "force-hardware-loop-guard") {
-      HardwareLoopOpts.setForceGuard(true);
-    } else {
-      return make_error<StringError>(
+        HardwareLoopOpts.setCounterBitwidth(Count);
+        continue;
+      }
+      if (ParamName == "force-hardware-loops") {
+        HardwareLoopOpts.setForce(true);
+      } else if (ParamName == "force-hardware-loop-phi") {
+        HardwareLoopOpts.setForcePhi(true);
+      } else if (ParamName == "force-nested-hardware-loop") {
+        HardwareLoopOpts.setForceNested(true);
+      } else if (ParamName == "force-hardware-loop-guard") {
+        HardwareLoopOpts.setForceGuard(true);
+      } else {
+        return make_error<StringError>(
           formatv("invalid HardwarePass parameter '{0}' ", ParamName).str(),
           inconvertibleErrorCode());
+      }
     }
+    return HardwareLoopOpts;
   }
-  return HardwareLoopOpts;
-}
 
-/// Parser of parameters for LoopUnroll pass.
-Expected<LoopUnrollOptions> parseLoopUnrollOptions(StringRef Params) {
-  LoopUnrollOptions UnrollOpts;
-  while (!Params.empty()) {
-    StringRef ParamName;
-    std::tie(ParamName, Params) = Params.split(';');
-    std::optional<OptimizationLevel> OptLevel = parseOptLevel(ParamName);
-    // Don't accept -Os/-Oz.
-    if (OptLevel && !OptLevel->isOptimizingForSize()) {
-      UnrollOpts.setOptLevel(OptLevel->getSpeedupLevel());
-      continue;
-    }
-    if (ParamName.consume_front("full-unroll-max=")) {
-      int Count;
-      if (ParamName.getAsInteger(0, Count))
-        return make_error<StringError>(
+  /// Parser of parameters for LoopUnroll pass.
+  Expected<LoopUnrollOptions> parseLoopUnrollOptions(StringRef Params) {
+    LoopUnrollOptions UnrollOpts;
+    while (!Params.empty()) {
+      StringRef ParamName;
+      std::tie(ParamName, Params) = Params.split(';');
+      std::optional<OptimizationLevel> OptLevel = parseOptLevel(ParamName);
+      // Don't accept -Os/-Oz.
+      if (OptLevel && !OptLevel->isOptimizingForSize()) {
+        UnrollOpts.setOptLevel(OptLevel->getSpeedupLevel());
+        continue;
+      }
+      if (ParamName.consume_front("full-unroll-max=")) {
+        int Count;
+        if (ParamName.getAsInteger(0, Count))
+          return make_error<StringError>(
             formatv("invalid LoopUnrollPass parameter '{0}' ", ParamName).str(),
             inconvertibleErrorCode());
-      UnrollOpts.setFullUnrollMaxCount(Count);
-      continue;
-    }
+        UnrollOpts.setFullUnrollMaxCount(Count);
+        continue;
+      }
 
-    bool Enable = !ParamName.consume_front("no-");
-    if (ParamName == "partial") {
-      UnrollOpts.setPartial(Enable);
-    } else if (ParamName == "peeling") {
-      UnrollOpts.setPeeling(Enable);
-    } else if (ParamName == "profile-peeling") {
-      UnrollOpts.setProfileBasedPeeling(Enable);
-    } else if (ParamName == "runtime") {
-      UnrollOpts.setRuntime(Enable);
-    } else if (ParamName == "upperbound") {
-      UnrollOpts.setUpperBound(Enable);
-    } else {
-      return make_error<StringError>(
+      bool Enable = !ParamName.consume_front("no-");
+      if (ParamName == "partial") {
+        UnrollOpts.setPartial(Enable);
+      } else if (ParamName == "peeling") {
+        UnrollOpts.setPeeling(Enable);
+      } else if (ParamName == "profile-peeling") {
+        UnrollOpts.setProfileBasedPeeling(Enable);
+      } else if (ParamName == "runtime") {
+        UnrollOpts.setRuntime(Enable);
+      } else if (ParamName == "upperbound") {
+        UnrollOpts.setUpperBound(Enable);
+      } else {
+        return make_error<StringError>(
           formatv("invalid LoopUnrollPass parameter '{0}' ", ParamName).str(),
           inconvertibleErrorCode());
+      }
     }
+    return UnrollOpts;
   }
-  return UnrollOpts;
-}
 
-Expected<bool> parseGlobalDCEPassOptions(StringRef Params) {
-  return PassBuilder::parseSinglePassOption(
+  Expected<bool> parseGlobalDCEPassOptions(StringRef Params) {
+    return PassBuilder::parseSinglePassOption(
       Params, "vfe-linkage-unit-visibility", "GlobalDCE");
-}
+  }
 
-Expected<bool> parseCGProfilePassOptions(StringRef Params) {
-  return PassBuilder::parseSinglePassOption(Params, "in-lto-post-link",
-                                            "CGProfile");
-}
+  Expected<bool> parseCGProfilePassOptions(StringRef Params) {
+    return PassBuilder::parseSinglePassOption(Params, "in-lto-post-link",
+                                              "CGProfile");
+  }
 
-Expected<bool> parseInlinerPassOptions(StringRef Params) {
-  return PassBuilder::parseSinglePassOption(Params, "only-mandatory",
-                                            "InlinerPass");
-}
+  Expected<bool> parseInlinerPassOptions(StringRef Params) {
+    return PassBuilder::parseSinglePassOption(Params, "only-mandatory",
+                                              "InlinerPass");
+  }
 
-Expected<bool> parseCoroSplitPassOptions(StringRef Params) {
-  return PassBuilder::parseSinglePassOption(Params, "reuse-storage",
-                                            "CoroSplitPass");
-}
+  Expected<bool> parseCoroSplitPassOptions(StringRef Params) {
+    return PassBuilder::parseSinglePassOption(Params, "reuse-storage",
+                                              "CoroSplitPass");
+  }
 
-Expected<bool> parsePostOrderFunctionAttrsPassOptions(StringRef Params) {
-  return PassBuilder::parseSinglePassOption(
+  Expected<bool> parsePostOrderFunctionAttrsPassOptions(StringRef Params) {
+    return PassBuilder::parseSinglePassOption(
       Params, "skip-non-recursive-function-attrs", "PostOrderFunctionAttrs");
-}
+  }
 
-Expected<CFGuardPass::Mechanism> parseCFGuardPassOptions(StringRef Params) {
-  if (Params.empty())
-    return CFGuardPass::Mechanism::Check;
+  Expected<CFGuardPass::Mechanism> parseCFGuardPassOptions(StringRef Params) {
+    if (Params.empty())
+      return CFGuardPass::Mechanism::Check;
 
-  auto [Param, RHS] = Params.split(';');
-  if (!RHS.empty())
-    return make_error<StringError>(
+    auto [Param, RHS] = Params.split(';');
+    if (!RHS.empty())
+      return make_error<StringError>(
         formatv("too many CFGuardPass parameters '{0}' ", Params).str(),
         inconvertibleErrorCode());
 
-  if (Param == "check")
-    return CFGuardPass::Mechanism::Check;
-  if (Param == "dispatch")
-    return CFGuardPass::Mechanism::Dispatch;
+    if (Param == "check")
+      return CFGuardPass::Mechanism::Check;
+    if (Param == "dispatch")
+      return CFGuardPass::Mechanism::Dispatch;
 
-  return make_error<StringError>(
+    return make_error<StringError>(
       formatv("invalid CFGuardPass mechanism: '{0}' ", Param).str(),
       inconvertibleErrorCode());
-}
-
-Expected<bool> parseEarlyCSEPassOptions(StringRef Params) {
-  return PassBuilder::parseSinglePassOption(Params, "memssa", "EarlyCSE");
-}
-
-Expected<bool> parseEntryExitInstrumenterPassOptions(StringRef Params) {
-  return PassBuilder::parseSinglePassOption(Params, "post-inline",
-                                            "EntryExitInstrumenter");
-}
-
-Expected<bool> parseLoopExtractorPassOptions(StringRef Params) {
-  return PassBuilder::parseSinglePassOption(Params, "single", "LoopExtractor");
-}
-
-Expected<bool> parseLowerMatrixIntrinsicsPassOptions(StringRef Params) {
-  return PassBuilder::parseSinglePassOption(Params, "minimal",
-                                            "LowerMatrixIntrinsics");
-}
-
-Expected<AddressSanitizerOptions> parseASanPassOptions(StringRef Params) {
-  AddressSanitizerOptions Result;
-  while (!Params.empty()) {
-    StringRef ParamName;
-    std::tie(ParamName, Params) = Params.split(';');
-
-    if (ParamName == "kernel") {
-      Result.CompileKernel = true;
-    } else {
-      return make_error<StringError>(
-          formatv("invalid AddressSanitizer pass parameter '{0}' ", ParamName)
-              .str(),
-          inconvertibleErrorCode());
-    }
   }
-  return Result;
-}
 
-Expected<HWAddressSanitizerOptions> parseHWASanPassOptions(StringRef Params) {
-  HWAddressSanitizerOptions Result;
-  while (!Params.empty()) {
-    StringRef ParamName;
-    std::tie(ParamName, Params) = Params.split(';');
-
-    if (ParamName == "recover") {
-      Result.Recover = true;
-    } else if (ParamName == "kernel") {
-      Result.CompileKernel = true;
-    } else {
-      return make_error<StringError>(
-          formatv("invalid HWAddressSanitizer pass parameter '{0}' ", ParamName)
-              .str(),
-          inconvertibleErrorCode());
-    }
+  Expected<bool> parseEarlyCSEPassOptions(StringRef Params) {
+    return PassBuilder::parseSinglePassOption(Params, "memssa", "EarlyCSE");
   }
-  return Result;
-}
 
-Expected<EmbedBitcodeOptions> parseEmbedBitcodePassOptions(StringRef Params) {
-  EmbedBitcodeOptions Result;
-  while (!Params.empty()) {
-    StringRef ParamName;
-    std::tie(ParamName, Params) = Params.split(';');
-
-    if (ParamName == "thinlto") {
-      Result.IsThinLTO = true;
-    } else if (ParamName == "emit-summary") {
-      Result.EmitLTOSummary = true;
-    } else {
-      return make_error<StringError>(
-          formatv("invalid EmbedBitcode pass parameter '{0}' ", ParamName)
-              .str(),
-          inconvertibleErrorCode());
-    }
+  Expected<bool> parseEntryExitInstrumenterPassOptions(StringRef Params) {
+    return PassBuilder::parseSinglePassOption(Params, "post-inline",
+                                              "EntryExitInstrumenter");
   }
-  return Result;
-}
 
-Expected<MemorySanitizerOptions> parseMSanPassOptions(StringRef Params) {
-  MemorySanitizerOptions Result;
-  while (!Params.empty()) {
-    StringRef ParamName;
-    std::tie(ParamName, Params) = Params.split(';');
+  Expected<bool> parseLoopExtractorPassOptions(StringRef Params) {
+    return PassBuilder::parseSinglePassOption(Params, "single", "LoopExtractor");
+  }
 
-    if (ParamName == "recover") {
-      Result.Recover = true;
-    } else if (ParamName == "kernel") {
-      Result.Kernel = true;
-    } else if (ParamName.consume_front("track-origins=")) {
-      if (ParamName.getAsInteger(0, Result.TrackOrigins))
+  Expected<bool> parseLowerMatrixIntrinsicsPassOptions(StringRef Params) {
+    return PassBuilder::parseSinglePassOption(Params, "minimal",
+                                              "LowerMatrixIntrinsics");
+  }
+
+  Expected<AddressSanitizerOptions> parseASanPassOptions(StringRef Params) {
+    AddressSanitizerOptions Result;
+    while (!Params.empty()) {
+      StringRef ParamName;
+      std::tie(ParamName, Params) = Params.split(';');
+
+      if (ParamName == "kernel") {
+        Result.CompileKernel = true;
+      } else {
         return make_error<StringError>(
+          formatv("invalid AddressSanitizer pass parameter '{0}' ", ParamName)
+          .str(),
+          inconvertibleErrorCode());
+      }
+    }
+    return Result;
+  }
+
+  Expected<HWAddressSanitizerOptions> parseHWASanPassOptions(StringRef Params) {
+    HWAddressSanitizerOptions Result;
+    while (!Params.empty()) {
+      StringRef ParamName;
+      std::tie(ParamName, Params) = Params.split(';');
+
+      if (ParamName == "recover") {
+        Result.Recover = true;
+      } else if (ParamName == "kernel") {
+        Result.CompileKernel = true;
+      } else {
+        return make_error<StringError>(
+          formatv("invalid HWAddressSanitizer pass parameter '{0}' ", ParamName)
+          .str(),
+          inconvertibleErrorCode());
+      }
+    }
+    return Result;
+  }
+
+  Expected<EmbedBitcodeOptions> parseEmbedBitcodePassOptions(StringRef Params) {
+    EmbedBitcodeOptions Result;
+    while (!Params.empty()) {
+      StringRef ParamName;
+      std::tie(ParamName, Params) = Params.split(';');
+
+      if (ParamName == "thinlto") {
+        Result.IsThinLTO = true;
+      } else if (ParamName == "emit-summary") {
+        Result.EmitLTOSummary = true;
+      } else {
+        return make_error<StringError>(
+          formatv("invalid EmbedBitcode pass parameter '{0}' ", ParamName)
+          .str(),
+          inconvertibleErrorCode());
+      }
+    }
+    return Result;
+  }
+
+  Expected<MemorySanitizerOptions> parseMSanPassOptions(StringRef Params) {
+    MemorySanitizerOptions Result;
+    while (!Params.empty()) {
+      StringRef ParamName;
+      std::tie(ParamName, Params) = Params.split(';');
+
+      if (ParamName == "recover") {
+        Result.Recover = true;
+      } else if (ParamName == "kernel") {
+        Result.Kernel = true;
+      } else if (ParamName.consume_front("track-origins=")) {
+        if (ParamName.getAsInteger(0, Result.TrackOrigins))
+          return make_error<StringError>(
             formatv("invalid argument to MemorySanitizer pass track-origins "
                     "parameter: '{0}' ",
                     ParamName)
-                .str(),
+            .str(),
             inconvertibleErrorCode());
-    } else if (ParamName == "eager-checks") {
-      Result.EagerChecks = true;
-    } else {
-      return make_error<StringError>(
-          formatv("invalid MemorySanitizer pass parameter '{0}' ", ParamName)
-              .str(),
-          inconvertibleErrorCode());
-    }
-  }
-  return Result;
-}
-
-/// Parser of parameters for SimplifyCFG pass.
-Expected<SimplifyCFGOptions> parseSimplifyCFGOptions(StringRef Params) {
-  SimplifyCFGOptions Result;
-  while (!Params.empty()) {
-    StringRef ParamName;
-    std::tie(ParamName, Params) = Params.split(';');
-
-    bool Enable = !ParamName.consume_front("no-");
-    if (ParamName == "speculate-blocks") {
-      Result.speculateBlocks(Enable);
-    } else if (ParamName == "simplify-cond-branch") {
-      Result.setSimplifyCondBranch(Enable);
-    } else if (ParamName == "forward-switch-cond") {
-      Result.forwardSwitchCondToPhi(Enable);
-    } else if (ParamName == "switch-range-to-icmp") {
-      Result.convertSwitchRangeToICmp(Enable);
-    } else if (ParamName == "switch-to-lookup") {
-      Result.convertSwitchToLookupTable(Enable);
-    } else if (ParamName == "keep-loops") {
-      Result.needCanonicalLoops(Enable);
-    } else if (ParamName == "hoist-common-insts") {
-      Result.hoistCommonInsts(Enable);
-    } else if (ParamName == "sink-common-insts") {
-      Result.sinkCommonInsts(Enable);
-    } else if (ParamName == "speculate-unpredictables") {
-      Result.speculateUnpredictables(Enable);
-    } else if (Enable && ParamName.consume_front("bonus-inst-threshold=")) {
-      APInt BonusInstThreshold;
-      if (ParamName.getAsInteger(0, BonusInstThreshold))
+      } else if (ParamName == "eager-checks") {
+        Result.EagerChecks = true;
+      } else {
         return make_error<StringError>(
+          formatv("invalid MemorySanitizer pass parameter '{0}' ", ParamName)
+          .str(),
+          inconvertibleErrorCode());
+      }
+    }
+    return Result;
+  }
+
+  /// Parser of parameters for SimplifyCFG pass.
+  Expected<SimplifyCFGOptions> parseSimplifyCFGOptions(StringRef Params) {
+    SimplifyCFGOptions Result;
+    while (!Params.empty()) {
+      StringRef ParamName;
+      std::tie(ParamName, Params) = Params.split(';');
+
+      bool Enable = !ParamName.consume_front("no-");
+      if (ParamName == "speculate-blocks") {
+        Result.speculateBlocks(Enable);
+      } else if (ParamName == "simplify-cond-branch") {
+        Result.setSimplifyCondBranch(Enable);
+      } else if (ParamName == "forward-switch-cond") {
+        Result.forwardSwitchCondToPhi(Enable);
+      } else if (ParamName == "switch-range-to-icmp") {
+        Result.convertSwitchRangeToICmp(Enable);
+      } else if (ParamName == "switch-to-lookup") {
+        Result.convertSwitchToLookupTable(Enable);
+      } else if (ParamName == "keep-loops") {
+        Result.needCanonicalLoops(Enable);
+      } else if (ParamName == "hoist-common-insts") {
+        Result.hoistCommonInsts(Enable);
+      } else if (ParamName == "sink-common-insts") {
+        Result.sinkCommonInsts(Enable);
+      } else if (ParamName == "speculate-unpredictables") {
+        Result.speculateUnpredictables(Enable);
+      } else if (Enable && ParamName.consume_front("bonus-inst-threshold=")) {
+        APInt BonusInstThreshold;
+        if (ParamName.getAsInteger(0, BonusInstThreshold))
+          return make_error<StringError>(
             formatv("invalid argument to SimplifyCFG pass bonus-threshold "
                     "parameter: '{0}' ",
                     ParamName).str(),
             inconvertibleErrorCode());
-      Result.bonusInstThreshold(BonusInstThreshold.getSExtValue());
-    } else {
-      return make_error<StringError>(
+        Result.bonusInstThreshold(BonusInstThreshold.getSExtValue());
+      } else {
+        return make_error<StringError>(
           formatv("invalid SimplifyCFG pass parameter '{0}' ", ParamName).str(),
           inconvertibleErrorCode());
+      }
     }
+    return Result;
   }
-  return Result;
-}
 
-Expected<InstCombineOptions> parseInstCombineOptions(StringRef Params) {
-  InstCombineOptions Result;
-  // When specifying "instcombine" in -passes enable fix-point verification by
-  // default, as this is what most tests should use.
-  Result.setVerifyFixpoint(true);
-  while (!Params.empty()) {
-    StringRef ParamName;
-    std::tie(ParamName, Params) = Params.split(';');
+  Expected<InstCombineOptions> parseInstCombineOptions(StringRef Params) {
+    InstCombineOptions Result;
+    // When specifying "instcombine" in -passes enable fix-point verification by
+    // default, as this is what most tests should use.
+    Result.setVerifyFixpoint(true);
+    while (!Params.empty()) {
+      StringRef ParamName;
+      std::tie(ParamName, Params) = Params.split(';');
 
-    bool Enable = !ParamName.consume_front("no-");
-    if (ParamName == "use-loop-info") {
-      Result.setUseLoopInfo(Enable);
-    } else if (ParamName == "verify-fixpoint") {
-      Result.setVerifyFixpoint(Enable);
-    } else if (Enable && ParamName.consume_front("max-iterations=")) {
-      APInt MaxIterations;
-      if (ParamName.getAsInteger(0, MaxIterations))
-        return make_error<StringError>(
+      bool Enable = !ParamName.consume_front("no-");
+      if (ParamName == "use-loop-info") {
+        Result.setUseLoopInfo(Enable);
+      } else if (ParamName == "verify-fixpoint") {
+        Result.setVerifyFixpoint(Enable);
+      } else if (Enable && ParamName.consume_front("max-iterations=")) {
+        APInt MaxIterations;
+        if (ParamName.getAsInteger(0, MaxIterations))
+          return make_error<StringError>(
             formatv("invalid argument to InstCombine pass max-iterations "
                     "parameter: '{0}' ",
                     ParamName).str(),
             inconvertibleErrorCode());
-      Result.setMaxIterations((unsigned)MaxIterations.getZExtValue());
-    } else {
-      return make_error<StringError>(
+        Result.setMaxIterations((unsigned) MaxIterations.getZExtValue());
+      } else {
+        return make_error<StringError>(
           formatv("invalid InstCombine pass parameter '{0}' ", ParamName).str(),
           inconvertibleErrorCode());
+      }
     }
+    return Result;
   }
-  return Result;
-}
 
-/// Parser of parameters for LoopVectorize pass.
-Expected<LoopVectorizeOptions> parseLoopVectorizeOptions(StringRef Params) {
-  LoopVectorizeOptions Opts;
-  while (!Params.empty()) {
-    StringRef ParamName;
-    std::tie(ParamName, Params) = Params.split(';');
+  /// Parser of parameters for LoopVectorize pass.
+  Expected<LoopVectorizeOptions> parseLoopVectorizeOptions(StringRef Params) {
+    LoopVectorizeOptions Opts;
+    while (!Params.empty()) {
+      StringRef ParamName;
+      std::tie(ParamName, Params) = Params.split(';');
 
-    bool Enable = !ParamName.consume_front("no-");
-    if (ParamName == "interleave-forced-only") {
-      Opts.setInterleaveOnlyWhenForced(Enable);
-    } else if (ParamName == "vectorize-forced-only") {
-      Opts.setVectorizeOnlyWhenForced(Enable);
-    } else {
-      return make_error<StringError>(
+      bool Enable = !ParamName.consume_front("no-");
+      if (ParamName == "interleave-forced-only") {
+        Opts.setInterleaveOnlyWhenForced(Enable);
+      } else if (ParamName == "vectorize-forced-only") {
+        Opts.setVectorizeOnlyWhenForced(Enable);
+      } else {
+        return make_error<StringError>(
           formatv("invalid LoopVectorize parameter '{0}' ", ParamName).str(),
           inconvertibleErrorCode());
+      }
     }
+    return Opts;
   }
-  return Opts;
-}
 
-Expected<std::pair<bool, bool>> parseLoopUnswitchOptions(StringRef Params) {
-  std::pair<bool, bool> Result = {false, true};
-  while (!Params.empty()) {
-    StringRef ParamName;
-    std::tie(ParamName, Params) = Params.split(';');
+  Expected<std::pair<bool, bool> > parseLoopUnswitchOptions(StringRef Params) {
+    std::pair<bool, bool> Result = {false, true};
+    while (!Params.empty()) {
+      StringRef ParamName;
+      std::tie(ParamName, Params) = Params.split(';');
 
-    bool Enable = !ParamName.consume_front("no-");
-    if (ParamName == "nontrivial") {
-      Result.first = Enable;
-    } else if (ParamName == "trivial") {
-      Result.second = Enable;
-    } else {
-      return make_error<StringError>(
+      bool Enable = !ParamName.consume_front("no-");
+      if (ParamName == "nontrivial") {
+        Result.first = Enable;
+      } else if (ParamName == "trivial") {
+        Result.second = Enable;
+      } else {
+        return make_error<StringError>(
           formatv("invalid LoopUnswitch pass parameter '{0}' ", ParamName)
-              .str(),
+          .str(),
           inconvertibleErrorCode());
+      }
     }
+    return Result;
   }
-  return Result;
-}
 
-Expected<LICMOptions> parseLICMOptions(StringRef Params) {
-  LICMOptions Result;
-  while (!Params.empty()) {
-    StringRef ParamName;
-    std::tie(ParamName, Params) = Params.split(';');
+  Expected<LICMOptions> parseLICMOptions(StringRef Params) {
+    LICMOptions Result;
+    while (!Params.empty()) {
+      StringRef ParamName;
+      std::tie(ParamName, Params) = Params.split(';');
 
-    bool Enable = !ParamName.consume_front("no-");
-    if (ParamName == "allowspeculation") {
-      Result.AllowSpeculation = Enable;
-    } else {
-      return make_error<StringError>(
+      bool Enable = !ParamName.consume_front("no-");
+      if (ParamName == "allowspeculation") {
+        Result.AllowSpeculation = Enable;
+      } else {
+        return make_error<StringError>(
           formatv("invalid LICM pass parameter '{0}' ", ParamName).str(),
           inconvertibleErrorCode());
+      }
     }
+    return Result;
   }
-  return Result;
-}
 
-Expected<std::pair<bool, bool>> parseLoopRotateOptions(StringRef Params) {
-  std::pair<bool, bool> Result = {true, false};
-  while (!Params.empty()) {
-    StringRef ParamName;
-    std::tie(ParamName, Params) = Params.split(';');
+  Expected<std::pair<bool, bool> > parseLoopRotateOptions(StringRef Params) {
+    std::pair<bool, bool> Result = {true, false};
+    while (!Params.empty()) {
+      StringRef ParamName;
+      std::tie(ParamName, Params) = Params.split(';');
 
-    bool Enable = !ParamName.consume_front("no-");
-    if (ParamName == "header-duplication") {
-      Result.first = Enable;
-    } else if (ParamName == "prepare-for-lto") {
-      Result.second = Enable;
-    } else {
-      return make_error<StringError>(
+      bool Enable = !ParamName.consume_front("no-");
+      if (ParamName == "header-duplication") {
+        Result.first = Enable;
+      } else if (ParamName == "prepare-for-lto") {
+        Result.second = Enable;
+      } else {
+        return make_error<StringError>(
           formatv("invalid LoopRotate pass parameter '{0}' ", ParamName).str(),
           inconvertibleErrorCode());
+      }
     }
+    return Result;
   }
-  return Result;
-}
 
-Expected<bool> parseMergedLoadStoreMotionOptions(StringRef Params) {
-  bool Result = false;
-  while (!Params.empty()) {
-    StringRef ParamName;
-    std::tie(ParamName, Params) = Params.split(';');
+  Expected<bool> parseMergedLoadStoreMotionOptions(StringRef Params) {
+    bool Result = false;
+    while (!Params.empty()) {
+      StringRef ParamName;
+      std::tie(ParamName, Params) = Params.split(';');
 
-    bool Enable = !ParamName.consume_front("no-");
-    if (ParamName == "split-footer-bb") {
-      Result = Enable;
-    } else {
-      return make_error<StringError>(
+      bool Enable = !ParamName.consume_front("no-");
+      if (ParamName == "split-footer-bb") {
+        Result = Enable;
+      } else {
+        return make_error<StringError>(
           formatv("invalid MergedLoadStoreMotion pass parameter '{0}' ",
                   ParamName)
-              .str(),
+          .str(),
           inconvertibleErrorCode());
+      }
     }
+    return Result;
   }
-  return Result;
-}
 
-Expected<GVNOptions> parseGVNOptions(StringRef Params) {
-  GVNOptions Result;
-  while (!Params.empty()) {
-    StringRef ParamName;
-    std::tie(ParamName, Params) = Params.split(';');
+  Expected<GVNOptions> parseGVNOptions(StringRef Params) {
+    GVNOptions Result;
+    while (!Params.empty()) {
+      StringRef ParamName;
+      std::tie(ParamName, Params) = Params.split(';');
 
-    bool Enable = !ParamName.consume_front("no-");
-    if (ParamName == "pre") {
-      Result.setPRE(Enable);
-    } else if (ParamName == "load-pre") {
-      Result.setLoadPRE(Enable);
-    } else if (ParamName == "split-backedge-load-pre") {
-      Result.setLoadPRESplitBackedge(Enable);
-    } else if (ParamName == "memdep") {
-      Result.setMemDep(Enable);
-    } else {
-      return make_error<StringError>(
+      bool Enable = !ParamName.consume_front("no-");
+      if (ParamName == "pre") {
+        Result.setPRE(Enable);
+      } else if (ParamName == "load-pre") {
+        Result.setLoadPRE(Enable);
+      } else if (ParamName == "split-backedge-load-pre") {
+        Result.setLoadPRESplitBackedge(Enable);
+      } else if (ParamName == "memdep") {
+        Result.setMemDep(Enable);
+      } else {
+        return make_error<StringError>(
           formatv("invalid GVN pass parameter '{0}' ", ParamName).str(),
           inconvertibleErrorCode());
+      }
     }
+    return Result;
   }
-  return Result;
-}
 
-Expected<IPSCCPOptions> parseIPSCCPOptions(StringRef Params) {
-  IPSCCPOptions Result;
-  while (!Params.empty()) {
-    StringRef ParamName;
-    std::tie(ParamName, Params) = Params.split(';');
+  Expected<IPSCCPOptions> parseIPSCCPOptions(StringRef Params) {
+    IPSCCPOptions Result;
+    while (!Params.empty()) {
+      StringRef ParamName;
+      std::tie(ParamName, Params) = Params.split(';');
 
-    bool Enable = !ParamName.consume_front("no-");
-    if (ParamName == "func-spec")
-      Result.setFuncSpec(Enable);
-    else
-      return make_error<StringError>(
+      bool Enable = !ParamName.consume_front("no-");
+      if (ParamName == "func-spec")
+        Result.setFuncSpec(Enable);
+      else
+        return make_error<StringError>(
           formatv("invalid IPSCCP pass parameter '{0}' ", ParamName).str(),
           inconvertibleErrorCode());
+    }
+    return Result;
   }
-  return Result;
-}
 
-Expected<SROAOptions> parseSROAOptions(StringRef Params) {
-  if (Params.empty() || Params == "modify-cfg")
-    return SROAOptions::ModifyCFG;
-  if (Params == "preserve-cfg")
-    return SROAOptions::PreserveCFG;
-  return make_error<StringError>(
+  Expected<SROAOptions> parseSROAOptions(StringRef Params) {
+    if (Params.empty() || Params == "modify-cfg")
+      return SROAOptions::ModifyCFG;
+    if (Params == "preserve-cfg")
+      return SROAOptions::PreserveCFG;
+    return make_error<StringError>(
       formatv("invalid SROA pass parameter '{0}' (either preserve-cfg or "
               "modify-cfg can be specified)",
               Params)
-          .str(),
+      .str(),
       inconvertibleErrorCode());
-}
+  }
 
-Expected<StackLifetime::LivenessType>
-parseStackLifetimeOptions(StringRef Params) {
-  StackLifetime::LivenessType Result = StackLifetime::LivenessType::May;
-  while (!Params.empty()) {
-    StringRef ParamName;
-    std::tie(ParamName, Params) = Params.split(';');
+  Expected<StackLifetime::LivenessType>
+  parseStackLifetimeOptions(StringRef Params) {
+    StackLifetime::LivenessType Result = StackLifetime::LivenessType::May;
+    while (!Params.empty()) {
+      StringRef ParamName;
+      std::tie(ParamName, Params) = Params.split(';');
 
-    if (ParamName == "may") {
-      Result = StackLifetime::LivenessType::May;
-    } else if (ParamName == "must") {
-      Result = StackLifetime::LivenessType::Must;
-    } else {
-      return make_error<StringError>(
+      if (ParamName == "may") {
+        Result = StackLifetime::LivenessType::May;
+      } else if (ParamName == "must") {
+        Result = StackLifetime::LivenessType::Must;
+      } else {
+        return make_error<StringError>(
           formatv("invalid StackLifetime parameter '{0}' ", ParamName).str(),
           inconvertibleErrorCode());
+      }
     }
+    return Result;
   }
-  return Result;
-}
 
-Expected<bool> parseDependenceAnalysisPrinterOptions(StringRef Params) {
-  return PassBuilder::parseSinglePassOption(Params, "normalized-results",
-                                            "DependenceAnalysisPrinter");
-}
+  Expected<bool> parseDependenceAnalysisPrinterOptions(StringRef Params) {
+    return PassBuilder::parseSinglePassOption(Params, "normalized-results",
+                                              "DependenceAnalysisPrinter");
+  }
 
-Expected<bool> parseSeparateConstOffsetFromGEPPassOptions(StringRef Params) {
-  return PassBuilder::parseSinglePassOption(Params, "lower-gep",
-                                            "SeparateConstOffsetFromGEP");
-}
+  Expected<bool> parseSeparateConstOffsetFromGEPPassOptions(StringRef Params) {
+    return PassBuilder::parseSinglePassOption(Params, "lower-gep",
+                                              "SeparateConstOffsetFromGEP");
+  }
 
-Expected<OptimizationLevel>
-parseFunctionSimplificationPipelineOptions(StringRef Params) {
-  std::optional<OptimizationLevel> L = parseOptLevel(Params);
-  if (!L || *L == OptimizationLevel::O0) {
-    return make_error<StringError>(
-        formatv("invalid function-simplification parameter '{0}' ", Params)
-            .str(),
-        inconvertibleErrorCode());
-  };
-  return *L;
-}
-
-Expected<bool> parseMemorySSAPrinterPassOptions(StringRef Params) {
-  return PassBuilder::parseSinglePassOption(Params, "no-ensure-optimized-uses",
-                                            "MemorySSAPrinterPass");
-}
-
-Expected<bool> parseSpeculativeExecutionPassOptions(StringRef Params) {
-  return PassBuilder::parseSinglePassOption(Params, "only-if-divergent-target",
-                                            "SpeculativeExecutionPass");
-}
-
-Expected<std::string> parseMemProfUsePassOptions(StringRef Params) {
-  std::string Result;
-  while (!Params.empty()) {
-    StringRef ParamName;
-    std::tie(ParamName, Params) = Params.split(';');
-
-    if (ParamName.consume_front("profile-filename=")) {
-      Result = ParamName.str();
-    } else {
+  Expected<OptimizationLevel>
+  parseFunctionSimplificationPipelineOptions(StringRef Params) {
+    std::optional<OptimizationLevel> L = parseOptLevel(Params);
+    if (!L || *L == OptimizationLevel::O0) {
       return make_error<StringError>(
+        formatv("invalid function-simplification parameter '{0}' ", Params)
+        .str(),
+        inconvertibleErrorCode());
+    };
+    return *L;
+  }
+
+  Expected<bool> parseMemorySSAPrinterPassOptions(StringRef Params) {
+    return PassBuilder::parseSinglePassOption(Params, "no-ensure-optimized-uses",
+                                              "MemorySSAPrinterPass");
+  }
+
+  Expected<bool> parseSpeculativeExecutionPassOptions(StringRef Params) {
+    return PassBuilder::parseSinglePassOption(Params, "only-if-divergent-target",
+                                              "SpeculativeExecutionPass");
+  }
+
+  Expected<std::string> parseMemProfUsePassOptions(StringRef Params) {
+    std::string Result;
+    while (!Params.empty()) {
+      StringRef ParamName;
+      std::tie(ParamName, Params) = Params.split(';');
+
+      if (ParamName.consume_front("profile-filename=")) {
+        Result = ParamName.str();
+      } else {
+        return make_error<StringError>(
           formatv("invalid MemProfUse pass parameter '{0}' ", ParamName).str(),
           inconvertibleErrorCode());
+      }
     }
+    return Result;
   }
-  return Result;
-}
 
-Expected<bool> parseStructuralHashPrinterPassOptions(StringRef Params) {
-  return PassBuilder::parseSinglePassOption(Params, "detailed",
-                                            "StructuralHashPrinterPass");
-}
+  Expected<bool> parseStructuralHashPrinterPassOptions(StringRef Params) {
+    return PassBuilder::parseSinglePassOption(Params, "detailed",
+                                              "StructuralHashPrinterPass");
+  }
 
-Expected<bool> parseWinEHPrepareOptions(StringRef Params) {
-  return PassBuilder::parseSinglePassOption(Params, "demote-catchswitch-only",
-                                            "WinEHPreparePass");
-}
+  Expected<bool> parseWinEHPrepareOptions(StringRef Params) {
+    return PassBuilder::parseSinglePassOption(Params, "demote-catchswitch-only",
+                                              "WinEHPreparePass");
+  }
 
-Expected<GlobalMergeOptions> parseGlobalMergeOptions(StringRef Params) {
-  GlobalMergeOptions Result;
-  while (!Params.empty()) {
-    StringRef ParamName;
-    std::tie(ParamName, Params) = Params.split(';');
+  Expected<GlobalMergeOptions> parseGlobalMergeOptions(StringRef Params) {
+    GlobalMergeOptions Result;
+    while (!Params.empty()) {
+      StringRef ParamName;
+      std::tie(ParamName, Params) = Params.split(';');
 
-    bool Enable = !ParamName.consume_front("no-");
-    if (ParamName == "group-by-use")
-      Result.GroupByUse = Enable;
-    else if (ParamName == "ignore-single-use")
-      Result.IgnoreSingleUse = Enable;
-    else if (ParamName == "merge-const")
-      Result.MergeConst = Enable;
-    else if (ParamName == "merge-external")
-      Result.MergeExternal = Enable;
-    else if (ParamName.consume_front("max-offset=")) {
-      if (ParamName.getAsInteger(0, Result.MaxOffset))
-        return make_error<StringError>(
+      bool Enable = !ParamName.consume_front("no-");
+      if (ParamName == "group-by-use")
+        Result.GroupByUse = Enable;
+      else if (ParamName == "ignore-single-use")
+        Result.IgnoreSingleUse = Enable;
+      else if (ParamName == "merge-const")
+        Result.MergeConst = Enable;
+      else if (ParamName == "merge-external")
+        Result.MergeExternal = Enable;
+      else if (ParamName.consume_front("max-offset=")) {
+        if (ParamName.getAsInteger(0, Result.MaxOffset))
+          return make_error<StringError>(
             formatv("invalid GlobalMergePass parameter '{0}' ", ParamName)
-                .str(),
-            inconvertibleErrorCode());
-    }
-  }
-  return Result;
-}
-
-Expected<SmallVector<std::string, 0>> parseInternalizeGVs(StringRef Params) {
-  SmallVector<std::string, 1> PreservedGVs;
-  while (!Params.empty()) {
-    StringRef ParamName;
-    std::tie(ParamName, Params) = Params.split(';');
-
-    if (ParamName.consume_front("preserve-gv=")) {
-      PreservedGVs.push_back(ParamName.str());
-    } else {
-      return make_error<StringError>(
-          formatv("invalid Internalize pass parameter '{0}' ", ParamName).str(),
-          inconvertibleErrorCode());
-    }
-  }
-
-  return Expected<SmallVector<std::string, 0>>(std::move(PreservedGVs));
-}
-
-Expected<RegAllocFastPassOptions>
-parseRegAllocFastPassOptions(PassBuilder &PB, StringRef Params) {
-  RegAllocFastPassOptions Opts;
-  while (!Params.empty()) {
-    StringRef ParamName;
-    std::tie(ParamName, Params) = Params.split(';');
-
-    if (ParamName.consume_front("filter=")) {
-      std::optional<RegAllocFilterFunc> Filter =
-          PB.parseRegAllocFilter(ParamName);
-      if (!Filter) {
-        return make_error<StringError>(
-            formatv("invalid regallocfast register filter '{0}' ", ParamName)
-                .str(),
+            .str(),
             inconvertibleErrorCode());
       }
-      Opts.Filter = *Filter;
-      Opts.FilterName = ParamName;
-      continue;
+    }
+    return Result;
+  }
+
+  Expected<SmallVector<std::string, 0> > parseInternalizeGVs(StringRef Params) {
+    SmallVector<std::string, 1> PreservedGVs;
+    while (!Params.empty()) {
+      StringRef ParamName;
+      std::tie(ParamName, Params) = Params.split(';');
+
+      if (ParamName.consume_front("preserve-gv=")) {
+        PreservedGVs.push_back(ParamName.str());
+      } else {
+        return make_error<StringError>(
+          formatv("invalid Internalize pass parameter '{0}' ", ParamName).str(),
+          inconvertibleErrorCode());
+      }
     }
 
-    if (ParamName == "no-clear-vregs") {
-      Opts.ClearVRegs = false;
-      continue;
-    }
+    return Expected<SmallVector<std::string, 0> >(std::move(PreservedGVs));
+  }
 
-    return make_error<StringError>(
+  Expected<RegAllocFastPassOptions>
+  parseRegAllocFastPassOptions(PassBuilder &PB, StringRef Params) {
+    RegAllocFastPassOptions Opts;
+    while (!Params.empty()) {
+      StringRef ParamName;
+      std::tie(ParamName, Params) = Params.split(';');
+
+      if (ParamName.consume_front("filter=")) {
+        std::optional<RegAllocFilterFunc> Filter =
+            PB.parseRegAllocFilter(ParamName);
+        if (!Filter) {
+          return make_error<StringError>(
+            formatv("invalid regallocfast register filter '{0}' ", ParamName)
+            .str(),
+            inconvertibleErrorCode());
+        }
+        Opts.Filter = *Filter;
+        Opts.FilterName = ParamName;
+        continue;
+      }
+
+      if (ParamName == "no-clear-vregs") {
+        Opts.ClearVRegs = false;
+        continue;
+      }
+
+      return make_error<StringError>(
         formatv("invalid regallocfast pass parameter '{0}' ", ParamName).str(),
         inconvertibleErrorCode());
+    }
+    return Opts;
   }
-  return Opts;
-}
-
 } // namespace
 
 /// Tests whether a pass name starts with a valid prefix for a default pipeline
@@ -1224,18 +1223,18 @@ static bool startsWithDefaultPipelineAliasPrefix(StringRef Name) {
 /// callbacks. We check this through the oridinary parsing callbacks by setting
 /// up a dummy PassManager in order to not force the client to also handle this
 /// type of query.
-template <typename PassManagerT, typename CallbacksT>
+template<typename PassManagerT, typename CallbacksT>
 static bool callbacksAcceptPassName(StringRef Name, CallbacksT &Callbacks) {
   if (!Callbacks.empty()) {
     PassManagerT DummyPM;
-    for (auto &CB : Callbacks)
+    for (auto &CB: Callbacks)
       if (CB(Name, DummyPM, {}))
         return true;
   }
   return false;
 }
 
-template <typename CallbacksT>
+template<typename CallbacksT>
 static bool isModulePassName(StringRef Name, CallbacksT &Callbacks) {
   // Manually handle aliases for pre-configured pipeline fragments.
   if (startsWithDefaultPipelineAliasPrefix(Name))
@@ -1267,7 +1266,7 @@ static bool isModulePassName(StringRef Name, CallbacksT &Callbacks) {
   return callbacksAcceptPassName<ModulePassManager>(Name, Callbacks);
 }
 
-template <typename CallbacksT>
+template<typename CallbacksT>
 static bool isCGSCCPassName(StringRef Name, CallbacksT &Callbacks) {
   // Explicitly handle pass manager names.
   StringRef NameNoBracket = Name.take_until([](char C) { return C == '<'; });
@@ -1294,7 +1293,7 @@ static bool isCGSCCPassName(StringRef Name, CallbacksT &Callbacks) {
   return callbacksAcceptPassName<CGSCCPassManager>(Name, Callbacks);
 }
 
-template <typename CallbacksT>
+template<typename CallbacksT>
 static bool isFunctionPassName(StringRef Name, CallbacksT &Callbacks) {
   // Explicitly handle pass manager names.
   StringRef NameNoBracket = Name.take_until([](char C) { return C == '<'; });
@@ -1317,7 +1316,7 @@ static bool isFunctionPassName(StringRef Name, CallbacksT &Callbacks) {
   return callbacksAcceptPassName<FunctionPassManager>(Name, Callbacks);
 }
 
-template <typename CallbacksT>
+template<typename CallbacksT>
 static bool isMachineFunctionPassName(StringRef Name, CallbacksT &Callbacks) {
   // Explicitly handle pass manager names.
   if (Name == "machine-function")
@@ -1327,7 +1326,7 @@ static bool isMachineFunctionPassName(StringRef Name, CallbacksT &Callbacks) {
   if (Name == NAME)                                                            \
     return true;
 #define MACHINE_FUNCTION_PASS_WITH_PARAMS(NAME, CLASS, CREATE_PASS, PARSER,    \
-                                          PARAMS)                              \
+  PARAMS)                              \
   if (PassBuilder::checkParametrizedPassName(Name, NAME))                      \
     return true;
 
@@ -1340,7 +1339,7 @@ static bool isMachineFunctionPassName(StringRef Name, CallbacksT &Callbacks) {
   return callbacksAcceptPassName<MachineFunctionPassManager>(Name, Callbacks);
 }
 
-template <typename CallbacksT>
+template<typename CallbacksT>
 static bool isLoopNestPassName(StringRef Name, CallbacksT &Callbacks,
                                bool &UseMemorySSA) {
   UseMemorySSA = false;
@@ -1358,7 +1357,7 @@ static bool isLoopNestPassName(StringRef Name, CallbacksT &Callbacks,
   return callbacksAcceptPassName<LoopPassManager>(Name, Callbacks);
 }
 
-template <typename CallbacksT>
+template<typename CallbacksT>
 static bool isLoopPassName(StringRef Name, CallbacksT &Callbacks,
                            bool &UseMemorySSA) {
   UseMemorySSA = false;
@@ -1382,12 +1381,13 @@ static bool isLoopPassName(StringRef Name, CallbacksT &Callbacks,
   return callbacksAcceptPassName<LoopPassManager>(Name, Callbacks);
 }
 
-std::optional<std::vector<PassBuilder::PipelineElement>>
+std::optional<std::vector<PassBuilder::PipelineElement> >
 PassBuilder::parsePipelineText(StringRef Text) {
   std::vector<PipelineElement> ResultPipeline;
 
   SmallVector<std::vector<PipelineElement> *, 4> PipelineStack = {
-      &ResultPipeline};
+    &ResultPipeline
+  };
   for (;;) {
     std::vector<PipelineElement> &Pipeline = *PipelineStack.back();
     size_t Pos = Text.find_first_of(",()");
@@ -1435,7 +1435,7 @@ PassBuilder::parsePipelineText(StringRef Text) {
     return std::nullopt;
 
   assert(PipelineStack.back() == &ResultPipeline &&
-         "Wrong pipeline at the bottom of the stack!");
+    "Wrong pipeline at the bottom of the stack!");
   return {std::move(ResultPipeline)};
 }
 
@@ -1470,25 +1470,24 @@ Error PassBuilder::parseModulePass(ModulePassManager &MPM,
     if (auto Params = parseFunctionPipelineName(Name)) {
       if (Params->second)
         return make_error<StringError>(
-            "cannot have a no-rerun module to function adaptor",
-            inconvertibleErrorCode());
+          "cannot have a no-rerun module to function adaptor",
+          inconvertibleErrorCode());
       FunctionPassManager FPM;
       if (auto Err = parseFunctionPassPipeline(FPM, InnerPipeline))
         return Err;
       MPM.addPass(
-          createModuleToFunctionPassAdaptor(std::move(FPM), Params->first));
+        createModuleToFunctionPassAdaptor(std::move(FPM), Params->first));
       return Error::success();
     }
 
-    for (auto &C : ModulePipelineParsingCallbacks)
+    for (auto &C: ModulePipelineParsingCallbacks)
       if (C(Name, MPM, InnerPipeline))
         return Error::success();
 
     // Normal passes can't have pipelines.
     return make_error<StringError>(
-        formatv("invalid use of '{0}' pass as module pipeline", Name).str(),
-        inconvertibleErrorCode());
-    ;
+      formatv("invalid use of '{0}' pass as module pipeline", Name).str(),
+      inconvertibleErrorCode());;
   }
 
   // Manually handle aliases for pre-configured pipeline fragments.
@@ -1496,8 +1495,8 @@ Error PassBuilder::parseModulePass(ModulePassManager &MPM,
     SmallVector<StringRef, 3> Matches;
     if (!DefaultAliasRegex.match(Name, &Matches))
       return make_error<StringError>(
-          formatv("unknown default pipeline alias '{0}'", Name).str(),
-          inconvertibleErrorCode());
+        formatv("unknown default pipeline alias '{0}'", Name).str(),
+        inconvertibleErrorCode());
 
     assert(Matches.size() == 3 && "Must capture two matched strings!");
 
@@ -1609,12 +1608,12 @@ Error PassBuilder::parseModulePass(ModulePassManager &MPM,
   }
 #include "PassRegistry.def"
 
-  for (auto &C : ModulePipelineParsingCallbacks)
+  for (auto &C: ModulePipelineParsingCallbacks)
     if (C(Name, MPM, InnerPipeline))
       return Error::success();
   return make_error<StringError>(
-      formatv("unknown module pass '{0}'", Name).str(),
-      inconvertibleErrorCode());
+    formatv("unknown module pass '{0}'", Name).str(),
+    inconvertibleErrorCode());
 }
 
 Error PassBuilder::parseCGSCCPass(CGSCCPassManager &CGPM,
@@ -1638,7 +1637,7 @@ Error PassBuilder::parseCGSCCPass(CGSCCPassManager &CGPM,
         return Err;
       // Add the nested pass manager with the appropriate adaptor.
       CGPM.addPass(createCGSCCToFunctionPassAdaptor(
-          std::move(FPM), Params->first, Params->second));
+        std::move(FPM), Params->first, Params->second));
       return Error::success();
     }
     if (auto MaxRepetitions = parseDevirtPassName(Name)) {
@@ -1646,21 +1645,21 @@ Error PassBuilder::parseCGSCCPass(CGSCCPassManager &CGPM,
       if (auto Err = parseCGSCCPassPipeline(NestedCGPM, InnerPipeline))
         return Err;
       CGPM.addPass(
-          createDevirtSCCRepeatedPass(std::move(NestedCGPM), *MaxRepetitions));
+        createDevirtSCCRepeatedPass(std::move(NestedCGPM), *MaxRepetitions));
       return Error::success();
     }
 
-    for (auto &C : CGSCCPipelineParsingCallbacks)
+    for (auto &C: CGSCCPipelineParsingCallbacks)
       if (C(Name, CGPM, InnerPipeline))
         return Error::success();
 
     // Normal passes can't have pipelines.
     return make_error<StringError>(
-        formatv("invalid use of '{0}' pass as cgscc pipeline", Name).str(),
-        inconvertibleErrorCode());
+      formatv("invalid use of '{0}' pass as cgscc pipeline", Name).str(),
+      inconvertibleErrorCode());
   }
 
-// Now expand the basic registered passes from the .inc file.
+  // Now expand the basic registered passes from the .inc file.
 #define CGSCC_PASS(NAME, CREATE_PASS)                                          \
   if (Name == NAME) {                                                          \
     CGPM.addPass(CREATE_PASS);                                                 \
@@ -1724,12 +1723,12 @@ Error PassBuilder::parseCGSCCPass(CGSCCPassManager &CGPM,
   }
 #include "PassRegistry.def"
 
-  for (auto &C : CGSCCPipelineParsingCallbacks)
+  for (auto &C: CGSCCPipelineParsingCallbacks)
     if (C(Name, CGPM, InnerPipeline))
       return Error::success();
   return make_error<StringError>(
-      formatv("unknown cgscc pass '{0}'", Name).str(),
-      inconvertibleErrorCode());
+    formatv("unknown cgscc pass '{0}'", Name).str(),
+    inconvertibleErrorCode());
 }
 
 Error PassBuilder::parseFunctionPass(FunctionPassManager &FPM,
@@ -1771,17 +1770,17 @@ Error PassBuilder::parseFunctionPass(FunctionPassManager &FPM,
       return Error::success();
     }
 
-    for (auto &C : FunctionPipelineParsingCallbacks)
+    for (auto &C: FunctionPipelineParsingCallbacks)
       if (C(Name, FPM, InnerPipeline))
         return Error::success();
 
     // Normal passes can't have pipelines.
     return make_error<StringError>(
-        formatv("invalid use of '{0}' pass as function pipeline", Name).str(),
-        inconvertibleErrorCode());
+      formatv("invalid use of '{0}' pass as function pipeline", Name).str(),
+      inconvertibleErrorCode());
   }
 
-// Now expand the basic registered passes from the .inc file.
+  // Now expand the basic registered passes from the .inc file.
 #define FUNCTION_PASS(NAME, CREATE_PASS)                                       \
   if (Name == NAME) {                                                          \
     FPM.addPass(CREATE_PASS);                                                  \
@@ -1807,10 +1806,10 @@ Error PassBuilder::parseFunctionPass(FunctionPassManager &FPM,
                 std::remove_reference_t<decltype(CREATE_PASS)>>());            \
     return Error::success();                                                   \
   }
-// FIXME: UseMemorySSA is set to false. Maybe we could do things like:
-//        bool UseMemorySSA = !("canon-freeze" || "loop-predication" ||
-//                              "guard-widening");
-//        The risk is that it may become obsolete if we're not careful.
+  // FIXME: UseMemorySSA is set to false. Maybe we could do things like:
+  //        bool UseMemorySSA = !("canon-freeze" || "loop-predication" ||
+  //                              "guard-widening");
+  //        The risk is that it may become obsolete if we're not careful.
 #define LOOPNEST_PASS(NAME, CREATE_PASS)                                       \
   if (Name == NAME) {                                                          \
     FPM.addPass(createFunctionToLoopPassAdaptor(CREATE_PASS, false, false));   \
@@ -1832,12 +1831,12 @@ Error PassBuilder::parseFunctionPass(FunctionPassManager &FPM,
   }
 #include "PassRegistry.def"
 
-  for (auto &C : FunctionPipelineParsingCallbacks)
+  for (auto &C: FunctionPipelineParsingCallbacks)
     if (C(Name, FPM, InnerPipeline))
       return Error::success();
   return make_error<StringError>(
-      formatv("unknown function pass '{0}'", Name).str(),
-      inconvertibleErrorCode());
+    formatv("unknown function pass '{0}'", Name).str(),
+    inconvertibleErrorCode());
 }
 
 Error PassBuilder::parseLoopPass(LoopPassManager &LPM,
@@ -1856,17 +1855,17 @@ Error PassBuilder::parseLoopPass(LoopPassManager &LPM,
       return Error::success();
     }
 
-    for (auto &C : LoopPipelineParsingCallbacks)
+    for (auto &C: LoopPipelineParsingCallbacks)
       if (C(Name, LPM, InnerPipeline))
         return Error::success();
 
     // Normal passes can't have pipelines.
     return make_error<StringError>(
-        formatv("invalid use of '{0}' pass as loop pipeline", Name).str(),
-        inconvertibleErrorCode());
+      formatv("invalid use of '{0}' pass as loop pipeline", Name).str(),
+      inconvertibleErrorCode());
   }
 
-// Now expand the basic registered passes from the .inc file.
+  // Now expand the basic registered passes from the .inc file.
 #define LOOPNEST_PASS(NAME, CREATE_PASS)                                       \
   if (Name == NAME) {                                                          \
     LPM.addPass(CREATE_PASS);                                                  \
@@ -1900,7 +1899,7 @@ Error PassBuilder::parseLoopPass(LoopPassManager &LPM,
   }
 #include "PassRegistry.def"
 
-  for (auto &C : LoopPipelineParsingCallbacks)
+  for (auto &C: LoopPipelineParsingCallbacks)
     if (C(Name, LPM, InnerPipeline))
       return Error::success();
   return make_error<StringError>(formatv("unknown loop pass '{0}'", Name).str(),
@@ -1925,7 +1924,7 @@ Error PassBuilder::parseMachinePass(MachineFunctionPassManager &MFPM,
     return Error::success();                                                   \
   }
 #define MACHINE_FUNCTION_PASS_WITH_PARAMS(NAME, CLASS, CREATE_PASS, PARSER,    \
-                                          PARAMS)                              \
+  PARAMS)                              \
   if (checkParametrizedPassName(Name, NAME)) {                                 \
     auto Params = parsePassParameters(PARSER, Name, NAME);                     \
     if (!Params)                                                               \
@@ -1947,12 +1946,12 @@ Error PassBuilder::parseMachinePass(MachineFunctionPassManager &MFPM,
   }
 #include "llvm/Passes/MachinePassRegistry.def"
 
-  for (auto &C : MachineFunctionPipelineParsingCallbacks)
+  for (auto &C: MachineFunctionPipelineParsingCallbacks)
     if (C(Name, MFPM, E.InnerPipeline))
       return Error::success();
   return make_error<StringError>(
-      formatv("unknown machine pass '{0}'", Name).str(),
-      inconvertibleErrorCode());
+    formatv("unknown machine pass '{0}'", Name).str(),
+    inconvertibleErrorCode());
 }
 
 bool PassBuilder::parseAAPassName(AAManager &AA, StringRef Name) {
@@ -1970,15 +1969,15 @@ bool PassBuilder::parseAAPassName(AAManager &AA, StringRef Name) {
   }
 #include "PassRegistry.def"
 
-  for (auto &C : AAParsingCallbacks)
+  for (auto &C: AAParsingCallbacks)
     if (C(Name, AA))
       return true;
   return false;
 }
 
 Error PassBuilder::parseMachinePassPipeline(
-    MachineFunctionPassManager &MFPM, ArrayRef<PipelineElement> Pipeline) {
-  for (const auto &Element : Pipeline) {
+  MachineFunctionPassManager &MFPM, ArrayRef<PipelineElement> Pipeline) {
+  for (const auto &Element: Pipeline) {
     if (auto Err = parseMachinePass(MFPM, Element))
       return Err;
   }
@@ -1987,7 +1986,7 @@ Error PassBuilder::parseMachinePassPipeline(
 
 Error PassBuilder::parseLoopPassPipeline(LoopPassManager &LPM,
                                          ArrayRef<PipelineElement> Pipeline) {
-  for (const auto &Element : Pipeline) {
+  for (const auto &Element: Pipeline) {
     if (auto Err = parseLoopPass(LPM, Element))
       return Err;
   }
@@ -1995,8 +1994,8 @@ Error PassBuilder::parseLoopPassPipeline(LoopPassManager &LPM,
 }
 
 Error PassBuilder::parseFunctionPassPipeline(
-    FunctionPassManager &FPM, ArrayRef<PipelineElement> Pipeline) {
-  for (const auto &Element : Pipeline) {
+  FunctionPassManager &FPM, ArrayRef<PipelineElement> Pipeline) {
+  for (const auto &Element: Pipeline) {
     if (auto Err = parseFunctionPass(FPM, Element))
       return Err;
   }
@@ -2005,7 +2004,7 @@ Error PassBuilder::parseFunctionPassPipeline(
 
 Error PassBuilder::parseCGSCCPassPipeline(CGSCCPassManager &CGPM,
                                           ArrayRef<PipelineElement> Pipeline) {
-  for (const auto &Element : Pipeline) {
+  for (const auto &Element: Pipeline) {
     if (auto Err = parseCGSCCPass(CGPM, Element))
       return Err;
   }
@@ -2026,19 +2025,19 @@ void PassBuilder::crossRegisterProxies(LoopAnalysisManager &LAM,
   LAM.registerPass([&] { return FunctionAnalysisManagerLoopProxy(FAM); });
   if (MFAM) {
     MAM.registerPass(
-        [&] { return MachineFunctionAnalysisManagerModuleProxy(*MFAM); });
+      [&] { return MachineFunctionAnalysisManagerModuleProxy(*MFAM); });
     FAM.registerPass(
-        [&] { return MachineFunctionAnalysisManagerFunctionProxy(*MFAM); });
+      [&] { return MachineFunctionAnalysisManagerFunctionProxy(*MFAM); });
     MFAM->registerPass(
-        [&] { return ModuleAnalysisManagerMachineFunctionProxy(MAM); });
+      [&] { return ModuleAnalysisManagerMachineFunctionProxy(MAM); });
     MFAM->registerPass(
-        [&] { return FunctionAnalysisManagerMachineFunctionProxy(FAM); });
+      [&] { return FunctionAnalysisManagerMachineFunctionProxy(FAM); });
   }
 }
 
 Error PassBuilder::parseModulePassPipeline(ModulePassManager &MPM,
                                            ArrayRef<PipelineElement> Pipeline) {
-  for (const auto &Element : Pipeline) {
+  for (const auto &Element: Pipeline) {
     if (auto Err = parseModulePass(MPM, Element))
       return Err;
   }
@@ -2053,8 +2052,8 @@ Error PassBuilder::parsePassPipeline(ModulePassManager &MPM,
   auto Pipeline = parsePipelineText(PipelineText);
   if (!Pipeline || Pipeline->empty())
     return make_error<StringError>(
-        formatv("invalid pipeline '{0}'", PipelineText).str(),
-        inconvertibleErrorCode());
+      formatv("invalid pipeline '{0}'", PipelineText).str(),
+      inconvertibleErrorCode());
 
   // If the first name isn't at the module layer, wrap the pipeline up
   // automatically.
@@ -2069,27 +2068,43 @@ Error PassBuilder::parsePassPipeline(ModulePassManager &MPM,
       Pipeline = {{"function", std::move(*Pipeline)}};
     } else if (isLoopNestPassName(FirstName, LoopPipelineParsingCallbacks,
                                   UseMemorySSA)) {
-      Pipeline = {{"function", {{UseMemorySSA ? "loop-mssa" : "loop",
-                                 std::move(*Pipeline)}}}};
+      Pipeline = {
+        {
+          "function", {
+            {
+              UseMemorySSA ? "loop-mssa" : "loop",
+              std::move(*Pipeline)
+            }
+          }
+        }
+      };
     } else if (isLoopPassName(FirstName, LoopPipelineParsingCallbacks,
                               UseMemorySSA)) {
-      Pipeline = {{"function", {{UseMemorySSA ? "loop-mssa" : "loop",
-                                 std::move(*Pipeline)}}}};
+      Pipeline = {
+        {
+          "function", {
+            {
+              UseMemorySSA ? "loop-mssa" : "loop",
+              std::move(*Pipeline)
+            }
+          }
+        }
+      };
     } else if (isMachineFunctionPassName(
-                   FirstName, MachineFunctionPipelineParsingCallbacks)) {
+      FirstName, MachineFunctionPipelineParsingCallbacks)) {
       Pipeline = {{"function", {{"machine-function", std::move(*Pipeline)}}}};
     } else {
-      for (auto &C : TopLevelPipelineParsingCallbacks)
+      for (auto &C: TopLevelPipelineParsingCallbacks)
         if (C(MPM, *Pipeline))
           return Error::success();
 
       // Unknown pass or pipeline name!
       auto &InnerPipeline = Pipeline->front().InnerPipeline;
       return make_error<StringError>(
-          formatv("unknown {0} name '{1}'",
-                  (InnerPipeline.empty() ? "pass" : "pipeline"), FirstName)
-              .str(),
-          inconvertibleErrorCode());
+        formatv("unknown {0} name '{1}'",
+                (InnerPipeline.empty() ? "pass" : "pipeline"), FirstName)
+        .str(),
+        inconvertibleErrorCode());
     }
   }
 
@@ -2104,16 +2119,16 @@ Error PassBuilder::parsePassPipeline(CGSCCPassManager &CGPM,
   auto Pipeline = parsePipelineText(PipelineText);
   if (!Pipeline || Pipeline->empty())
     return make_error<StringError>(
-        formatv("invalid pipeline '{0}'", PipelineText).str(),
-        inconvertibleErrorCode());
+      formatv("invalid pipeline '{0}'", PipelineText).str(),
+      inconvertibleErrorCode());
 
   StringRef FirstName = Pipeline->front().Name;
   if (!isCGSCCPassName(FirstName, CGSCCPipelineParsingCallbacks))
     return make_error<StringError>(
-        formatv("unknown cgscc pass '{0}' in pipeline '{1}'", FirstName,
-                PipelineText)
-            .str(),
-        inconvertibleErrorCode());
+      formatv("unknown cgscc pass '{0}' in pipeline '{1}'", FirstName,
+              PipelineText)
+      .str(),
+      inconvertibleErrorCode());
 
   if (auto Err = parseCGSCCPassPipeline(CGPM, *Pipeline))
     return Err;
@@ -2127,16 +2142,16 @@ Error PassBuilder::parsePassPipeline(FunctionPassManager &FPM,
   auto Pipeline = parsePipelineText(PipelineText);
   if (!Pipeline || Pipeline->empty())
     return make_error<StringError>(
-        formatv("invalid pipeline '{0}'", PipelineText).str(),
-        inconvertibleErrorCode());
+      formatv("invalid pipeline '{0}'", PipelineText).str(),
+      inconvertibleErrorCode());
 
   StringRef FirstName = Pipeline->front().Name;
   if (!isFunctionPassName(FirstName, FunctionPipelineParsingCallbacks))
     return make_error<StringError>(
-        formatv("unknown function pass '{0}' in pipeline '{1}'", FirstName,
-                PipelineText)
-            .str(),
-        inconvertibleErrorCode());
+      formatv("unknown function pass '{0}' in pipeline '{1}'", FirstName,
+              PipelineText)
+      .str(),
+      inconvertibleErrorCode());
 
   if (auto Err = parseFunctionPassPipeline(FPM, *Pipeline))
     return Err;
@@ -2149,8 +2164,8 @@ Error PassBuilder::parsePassPipeline(LoopPassManager &CGPM,
   auto Pipeline = parsePipelineText(PipelineText);
   if (!Pipeline || Pipeline->empty())
     return make_error<StringError>(
-        formatv("invalid pipeline '{0}'", PipelineText).str(),
-        inconvertibleErrorCode());
+      formatv("invalid pipeline '{0}'", PipelineText).str(),
+      inconvertibleErrorCode());
 
   if (auto Err = parseLoopPassPipeline(CGPM, *Pipeline))
     return Err;
@@ -2163,8 +2178,8 @@ Error PassBuilder::parsePassPipeline(MachineFunctionPassManager &MFPM,
   auto Pipeline = parsePipelineText(PipelineText);
   if (!Pipeline || Pipeline->empty())
     return make_error<StringError>(
-        formatv("invalid machine pass pipeline '{0}'", PipelineText).str(),
-        inconvertibleErrorCode());
+      formatv("invalid machine pass pipeline '{0}'", PipelineText).str(),
+      inconvertibleErrorCode());
 
   if (auto Err = parseMachinePassPipeline(MFPM, *Pipeline))
     return Err;
@@ -2185,8 +2200,8 @@ Error PassBuilder::parseAAPipeline(AAManager &AA, StringRef PipelineText) {
     std::tie(Name, PipelineText) = PipelineText.split(',');
     if (!parseAAPassName(AA, Name))
       return make_error<StringError>(
-          formatv("unknown alias analysis name '{0}'", Name).str(),
-          inconvertibleErrorCode());
+        formatv("unknown alias analysis name '{0}'", Name).str(),
+        inconvertibleErrorCode());
   }
 
   return Error::success();
@@ -2196,7 +2211,7 @@ std::optional<RegAllocFilterFunc>
 PassBuilder::parseRegAllocFilter(StringRef FilterName) {
   if (FilterName == "all")
     return nullptr;
-  for (auto &C : RegClassFilterParsingCallbacks)
+  for (auto &C: RegClassFilterParsingCallbacks)
     if (auto F = C(FilterName))
       return F;
   return std::nullopt;
@@ -2205,6 +2220,7 @@ PassBuilder::parseRegAllocFilter(StringRef FilterName) {
 static void printPassName(StringRef PassName, raw_ostream &OS) {
   OS << "  " << PassName << "\n";
 }
+
 static void printPassName(StringRef PassName, StringRef Params,
                           raw_ostream &OS) {
   OS << "  " << PassName << "<" << Params << ">\n";
@@ -2291,7 +2307,7 @@ void PassBuilder::printPassNames(raw_ostream &OS) {
 }
 
 void PassBuilder::registerParseTopLevelPipelineCallback(
-    const std::function<bool(ModulePassManager &, ArrayRef<PipelineElement>)>
-        &C) {
+  const std::function<bool(ModulePassManager &, ArrayRef<PipelineElement>)>
+  &C) {
   TopLevelPipelineParsingCallbacks.push_back(C);
 }
