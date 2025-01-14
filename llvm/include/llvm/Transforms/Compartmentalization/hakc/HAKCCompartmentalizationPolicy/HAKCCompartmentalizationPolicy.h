@@ -33,7 +33,7 @@ namespace llvm::hakc {
     public:
         HAKCDatabaseResponse(std::chrono::milliseconds Timeout);
 
-        Expected<json::Value> GetJSON();
+        Expected<json::Value> GetJSON() const;
 
         operator bool() const;
 
@@ -49,7 +49,7 @@ namespace llvm::hakc {
     public:
         HAKCDatabaseConnection(std::chrono::milliseconds Timeout);
 
-        HAKCDatabaseResponse HandleRequest(HAKCDatabaseRequest &Request);
+        HAKCDatabaseResponse HandleRequest(const HAKCDatabaseRequest &Request) const;
 
         operator bool() const;
 
@@ -92,7 +92,7 @@ namespace llvm::hakc {
 
         HAKCCompartmentP FindCachedCompartment(hakc_compartment_id_t CompartmentID);
 
-        json::Object Execute(StringRef Endpoint, json::Object &Parameters);
+        json::Object Execute(StringRef Endpoint, json::Object &Parameters) const;
     };
 } // hakc
 

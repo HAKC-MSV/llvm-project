@@ -3,8 +3,8 @@
 //
 
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartmentalizationPolicy.h"
-#include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartmentDivision.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/CommonHAKCAnalysis.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartmentDivision.h"
 
 
 namespace llvm::hakc {
@@ -20,7 +20,7 @@ namespace llvm::hakc {
         Success(false) {
     }
 
-    Expected<json::Value> HAKCDatabaseResponse::GetJSON() {
+    Expected<json::Value> HAKCDatabaseResponse::GetJSON() const {
         if (!Success) {
             return llvm::createStringError(std::errc::timed_out, "Response timed out");
         }
@@ -44,7 +44,7 @@ namespace llvm::hakc {
             LastReadSize = OS.read(Buffer.data(), Buffer.size(), Timeout);
             if (LastReadSize > 0) {
                 ResponseOstream << Buffer;
-                if (LastReadSize != (ssize_t) Buffer.size()) {
+                if (LastReadSize != static_cast<ssize_t>(Buffer.size())) {
                     break;
                 }
             }
@@ -57,7 +57,7 @@ namespace llvm::hakc {
         Timeout(Timeout) {
     }
 
-    HAKCDatabaseResponse HAKCDatabaseConnection::HandleRequest(HAKCDatabaseRequest &Request) {
+    HAKCDatabaseResponse HAKCDatabaseConnection::HandleRequest(const HAKCDatabaseRequest &Request) const {
         HAKCDatabaseResponse Response(Timeout);
         Request >> *Socket;
         Response << *Socket;
@@ -165,7 +165,7 @@ namespace llvm::hakc {
         return Compartment;
     }
 
-    json::Object HAKCCompartmentalizationPolicy::Execute(StringRef Endpoint, json::Object &Parameters) {
+    json::Object HAKCCompartmentalizationPolicy::Execute(StringRef Endpoint, json::Object &Parameters) const {
         CheckConnection();
         HAKCDatabaseRequest Request(Endpoint, Parameters);
         auto Response = Client.HandleRequest(Request);
@@ -200,4 +200,4 @@ namespace llvm::hakc {
         }
         return nullptr;
     }
-} // hakc
+} // namespace llvm::hakc
