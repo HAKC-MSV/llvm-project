@@ -31,6 +31,9 @@ add_llvm_component_library(LLVMHAKC
         ADDITIONAL_HEADER_DIRS
         ${LLVM_MAIN_INCLUDE_DIR}/llvm/Transforms/Compartmentalization/hakc
 
+        DEPENDS
+        intrinsics_gen
+
         ADD_TO_COMPONENT
         LLVMInstrumentation
 )
