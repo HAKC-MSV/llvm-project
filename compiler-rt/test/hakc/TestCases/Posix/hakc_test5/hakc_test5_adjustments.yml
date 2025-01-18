@@ -1,0 +1,12 @@
+---
+!HAKCAdjustments
+add-kernel-division: true
+compartmentalize:
+  - !HAKCAdjustment
+    path: "_HAKC_SOURCE_PATH_"
+    division_id: 0
+    compartment_id: 0
+  - !HAKCAdjustment
+    path: "_HAKC_SOURCE_PATH_/hakc_test5.c"
+    division_id: 7
+    compartment_id: 1

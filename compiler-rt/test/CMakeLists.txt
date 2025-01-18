@@ -104,6 +104,10 @@ if(COMPILER_RT_CAN_EXECUTE_TESTS)
   add_subdirectory(shadowcallstack)
 endif()
 
+if(COMPILER_RT_BUILD_HAKC)
+  compiler_rt_test_runtime(hakc)
+endif()
+
 # Now that we've traversed all the directories and know all the lit testsuites,
 # introduce a rule to run to run all of them.
 get_property(LLVM_COMPILER_RT_LIT_DEPENDS GLOBAL PROPERTY LLVM_COMPILER_RT_LIT_DEPENDS)
