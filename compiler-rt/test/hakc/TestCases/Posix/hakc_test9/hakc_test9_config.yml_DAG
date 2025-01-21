@@ -1,11 +1,11 @@
 Arch:                 X86
 Platform:             Test
-DatabasePath:         /home/al32163/hakc/HAKC_CURR/llvm-project/compiler-rt/test/hakc/TestCases/Posix/hakc_test3/hakc-db
-SourcePath:           /home/al32163/hakc/HAKC_CURR/llvm-project/compiler-rt/test/hakc/TestCases/Posix/hakc_test3
-BuildPath:            /home/al32163/hakc/HAKC_CURR/llvm-project/compiler-rt/test/hakc/TestCases/Posix/hakc_test3/build
-DagAnalysisRootPath:  /home/al32163/hakc/HAKC_CURR/llvm-project/compiler-rt/test/hakc/TestCases/Posix/hakc_test3/dag_analysis
+DatabasePath:         /home/al32163/hakc/HAKC_CURR/llvm-project/compiler-rt/test/hakc/TestCases/Posix/hakc_test9/hakc-db
+SourcePath:           /home/al32163/hakc/HAKC_CURR/llvm-project/compiler-rt/test/hakc/TestCases/Posix/hakc_test9
+BuildPath:            /home/al32163/hakc/HAKC_CURR/llvm-project/compiler-rt/test/hakc/TestCases/Posix/hakc_test9/build
+DagAnalysisRootPath:  /home/al32163/hakc/HAKC_CURR/llvm-project/compiler-rt/test/hakc/TestCases/Posix/hakc_test9/dag_analysis
 OutputDebugInfo:      true
-PassMode:             @PASS_MODE@
+PassMode:             RunDataAccessGraphAnalysis
 IncludePaths:         []
 #CustomTransferFunctions:
 #  - { type: "char *", name: "hakc_transfer_string", ptr-idx: 0, compartment-idx: 1, division-idx: 2 }

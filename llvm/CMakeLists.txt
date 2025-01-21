@@ -988,6 +988,9 @@ include(HandleLLVMOptions)
 
 option(LLVM_ENABLE_HAKC "Build HAKC" OFF)
 mark_as_advanced(LLVM_ENABLE_HAKC)
+if(LLVM_ENABLE_HAKC)
+    set(HAKC_PASS_LIB "HAKC-Compartmentalizer" CACHE STRING "HAKC Pass Name")
+endif()
 
 ######
 
