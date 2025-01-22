@@ -28,7 +28,12 @@ namespace llvm::hakc {
     }
 
     void HAKCDatabaseRequest::operator>>(raw_ostream &OS) const {
-        OS << Request;
+        std::string RequestJSON;
+        raw_string_ostream RequestStream(RequestJSON);
+        RequestStream << Request;
+        size_t RequestSize = RequestJSON.size();
+        OS << RequestSize;
+        OS << RequestJSON;
     }
 
     HAKCDatabaseResponse::operator bool() const {
@@ -36,20 +41,11 @@ namespace llvm::hakc {
     }
 
     void HAKCDatabaseResponse::operator<<(raw_socket_stream &OS) {
-        ssize_t LastReadSize = 0;
         Response = "";
-        raw_string_ostream ResponseOstream(Response);
-        do {
-            SmallString<64> Buffer;
-            LastReadSize = OS.read(Buffer.data(), Buffer.size(), Timeout);
-            if (LastReadSize > 0) {
-                ResponseOstream << Buffer;
-                if (LastReadSize != static_cast<ssize_t>(Buffer.size())) {
-                    break;
-                }
-            }
-        } while (LastReadSize > 0);
-
+        size_t ResponseSize = 0;
+        OS.read((char *) &ResponseSize, sizeof(ResponseSize), Timeout);
+        Response.resize(ResponseSize);
+        auto LastReadSize = OS.read(Response.data(), ResponseSize, Timeout);
         Success = LastReadSize >= 0;
     }
 
