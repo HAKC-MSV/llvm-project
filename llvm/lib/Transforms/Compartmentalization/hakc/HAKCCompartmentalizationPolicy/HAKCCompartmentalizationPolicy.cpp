@@ -32,8 +32,10 @@ namespace llvm::hakc {
         raw_string_ostream RequestStream(RequestJSON);
         RequestStream << Request;
         size_t RequestSize = RequestJSON.size();
-        OS << RequestSize;
+        /* The << operator for size_t does not seem to write 8 bytes, so specifically write 8 bytes */
+        OS.write((const char *) &RequestSize, sizeof(RequestSize));
         OS << RequestJSON;
+        OS.flush();
     }
 
     HAKCDatabaseResponse::operator bool() const {
@@ -149,7 +151,7 @@ namespace llvm::hakc {
         );
 
         auto ResponseData = Execute(SystemInformation.GetDatabaseInformation().GetCompartmentEndpoint(), Parameters);
-        auto EntryToken = ResponseData.getInteger("EntryToken");
+        auto EntryToken = ResponseData.getInteger("entry_token");
         if (!EntryToken.has_value()) {
             CommonHAKCAnalysis::getWriter() << "Received No Entry Token for Compartment " << CompartmentID << "\n";
             throw std::exception();
