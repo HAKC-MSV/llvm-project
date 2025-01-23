@@ -1,6 +1,9 @@
 Arch:                 X86
 Platform:             Test
-DatabasePath:         @PWD@/hakc-db
+Database:
+  server-url: /home/de29664/code/HAKC/python/analysis/hakc-socket
+  server-timeout: 1000
+  get-compartment-endpoint: "get-compartment"
 SourcePath:           @PWD@
 BuildPath:            @PWD@/build
 DagAnalysisRootPath:  @PWD@/dag_analysis
