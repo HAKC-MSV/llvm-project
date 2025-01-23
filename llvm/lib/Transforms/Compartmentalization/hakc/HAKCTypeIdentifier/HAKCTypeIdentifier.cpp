@@ -584,7 +584,7 @@ void hakc::HAKCTypeIdentifier::FindUsesInFunctions() {
         std::set<GlobalObject *> GlobalsUsed;
         for (auto InstIt = inst_begin(F); InstIt != inst_end(F); ++InstIt) {
             auto *I = &(*InstIt);
-            if (I->isDebugOrPseudoInst() || isa<IntrinsicInst>(I)) {
+            if (I->isDebugOrPseudoInst() || isa<IntrinsicInst>(I) || isa<BranchInst>(I)) {
                 continue;
             }
             FindAllGlobalsUsed(I, GlobalsUsed);
@@ -593,7 +593,7 @@ void hakc::HAKCTypeIdentifier::FindUsesInFunctions() {
 
         for (auto InstIt = inst_begin(F); InstIt != inst_end(F); ++InstIt) {
             auto *I = &(*InstIt);
-            if (I->isDebugOrPseudoInst() || isa<IntrinsicInst>(I)) {
+            if (I->isDebugOrPseudoInst() || isa<IntrinsicInst>(I) || isa<BranchInst>(I)) {
                 continue;
             }
             if (auto *Call = dyn_cast<CallInst>(I)) {

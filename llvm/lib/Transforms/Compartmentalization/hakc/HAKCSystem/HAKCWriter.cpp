@@ -41,13 +41,13 @@ namespace llvm::hakc {
 
     HAKCWriter &HAKCWriter::operator<<(llvm::Value *V) {
         if (V == nullptr) {
-            os << "!!nullptr!!";
+            *this << "!!nullptr!!";
         } else if (const auto *F = dyn_cast<Function>(V)) {
-            os << "Function " << F->getName();
+            *this << "Function " << F->getName();
         } else if (const auto *GV = dyn_cast<GlobalVariable>(V)) {
-            os << "Global " << GV->getName();
+            *this << "Global " << GV->getName();
         } else if (auto *Arg = dyn_cast<Argument>(V)) {
-            os << "__Argument " << Arg->getArgNo() << " of " << Arg->getParent()->getName();
+            os << "Argument " << Arg->getArgNo() << " of " << Arg->getParent()->getName();
         } else {
             os << *V;
         }
@@ -171,8 +171,8 @@ namespace llvm::hakc {
     }
 
     HAKCWriter &HAKCWriter::operator<<(const ManagedHAKCPointerUse &HAKCPointerUse) {
-        os << "[" << HAKCPointerUse.getID() << "] Argument " << HAKCPointerUse.getOperandNo() << " of "
-                << HAKCPointerUse.getUser() << " for ";
+        os << "[" << HAKCPointerUse.getID() << "] Argument " << HAKCPointerUse.getOperandNo() << " of ";
+        *this << HAKCPointerUse.getUser() << " for ";
         *this << HAKCPointerUse.getManagedPtr();
         return *this;
     }
@@ -185,7 +185,7 @@ namespace llvm::hakc {
                 isa<GlobalValue>(ManagedPointer.GetBaseDefinition())) {
                 os << "  ";
             }
-            os << ManagedPointer.GetBaseDefinition() << "  ]";
+            *this << ManagedPointer.GetBaseDefinition() << "  ]";
         }
         return *this;
     }

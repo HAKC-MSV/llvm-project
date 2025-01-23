@@ -192,12 +192,13 @@ namespace llvm::hakc {
     CommonHAKCAnalysis::findDefChain(Value *v, bool followLoad, SmallVectorImpl<Value *> &Results) {
         auto debug = GetSystemInfo().OutputDebugInfo();
         if (v == nullptr) {
-            errs() << "v is null\n";
+            CommonHAKCAnalysis::getWriter() << "v is null\n";
             throw std::exception();
         }
         if (DefchainCache.contains(v)) {
             auto CachedChain = DefchainCache[v];
             Results.append(CachedChain);
+            return;
         }
 
         if (debug) {
@@ -283,10 +284,7 @@ namespace llvm::hakc {
                 // instruction that seems to cause infinite loop:
                 // %4 = load i32, ptr %0, align 4, !dbg !25, !tbaa !27
                 // %5 = add nsw i32 %4, 1, !dbg !25
-                CommonHAKCAnalysis::getWriter() << "______binop : " << binOp << "\n";
-                CommonHAKCAnalysis::getWriter() << "______get def 0, binop0 arg0: " << binOp->getOperand(0) << "\n";
                 auto *LHSDef = getDef(binOp->getOperand(0), false);
-                CommonHAKCAnalysis::getWriter() << "______get def 1, binop1 arg1: " << binOp->getOperand(1) << "\n";
                 auto *RHSDef = getDef(binOp->getOperand(1), false);
                 if (!isa<Constant>(LHSDef) && ValueIsUsedAsPointer(LHSDef)) {
                     if (debug) {
@@ -313,7 +311,6 @@ namespace llvm::hakc {
                 }
             }
         add_to_chain:
-            CommonHAKCAnalysis::getWriter() << "______add_to_chain " << curr << "\n";
             Results.push_back(curr);
         }
 
