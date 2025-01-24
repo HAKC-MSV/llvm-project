@@ -1,11 +1,14 @@
 Arch:                 X86
 Platform:             Test
-DatabasePath:         /home/al32163/hakc/HAKC_CURR/llvm-project/compiler-rt/test/hakc/TestCases/Posix/hakc_test0/hakc-db
-SourcePath:           /home/al32163/hakc/HAKC_CURR/llvm-project/compiler-rt/test/hakc/TestCases/Posix/hakc_test0
-BuildPath:            /home/al32163/hakc/HAKC_CURR/llvm-project/compiler-rt/test/hakc/TestCases/Posix/hakc_test0/build
-DagAnalysisRootPath:  /home/al32163/hakc/HAKC_CURR/llvm-project/compiler-rt/test/hakc/TestCases/Posix/hakc_test0/dag_analysis
+Database:
+  server-url:         @PWD@/hakc-socket
+  server-timeout: 1000
+  get-compartment-endpoint: "get-compartment"
+SourcePath:           @PWD@
+BuildPath:            @PWD@/build
+DagAnalysisRootPath:  @PWD@/dag_analysis
 OutputDebugInfo:      true
-PassMode:             RunDataAccessGraphAnalysis
+PassMode:             @PASS_MODE@
 IncludePaths:         []
 CodeValidationFunction: "check_hakc_code_access"
 DataValidationFunction: "check_hakc_data_access"

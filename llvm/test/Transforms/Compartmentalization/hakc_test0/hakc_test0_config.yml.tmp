@@ -1,9 +1,12 @@
 Arch:                 X86
 Platform:             Test
-DatabasePath:         /home/al32163/hakc/HAKC_CURR/llvm-project/compiler-rt/test/hakc/TestCases/Posix/hakc_test0/hakc-db
-SourcePath:           /home/al32163/hakc/HAKC_CURR/llvm-project/compiler-rt/test/hakc/TestCases/Posix/hakc_test0
-BuildPath:            /home/al32163/hakc/HAKC_CURR/llvm-project/compiler-rt/test/hakc/TestCases/Posix/hakc_test0/build
-DagAnalysisRootPath:  /home/al32163/hakc/HAKC_CURR/llvm-project/compiler-rt/test/hakc/TestCases/Posix/hakc_test0/dag_analysis
+Database:
+  server-url:         /home/al32163/hakc/HAKC_CURR/llvm-project/llvm/test/Transforms/Compartmentalization/hakc_test0/hakc-socket
+  server-timeout: 1000
+  get-compartment-endpoint: "get-compartment"
+SourcePath:           /home/al32163/hakc/HAKC_CURR/llvm-project/llvm/test/Transforms/Compartmentalization/hakc_test0
+BuildPath:            /home/al32163/hakc/HAKC_CURR/llvm-project/llvm/test/Transforms/Compartmentalization/hakc_test0/build
+DagAnalysisRootPath:  /home/al32163/hakc/HAKC_CURR/llvm-project/llvm/test/Transforms/Compartmentalization/hakc_test0/dag_analysis
 OutputDebugInfo:      true
 PassMode:             @PASS_MODE@
 IncludePaths:         []
