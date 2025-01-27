@@ -5,7 +5,7 @@
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartmentalizationPolicy.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/CommonHAKCAnalysis.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartmentDivision.h"
-
+#include <unistd.h>
 
 namespace llvm::hakc {
     HAKCDatabaseRequest::HAKCDatabaseRequest(StringRef Endpoint, json::Object &Parameters) : Request(nullptr) {
@@ -79,10 +79,19 @@ namespace llvm::hakc {
 
     void HAKCDatabaseConnection::connect(StringRef ServerURL) {
         close();
+        int max_tries = 5; 
+        int current_try = 0; 
+        int timeout = 5;
         auto NewConnection = raw_socket_stream::createConnectedUnix(ServerURL);
-        if (!NewConnection) {
-            CommonHAKCAnalysis::getWriter() << "Could not connect to " << ServerURL << "\n";
-            throw std::exception();
+        while(!NewConnection){
+            // connection failed, try again with a timeout 
+            NewConnection = raw_socket_stream::createConnectedUnix(ServerURL);
+            if(current_try > max_tries){
+                CommonHAKCAnalysis::getWriter() << "Could not connect to " << ServerURL << "\n";
+                throw std::exception();
+            }
+            current_try++; 
+            sleep(timeout); 
         }
         Socket = std::move(*NewConnection);
     }
