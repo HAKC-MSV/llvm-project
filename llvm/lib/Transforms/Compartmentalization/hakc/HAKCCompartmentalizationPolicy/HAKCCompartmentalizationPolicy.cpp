@@ -79,19 +79,22 @@ namespace llvm::hakc {
 
     void HAKCDatabaseConnection::connect(StringRef ServerURL) {
         close();
-        int max_tries = 5; 
-        int current_try = 0; 
-        int timeout = 5;
+        constexpr int max_tries = 5;
+        int current_try = 1;
+        auto TimeoutInSeconds = Timeout.count() / 1000;
+        if (TimeoutInSeconds == 0) {
+            TimeoutInSeconds = 1;
+        }
         auto NewConnection = raw_socket_stream::createConnectedUnix(ServerURL);
-        while(!NewConnection){
+        while (!NewConnection) {
             // connection failed, try again with a timeout 
             NewConnection = raw_socket_stream::createConnectedUnix(ServerURL);
-            if(current_try > max_tries){
+            if (current_try >= max_tries) {
                 CommonHAKCAnalysis::getWriter() << "Could not connect to " << ServerURL << "\n";
                 throw std::exception();
             }
-            current_try++; 
-            sleep(timeout); 
+            current_try++;
+            sleep(TimeoutInSeconds);
         }
         Socket = std::move(*NewConnection);
     }
