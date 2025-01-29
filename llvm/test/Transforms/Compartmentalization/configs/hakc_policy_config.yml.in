@@ -1,11 +1,11 @@
 {
   "backing_store": {
-    "type": "json",
+    "type": "yaml",
     "path": "@HAKC_BACKING_STORE@",
     "default_compartment": @HAKC_DEFAULT_COMPARTMENT@,
     "default_division": @HAKC_DEFAULT_DIVISION@
   },
   "reuse_path": true,
   "socket_path": "@PWD@/hakc-socket",
-  "server_timeout": 10
+  "server_timeout": @SERVER_TIMEOUT@
 }
