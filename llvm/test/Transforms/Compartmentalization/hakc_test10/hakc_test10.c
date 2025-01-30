@@ -1,20 +1,15 @@
-// RUN: %HAKC_SETUP
-// RUN: %HAKC_YAML_REPLACE_PATHS
-// RUN: %HAKC_YAML_CHANGE_MODE_DAG
-// RUN: %HAKC_YAML_CHANGE_MODE_COMP
+// RUN: %HAKC_PROCESS_YAML_COMP_CONFIG
+// RUN: %HAKC_PROCESS_YAML_POLICY_CONFIG
 // RUN: %HAKC_PYTHON_VENV
 // RUN: %HAKC_EMIT_LLVM
-// RUN: %HAKC_PASS
+// RUN: %HAKC_START_POLICY_SERVER & sleep 1 &&\
+// RUN: %HAKC_RUN_PASS
 // RUN: %HAKC_EVALUATE
 
 // test of GetIgnoredGlobals
 
-int* kmalloc_caches = 53;
-int* somevar = 53;
-
-int bar(){
-    return foo(kmalloc_caches, somevar);
-}
+int kmalloc_caches = 53;
+int somevar = 53;
 
 int foo(int* v1, int* v2) {
     if (&v1) {
@@ -22,6 +17,14 @@ int foo(int* v1, int* v2) {
         return *v2;
     }
     return 0;
+}
+
+int bar(){
+    int *v1;
+    v1 = &kmalloc_caches; 
+    int *v2;
+    v2 = &somevar; 
+    return foo(v1, v2);
 }
 
 // note: incomplete test. need derricks help for expected behavior 

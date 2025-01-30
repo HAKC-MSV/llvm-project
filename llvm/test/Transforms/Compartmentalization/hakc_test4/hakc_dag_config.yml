@@ -1,14 +1,14 @@
 Arch:                 X86
 Platform:             Test
 Database:
-  server-url:         @PWD@/hakc-socket
+  server-url:         /home/al32163/hakc/HAKC_CURR/llvm-project/llvm/test/Transforms/Compartmentalization/hakc_test4/hakc-socket
   server-timeout: 1000
   get-compartment-endpoint: "get-compartment"
-SourcePath:           @PWD@
-BuildPath:            @PWD@/build
-DagAnalysisRootPath:  @PWD@/dag_analysis
+SourcePath:           /home/al32163/hakc/HAKC_CURR/llvm-project/llvm/test/Transforms/Compartmentalization/hakc_test4
+BuildPath:            /home/al32163/hakc/HAKC_CURR/llvm-project/llvm/test/Transforms/Compartmentalization/hakc_test4/build
+DagAnalysisRootPath:  /home/al32163/hakc/HAKC_CURR/llvm-project/llvm/test/Transforms/Compartmentalization/hakc_test4/dag_analysis
 OutputDebugInfo:      true
-PassMode:             @PASS_MODE@
+PassMode:             RunDataAccessGraphAnalysis
 IncludePaths:         []
 CodeValidationFunction: "check_hakc_code_access"
 DataValidationFunction: "check_hakc_data_access"

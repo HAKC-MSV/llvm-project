@@ -20,7 +20,7 @@
 std::string HAKC_CONFIG_PATH;
 
 static cl::opt<std::string, true> HAKC_CONFIG_CL("HAKC_CONFIG", cl::desc("Path to HAKC Configuration File"),
-                                                 cl::location(HAKC_CONFIG_PATH), cl::Required);
+                                                 cl::location(HAKC_CONFIG_PATH), cl::Optional);
 using namespace llvm::hakc;
 
 namespace llvm {

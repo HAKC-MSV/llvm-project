@@ -1,0 +1,11 @@
+{
+  "backing_store": {
+    "type": "yaml",
+    "path": "/home/al32163/hakc/HAKC_CURR/llvm-project/llvm/test/Transforms/Compartmentalization/hakc_test0/../configs/backing_stores/hakc_backing_foo1_bar2.yaml",
+    "default_compartment": 0,
+    "default_division": 0
+  },
+  "reuse_path": true,
+  "socket_path": "/home/al32163/hakc/HAKC_CURR/llvm-project/llvm/test/Transforms/Compartmentalization/hakc_test0/hakc-socket",
+  "server_timeout": 10
+}

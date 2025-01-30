@@ -48,7 +48,7 @@ _adj: &id024
   *id003: {}
   ? &id012 !HAKCFunction
     DefiningFile: _HAKC_SOURCE_PATH_/hakc_test0.c
-    DefiningLine: 15
+    DefiningLine: 16
     Name: foo
     Scope: &id005 !HAKCScope
       computed_hash: 9223867316266404956
@@ -117,7 +117,7 @@ _adj: &id024
         persisted: true
     *id003: &id019
       DefinedIn:
-        line: 15
+        line: 16
         persisted: true
       UsedInCompilationUnit:
         persisted: true
@@ -202,8 +202,6 @@ _pred:
 _succ: *id024
 adj: !!python/object:networkx.classes.coreviews.MultiAdjacencyView
   _atlas: *id024
-default_compartment: null
-default_division: null
 division_count: 16
 edges: !!python/object:networkx.classes.reportviews.OutMultiEdgeView
   _adjdict: *id024

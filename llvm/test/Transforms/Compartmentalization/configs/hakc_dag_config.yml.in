@@ -8,7 +8,7 @@ SourcePath:           @PWD@
 BuildPath:            @PWD@/build
 DagAnalysisRootPath:  @PWD@/dag_analysis
 OutputDebugInfo:      true
-PassMode:             @PASS_MODE@
+PassMode:             RunDataAccessGraphAnalysis
 IncludePaths:         []
 CodeValidationFunction: "check_hakc_code_access"
 DataValidationFunction: "check_hakc_data_access"

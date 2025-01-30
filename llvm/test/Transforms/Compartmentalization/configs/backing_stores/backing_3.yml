@@ -29,8 +29,8 @@ _adj: &id024
       HasScope:
         persisted: true
     ? &id003 !HAKCCompilationUnit
-      computed_hash: 17654725404966094356
-      filename: _HAKC_SOURCE_PATH_/hakc_test0.c
+      computed_hash: 4030959379486237775
+      filename: _HAKC_SOURCE_PATH_/hakc_test3.c
     : &id018
       UsedInCompilationUnit:
         persisted: true
@@ -47,8 +47,8 @@ _adj: &id024
   *id002: {}
   *id003: {}
   ? &id012 !HAKCFunction
-    DefiningFile: _HAKC_SOURCE_PATH_/hakc_test0.c
-    DefiningLine: 15
+    DefiningFile: _HAKC_SOURCE_PATH_/hakc_test3.c
+    DefiningLine: 16
     Name: foo
     Scope: &id005 !HAKCScope
       computed_hash: 9223867316266404956
@@ -117,7 +117,7 @@ _adj: &id024
         persisted: true
     *id003: &id019
       DefinedIn:
-        line: 15
+        line: 16
         persisted: true
       UsedInCompilationUnit:
         persisted: true

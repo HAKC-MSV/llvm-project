@@ -1,0 +1,102 @@
+&id013 !!python/object:hakc.HAKCCompartmentalization.HAKCCompartmentalization
+__networkx_cache__: {}
+_adj: &id012
+  ? &id006 !HAKCFunction
+    DefiningFile: _HAKC_SOURCE_PATH_/hakc_test6.c
+    DefiningLine: 14
+    Name: static_branch_foo
+    Scope: &id002 !HAKCScope
+      computed_hash: 9223867316266404956
+      is_global_scope: true
+      is_local_scope: false
+      local_scope_name: global
+      scope: global
+    Type: &id001 !HAKCType
+      DebugType: int (struct data_struct*)
+      LLVMType: i32 (ptr)
+      _debug_type_is_known: true
+      _debug_type_transformed: int (struct data_struct*)
+      _llvm_type_is_known: true
+      computed_hash: 1068654295402828832
+    UsedSymbols: []
+    computed_hash: 5184022573217240795
+    direct_calls: []
+    indirect_calls: []
+  : *id001: &id007
+      IsType:
+        persisted: true
+    *id002: &id008
+      HasScope:
+        persisted: true
+    ? &id003 !HAKCCompilationUnit
+      computed_hash: 10302389366386136480
+      filename: _HAKC_SOURCE_PATH_/hakc_test6.c
+    : &id009
+      DefinedIn:
+        line: 14
+        persisted: true
+      UsedInCompilationUnit:
+        persisted: true
+    ? &id004 !HAKCDivision
+      access_token: 73728
+      compartment_id: 1
+      computed_hash: 13723477563850267561
+      division_count: 16
+      division_id: 13
+    : &id010
+      InDivision:
+        persisted: true
+  *id001: {}
+  *id002: {}
+  *id003: {}
+  *id004:
+    ? &id005 !HAKCCompartment
+      compartment_id: 1
+      computed_hash: null
+      division_count: 16
+      divisions: !!set
+        *id004: null
+      entry_token: 73728
+    : &id011
+      InCompartment:
+        persisted: true
+  *id005: {}
+_node: &id014
+  *id006:
+    persisted: true
+  *id001:
+    persisted: true
+  *id002:
+    persisted: true
+  *id003:
+    persisted: true
+  *id004:
+    persisted: true
+  *id005:
+    persisted: true
+_pred:
+  *id006: {}
+  *id001:
+    *id006: *id007
+  *id002:
+    *id006: *id008
+  *id003:
+    *id006: *id009
+  *id004:
+    *id006: *id010
+  *id005:
+    *id004: *id011
+_succ: *id012
+adj: !!python/object:networkx.classes.coreviews.MultiAdjacencyView
+  _atlas: *id012
+default_compartment: null
+default_division: null
+division_count: 16
+edges: !!python/object:networkx.classes.reportviews.OutMultiEdgeView
+  _adjdict: *id012
+  _graph: *id013
+graph: {}
+nodes: !!python/object:networkx.classes.reportviews.NodeView
+  _nodes: *id014
+succ: !!python/object:networkx.classes.coreviews.MultiAdjacencyView
+  _atlas: *id012

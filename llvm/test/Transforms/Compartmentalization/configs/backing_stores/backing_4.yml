@@ -29,8 +29,8 @@ _adj: &id024
       HasScope:
         persisted: true
     ? &id003 !HAKCCompilationUnit
-      computed_hash: 17654725404966094356
-      filename: _HAKC_SOURCE_PATH_/hakc_test0.c
+      computed_hash: 5207691315967219419
+      filename: _HAKC_SOURCE_PATH_/hakc_test4.c
     : &id018
       UsedInCompilationUnit:
         persisted: true
@@ -47,9 +47,9 @@ _adj: &id024
   *id002: {}
   *id003: {}
   ? &id012 !HAKCFunction
-    DefiningFile: _HAKC_SOURCE_PATH_/hakc_test0.c
-    DefiningLine: 15
-    Name: foo
+    DefiningFile: _HAKC_SOURCE_PATH_/hakc_test4.c
+    DefiningLine: 17
+    Name: ftrace_stub
     Scope: &id005 !HAKCScope
       computed_hash: 9223867316266404956
       is_global_scope: true
@@ -85,7 +85,7 @@ _adj: &id024
       computed_hash: 6588985453060915670
       direct_calls: []
       indirect_calls: []
-    computed_hash: 5954552900367763080
+    computed_hash: 12653416057862466618
     direct_calls:
     - !HAKCFunction
       DefiningFile: null
@@ -117,7 +117,7 @@ _adj: &id024
         persisted: true
     *id003: &id019
       DefinedIn:
-        line: 15
+        line: 17
         persisted: true
       UsedInCompilationUnit:
         persisted: true

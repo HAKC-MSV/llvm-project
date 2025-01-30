@@ -2,8 +2,8 @@
 __networkx_cache__: {}
 _adj: &id024
   ? &id011 !HAKCFunction
-    DefiningFile: null
-    DefiningLine: null
+    DefiningFile: _HAKC_SOURCE_PATH_/hakc_test9.c
+    DefiningLine: 15
     Name: bar
     Scope: &id002 !HAKCScope
       computed_hash: 9223867316266404956
@@ -29,9 +29,12 @@ _adj: &id024
       HasScope:
         persisted: true
     ? &id003 !HAKCCompilationUnit
-      computed_hash: 17654725404966094356
-      filename: _HAKC_SOURCE_PATH_/hakc_test0.c
+      computed_hash: 5773408004513745445
+      filename: _HAKC_SOURCE_PATH_/hakc_test9.c
     : &id018
+      DefinedIn:
+        line: 15
+        persisted: true
       UsedInCompilationUnit:
         persisted: true
     ? &id007 !HAKCDivision
@@ -47,8 +50,8 @@ _adj: &id024
   *id002: {}
   *id003: {}
   ? &id012 !HAKCFunction
-    DefiningFile: _HAKC_SOURCE_PATH_/hakc_test0.c
-    DefiningLine: 15
+    DefiningFile: _HAKC_SOURCE_PATH_/hakc_test9.c
+    DefiningLine: 22
     Name: foo
     Scope: &id005 !HAKCScope
       computed_hash: 9223867316266404956
@@ -65,8 +68,8 @@ _adj: &id024
       computed_hash: 1068654295402828832
     UsedSymbols:
     - &id006 !HAKCFunction
-      DefiningFile: null
-      DefiningLine: null
+      DefiningFile: _HAKC_SOURCE_PATH_/hakc_test9.c
+      DefiningLine: 15
       Name: bar
       Scope: !HAKCScope
         computed_hash: 9223867316266404956
@@ -88,8 +91,8 @@ _adj: &id024
     computed_hash: 5954552900367763080
     direct_calls:
     - !HAKCFunction
-      DefiningFile: null
-      DefiningLine: null
+      DefiningFile: _HAKC_SOURCE_PATH_/hakc_test9.c
+      DefiningLine: 15
       Name: bar
       Scope: !HAKCScope
         computed_hash: 9223867316266404956
@@ -117,7 +120,7 @@ _adj: &id024
         persisted: true
     *id003: &id019
       DefinedIn:
-        line: 15
+        line: 22
         persisted: true
       UsedInCompilationUnit:
         persisted: true
