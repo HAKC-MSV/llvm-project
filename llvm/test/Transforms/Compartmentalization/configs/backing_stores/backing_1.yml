@@ -101,8 +101,6 @@ _pred:
 _succ: *id012
 adj: !!python/object:networkx.classes.coreviews.MultiAdjacencyView
   _atlas: *id012
-default_compartment: null
-default_division: null
 division_count: 16
 edges: !!python/object:networkx.classes.reportviews.OutMultiEdgeView
   _adjdict: *id012

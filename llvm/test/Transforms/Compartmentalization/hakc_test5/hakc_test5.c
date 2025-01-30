@@ -7,13 +7,13 @@
 // RUN: %HAKC_EVALUATE
 // TODO: add the linux include for build 
 // testing function that allocates variable sized memory is tagged correctly 
-#include <linux/slab.h>         // kmalloc()
+// #include <linux/slab.h>         // kmalloc()
 
-inline void *kmalloc(size_t size, gfp_t gfp);
+void *kmalloc(unsigned long size, unsigned int);
 
 int foo() {
     int * mem; 
-    mem = (int *) kmalloc(2<<8, GFP_KERNEL);
+    mem = (int *) kmalloc(2<<8, 0);
     for(int i = 0; i < 2<<8; ++i){
         *(mem + i) = (int) i;
     }
