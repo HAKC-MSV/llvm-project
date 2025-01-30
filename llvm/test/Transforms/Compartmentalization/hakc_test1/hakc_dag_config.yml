@@ -2,7 +2,6 @@ Arch:                 X86
 Platform:             Test
 Database:
   server-url:         /home/al32163/hakc/HAKC_CURR/llvm-project/llvm/test/Transforms/Compartmentalization/hakc_test1/hakc-socket
-  server-timeout: 1000
   get-compartment-endpoint: "get-compartment"
 SourcePath:           /home/al32163/hakc/HAKC_CURR/llvm-project/llvm/test/Transforms/Compartmentalization/hakc_test1
 BuildPath:            /home/al32163/hakc/HAKC_CURR/llvm-project/llvm/test/Transforms/Compartmentalization/hakc_test1/build

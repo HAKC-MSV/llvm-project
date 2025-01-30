@@ -54,24 +54,6 @@ define dso_local i32 @foo(ptr noundef %0, ptr noundef %1, ptr noundef %2) #0 !db
   ret i32 %25, !dbg !55
 }
 
-; Function Attrs: noinline nounwind optnone uwtable
-define dso_local i32 @bar() #0 !dbg !56 {
-  %1 = alloca i32, align 4
-  %2 = alloca %struct.data_struct2, align 8
-  %3 = alloca ptr, align 8
-  %4 = alloca ptr, align 8
-    #dbg_declare(ptr %2, !59, !DIExpression(), !60)
-    #dbg_declare(ptr %3, !61, !DIExpression(), !62)
-  store ptr @kmalloc_caches, ptr %3, align 8, !dbg !63
-    #dbg_declare(ptr %4, !64, !DIExpression(), !65)
-  store ptr @somevar, ptr %4, align 8, !dbg !66
-  %5 = load ptr, ptr %3, align 8, !dbg !67
-  %6 = load ptr, ptr %4, align 8, !dbg !68
-  %7 = call i32 @foo(ptr noundef %2, ptr noundef %5, ptr noundef %6), !dbg !69
-  %8 = load i32, ptr %1, align 4, !dbg !70
-  ret i32 %8, !dbg !70
-}
-
 attributes #0 = { noinline nounwind optnone uwtable "frame-pointer"="all" "min-legal-vector-width"="0" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="x86-64" "target-features"="+cmov,+cx8,+fxsr,+mmx,+sse,+sse2,+x87" "tune-cpu"="generic" }
 
 !llvm.dbg.cu = !{!2}
@@ -80,12 +62,12 @@ attributes #0 = { noinline nounwind optnone uwtable "frame-pointer"="all" "min-l
 
 !0 = !DIGlobalVariableExpression(var: !1, expr: !DIExpression())
 !1 = distinct !DIGlobalVariable(name: "kmalloc_caches", scope: !2, file: !7, line: 10, type: !8, isLocal: false, isDefinition: true)
-!2 = distinct !DICompileUnit(language: DW_LANG_C11, file: !3, producer: "clang version 19.1.2 (git@g53gitlab.llan.ll.mit.edu:inherently-secure/llvm-project.git 6ac24fd1f99e0a3d7173c1e017764e588a5ed686)", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug, globals: !4, splitDebugInlining: false, nameTableKind: None)
-!3 = !DIFile(filename: "/home/al32163/hakc/HAKC_CURR/llvm-project/llvm/test/Transforms/Compartmentalization/hakc_test8/hakc_test8.c", directory: "/home/al32163/hakc/HAKC_CURR/cmake-build-hakc-llvm/llvm-project/llvm/test", checksumkind: CSK_MD5, checksum: "03df2aeb4723b8cee3519c8448c11132")
+!2 = distinct !DICompileUnit(language: DW_LANG_C11, file: !3, producer: "clang version 19.1.2 (git@g53gitlab.llan.ll.mit.edu:inherently-secure/llvm-project.git 3302becd236de1832c655b222b179974c9a2fd47)", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug, globals: !4, splitDebugInlining: false, nameTableKind: None)
+!3 = !DIFile(filename: "/home/al32163/hakc/HAKC_CURR/llvm-project/llvm/test/Transforms/Compartmentalization/hakc_test8/hakc_test8.c", directory: "/home/al32163/hakc/HAKC_CURR/cmake-build-hakc-llvm/llvm-project/llvm/test", checksumkind: CSK_MD5, checksum: "d52aca8c72c745729f68ddbd62ec7687")
 !4 = !{!0, !5}
 !5 = !DIGlobalVariableExpression(var: !6, expr: !DIExpression())
 !6 = distinct !DIGlobalVariable(name: "somevar", scope: !2, file: !7, line: 11, type: !8, isLocal: false, isDefinition: true)
-!7 = !DIFile(filename: "llvm-project/llvm/test/Transforms/Compartmentalization/hakc_test8/hakc_test8.c", directory: "/home/al32163/hakc/HAKC_CURR", checksumkind: CSK_MD5, checksum: "03df2aeb4723b8cee3519c8448c11132")
+!7 = !DIFile(filename: "llvm-project/llvm/test/Transforms/Compartmentalization/hakc_test8/hakc_test8.c", directory: "/home/al32163/hakc/HAKC_CURR", checksumkind: CSK_MD5, checksum: "d52aca8c72c745729f68ddbd62ec7687")
 !8 = !DIBasicType(name: "int", size: 32, encoding: DW_ATE_signed)
 !9 = !{i32 7, !"Dwarf Version", i32 5}
 !10 = !{i32 2, !"Debug Info Version", i32 3}
@@ -94,7 +76,7 @@ attributes #0 = { noinline nounwind optnone uwtable "frame-pointer"="all" "min-l
 !13 = !{i32 7, !"PIE Level", i32 2}
 !14 = !{i32 7, !"uwtable", i32 2}
 !15 = !{i32 7, !"frame-pointer", i32 2}
-!16 = !{!"clang version 19.1.2 (git@g53gitlab.llan.ll.mit.edu:inherently-secure/llvm-project.git 6ac24fd1f99e0a3d7173c1e017764e588a5ed686)"}
+!16 = !{!"clang version 19.1.2 (git@g53gitlab.llan.ll.mit.edu:inherently-secure/llvm-project.git 3302becd236de1832c655b222b179974c9a2fd47)"}
 !17 = distinct !DISubprogram(name: "foo", scope: !7, file: !7, line: 21, type: !18, scopeLine: 21, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !2, retainedNodes: !32)
 !18 = !DISubroutineType(types: !19)
 !19 = !{!8, !20, !31, !31}
@@ -134,18 +116,3 @@ attributes #0 = { noinline nounwind optnone uwtable "frame-pointer"="all" "min-l
 !53 = !DILocation(line: 27, column: 9, scope: !43)
 !54 = !DILocation(line: 29, column: 5, scope: !17)
 !55 = !DILocation(line: 30, column: 1, scope: !17)
-!56 = distinct !DISubprogram(name: "bar", scope: !7, file: !7, line: 32, type: !57, scopeLine: 32, spFlags: DISPFlagDefinition, unit: !2, retainedNodes: !32)
-!57 = !DISubroutineType(types: !58)
-!58 = !{!8}
-!59 = !DILocalVariable(name: "ds2", scope: !56, file: !7, line: 33, type: !21)
-!60 = !DILocation(line: 33, column: 25, scope: !56)
-!61 = !DILocalVariable(name: "v1", scope: !56, file: !7, line: 34, type: !31)
-!62 = !DILocation(line: 34, column: 10, scope: !56)
-!63 = !DILocation(line: 35, column: 8, scope: !56)
-!64 = !DILocalVariable(name: "v2", scope: !56, file: !7, line: 36, type: !31)
-!65 = !DILocation(line: 36, column: 10, scope: !56)
-!66 = !DILocation(line: 37, column: 8, scope: !56)
-!67 = !DILocation(line: 38, column: 15, scope: !56)
-!68 = !DILocation(line: 38, column: 19, scope: !56)
-!69 = !DILocation(line: 38, column: 5, scope: !56)
-!70 = !DILocation(line: 39, column: 1, scope: !56)

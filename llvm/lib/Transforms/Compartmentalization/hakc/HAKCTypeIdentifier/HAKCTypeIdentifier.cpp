@@ -564,7 +564,7 @@ void hakc::HAKCTypeIdentifier::FindIndirectCallSource(CallInst *CallI,
     }
 }
 
-FunctionType *hakc::HAKCTypeIdentifier::GetIndirectCallFunctionType(CallInst *CallI) {
+FunctionType *hakc::HAKCTypeIdentifier::GetIndirectCallFunctionType(CallInst *CallI) { 
     if (!CallI->isIndirectCall()) {
         errs() << "Trying to get type from a Call that is not an indirect call\n";
         throw std::exception();

@@ -43,7 +43,7 @@ attributes #0 = { noinline nounwind optnone uwtable "frame-pointer"="all" "min-l
 !llvm.module.flags = !{!2, !3, !4, !5, !6, !7, !8}
 !llvm.ident = !{!9}
 
-!0 = distinct !DICompileUnit(language: DW_LANG_C11, file: !1, producer: "clang version 19.1.2 (git@g53gitlab.llan.ll.mit.edu:inherently-secure/llvm-project.git 6ac24fd1f99e0a3d7173c1e017764e588a5ed686)", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug, splitDebugInlining: false, nameTableKind: None)
+!0 = distinct !DICompileUnit(language: DW_LANG_C11, file: !1, producer: "clang version 19.1.2 (git@g53gitlab.llan.ll.mit.edu:inherently-secure/llvm-project.git 3302becd236de1832c655b222b179974c9a2fd47)", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug, splitDebugInlining: false, nameTableKind: None)
 !1 = !DIFile(filename: "/home/al32163/hakc/HAKC_CURR/llvm-project/llvm/test/Transforms/Compartmentalization/hakc_test1/hakc_test1.c", directory: "/home/al32163/hakc/HAKC_CURR/cmake-build-hakc-llvm/llvm-project/llvm/test", checksumkind: CSK_MD5, checksum: "a343fbff25df52b7595be1ae987d0236")
 !2 = !{i32 7, !"Dwarf Version", i32 5}
 !3 = !{i32 2, !"Debug Info Version", i32 3}
@@ -52,7 +52,7 @@ attributes #0 = { noinline nounwind optnone uwtable "frame-pointer"="all" "min-l
 !6 = !{i32 7, !"PIE Level", i32 2}
 !7 = !{i32 7, !"uwtable", i32 2}
 !8 = !{i32 7, !"frame-pointer", i32 2}
-!9 = !{!"clang version 19.1.2 (git@g53gitlab.llan.ll.mit.edu:inherently-secure/llvm-project.git 6ac24fd1f99e0a3d7173c1e017764e588a5ed686)"}
+!9 = !{!"clang version 19.1.2 (git@g53gitlab.llan.ll.mit.edu:inherently-secure/llvm-project.git 3302becd236de1832c655b222b179974c9a2fd47)"}
 !10 = distinct !DISubprogram(name: "foo", scope: !11, file: !11, line: 16, type: !12, scopeLine: 16, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !0, retainedNodes: !26)
 !11 = !DIFile(filename: "llvm-project/llvm/test/Transforms/Compartmentalization/hakc_test1/hakc_test1.c", directory: "/home/al32163/hakc/HAKC_CURR", checksumkind: CSK_MD5, checksum: "a343fbff25df52b7595be1ae987d0236")
 !12 = !DISubroutineType(types: !13)

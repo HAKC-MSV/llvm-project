@@ -2,7 +2,6 @@ Arch:                 X86
 Platform:             Test
 Database:
   server-url:         @PWD@/hakc-socket
-  server-timeout: 1000
   get-compartment-endpoint: "get-compartment"
 SourcePath:           @PWD@
 BuildPath:            @PWD@/build
