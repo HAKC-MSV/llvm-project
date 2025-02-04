@@ -131,7 +131,8 @@ namespace llvm::hakc {
 
     hakc::HAKCCompartmentDivision &HAKCCompartmentalizationPolicy::GetDivision(GlobalValue *GV) {
         // TODO: Implement this end point
-        return *GetDivision(0, 0);
+      CommonHAKCAnalysis::getWriter() << "HAKCComparmentalizationPolicy::GetDivision by GV: " << GV <<"\n";
+      return *GetDivision(0, 0);
     }
 
     HAKCDivisionP HAKCCompartmentalizationPolicy::GetDivision(hakc_compartment_id_t CompartmentID,
@@ -141,9 +142,28 @@ namespace llvm::hakc {
             return Division;
         }
 
-        auto Compartment = GetCompartment(CompartmentID);
-        // TODO: Create Get Division Endpoint
-        Division = std::make_shared<hakc::HAKCCompartmentDivision>(*Compartment, 0, 0,
+        json::Object Parameters(
+            {
+                {"compartment-id", std::to_string(CompartmentID)},
+                {"division-id", std::to_string(DivisionID)},
+            }
+        );
+
+        auto ResponseData = Execute(SystemInformation.GetDatabaseInformation().GetDivisionEndpoint(), Parameters);
+        auto CompartmentEntryToken = ResponseData.getInteger("compartment_entry_token");
+        auto DivisionAccessToken = ResponseData.getInteger("division_access_token");
+        if (!CompartmentEntryToken.has_value()) {
+          CommonHAKCAnalysis::getWriter() << "Received No Entry Token for Compartment " << CompartmentID << "\n";
+          throw std::exception();
+        }
+        if (!DivisionAccessToken.has_value()) {
+          CommonHAKCAnalysis::getWriter() << "Received No Entry Token for Division " << DivisionID << "\n";
+          throw std::exception();
+        }
+
+        auto Compartment = std::make_shared<hakc::HAKCCompartment>(CompartmentID, (hakc_access_token_t) *CompartmentEntryToken, SystemInformation.GetModule().getContext());
+
+        Division = std::make_shared<hakc::HAKCCompartmentDivision>(*Compartment, (hakc_compartment_division_t) DivisionID, (hakc_access_token_t) *DivisionAccessToken,
                                                                    SystemInformation.GetModule().getContext());
         Divisions.push_back(Division);
 

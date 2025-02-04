@@ -1,6 +1,6 @@
 {
   "backing_store": {
-    "type": "yaml",
+    "type": "@HAKC_BACKING_TYPE@",
     "path": "@HAKC_BACKING_STORE@",
     "default_compartment": @HAKC_DEFAULT_COMPARTMENT@,
     "default_division": @HAKC_DEFAULT_DIVISION@

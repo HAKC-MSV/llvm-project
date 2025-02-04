@@ -3,6 +3,7 @@ Platform:             Test
 Database:
   server-url:         @PWD@/hakc-socket
   get-compartment-endpoint: "get-compartment"
+  get-division-endpoint: "get-division"
 SourcePath:           @PWD@
 BuildPath:            @PWD@/build
 DagAnalysisRootPath:  @PWD@/dag_analysis

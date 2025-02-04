@@ -1,3 +1,5 @@
 dag_analysis/
 hakc-db/
 *.yml
+*.ll
+hakc-socket

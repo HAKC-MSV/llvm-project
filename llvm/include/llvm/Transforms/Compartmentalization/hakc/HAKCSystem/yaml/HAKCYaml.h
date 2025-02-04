@@ -126,6 +126,7 @@ namespace llvm::hakc {
     struct HAKCYamlDatabaseConfig {
         HAKCYAMLStringType ServerURL;
         HAKCYAMLStringType GetCompartmentEndpoint;
+        HAKCYAMLStringType GetDivisionEndpoint;
         unsigned ServerTimeout;
     };
 
@@ -286,6 +287,7 @@ struct yaml::MappingTraits<hakc::HAKCYamlDatabaseConfig> {
         io.mapRequired("server-url", YamlConfig.ServerURL);
         io.mapOptional("server-timeout", YamlConfig.ServerTimeout, 1000);
         io.mapOptional("get-compartment-endpoint", YamlConfig.GetCompartmentEndpoint, "get-compartment");
+        io.mapOptional("get-division-endpoint", YamlConfig.GetDivisionEndpoint, "get-division");
     }
 };
 
