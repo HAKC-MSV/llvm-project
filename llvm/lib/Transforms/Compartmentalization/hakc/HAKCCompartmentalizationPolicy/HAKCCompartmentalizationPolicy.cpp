@@ -130,7 +130,7 @@ namespace llvm::hakc {
     }
 
     hakc::HAKCCompartmentDivision &HAKCCompartmentalizationPolicy::GetDivision(GlobalValue *GV) {
-        // TODO: Implement this end point
+        // TODO: Ask derrick, is 0,0 the desired configuration for GV?
       CommonHAKCAnalysis::getWriter() << "HAKCComparmentalizationPolicy::GetDivision by GV: " << GV <<"\n";
       return *GetDivision(0, 0);
     }
@@ -150,19 +150,19 @@ namespace llvm::hakc {
         );
 
         auto ResponseData = Execute(SystemInformation.GetDatabaseInformation().GetDivisionEndpoint(), Parameters);
-        auto CompartmentEntryToken = ResponseData.getInteger("compartment_entry_token");
-        auto DivisionAccessToken = ResponseData.getInteger("division_access_token");
-        if (!CompartmentEntryToken.has_value()) {
-          CommonHAKCAnalysis::getWriter() << "Received No Entry Token for Compartment " << CompartmentID << "\n";
-          throw std::exception();
-        }
+//        auto CompartmentEntryToken = ResponseData.getInteger("entry_token");
+        auto DivisionAccessToken = ResponseData.getInteger("access_token");
+//        if (!CompartmentEntryToken.has_value()) {
+//          CommonHAKCAnalysis::getWriter() << "Received No Entry Token for Compartment " << CompartmentID << "\n";
+//          throw std::exception();
+//        }
         if (!DivisionAccessToken.has_value()) {
           CommonHAKCAnalysis::getWriter() << "Received No Entry Token for Division " << DivisionID << "\n";
           throw std::exception();
         }
 
-        auto Compartment = std::make_shared<hakc::HAKCCompartment>(CompartmentID, (hakc_access_token_t) *CompartmentEntryToken, SystemInformation.GetModule().getContext());
-
+//        auto Compartment = std::make_shared<hakc::HAKCCompartment>(CompartmentID, (hakc_access_token_t) *CompartmentEntryToken, SystemInformation.GetModule().getContext());
+        auto Compartment = GetCompartment(CompartmentID);
         Division = std::make_shared<hakc::HAKCCompartmentDivision>(*Compartment, (hakc_compartment_division_t) DivisionID, (hakc_access_token_t) *DivisionAccessToken,
                                                                    SystemInformation.GetModule().getContext());
         Divisions.push_back(Division);
