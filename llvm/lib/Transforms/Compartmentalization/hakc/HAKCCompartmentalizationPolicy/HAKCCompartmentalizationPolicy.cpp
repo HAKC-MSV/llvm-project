@@ -143,6 +143,18 @@ namespace llvm::hakc {
         json::Object Parameters({
             {"object", ObjectYaml}
         });
+        auto ResponseData = Execute(SystemInformation.GetDatabaseInformation().GetSymbolDivisionEndpoint(), Parameters);
+        auto CompartmentID = ResponseData.getInteger("compartment_id");
+        if (!CompartmentID.has_value()) {
+            CommonHAKCAnalysis::getWriter() << "Could not find CompartmentID for " << *GV << "\n";
+            throw std::exception();
+        }
+        auto DivisionID = ResponseData.getInteger("division_id");
+        if (!DivisionID.has_value()) {
+            CommonHAKCAnalysis::getWriter() << "Could not get DivisionID for " << *GV << "\n";
+            throw std::exception();
+        }
+        return *GetDivision(*CompartmentID, *DivisionID);
     }
 
     hakc::HAKCCompartmentDivision &HAKCCompartmentalizationPolicy::GetDefaultDivision() {
