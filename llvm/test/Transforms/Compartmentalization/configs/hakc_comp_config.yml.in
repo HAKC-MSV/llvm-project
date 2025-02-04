@@ -1,9 +1,10 @@
 Arch:                 X86
 Platform:             Test
 Database:
-  server-url:         @PWD@/hakc-socket
-  get-compartment-endpoint: "get-compartment"
-  get-division-endpoint: "get-division"
+  server-url:                   @PWD@/hakc-socket
+  get-compartment-endpoint:     "get-compartment"
+  get-division-endpoint:        "get-division"
+  get-symbol-division-endpoint: "get-symbol-endpoint"
 SourcePath:           @PWD@
 BuildPath:            @PWD@/build
 DagAnalysisRootPath:  @PWD@/dag_analysis

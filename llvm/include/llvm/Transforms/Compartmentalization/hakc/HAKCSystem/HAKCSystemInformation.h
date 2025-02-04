@@ -5,14 +5,14 @@
 #ifndef HAKC_HAKCSYSTEMINFORMATION_H
 #define HAKC_HAKCSYSTEMINFORMATION_H
 
-#include <string>
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/IR/Module.h"
-#include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCAllocationSize.h"
-#include "llvm/Transforms/Compartmentalization/hakc/HAKCFunctionDefinition/HAKCTransferFunction.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCFunctionDefinition/HAKCCustomTransfer.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCFunctionDefinition/HAKCTransferFunction.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCAllocationSize.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/yaml/HAKCYaml.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTypeIdentifier/HAKCTypeIdentifier.h"
+#include <string>
 
 typedef std::shared_ptr<llvm::hakc::HAKCAllocationSize> HAKCCustomAllocation;
 
@@ -40,6 +40,8 @@ namespace llvm::hakc {
 
         StringRef GetDivisionEndpoint() const;
 
+        StringRef GetSymbolDivisionEndpoint() const;
+
         std::chrono::milliseconds GetServerTimeout() const;
 
         void operator<<(HAKCYamlDatabaseConfig &DatabaseConfig);
@@ -48,6 +50,7 @@ namespace llvm::hakc {
         std::string ServerURL;
         std::string CompartmentEndpoint;
         std::string DivisionEndpoint;
+        std::string SymbolDivisionEndpoint;
         std::chrono::milliseconds Timeout;
     };
 

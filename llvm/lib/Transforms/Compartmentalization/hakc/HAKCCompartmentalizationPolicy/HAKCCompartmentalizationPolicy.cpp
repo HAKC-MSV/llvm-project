@@ -5,6 +5,7 @@
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartmentalizationPolicy.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/CommonHAKCAnalysis.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartmentDivision.h"
+#include "llvm/Support/raw_ostream.h"
 #include <unistd.h>
 
 namespace llvm::hakc {
@@ -130,9 +131,22 @@ namespace llvm::hakc {
     }
 
     hakc::HAKCCompartmentDivision &HAKCCompartmentalizationPolicy::GetDivision(GlobalValue *GV) {
-        // TODO: Ask derrick, is 0,0 the desired configuration for GV?
-      CommonHAKCAnalysis::getWriter() << "HAKCComparmentalizationPolicy::GetDivision by GV: " << GV <<"\n";
-      return *GetDivision(0, 0);
+        auto HAKCSymbol = SystemInformation.GetTypeIdentifier().FindSymbol(GV, true);
+        if (!HAKCSymbol) {
+            CommonHAKCAnalysis::getWriter() << "Could not find HAKCSymbol for " << GV << "\n";
+            return GetDefaultDivision();
+        }
+
+        std::string ObjectYaml;
+        llvm::raw_string_ostream os(ObjectYaml);
+        os << *HAKCSymbol;
+        json::Object Parameters({
+            {"object", ObjectYaml}
+        });
+    }
+
+    hakc::HAKCCompartmentDivision &HAKCCompartmentalizationPolicy::GetDefaultDivision() {
+        return *GetDivision(0, 0);
     }
 
     HAKCDivisionP HAKCCompartmentalizationPolicy::GetDivision(hakc_compartment_id_t CompartmentID,
@@ -150,20 +164,16 @@ namespace llvm::hakc {
         );
 
         auto ResponseData = Execute(SystemInformation.GetDatabaseInformation().GetDivisionEndpoint(), Parameters);
-//        auto CompartmentEntryToken = ResponseData.getInteger("entry_token");
         auto DivisionAccessToken = ResponseData.getInteger("access_token");
-//        if (!CompartmentEntryToken.has_value()) {
-//          CommonHAKCAnalysis::getWriter() << "Received No Entry Token for Compartment " << CompartmentID << "\n";
-//          throw std::exception();
-//        }
         if (!DivisionAccessToken.has_value()) {
-          CommonHAKCAnalysis::getWriter() << "Received No Entry Token for Division " << DivisionID << "\n";
-          throw std::exception();
+            CommonHAKCAnalysis::getWriter() << "Received No Entry Token for Division " << DivisionID << "\n";
+            throw std::exception();
         }
 
-//        auto Compartment = std::make_shared<hakc::HAKCCompartment>(CompartmentID, (hakc_access_token_t) *CompartmentEntryToken, SystemInformation.GetModule().getContext());
         auto Compartment = GetCompartment(CompartmentID);
-        Division = std::make_shared<hakc::HAKCCompartmentDivision>(*Compartment, (hakc_compartment_division_t) DivisionID, (hakc_access_token_t) *DivisionAccessToken,
+        Division = std::make_shared<hakc::HAKCCompartmentDivision>(*Compartment,
+                                                                   (hakc_compartment_division_t) DivisionID,
+                                                                   (hakc_access_token_t) *DivisionAccessToken,
                                                                    SystemInformation.GetModule().getContext());
         Divisions.push_back(Division);
 
@@ -188,10 +198,23 @@ namespace llvm::hakc {
             CommonHAKCAnalysis::getWriter() << "Received No Entry Token for Compartment " << CompartmentID << "\n";
             throw std::exception();
         }
-        Compartment = std::make_shared<HAKCCompartment>(CompartmentID, *EntryToken,
-                                                        SystemInformation.GetModule().getContext());
-        Compartments.push_back(Compartment);
+        Compartment = CreateCompartment(CompartmentID, *EntryToken, false);
+        return Compartment;
+    }
 
+    HAKCCompartmentP HAKCCompartmentalizationPolicy::CreateCompartment(hakc_compartment_id_t CompartmentID,
+                                                                       hakc_access_token_t AccessToken,
+                                                                       bool CheckForExisting) {
+        if (CheckForExisting) {
+            auto Compartment = FindCachedCompartment(CompartmentID);
+            if (Compartment) {
+                return Compartment;
+            }
+        }
+
+        auto Compartment = std::make_shared<HAKCCompartment>(CompartmentID, AccessToken,
+                                                             SystemInformation.GetModule().getContext());
+        Compartments.push_back(Compartment);
         return Compartment;
     }
 

@@ -82,6 +82,8 @@ namespace llvm::hakc {
 
         void CheckConnection() const;
 
+        hakc::HAKCCompartmentDivision &GetDefaultDivision();
+
         HAKCDivisionP GetDivision(hakc_compartment_id_t CompartmentID, hakc_compartment_division_t DivisionID);
 
         void ConnectToDatabase();
@@ -93,6 +95,9 @@ namespace llvm::hakc {
         HAKCCompartmentP FindCachedCompartment(hakc_compartment_id_t CompartmentID);
 
         json::Object Execute(StringRef Endpoint, json::Object &Parameters) const;
+
+        HAKCCompartmentP CreateCompartment(hakc_compartment_id_t CompartmentID, hakc_access_token_t AccessToken,
+                                           bool CheckForExisting);
     };
 } // hakc
 

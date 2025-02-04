@@ -7,7 +7,8 @@
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/yaml/HAKCYaml.h"
 
 namespace llvm::hakc {
-    HAKCDatabaseInformation::HAKCDatabaseInformation() : ServerURL(), CompartmentEndpoint(), Timeout() {
+    HAKCDatabaseInformation::HAKCDatabaseInformation() : ServerURL(), CompartmentEndpoint(), DivisionEndpoint(),
+                                                         SymbolDivisionEndpoint(), Timeout() {
     }
 
     StringRef HAKCDatabaseInformation::GetServerURL() const {
@@ -19,7 +20,11 @@ namespace llvm::hakc {
     }
 
     StringRef HAKCDatabaseInformation::GetDivisionEndpoint() const {
-      return DivisionEndpoint;
+        return DivisionEndpoint;
+    }
+
+    StringRef HAKCDatabaseInformation::GetSymbolDivisionEndpoint() const {
+        return SymbolDivisionEndpoint;
     }
 
     std::chrono::milliseconds HAKCDatabaseInformation::GetServerTimeout() const {
@@ -30,6 +35,7 @@ namespace llvm::hakc {
         ServerURL = DatabaseConfig.ServerURL;
         CompartmentEndpoint = DatabaseConfig.GetCompartmentEndpoint;
         DivisionEndpoint = DatabaseConfig.GetDivisionEndpoint;
+        SymbolDivisionEndpoint = DatabaseConfig.GetSymbolDivisionEndpoint;
         Timeout = std::chrono::milliseconds(DatabaseConfig.ServerTimeout);
     }
 

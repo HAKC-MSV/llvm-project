@@ -57,8 +57,6 @@ namespace llvm::hakc {
 
         void AddGlobalMapping(const DIGlobalVariable *DIGV, const HAKCGlobalP &HAKCSymbol);
 
-        //        void AddLLVMTypeMapping(const HAKCTypeP &HAKCType, Type *Ty);
-
         GlobalVariable *FindGlobal(const DIGlobalVariable *DIGV);
 
         HAKCFunctionP HandleFunction(const DISubprogram *SubProg);
@@ -74,10 +72,6 @@ namespace llvm::hakc {
         void FindTypesInFunctions();
 
         unsigned GetAnonymousID(const DIType *type);
-
-        //        bool LLVMTypeMappingSanityCheck(const DIType *type, Type *Ty);
-
-        //        static std::string ConstructStructName(StructType *StructTy);
 
         HAKCSymbolP AddUnmappedGlobal(GlobalObject *GlobalObj);
 
@@ -105,7 +99,6 @@ namespace llvm::hakc {
         std::map<const DIType *, HAKCTypeP> types;
         std::map<const DIGlobalVariable *, HAKCGlobalP> globals;
         std::map<const DISubprogram *, HAKCFunctionP> functions;
-        //        std::map<HAKCTypeP, std::vector<Type *>> LLVMTypeMapping;
         std::map<const DIType *, unsigned> AnonymousNumberMapping;
         std::set<HAKCGlobalP> UnmappedGlobals;
         std::set<HAKCFunctionP> UnmappedFunctions;
