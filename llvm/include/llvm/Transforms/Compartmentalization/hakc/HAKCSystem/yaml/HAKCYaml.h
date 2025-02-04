@@ -287,9 +287,9 @@ struct yaml::MappingTraits<hakc::HAKCYamlDatabaseConfig> {
     static void mapping(yaml::IO &io, hakc::HAKCYamlDatabaseConfig &YamlConfig) {
         io.mapRequired("server-url", YamlConfig.ServerURL);
         io.mapOptional("server-timeout", YamlConfig.ServerTimeout, 1000);
-        io.mapOptional("get-compartment-endpoint", YamlConfig.GetCompartmentEndpoint, "get-compartment");
-        io.mapOptional("get-division-endpoint", YamlConfig.GetDivisionEndpoint, "get-division");
-        io.mapOptional("get-symbol-division-endpoint", YamlConfig.GetSymbolDivisionEndpoint, "get-symbol-division");
+        io.mapOptional("get-compartment-by-id-endpoint", YamlConfig.GetCompartmentEndpoint, "get-compartment-id");
+        io.mapOptional("get-division-by-id-endpoint", YamlConfig.GetDivisionEndpoint, "get-division-id");
+        io.mapOptional("get-division-from-symbol-endpoint", YamlConfig.GetSymbolDivisionEndpoint, "get-division-from-symbol");
     }
 };
 
