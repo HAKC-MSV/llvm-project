@@ -3,9 +3,9 @@
 //
 
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartmentalizationPolicy.h"
+#include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/CommonHAKCAnalysis.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartmentDivision.h"
-#include "llvm/Support/raw_ostream.h"
 #include <unistd.h>
 
 namespace llvm::hakc {
@@ -214,6 +214,12 @@ namespace llvm::hakc {
         return Compartment;
     }
 
+    std::vector<hakc_compartment_id_t> HAKCCompartmentalizationPolicy::GetValidCompartmentTargets(
+        hakc_compartment_id_t CompartmentID) {
+        // TODO: Query database for the actual values
+        return {0};
+    }
+
     HAKCCompartmentP HAKCCompartmentalizationPolicy::CreateCompartment(hakc_compartment_id_t CompartmentID,
                                                                        hakc_access_token_t AccessToken,
                                                                        bool CheckForExisting) {
@@ -226,6 +232,10 @@ namespace llvm::hakc {
 
         auto Compartment = std::make_shared<HAKCCompartment>(CompartmentID, AccessToken,
                                                              SystemInformation.GetModule().getContext());
+        for (auto TargetCompartmentID: GetValidCompartmentTargets(CompartmentID)) {
+            auto *TargetCompartment = HAKCCompartment::CreateID(TargetCompartmentID, SystemInformation.GetModule());
+            Compartment->AddTarget(TargetCompartment);
+        }
         Compartments.push_back(Compartment);
         return Compartment;
     }

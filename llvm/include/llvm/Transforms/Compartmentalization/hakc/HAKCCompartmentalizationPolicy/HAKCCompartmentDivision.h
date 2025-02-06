@@ -8,7 +8,6 @@
 #include "HAKCCompartment.h"
 
 namespace llvm::hakc {
-
     class HAKCCompartmentDivision {
     public:
         HAKCCompartmentDivision(const HAKCCompartment &C, hakc_compartment_division_t DivisionID,
@@ -16,7 +15,7 @@ namespace llvm::hakc {
 
         HAKCCompartmentDivision();
 
-        HAKCCompartment GetHAKCCompartment() const;
+        const HAKCCompartment &GetHAKCCompartment() const;
 
         HAKC_Division_ID GetDivisionID() const;
 
@@ -33,7 +32,6 @@ namespace llvm::hakc {
         HAKC_Access_Token AccessToken;
         HAKC_Division_ID DivisionID;
     };
-
 } // hakc
 
 #endif //HAKC_HAKCCOMPARTMENTDIVISION_H

@@ -98,6 +98,8 @@ namespace llvm::hakc {
 
         HAKCCompartmentP CreateCompartment(hakc_compartment_id_t CompartmentID, hakc_access_token_t AccessToken,
                                            bool CheckForExisting);
+
+        std::vector<hakc_compartment_id_t> GetValidCompartmentTargets(hakc_compartment_id_t CompartmentID);
     };
 } // hakc
 

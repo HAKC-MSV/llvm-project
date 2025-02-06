@@ -24,7 +24,7 @@ namespace llvm::hakc {
     }
 
 
-    HAKCCompartment HAKCCompartmentDivision::GetHAKCCompartment() const {
+    const HAKCCompartment &HAKCCompartmentDivision::GetHAKCCompartment() const {
         return ParentCompartment;
     }
 
