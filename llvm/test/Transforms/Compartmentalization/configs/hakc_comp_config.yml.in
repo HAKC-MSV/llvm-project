@@ -1,16 +1,16 @@
-Arch:                 X86
-Platform:             Test
+Arch: X86
+Platform: Test
 Database:
-  server-url:                   @PWD@/hakc-socket
-  get-compartment-by-id-endpoint:     "get-compartment-by-id"
-  get-division-by-id-endpoint:        "get-division-by-id"
+  server-url: @PWD@/hakc-socket
+  get-compartment-by-id-endpoint: "get-compartment-by-id"
+  get-division-by-id-endpoint: "get-division-by-id"
   get-division-from-symbol-endpoint: "get-division-from-symbol"
-SourcePath:           @PWD@
-BuildPath:            @PWD@/build
-DagAnalysisRootPath:  @PWD@/dag_analysis
-OutputDebugInfo:      true
-PassMode:             @PASS_MODE@
-IncludePaths:         []
+SourcePath: @PWD@
+BuildPath: @PWD@/build
+DagAnalysisRootPath: @PWD@/dag_analysis
+OutputDebugInfo: true
+PassMode: @PASS_MODE@
+IncludePaths: [ ]
 CodeValidationFunction: "check_hakc_code_access"
 DataValidationFunction: "check_hakc_data_access"
 SignWithDivisionFunction: { name: "hakc_sign_pointer_with_color", ptr-idx: 0, compartment-idx: 1, is-code-idx: 2 }
@@ -18,7 +18,7 @@ DefaultCompartmentTransferFunction: { name: "hakc_transfer_to_clique", ptr-idx: 
 CompartmentalizationSupportFunctions:
   - { name: "get_hakc_color_by_name" }
   - { name: "get_hakc_percpu_color", ptr-idx: 0 }
-  - { name: "get_hakc_address_color", ptr-idx: 0}
+  - { name: "get_hakc_address_color", ptr-idx: 0 }
   - { name: "hakc_sign_pointer_with_color", ptr-idx: 0, compartment-idx: 1 }
   - { name: "hakc_sign_pcpu_pointer_with_color", ptr-idx: 0, compartment-idx: 1 }
   - { name: "hakc_sign_pointer", ptr-idx: 0, compartment-idx: 1, division-idx: 2 }
