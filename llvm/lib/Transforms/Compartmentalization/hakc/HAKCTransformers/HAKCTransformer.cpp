@@ -5,8 +5,8 @@
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCTransformer.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/CommonHAKCAnalysis.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/HAKCModuleAnalysis.h"
-#include "llvm/Transforms/Compartmentalization/hakc/HAKCFunctionDefinition/HAKCCustomTransfer.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartmentDivision.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCFunctionDefinition/HAKCCustomTransfer.h"
 
 hakc::HAKCTransformer::HAKCTransformer(HAKCCompartmentalizationPolicy &Policy,
                                        HAKCModuleAnalysis &HAKCAnalysis) : HAKCIRBuilder(
@@ -19,58 +19,6 @@ hakc::HAKCTransformer::HAKCTransformer(HAKCCompartmentalizationPolicy &Policy,
 Type *hakc::HAKCTransformer::GetEntryTokenType(unsigned AddrSpace) {
     return HAKCIRBuilder.getPtrTy(AddrSpace);
 }
-
-//void hakc::HAKCTransformer::CreateTransferFunctionFinalize_Arch(Function *Original, Function *Transfer) {
-//    if (ModuleAnalysis.GetCommonAnalysis().FunctionIsExported(Original)) {
-//        /* Exported functions are often used elsewhere. Make sure that
-//             * the transfer function is also exported, so it can be used in the same places.
-//             * According to the comment for ___EXPORT_SYMBOL in include/linux/export.h,
-//             * there are three things needed, but we won't use __kcrctab for simplicity
-//             */
-//
-//        // Create kstrtab entry
-//        std::stringstream asm_stream;
-//        asm_stream << "\t.section \"__ksymtab_strings\",\"aMS\",%progbits,1\t\n"
-//                   << getKstrtab_entry_name(Transfer) << ":\t\t\t\t\t\n"
-//                   << "\t.asciz \"" << Transfer->getName().str() << "\"\n";
-//
-//        // Create kstrtabns entry
-//        /* Namespace values for exported symbols are defined by inline assembly, which is hard to get, but
-//             * an empty string is valid, so hopefully this will be ok
-//             */
-//        asm_stream << getKstrtabns_entry_name(Transfer) << ":\t\t\t\t\t\n"
-//                   << "\t.asciz \"\"\n"
-//                   << "\t.previous\t\t\t\t\t\n";
-//
-//        // Create kernel_symbol entry
-//        asm_stream << "\t.section \"___ksymtab+" << Transfer->getName().str() << "\", \"a\"\t\n"
-//                   << "\t.balign\t4\t\t\t\t\t\n"
-//                   << "__ksymtab_" << Transfer->getName().str() << ":\t\t\t\t\n"
-//                   << "\t.long\t" << Transfer->getName().str() << "- .\t\t\t\t\n"
-//                   << "\t.long\t" << getKstrtab_entry_name(Transfer) << "- .\t\t\t\n"
-//                   << "\t.long\t" << getKstrtabns_entry_name(Transfer) << "- .\t\t\t\n"
-//                   << "\t.previous\t\t\t\t\t\n";
-//        getModule().appendModuleInlineAsm(asm_stream.str());
-//
-//        std::string unique_addressable_name = getUniqueAddressable_Name(Original);
-//        auto *unique_addressable = getModule().getNamedValue(unique_addressable_name);
-//        if (!unique_addressable) {
-//            CommonHAKCAnalysis::getWriter() << "Could not find unique ID global " << unique_addressable_name
-//                                            << "\n";
-//            throw std::exception();
-//        }
-//        unique_addressable_name = getUniqueAddressable_Name(Transfer);
-//        auto *transfer_unique_addressable = getModule().getOrInsertGlobal(unique_addressable_name,
-//                                                                          unique_addressable->getValueType());
-//        auto *transfer_unique_global = dyn_cast<GlobalVariable>(transfer_unique_addressable);
-//        auto *unique_addressable_global = dyn_cast<GlobalVariable>(unique_addressable);
-//        Constant *transfer_func_cast = ConstantExpr::getBitCast(Transfer,
-//                                                                PointerType::get(getModule().getContext(), 0));
-//        transfer_unique_global->setSection(unique_addressable_global->getSection());
-//        transfer_unique_global->copyAttributesFrom(unique_addressable_global);
-//        transfer_unique_global->setInitializer(transfer_func_cast);
-//    }
-//}
 
 std::string hakc::HAKCTransformer::getUniqueAddressable_Name(Function *F) {
     std::string unique_addressable_name = "__UNIQUE_ID___addressable_";
