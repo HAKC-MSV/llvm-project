@@ -128,6 +128,7 @@ namespace llvm::hakc {
         HAKCYAMLStringType GetCompartmentEndpoint;
         HAKCYAMLStringType GetDivisionEndpoint;
         HAKCYAMLStringType GetSymbolDivisionEndpoint;
+        HAKCYAMLStringType GetValidTargetsEndpoint;
         unsigned ServerTimeout;
     };
 
@@ -290,6 +291,7 @@ struct yaml::MappingTraits<hakc::HAKCYamlDatabaseConfig> {
         io.mapOptional("get-compartment-by-id-endpoint", YamlConfig.GetCompartmentEndpoint, "get-compartment-id");
         io.mapOptional("get-division-by-id-endpoint", YamlConfig.GetDivisionEndpoint, "get-division-id");
         io.mapOptional("get-division-from-symbol-endpoint", YamlConfig.GetSymbolDivisionEndpoint, "get-division-from-symbol");
+        io.mapOptional("get-valid-targets-from-compartment-id-endpoint", YamlConfig.GetValidTargetsEndpoint, "get-valid-targets-from-compartment-id");
     }
 };
 
