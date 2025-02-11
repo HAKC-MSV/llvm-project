@@ -1,5 +1,5 @@
 {
-  "backing_store": {
+  "backing_policy_config": {
     "type": "@HAKC_BACKING_TYPE@",
     "path": "@HAKC_BACKING_STORE@",
     "default_compartment": @HAKC_DEFAULT_COMPARTMENT@,
@@ -7,5 +7,9 @@
   },
   "reuse_path": true,
   "socket_path": "@PWD@/hakc-socket",
-  "server_timeout": @SERVER_TIMEOUT@
+  "server_timeout": @SERVER_TIMEOUT@,
+  "get-compartment-by-id-endpoint": "get-compartment-by-id",
+  "get-division-by-id-endpoint": "get-division-by-id",
+  "get-division-from-symbol-endpoint": "get-division-from-symbol",
+  "get-valid-targets-from-compartment-id-endpoint": "get-valid-targets-from-compartment-id"
 }
