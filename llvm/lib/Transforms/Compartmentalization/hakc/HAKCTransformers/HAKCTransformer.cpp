@@ -174,7 +174,6 @@ Value *hakc::HAKCTransformer::CreateSafePointer(HAKCPointerBase &HAKCPointer, In
 
     unsigned AddrSpace = GetPointerAddrSpace(HAKCPointer);
 
-    // todo: derrick, please check this code; getint8ptrty replaced with getintptrty, hakcpointer replaced with hakcpointer.getbasedefinition
     if (HAKCPointer.GetBaseDefinition()->getType()->isIntegerTy()) {
         voidCast = HAKCIRBuilder.CreateIntToPtr(HAKCPointer.GetBaseDefinition(), HAKCIRBuilder.getPtrTy(AddrSpace));
     } else {
@@ -1054,11 +1053,13 @@ Value *hakc::HAKCTransformer::CreateBitCast(hakc::HAKCPointerBase &HAKCPointer, 
 
 
 ConstantInt *hakc::HAKCTransformer::GetObjectSizeInBytes(hakc::HAKCPointerBase &HAKCPointer) {
-    return GetObjectSizeInBytes(HAKCPointer.GetType()->GetPointeeType());
+  CommonHAKCAnalysis::getWriter() << "In Getobjectsizeinbytes, hakc pointer:: " << HAKCPointer << "\n";
+  return GetObjectSizeInBytes(HAKCPointer.GetType()->GetPointeeType());
 }
 
 ConstantInt *hakc::HAKCTransformer::GetObjectSizeInBytes(hakc::HAKCTypeP HAKCType) {
     auto bit_size = HAKCType->GetSizeInBits();
+    CommonHAKCAnalysis::getWriter() << "In Getobjectsizeinbytes: bitsize: " << bit_size << "\n";
     return getInt64(bit_size / BITS_PER_BYTE);
 }
 

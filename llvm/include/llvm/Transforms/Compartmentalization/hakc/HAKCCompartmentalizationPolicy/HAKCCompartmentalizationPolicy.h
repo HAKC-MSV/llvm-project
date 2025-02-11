@@ -74,10 +74,16 @@ namespace llvm::hakc {
 
         HAKCCompartmentP GetCompartment(hakc_compartment_id_t CompartmentID);
 
+        HAKCDivisionP GetDivisionFromSymbol(hakc::HAKCYamlSymbol symbol);
+
+        std::vector<hakc_compartment_id_t> GetValidTargets(hakc_compartment_id_t CompartmentID);
+
+
     protected:
         HAKCSystemInformation &SystemInformation;
         std::vector<HAKCCompartmentP> Compartments;
         std::vector<HAKCDivisionP> Divisions;
+        std::vector<hakc_compartment_id_t> ValidTargets;
         HAKCDatabaseConnection Client;
 
         void CheckConnection() const;

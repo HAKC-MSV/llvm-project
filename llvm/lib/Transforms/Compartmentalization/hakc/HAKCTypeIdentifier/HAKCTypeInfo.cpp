@@ -75,6 +75,7 @@ namespace llvm::hakc {
 
     std::shared_ptr<HAKCTypeInfo> HAKCTypeInfo::GetPointeeType() {
         /* TODO: Implement me */
+        // Look at this
         return nullptr;
     }
 

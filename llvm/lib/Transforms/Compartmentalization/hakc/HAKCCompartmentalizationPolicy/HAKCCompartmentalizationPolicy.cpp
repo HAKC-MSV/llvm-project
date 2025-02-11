@@ -214,7 +214,35 @@ namespace llvm::hakc {
         return Compartment;
     }
 
-    void HAKCCompartmentalizationPolicy::GetValidCompartmentTargets(HAKCCompartment &Compartment) {
+    std::vector<hakc_compartment_id_t> HAKCCompartmentalizationPolicy::GetValidTargets(hakc_compartment_id_t CompartmentID) {
+      // TODO: Query database for the actual values
+      // auto Compartment = FindCachedCompartment(CompartmentID);
+      // if (Compartment) {
+      //   return Compartment;
+      // }
+
+      json::Object Parameters(
+          {
+              {"compartment-id", std::to_string(CompartmentID)},
+          }
+      );
+
+      auto ResponseData = Execute(SystemInformation.GetDatabaseInformation().GetValidTargetsEndpoint(), Parameters);
+
+      // auto ValidTargets = ResponseData.getInteger("valid_targets");
+      // if (!ValidTargets.has_value()) {
+      //   CommonHAKCAnalysis::getWriter() << "Received No Valid Targets for Compartment " << CompartmentID << "\n";
+      //   throw std::exception();
+      // }
+      // CommonHAKCAnalysis::getWriter() << "Got valid_targets response: " << ResponseData.getArray() << "\n";
+      auto valid_targets_array = ResponseData.getArray("valid_targets");
+      CommonHAKCAnalysis::getWriter() << "Got valid_targets response: " << valid_targets_array << "\n";
+      std::vector<hakc_compartment_id_t> valid_targets;
+      for (auto itr = valid_targets_array->begin(); itr != valid_targets_array->end(); ++itr){
+        valid_targets.push_back((hakc_compartment_id_t) itr->getAsInteger().value());
+      }
+
+      return valid_targets;
     }
 
     HAKCCompartmentP HAKCCompartmentalizationPolicy::CreateCompartment(hakc_compartment_id_t CompartmentID,
