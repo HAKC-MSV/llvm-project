@@ -42,6 +42,8 @@ namespace llvm::hakc {
 
         StringRef GetSymbolDivisionEndpoint() const;
 
+        StringRef GetValidTargetsEndpoint() const;
+
         std::chrono::milliseconds GetServerTimeout() const;
 
         void operator<<(HAKCYamlDatabaseConfig &DatabaseConfig);
@@ -51,6 +53,7 @@ namespace llvm::hakc {
         std::string CompartmentEndpoint;
         std::string DivisionEndpoint;
         std::string SymbolDivisionEndpoint;
+        std::string ValidTargetsEndpoint;
         std::chrono::milliseconds Timeout;
     };
 

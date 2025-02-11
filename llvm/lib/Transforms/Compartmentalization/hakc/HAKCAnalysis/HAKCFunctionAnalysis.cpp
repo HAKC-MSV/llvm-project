@@ -1096,6 +1096,8 @@ namespace llvm::hakc {
 
     void HAKCFunctionAnalysis::CheckForValidCompartmentTransitionAndUpdateIntraCompartmentCalls() {
         auto CurrentDivision = Policy.GetDivision(&getFunction());
+        // now, get valid target from backing store
+        std::vector<hakc_compartment_id_t> valid_targets = Policy.GetValidTargets((hakc_compartment_id_t) CurrentDivision.GetHAKCCompartment().GetCompartmentIDValue());
         for (auto *call: NonKernelDirectFunctionCallSet) {
             auto TargetCompartment = Policy.GetDivision(call->getCalledFunction()).GetHAKCCompartment();
             if (CurrentDivision.GetHAKCCompartment().GetCompartmentID() == TargetCompartment.GetCompartmentID()) {
@@ -1112,15 +1114,15 @@ namespace llvm::hakc {
                 // Fixing https://github.mit.edu/inherently-secure/ARM-MTE/issues/40
                 bool ValidTransition = false;
 
-                for (auto *Target: CurrentDivision.GetHAKCCompartment().GetValidTargets()) {
-                    if (DebugActive) {
-                        CommonHAKCAnalysis::getWriter() << "Testing Target Compartment " << *Target << " against "
-                                << *TargetCompartment.GetCompartmentID() << "\n";
-                    }
-                    if (Target == TargetCompartment.GetCompartmentID()) {
-                        ValidTransition = true;
-                        break;
-                    }
+                for (hakc_compartment_id_t& target_id: valid_targets) {
+                  if (DebugActive) {
+                    CommonHAKCAnalysis::getWriter() << "Testing Target Compartment " << target_id << " against "
+                            << TargetCompartment.GetCompartmentIDValue() << "\n";
+                  }
+                  if (target_id == TargetCompartment.GetCompartmentIDValue()) {
+                    ValidTransition = true;
+                    break;
+                  }
                 }
 
                 if (!ValidTransition) {

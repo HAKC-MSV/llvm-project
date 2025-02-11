@@ -8,13 +8,13 @@
 
 // Testing if foo can find valid targets of bar and baz
 
-int foo(int _a);
+int foo(int* _a);
 
-int bar (int _b);
+int bar (int* _b);
 
-int baz (int _c);
+int baz (int* _c);
 
-int foo(int _a) {
+int foo(int* _a) {
   int b = bar(_a);
   int c = baz(_a);
   return b + c;
