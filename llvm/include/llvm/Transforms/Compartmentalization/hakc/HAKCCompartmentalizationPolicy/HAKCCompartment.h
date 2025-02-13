@@ -6,10 +6,13 @@
 #define HAKC_HAKCCOMPARTMENT_H
 
 #include "llvm/Transforms/Compartmentalization/hakc/HAKC-defs.h"
+#include <llvm/ADT/SmallSet.h>
 
 
 namespace llvm::hakc {
     class HAKCCompartmentDivision;
+
+    typedef std::set<HAKC_Compartment_ID> CompartmentIDSet;
 
     class HAKCCompartment {
     public:
@@ -21,7 +24,7 @@ namespace llvm::hakc {
 
         HAKC_Access_Token GetEntryToken() const;
 
-        std::vector<HAKC_Compartment_ID> GetValidTargets() const;
+        iterator_range<CompartmentIDSet::const_iterator> GetValidTargets() const;
 
         void AddTarget(HAKC_Compartment_ID CompartmentID);
 
@@ -44,7 +47,7 @@ namespace llvm::hakc {
     protected:
         HAKC_Compartment_ID Compartment;
         HAKC_Access_Token EntryToken;
-        std::vector<HAKC_Compartment_ID> Targets;
+        CompartmentIDSet Targets;
     };
 } // hakc
 
