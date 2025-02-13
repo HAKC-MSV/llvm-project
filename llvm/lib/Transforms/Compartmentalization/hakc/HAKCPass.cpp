@@ -30,14 +30,15 @@ namespace llvm {
         StringRef CurrentSourceName(M.getSourceFileName());
         for (auto &path: HAKCAnalysis.GetSystemInfo().HAKCSourcePaths()) {
             if (CurrentSourceName.contains(path)) {
-                CommonHAKCAnalysis::getWriter() << "Skipping hakc source " << CurrentSourceName << "\n";
+                CommonHAKCAnalysis::getWriter(true) << "Skipping hakc source " << CurrentSourceName << "\n";
                 PerformTransformations = false;
             }
         }
 
         for (auto &path: HAKCAnalysis.GetSystemInfo().SeparateNamespacePaths()) {
             if (CurrentSourceName.contains(path)) {
-                CommonHAKCAnalysis::getWriter() << "Skipping separate namespace source " << CurrentSourceName << "\n";
+                CommonHAKCAnalysis::getWriter(true) << "Skipping separate namespace source " << CurrentSourceName <<
+                "\n";
                 PerformTransformations = false;
             }
         }

@@ -24,7 +24,7 @@ namespace llvm::hakc {
 
     void HAKCFunctionInfo::AddIndirectCall(const std::shared_ptr<HAKCIndirectCallSource> &Source) {
         if (!Source) {
-            CommonHAKCAnalysis::getWriter() << "Trying to add null indirect call source\n";
+            CommonHAKCAnalysis::getWriter(true) << "Trying to add null indirect call source\n";
             throw std::exception();
         }
         IndirectCalls.insert(Source);
@@ -32,7 +32,7 @@ namespace llvm::hakc {
 
     void HAKCFunctionInfo::AddDirectCall(const std::shared_ptr<HAKCFunctionInfo> &DirectCall) {
         if (!DirectCall) {
-            CommonHAKCAnalysis::getWriter() << "Trying to add null Direct Call\n";
+            CommonHAKCAnalysis::getWriter(true) << "Trying to add null Direct Call\n";
             throw std::exception();
         }
         DirectCalls.insert(DirectCall);

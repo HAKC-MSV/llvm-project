@@ -127,7 +127,7 @@ namespace llvm::hakc {
 
     void HAKCTypeInfo::SetLLVMType(Type *Ty) {
         if (!Ty) {
-            CommonHAKCAnalysis::getWriter() << "Trying to set null LLVM Type for " << GetName() << "\n";
+            CommonHAKCAnalysis::getWriter(true) << "Trying to set null LLVM Type for " << GetName() << "\n";
             throw std::exception();
         }
         if (LLVMType && Ty != LLVMType) {
@@ -147,8 +147,8 @@ namespace llvm::hakc {
                 }
             }
 
-            CommonHAKCAnalysis::getWriter() << "Trying to change LLVM Type for " << GetName() << " from " << *LLVMType
-                    << " to " << *Ty << "\n";
+            CommonHAKCAnalysis::getWriter(true) << "Trying to change LLVM Type for " << GetName() << " from "
+                    << *LLVMType << " to " << *Ty << "\n";
             throw std::exception();
         }
         LLVMType = Ty;
@@ -217,4 +217,4 @@ namespace llvm::hakc {
 
         return Yaml;
     }
-} // hakc
+} // namespace llvm::hakc

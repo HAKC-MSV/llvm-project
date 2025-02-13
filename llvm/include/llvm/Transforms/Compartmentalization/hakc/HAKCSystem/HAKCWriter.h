@@ -28,10 +28,13 @@ namespace llvm::hakc {
 
     protected:
         raw_ostream &os;
+        bool debug;
 
         void printDIType(const DIType *type, unsigned indents) const;
 
     public:
+        void SetDebug(bool Debug);
+
         HAKCWriter &operator<<(llvm::Value *V);
 
         HAKCWriter &operator<<(llvm::Value &V);

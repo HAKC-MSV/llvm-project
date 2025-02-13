@@ -206,7 +206,7 @@ namespace llvm::hakc {
 
         std::set<Value *> GetAllIncomingValues();
 
-        bool PointerSetsShouldBeEqual();
+        bool PointerSetsShouldBeEqual() const;
 
         void SetPointerSetsToBeEqual();
 
@@ -219,7 +219,7 @@ namespace llvm::hakc {
 
         ~ManagedHAKCPointer() = default;
 
-        Value *GetProtectedPointer();
+        Value *GetProtectedPointer() const;
 
         void CreateBaseAuthenticatedPointer();
 
@@ -235,9 +235,9 @@ namespace llvm::hakc {
 
         void RegisterManualHAKCTransfer(CallBase *CallI);
 
-        unsigned GetAuthenticatedUserCount();
+        unsigned GetAuthenticatedUserCount() const;
 
-        unsigned GetProtectedUserCount();
+        unsigned GetProtectedUserCount() const;
 
         bool BaseIsAuthenticatedPointer() const;
 
@@ -251,7 +251,7 @@ namespace llvm::hakc {
 
         void AddCloneUse(const ManagedHAKCPointerUseP &UPtr);
 
-        bool PointerSetsCanBeEqual();
+        bool PointerSetsCanBeEqual() const;
 
         void UpdateUserCounts();
 

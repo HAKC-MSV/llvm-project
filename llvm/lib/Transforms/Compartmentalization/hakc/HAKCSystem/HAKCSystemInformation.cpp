@@ -95,9 +95,7 @@ namespace llvm::hakc {
 
         for (auto &FileType: YamlConfig.SeparateNamespacePaths) {
             auto PathRoot = FileType.PathRoot;
-            CommonHAKCAnalysis::getWriter() << "PathRoot: " << PathRoot << "\n";
             for (auto &FileName: FileType.Files) {
-                CommonHAKCAnalysis::getWriter() << "\tFile: " << PathRoot << FileName << "\n";
                 auto File = PathRoot + FileName;
                 YamlConfig.SeparateNamespacePathsList.push_back(File);
             }
@@ -107,9 +105,7 @@ namespace llvm::hakc {
 
         for (auto &FileType: YamlConfig.HAKCSourcePaths) {
             auto PathRoot = FileType.PathRoot;
-            CommonHAKCAnalysis::getWriter() << "PathRoot: " << PathRoot << "\n";
             for (auto &FileName: FileType.Files) {
-                CommonHAKCAnalysis::getWriter() << "\tFile: " << PathRoot << FileName << "\n";
                 auto File = PathRoot + FileName;
                 YamlConfig.HAKCSourcePathsList.push_back(File);
             }
