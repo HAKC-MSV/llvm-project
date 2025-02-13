@@ -116,8 +116,9 @@ namespace llvm::hakc {
     }
 
     void HAKCCompartmentalizationPolicy::ConnectToDatabase() {
-            CommonHAKCAnalysis::getWriter(SystemInformation.OutputDebugInfo()) << "Connecting to " << SystemInformation.GetDatabaseInformation().
-                    GetServerURL() << "\n";
+        CommonHAKCAnalysis::getWriter(SystemInformation.OutputDebugInfo()) << "Connecting to " << SystemInformation.
+                GetDatabaseInformation().
+                GetServerURL() << "\n";
         Client.connect(SystemInformation.GetDatabaseInformation().GetServerURL());
     }
 
@@ -131,7 +132,8 @@ namespace llvm::hakc {
     hakc::HAKCCompartmentDivision &HAKCCompartmentalizationPolicy::GetDivision(GlobalValue *GV) {
         auto HAKCSymbol = SystemInformation.GetTypeIdentifier().FindSymbol(GV, true);
         if (!HAKCSymbol) {
-            CommonHAKCAnalysis::getWriter(SystemInformation.OutputDebugInfo()) << "Could not find HAKCSymbol for " << GV << "\n";
+            CommonHAKCAnalysis::getWriter(SystemInformation.OutputDebugInfo()) << "Could not find HAKCSymbol for " << GV
+                    << "\n";
             return GetDefaultDivision();
         }
 

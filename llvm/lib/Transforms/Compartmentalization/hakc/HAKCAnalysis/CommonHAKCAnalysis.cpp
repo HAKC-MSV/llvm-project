@@ -282,10 +282,10 @@ namespace llvm::hakc {
                             "\n";
                     working_list.push_back(binOp->getOperand(1));
                 } else if (!isa<Constant>(LHSDef) && !isa<Constant>(RHSDef)) {
-                        CommonHAKCAnalysis::getWriter(debug) << "Neither LHS nor RHS of " << binOp <<
-                                " are constants\n";
-                        /* We stop here */
-                        goto add_to_chain;
+                    CommonHAKCAnalysis::getWriter(debug) << "Neither LHS nor RHS of " << binOp <<
+                            " are constants\n";
+                    /* We stop here */
+                    goto add_to_chain;
                 } else if (isa<Constant>(LHSDef) && isa<Constant>(RHSDef)) {
                     CommonHAKCAnalysis::getWriter(debug) << "Both LHS and RHS of " << binOp << " are constants\n";
                     /* We stop here */

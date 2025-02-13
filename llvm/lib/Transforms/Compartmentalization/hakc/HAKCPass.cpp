@@ -38,7 +38,7 @@ namespace llvm {
         for (auto &path: HAKCAnalysis.GetSystemInfo().SeparateNamespacePaths()) {
             if (CurrentSourceName.contains(path)) {
                 CommonHAKCAnalysis::getWriter(true) << "Skipping separate namespace source " << CurrentSourceName <<
-                "\n";
+                        "\n";
                 PerformTransformations = false;
             }
         }
