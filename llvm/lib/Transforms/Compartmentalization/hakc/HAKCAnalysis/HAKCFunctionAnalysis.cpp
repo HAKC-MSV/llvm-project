@@ -972,7 +972,7 @@ namespace llvm::hakc {
     void HAKCFunctionAnalysis::CheckForValidCompartmentTransitionAndUpdateIntraCompartmentCalls() {
         auto CurrentDivision = Policy.GetDivision(&getFunction());
         // now, get valid target from backing store
-        std::vector<hakc_compartment_id_t> valid_targets = Policy.GetValidTargets((hakc_compartment_id_t) CurrentDivision.GetHAKCCompartment().GetCompartmentIDValue());
+        Policy.GetValidTargets(CurrentDivision.GetHAKCCompartment());
         for (auto *call: NonKernelDirectFunctionCallSet) {
             auto TargetCompartment = Policy.GetDivision(call->getCalledFunction()).GetHAKCCompartment();
             if (CurrentDivision.GetHAKCCompartment().GetCompartmentID() == TargetCompartment.GetCompartmentID()) {
