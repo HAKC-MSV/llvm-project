@@ -226,7 +226,7 @@ namespace llvm::hakc {
 
       auto valid_targets_array = ResponseData.getArray("valid_targets");
       if (SystemInformation.OutputDebugInfo()) {
-        CommonHAKCAnalysis::getWriter() << "Got valid_targets response: " << valid_targets_array << "\n";
+        CommonHAKCAnalysis::getWriter(true) << "Got valid_targets response: " << valid_targets_array << "\n";
       }
       for (auto target = valid_targets_array->begin(); target != valid_targets_array->end(); ++target){
         auto *TargetCompartment = HAKCCompartment::CreateID(target->getAsInteger().value(), SystemInformation.GetModule());
@@ -246,7 +246,7 @@ namespace llvm::hakc {
 
         auto Compartment = std::make_shared<HAKCCompartment>(CompartmentID, AccessToken,
                                                              SystemInformation.GetModule().getContext());
-        GetValidCompartmentTargets(*Compartment);
+        GetValidTargets(*Compartment);
         Compartments.push_back(Compartment);
         return Compartment;
     }

@@ -1053,13 +1053,13 @@ Value *hakc::HAKCTransformer::CreateBitCast(hakc::HAKCPointerBase &HAKCPointer, 
 
 
 ConstantInt *hakc::HAKCTransformer::GetObjectSizeInBytes(hakc::HAKCPointerBase &HAKCPointer) {
-  CommonHAKCAnalysis::getWriter() << "In Getobjectsizeinbytes, hakc pointer:: " << HAKCPointer << "\n";
+  CommonHAKCAnalysis::getWriter(DebugIsActive()) << "In Getobjectsizeinbytes, hakc pointer:: " << HAKCPointer << "\n";
   return GetObjectSizeInBytes(HAKCPointer.GetType()->GetPointeeType());
 }
 
 ConstantInt *hakc::HAKCTransformer::GetObjectSizeInBytes(hakc::HAKCTypeP HAKCType) {
     auto bit_size = HAKCType->GetSizeInBits();
-    CommonHAKCAnalysis::getWriter() << "In Getobjectsizeinbytes: bitsize: " << bit_size << "\n";
+    CommonHAKCAnalysis::getWriter(DebugIsActive()) << "In Getobjectsizeinbytes: bitsize: " << bit_size << "\n";
     return getInt64(bit_size / BITS_PER_BYTE);
 }
 
