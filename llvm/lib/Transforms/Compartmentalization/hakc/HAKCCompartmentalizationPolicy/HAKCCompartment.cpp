@@ -7,8 +7,6 @@
 
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartment.h"
 
-#include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartmentDivision.h"
-
 namespace llvm::hakc {
     HAKCCompartment::HAKCCompartment(hakc_compartment_id_t Compartment, hakc_access_token_t EntryToken,
                                      class LLVMContext &Context) : Compartment(
@@ -32,12 +30,12 @@ namespace llvm::hakc {
         return GetCompartmentIDValue() == KERNEL_COMPARTMENT;
     }
 
-    std::vector<HAKC_Compartment_ID> HAKCCompartment::GetValidTargets() const {
-        return Targets;
+    iterator_range<CompartmentIDSet::const_iterator> HAKCCompartment::GetValidTargets() const {
+        return make_range(Targets.begin(), Targets.end());
     }
 
     void HAKCCompartment::AddTarget(HAKC_Compartment_ID CompartmentID) {
-        Targets.push_back(CompartmentID);
+        Targets.insert(CompartmentID);
     }
 
     hakc_compartment_id_t HAKCCompartment::GetCompartmentIDValue() const {

@@ -91,7 +91,7 @@ namespace llvm::hakc {
             // connection failed, try again with a timeout 
             NewConnection = raw_socket_stream::createConnectedUnix(ServerURL);
             if (current_try >= max_tries) {
-                CommonHAKCAnalysis::getWriter() << "Could not connect to " << ServerURL << "\n";
+                CommonHAKCAnalysis::getWriter(true) << "Could not connect to " << ServerURL << "\n";
                 throw std::exception();
             }
             current_try++;
@@ -116,16 +116,15 @@ namespace llvm::hakc {
     }
 
     void HAKCCompartmentalizationPolicy::ConnectToDatabase() {
-        if (SystemInformation.OutputDebugInfo()) {
-            CommonHAKCAnalysis::getWriter() << "Connecting to " << SystemInformation.GetDatabaseInformation().
-                    GetServerURL() << "\n";
-        }
+        CommonHAKCAnalysis::getWriter(SystemInformation.OutputDebugInfo()) << "Connecting to " << SystemInformation.
+                GetDatabaseInformation().
+                GetServerURL() << "\n";
         Client.connect(SystemInformation.GetDatabaseInformation().GetServerURL());
     }
 
     void HAKCCompartmentalizationPolicy::CheckConnection() const {
         if (!Client) {
-            CommonHAKCAnalysis::getWriter() << "Client is unavailable\n";
+            CommonHAKCAnalysis::getWriter(true) << "Client is unavailable\n";
             throw std::exception();
         }
     }
@@ -133,7 +132,8 @@ namespace llvm::hakc {
     hakc::HAKCCompartmentDivision &HAKCCompartmentalizationPolicy::GetDivision(GlobalValue *GV) {
         auto HAKCSymbol = SystemInformation.GetTypeIdentifier().FindSymbol(GV, true);
         if (!HAKCSymbol) {
-            CommonHAKCAnalysis::getWriter() << "Could not find HAKCSymbol for " << GV << "\n";
+            CommonHAKCAnalysis::getWriter(SystemInformation.OutputDebugInfo()) << "Could not find HAKCSymbol for " << GV
+                    << "\n";
             return GetDefaultDivision();
         }
 
@@ -146,12 +146,12 @@ namespace llvm::hakc {
         auto ResponseData = Execute(SystemInformation.GetDatabaseInformation().GetSymbolDivisionEndpoint(), Parameters);
         auto CompartmentID = ResponseData.getInteger("compartment_id");
         if (!CompartmentID.has_value()) {
-            CommonHAKCAnalysis::getWriter() << "Could not find CompartmentID for " << *GV << "\n";
+            CommonHAKCAnalysis::getWriter(true) << "Could not find CompartmentID for " << *GV << "\n";
             throw std::exception();
         }
         auto DivisionID = ResponseData.getInteger("division_id");
         if (!DivisionID.has_value()) {
-            CommonHAKCAnalysis::getWriter() << "Could not get DivisionID for " << *GV << "\n";
+            CommonHAKCAnalysis::getWriter(true) << "Could not get DivisionID for " << *GV << "\n";
             throw std::exception();
         }
         return *GetDivision(*CompartmentID, *DivisionID);
@@ -178,7 +178,7 @@ namespace llvm::hakc {
         auto ResponseData = Execute(SystemInformation.GetDatabaseInformation().GetDivisionEndpoint(), Parameters);
         auto DivisionAccessToken = ResponseData.getInteger("access_token");
         if (!DivisionAccessToken.has_value()) {
-            CommonHAKCAnalysis::getWriter() << "Received No Entry Token for Division " << DivisionID << "\n";
+            CommonHAKCAnalysis::getWriter(true) << "Received No Entry Token for Division " << DivisionID << "\n";
             throw std::exception();
         }
 
@@ -207,7 +207,7 @@ namespace llvm::hakc {
         auto ResponseData = Execute(SystemInformation.GetDatabaseInformation().GetCompartmentEndpoint(), Parameters);
         auto EntryToken = ResponseData.getInteger("entry_token");
         if (!EntryToken.has_value()) {
-            CommonHAKCAnalysis::getWriter() << "Received No Entry Token for Compartment " << CompartmentID << "\n";
+            CommonHAKCAnalysis::getWriter(true) << "Received No Entry Token for Compartment " << CompartmentID << "\n";
             throw std::exception();
         }
         Compartment = CreateCompartment(CompartmentID, *EntryToken, false);
@@ -246,6 +246,7 @@ namespace llvm::hakc {
 
         auto Compartment = std::make_shared<HAKCCompartment>(CompartmentID, AccessToken,
                                                              SystemInformation.GetModule().getContext());
+        GetValidCompartmentTargets(*Compartment);
         Compartments.push_back(Compartment);
         return Compartment;
     }
@@ -255,12 +256,12 @@ namespace llvm::hakc {
         HAKCDatabaseRequest Request(Endpoint, Parameters);
         auto Response = Client.HandleRequest(Request);
         if (!Response) {
-            CommonHAKCAnalysis::getWriter() << "Error Handling Request to " << Endpoint << "\n";
+            CommonHAKCAnalysis::getWriter(true) << "Error Handling Request to " << Endpoint << "\n";
             throw std::exception();
         }
         auto ParsedJson = Response.GetJSON();
         if (!ParsedJson) {
-            CommonHAKCAnalysis::getWriter() << "Error Parsing JSON\n";
+            CommonHAKCAnalysis::getWriter(true) << "Error Parsing JSON\n";
             throw std::exception();
         }
         return *Response.GetJSON()->getAsObject();

@@ -10,14 +10,22 @@
 #include "llvm/BinaryFormat/Dwarf.h"
 
 namespace llvm::hakc {
-    HAKCWriter::HAKCWriter(): os(errs()) {
+    HAKCWriter::HAKCWriter(): os(errs()), debug(false) {
     }
 
     raw_ostream &HAKCWriter::ostream() const {
         return os;
     }
 
+    void HAKCWriter::SetDebug(bool Debug) {
+        debug = Debug;
+    }
+
     void HAKCWriter::printDIType(const DIType *type, unsigned indents) const {
+        if (debug) {
+            return;
+        }
+
         if (!type) {
             return;
         }
@@ -40,6 +48,9 @@ namespace llvm::hakc {
     }
 
     HAKCWriter &HAKCWriter::operator<<(llvm::Value *V) {
+        if (debug) {
+            return *this;
+        }
         if (V == nullptr) {
             *this << "!!nullptr!!";
         } else if (const auto *F = dyn_cast<Function>(V)) {
@@ -61,41 +72,65 @@ namespace llvm::hakc {
     }
 
     HAKCWriter &HAKCWriter::operator<<(StringRef str) {
+        if (debug) {
+            return *this;
+        }
         os << str;
         return *this;
     }
 
     HAKCWriter &HAKCWriter::operator<<(unsigned int i) {
+        if (debug) {
+            return *this;
+        }
         os << i;
         return *this;
     }
 
     HAKCWriter &HAKCWriter::operator<<(unsigned long i) {
+        if (debug) {
+            return *this;
+        }
         os << i;
         return *this;
     }
 
     HAKCWriter &HAKCWriter::operator<<(bool b) {
+        if (debug) {
+            return *this;
+        }
         os << (b ? "True" : "False");
         return *this;
     }
 
     HAKCWriter &HAKCWriter::operator<<(const std::string &str) {
+        if (debug) {
+            return *this;
+        }
         os << str;
         return *this;
     }
 
     HAKCWriter &HAKCWriter::operator<<(const char *s) {
+        if (debug) {
+            return *this;
+        }
         os << s;
         return *this;
     }
 
     HAKCWriter &HAKCWriter::operator<<(const Function &F) {
+        if (debug) {
+            return *this;
+        }
         F.print(os, nullptr);
         return *this;
     }
 
     HAKCWriter &HAKCWriter::operator<<(const Module &M) {
+        if (debug) {
+            return *this;
+        }
         M.print(os, nullptr);
         return *this;
     }
@@ -111,6 +146,9 @@ namespace llvm::hakc {
     }
 
     HAKCWriter &HAKCWriter::operator<<(const Type &Ty) {
+        if (debug) {
+            return *this;
+        }
         os << Ty;
         return *this;
     }
@@ -121,6 +159,9 @@ namespace llvm::hakc {
     }
 
     HAKCWriter &HAKCWriter::operator<<(const DINode &DiNode) {
+        if (debug) {
+            return *this;
+        }
         os << DiNode;
         return *this;
     }
@@ -131,22 +172,34 @@ namespace llvm::hakc {
     }
 
     HAKCWriter &HAKCWriter::operator<<(const hakc::HAKCCompartment &Compartment) {
+        if (debug) {
+            return *this;
+        }
         os << "Compartment " << Compartment.GetCompartmentIDValue();
         return *this;
     }
 
     HAKCWriter &HAKCWriter::operator<<(const hakc::HAKCCompartmentDivision &Division) {
+        if (debug) {
+            return *this;
+        }
         *this << Division.GetHAKCCompartment();
         os << " Division " << Division.GetDivisionID()->getZExtValue();
         return *this;
     }
 
     HAKCWriter &HAKCWriter::operator<<(const hakc::HAKCTypeInfo &TypeInfo) {
+        if (debug) {
+            return *this;
+        }
         TypeInfo >> os;
         return *this;
     }
 
     HAKCWriter &HAKCWriter::operator<<(const enum HAKCAllocationTypeEnum AllocationType) {
+        if (debug) {
+            return *this;
+        }
         switch (AllocationType) {
             case InvalidAllocationType:
                 os << "InvalidAllocationType";
@@ -171,6 +224,9 @@ namespace llvm::hakc {
     }
 
     HAKCWriter &HAKCWriter::operator<<(const ManagedHAKCPointerUse &HAKCPointerUse) {
+        if (debug) {
+            return *this;
+        }
         os << "[" << HAKCPointerUse.getID() << "] Argument " << HAKCPointerUse.getOperandNo() << " of ";
         *this << HAKCPointerUse.getUser() << " for ";
         *this << HAKCPointerUse.getManagedPtr();
@@ -178,6 +234,9 @@ namespace llvm::hakc {
     }
 
     HAKCWriter &HAKCWriter::operator<<(const HAKCPointerBase &ManagedPointer) {
+        if (debug) {
+            return *this;
+        }
         os << "Managed Pointer " << ManagedPointer.GetID();
         if (ManagedPointer.GetBaseDefinition()) {
             os << " [";
@@ -196,7 +255,10 @@ namespace llvm::hakc {
     }
 
     HAKCWriter &HAKCWriter::operator<<(const HAKCFunctionInfo &HAKCFuncInfo) {
+        if (debug) {
+            return *this;
+        }
         HAKCFuncInfo >> os;
         return *this;
     }
-} // hakc
+} // namespace llvm::hakc

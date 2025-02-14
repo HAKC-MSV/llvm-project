@@ -86,7 +86,7 @@ namespace llvm::hakc {
 
         bool functionIsTransferCandidate(Function *F, HAKCCompartmentalizationPolicy &Policy);
 
-        static hakc::HAKCWriter &getWriter();
+        static hakc::HAKCWriter &getWriter(bool DebugActive);
 
         static FunctionType *GetDataAuthenticationFunctionType(Module &M, unsigned AddrSpace = 0);
 

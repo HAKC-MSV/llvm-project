@@ -30,26 +30,26 @@ Instruction *hakc::HAKCCustomTransfer::CreateTransfer(IRBuilder<> &HAKCIRBuilder
     SmallVector<Value *, hakc::HAKCTransferFunction::MaxArgIndex> Args;
 
     if (!SignedPtrIdx) {
-        CommonHAKCAnalysis::getWriter() << "No signed pointer index for " << GetFunction()->getName() << "\n";
+        CommonHAKCAnalysis::getWriter(true) << "No signed pointer index for " << GetFunction()->getName() << "\n";
         throw std::exception();
     }
     Args[SignedPtrIdx->getZExtValue()] = Pointer;
 
     if (!DivisionIdIdx) {
-        CommonHAKCAnalysis::getWriter() << "No Division index for " << GetFunction()->getName() << "\n";
+        CommonHAKCAnalysis::getWriter(true) << "No Division index for " << GetFunction()->getName() << "\n";
         throw std::exception();
     }
     Args[DivisionIdIdx->getZExtValue()] = CompartmentDivision.GetDivisionID();
 
     if (!CompartmentIdIdx) {
-        CommonHAKCAnalysis::getWriter() << "No Compartment index for " << GetFunction()->getName() << "\n";
+        CommonHAKCAnalysis::getWriter(true) << "No Compartment index for " << GetFunction()->getName() << "\n";
         throw std::exception();
     }
     Args[CompartmentIdIdx->getZExtValue()] = CompartmentDivision.GetHAKCCompartment().GetCompartmentID();
 
     if (Size) {
         if (!SizeIdx) {
-            CommonHAKCAnalysis::getWriter() << "No size index for " << GetFunction()->getName() << "\n";
+            CommonHAKCAnalysis::getWriter(true) << "No size index for " << GetFunction()->getName() << "\n";
             throw std::exception();
         }
         Args[SizeIdx->getZExtValue()] = Size;

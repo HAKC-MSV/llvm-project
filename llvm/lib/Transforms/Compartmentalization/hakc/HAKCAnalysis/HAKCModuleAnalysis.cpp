@@ -2,12 +2,11 @@
 // Created by derrick on 8/20/21.
 //
 #include "llvm/IR/InstIterator.h"
-#include "llvm/Support/Regex.h"
 #include "llvm/IR/DIBuilder.h"
+#include "llvm/Support/Regex.h"
 
-#include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/HAKCModuleAnalysis.h"
-#include "llvm/Transforms/Compartmentalization/hakc/HAKCFunctionDefinition/HAKCTransferFunction.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/HAKCFunctionAnalysis.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/HAKCModuleAnalysis.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCSystemInformation.h"
 
 namespace llvm::hakc {
@@ -81,10 +80,9 @@ namespace llvm::hakc {
             RegisterUsedCompartment(compartment);
 
             if (finalName != pGlobal->getSection()) {
-                if (CommonAnalysis.GetSystemInfo().OutputDebugInfo(pGlobal)) {
-                    CommonHAKCAnalysis::getWriter() << "Changing section of global " << *pGlobal << " to section "
-                            << finalName << " from " << pGlobal->getSection() << "\n";
-                }
+                CommonHAKCAnalysis::getWriter(CommonAnalysis.GetSystemInfo().OutputDebugInfo(pGlobal)) <<
+                        "Changing section of global " << *pGlobal << " to section "
+                        << finalName << " from " << pGlobal->getSection() << "\n";
                 pGlobal->setSection(finalName);
             }
         }
@@ -93,22 +91,6 @@ namespace llvm::hakc {
     bool HAKCModuleAnalysis::FunctionNeedsAnalysis(Function *F) {
         bool needsAnalysis = !F->isIntrinsic() && !F->isDeclaration() && F->getSubprogram() != nullptr &&
                              !CommonHAKCAnalysis::IsOutsideTransferFunc(F) && !CommonAnalysis.IsHAKCFunction(F);
-
-
-        // TODO: Add this to configuration file
-        // linux
-        // if (F->getName().contains("static_branch_")) {
-        //        if (F->getName().contains(StringRef(*(*GetSysInfo()->GetMethods())["FunctionNeedsAnalysis"].begin()))) {
-        //            /* These functions call inline assembly that needs to be
-        //                * constant at compile time, so we can't analyze them.
-        //                * We ensure that any pointer passed to these functions have
-        //                * no signature in argNeedsAnalysis.
-        //                */
-        //            if (CommonAnalysis.GetSystemInfo().OutputDebugInfo(F)) {
-        //                CommonHAKCAnalysis::getWriter() << F->getName() << " does not need analysis\n";
-        //            }
-        //            needsAnalysis = false;
-        //        }
 
         if (!needsAnalysis) {
             goto out;
@@ -122,13 +104,13 @@ namespace llvm::hakc {
 
     out:
         if (CommonAnalysis.GetSystemInfo().OutputDebugInfo(F)) {
-            CommonHAKCAnalysis::getWriter() << F->getName();
+            CommonHAKCAnalysis::getWriter(true) << F->getName();
             if (!needsAnalysis) {
-                CommonHAKCAnalysis::getWriter() << " does not need ";
+                CommonHAKCAnalysis::getWriter(true) << " does not need ";
             } else {
-                CommonHAKCAnalysis::getWriter() << " needs ";
+                CommonHAKCAnalysis::getWriter(true) << " needs ";
             }
-            CommonHAKCAnalysis::getWriter() << "analysis\n";
+            CommonHAKCAnalysis::getWriter(true) << "analysis\n";
         }
 
         return needsAnalysis;
@@ -165,11 +147,13 @@ namespace llvm::hakc {
         SmallVector<StringRef, 2> Matches;
 
         auto NameInAssembly = NameRegex.match(ModuleAsm, &Matches, nullptr);
-        if (NameInAssembly && CommonAnalysis.GetSystemInfo().OutputDebugInfo(F)) {
-            CommonHAKCAnalysis::getWriter() << F->getName() << " was found in the Module inline assembly: " <<
+        if (NameInAssembly) {
+            CommonHAKCAnalysis::getWriter(CommonAnalysis.GetSystemInfo().OutputDebugInfo(F)) << F->getName() <<
+                    " was found in the Module inline assembly: " <<
                     Matches[0] << "\n";
-        } else if (CommonAnalysis.GetSystemInfo().OutputDebugInfo(F)) {
-            CommonHAKCAnalysis::getWriter() << "Could not find " << SearchTerm << " in\n" << ModuleAsm << "\n";
+        } else {
+            CommonHAKCAnalysis::getWriter(CommonAnalysis.GetSystemInfo().OutputDebugInfo(F)) << "Could not find " <<
+                    SearchTerm << " in\n" << ModuleAsm << "\n";
         }
         return NameInAssembly;
     }
@@ -223,11 +207,11 @@ namespace llvm::hakc {
         std::set<Value *> examined;
         bool escapes = _useEscapes(U, examined);
         if (in_debug) {
-            CommonHAKCAnalysis::getWriter() << "Use " << U.get() << " in " << U.getUser();
+            CommonHAKCAnalysis::getWriter(in_debug) << "Use " << U.get() << " in " << U.getUser();
             if (escapes) {
-                CommonHAKCAnalysis::getWriter() << " escapes\n";
+                CommonHAKCAnalysis::getWriter(in_debug) << " escapes\n";
             } else {
-                CommonHAKCAnalysis::getWriter() << " does not escape\n";
+                CommonHAKCAnalysis::getWriter(in_debug) << " does not escape\n";
             }
         }
         return escapes;
@@ -251,9 +235,8 @@ namespace llvm::hakc {
 
     void HAKCModuleAnalysis::performTransformations() {
         TransformModule();
-        if (CommonAnalysis.GetSystemInfo().OutputDebugInfo()) {
-            CommonHAKCAnalysis::getWriter() << "Final Module After Transformations:\n" << GetModule() << "\n";
-        }
+        CommonHAKCAnalysis::getWriter(CommonAnalysis.GetSystemInfo().OutputDebugInfo()) <<
+                "Final Module After Transformations:\n" << GetModule() << "\n";
     }
 
     bool HAKCModuleAnalysis::functionEscapes(Function *F) {
@@ -264,9 +247,8 @@ namespace llvm::hakc {
             if (useEscapes(U)) {
                 return true;
             }
-            if (CommonAnalysis.GetSystemInfo().OutputDebugInfo(F)) {
-                CommonHAKCAnalysis::getWriter() << "Use " << U.getUser() << " does not escape\n";
-            }
+            CommonHAKCAnalysis::getWriter(CommonAnalysis.GetSystemInfo().OutputDebugInfo(F)) << "Use " << U.getUser() <<
+                    " does not escape\n";
         }
         Function *transfer = GetModule().getFunction(CommonAnalysis.GetOutsideTransferName(F));
         if (transfer) {
@@ -316,29 +298,28 @@ namespace llvm::hakc {
                 auto Compartment = Policy.GetDivision(&F).GetHAKCCompartment();
                 transferFunc = GetTransformer().CreateTransferFunction(&F);
                 if (!transferFunc) {
-                    CommonHAKCAnalysis::getWriter() << "Could not create transfer for " << F.getName() << "\n";
+                    CommonHAKCAnalysis::getWriter(true) << "Could not create transfer for " << F.getName() << "\n";
                     throw std::exception();
                 }
                 bool TransferAlreadyExisted = (transferFunc->getInstructionCount() > 0 && !F.isDeclaration());
-                if (debug_output) {
-                    if (TransferAlreadyExisted) {
-                        CommonHAKCAnalysis::getWriter() << "Retrieved transfer function " <<
-                                transferFunc->getName();
-                    } else {
-                        CommonHAKCAnalysis::getWriter() << "Created transfer function " << transferFunc->getName();
-                    }
-                    CommonHAKCAnalysis::getWriter() << " in compartment "
-                            << std::to_string(Compartment.GetCompartmentIDValue()) << "\n";
-                    if (!TransferAlreadyExisted) {
-                        CommonHAKCAnalysis::getWriter() << *transferFunc << "\n";
-                    }
+                if (TransferAlreadyExisted) {
+                    CommonHAKCAnalysis::getWriter(debug_output) << "Retrieved transfer function " <<
+                            transferFunc->getName();
+                } else {
+                    CommonHAKCAnalysis::getWriter(debug_output) << "Created transfer function " << transferFunc->
+                            getName();
+                }
+                CommonHAKCAnalysis::getWriter(debug_output) << " in compartment "
+                        << std::to_string(Compartment.GetCompartmentIDValue()) << "\n";
+                if (!TransferAlreadyExisted) {
+                    CommonHAKCAnalysis::getWriter(debug_output) << *transferFunc << "\n";
                 }
 
-                if (F.isDeclaration() && debug_output) {
-                    CommonHAKCAnalysis::getWriter() << F.getName() << " is a declaration\n";
+                if (F.isDeclaration()) {
+                    CommonHAKCAnalysis::getWriter(debug_output) << F.getName() << " is a declaration\n";
                 }
-            } else if (debug_output) {
-                CommonHAKCAnalysis::getWriter() << "No transfer created for " << F.getName() << "\n";
+            } else {
+                CommonHAKCAnalysis::getWriter(debug_output) << "No transfer created for " << F.getName() << "\n";
             }
             if (!transferFunc) {
                 transferFunc = GetFunctionByName(CommonAnalysis.GetOutsideTransferName(&F), F.getFunctionType());
@@ -350,31 +331,24 @@ namespace llvm::hakc {
 
             if (CommonAnalysis.ValueShouldBeReplacedWithTransfer(&F, Policy)) {
                 if (!CommonAnalysis.IsNoTransferFunction(&F)) {
-                    if (debug_output) {
-                        CommonHAKCAnalysis::getWriter() << "Replacing uses of " << F.getName()
-                                << " with " << transferFunc->getName() << "\n";
-                    }
+                    CommonHAKCAnalysis::getWriter(debug_output) << "Replacing uses of " << F.getName()
+                            << " with " << transferFunc->getName() << "\n";
                     in_debug = debug_output;
                     F.replaceUsesWithIf(transferFunc, useEscapes);
-                    if (debug_output) {
-                        CommonHAKCAnalysis::getWriter() << "Done\n" << GetModule() << "\n";
-                    }
+                    CommonHAKCAnalysis::getWriter(debug_output) << "Done\n" << GetModule() << "\n";
                 }
             }
             if (AliasShouldBeCreated(&F)) {
                 auto OrigName = F.getName().str();
                 auto NewName = CommonHAKCAnalysis::getOriginalTransformedName(&F);
-                if (debug_output) {
-                    CommonHAKCAnalysis::getWriter() << "Changing name from " << F.getName()
-                            << " to " << NewName << "\n";
-                }
+                CommonHAKCAnalysis::getWriter(debug_output) << "Changing name from " << F.getName()
+                        << " to " << NewName << "\n";
                 F.setName(NewName);
 
                 auto *alias = GlobalAlias::create(OrigName, transferFunc);
-                if (debug_output) {
-                    CommonHAKCAnalysis::getWriter() << "Final Transfer:\n" << *transferFunc << "\nAlias: " << *alias
-                            << "\n";
-                }
+                CommonHAKCAnalysis::getWriter(debug_output) << "Final Transfer:\n" << *transferFunc << "\nAlias: " << *
+                        alias
+                        << "\n";
                 auto *OrigSP = F.getSubprogram();
                 if (OrigSP) {
                     DIBuilder DIB(*F.getParent(), false, OrigSP->getUnit());
@@ -393,15 +367,13 @@ namespace llvm::hakc {
 
     bool HAKCModuleAnalysis::ConstantStructTransferIsNeeded(ConstantStruct *ConstStruct) {
         bool Result = false;
-        if (CommonAnalysis.GetSystemInfo().OutputDebugInfo()) {
-            CommonHAKCAnalysis::getWriter() << "TransferIsNeeded Checking " << *ConstStruct << "\n";
-        }
+        CommonHAKCAnalysis::getWriter(CommonAnalysis.GetSystemInfo().OutputDebugInfo()) << "TransferIsNeeded Checking "
+                << *ConstStruct << "\n";
         for (auto &Member: ConstStruct->operands()) {
             auto *Def = CommonAnalysis.getDef(Member.get(), false);
-            if (CommonAnalysis.GetSystemInfo().OutputDebugInfo()) {
-                CommonHAKCAnalysis::getWriter() << "Checking struct member " << *Member << " with Def " << *Def
-                        << "\n";
-            }
+            CommonHAKCAnalysis::getWriter(CommonAnalysis.GetSystemInfo().OutputDebugInfo()) << "Checking struct member "
+                    << *Member << " with Def " << *Def
+                    << "\n";
             if (isa<ConstantPointerNull>(Def)) {
                 continue;
             }
@@ -416,9 +388,8 @@ namespace llvm::hakc {
             }
         }
 
-        if (CommonAnalysis.GetSystemInfo().OutputDebugInfo()) {
-            CommonHAKCAnalysis::getWriter() << __FUNCTION__ << " Result: " << std::to_string(Result) << "\n";
-        }
+        CommonHAKCAnalysis::getWriter(CommonAnalysis.GetSystemInfo().OutputDebugInfo()) << __FUNCTION__ << " Result: "
+                << std::to_string(Result) << "\n";
         return Result;
     }
 
@@ -452,18 +423,17 @@ namespace llvm::hakc {
         CommonHAKCAnalysis::SortGlobalList(GlobalsToModifyDuringInit);
 
         if (CommonAnalysis.GetSystemInfo().OutputDebugInfo()) {
-            CommonHAKCAnalysis::getWriter() << "Creating Init transfer functions for "
+            CommonHAKCAnalysis::getWriter(true) << "Creating Init transfer functions for "
                     << std::to_string(GlobalsToModifyDuringInit.size()) << " globals:\n";
             for (auto *GlobToTransfer: GlobalsToModifyDuringInit) {
-                CommonHAKCAnalysis::getWriter() << GlobToTransfer->getName() << "\n";
+                CommonHAKCAnalysis::getWriter(true) << GlobToTransfer->getName() << "\n";
             }
         }
 
         for (auto *GlobToTransfer: GlobalsToModifyDuringInit) {
             auto *InitTransfer = CreateInitTransfer(GlobToTransfer);
-            if (CommonAnalysis.GetSystemInfo().OutputDebugInfo(GlobToTransfer)) {
-                CommonHAKCAnalysis::getWriter() << "Created InitTransfer " << InitTransfer->getName() << "\n";
-            }
+            CommonHAKCAnalysis::getWriter(CommonAnalysis.GetSystemInfo().OutputDebugInfo(GlobToTransfer)) <<
+                    "Created InitTransfer " << InitTransfer->getName() << "\n";
         }
     }
 
@@ -475,7 +445,7 @@ namespace llvm::hakc {
     Function *
     HAKCModuleAnalysis::CreateInitTransfer(GlobalVariable *GlobalVar) {
         if (!GlobalVar->hasInitializer()) {
-            CommonHAKCAnalysis::getWriter() << GlobalVar << " has no initializer\n";
+            CommonHAKCAnalysis::getWriter(true) << GlobalVar << " has no initializer\n";
             throw std::exception();
         }
 
@@ -490,16 +460,15 @@ namespace llvm::hakc {
         auto *GlobalTransferTy = FunctionType::get(Type::getVoidTy(GetModule().getContext()), {});
         auto *GlobalInitFunc = GetFunctionByName(FunctionName, GlobalTransferTy);
         if (!GlobalInitFunc) {
-            CommonHAKCAnalysis::getWriter() << "Could not get Global Transfer function " << FunctionName << "\n";
+            CommonHAKCAnalysis::getWriter(true) << "Could not get Global Transfer function " << FunctionName << "\n";
             throw std::exception();
         }
 
         if (GlobalInitFunc->empty()) {
             PopulateGlobalInitTransferFunc(GlobalInitFunc, GlobalVar);
-            if (CommonAnalysis.GetSystemInfo().OutputDebugInfo(GlobalVar)) {
-                CommonHAKCAnalysis::getWriter() << "Finished Populating Global Init Transfer\n" << *GlobalInitFunc
-                        << "\n";
-            }
+            CommonHAKCAnalysis::getWriter(CommonAnalysis.GetSystemInfo().OutputDebugInfo(GlobalVar)) <<
+                    "Finished Populating Global Init Transfer\n" << *GlobalInitFunc
+                    << "\n";
         }
 
         return GlobalInitFunc;
@@ -525,11 +494,9 @@ namespace llvm::hakc {
 
     void HAKCModuleAnalysis::PopulateGlobalInitTransferFunc(Function *GlobTransfer, GlobalVariable *GlobalVar) {
         auto debug_output = CommonAnalysis.GetSystemInfo().OutputDebugInfo(GlobalVar);
-        if (debug_output) {
-            CommonHAKCAnalysis::getWriter() << "Populating Global Init Transfer Function "
-                    << GlobTransfer->getName()
-                    << "\n";
-        }
+        CommonHAKCAnalysis::getWriter(debug_output) << "Populating Global Init Transfer Function "
+                << GlobTransfer->getName()
+                << "\n";
 
         GlobTransfer->setSection(GlobalInitTransferSectionName());
         if (!GlobTransfer->empty()) {
@@ -541,9 +508,7 @@ namespace llvm::hakc {
             GlobalVar->setSection(GlobalVariableROSectionName(GlobalVar));
         }
 
-        if (debug_output) {
-            CommonHAKCAnalysis::getWriter() << "Starting Global Init Population\n";
-        }
+        CommonHAKCAnalysis::getWriter(debug_output) << "Starting Global Init Population\n";
         GetTransformer().PopulateGlobalTransfer(GlobTransfer, GlobalVar, debug_output);
         CommonHAKCAnalysis::VerifyFunction(GlobTransfer);
 
@@ -643,9 +608,8 @@ namespace llvm::hakc {
             return nullptr;
         }
 
-        if (CommonAnalysis.GetSystemInfo().OutputDebugInfo(GV)) {
-            CommonHAKCAnalysis::getWriter() << "processing kernel param\n" << *kernparam << "\n";
-        }
+        CommonHAKCAnalysis::getWriter(CommonAnalysis.GetSystemInfo().OutputDebugInfo(GV)) << "processing kernel param\n"
+                << *kernparam << "\n";
 
         return kernparam;
     }
@@ -730,9 +694,8 @@ namespace llvm::hakc {
         // get HAKC symbol for the kernel parameter Value
         auto &Division = Policy.GetDivision(kernparam);
 
-        if (CommonAnalysis.GetSystemInfo().OutputDebugInfo(kernparam)) {
-            CommonHAKCAnalysis::getWriter() << kernparam << " " << Division << "\n";
-        }
+        CommonHAKCAnalysis::getWriter(CommonAnalysis.GetSystemInfo().OutputDebugInfo(kernparam)) << kernparam << " " <<
+                Division << "\n";
 
         // cast kernparam to a void*
         Value *voidCast;
@@ -758,9 +721,7 @@ namespace llvm::hakc {
         // function is done
         builder.CreateRet(ctxSelect);
 
-        if (CommonAnalysis.GetSystemInfo().OutputDebugInfo(kernparam)) {
-            CommonHAKCAnalysis::getWriter() << *getctx << "\n";
-        }
+        CommonHAKCAnalysis::getWriter(CommonAnalysis.GetSystemInfo().OutputDebugInfo(kernparam)) << *getctx << "\n";
 
         CommonHAKCAnalysis::VerifyFunction(getctx);
 
