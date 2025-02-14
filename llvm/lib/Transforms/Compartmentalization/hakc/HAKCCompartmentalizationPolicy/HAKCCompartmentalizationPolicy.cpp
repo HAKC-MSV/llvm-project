@@ -214,13 +214,8 @@ namespace llvm::hakc {
         return Compartment;
     }
 
-    std::vector<hakc_compartment_id_t> HAKCCompartmentalizationPolicy::GetValidTargets(hakc_compartment_id_t CompartmentID) {
-      // TODO: Query database for the actual values
-      // auto Compartment = FindCachedCompartment(CompartmentID);
-      // if (Compartment) {
-      //   return Compartment;
-      // }
-
+    void HAKCCompartmentalizationPolicy::GetValidTargets(HAKCCompartment &Compartment) {
+      hakc_compartment_id_t CompartmentID = Compartment.GetCompartmentIDValue();
       json::Object Parameters(
           {
               {"compartment-id", std::to_string(CompartmentID)},
@@ -229,20 +224,14 @@ namespace llvm::hakc {
 
       auto ResponseData = Execute(SystemInformation.GetDatabaseInformation().GetValidTargetsEndpoint(), Parameters);
 
-      // auto ValidTargets = ResponseData.getInteger("valid_targets");
-      // if (!ValidTargets.has_value()) {
-      //   CommonHAKCAnalysis::getWriter() << "Received No Valid Targets for Compartment " << CompartmentID << "\n";
-      //   throw std::exception();
-      // }
-      // CommonHAKCAnalysis::getWriter() << "Got valid_targets response: " << ResponseData.getArray() << "\n";
       auto valid_targets_array = ResponseData.getArray("valid_targets");
-      CommonHAKCAnalysis::getWriter() << "Got valid_targets response: " << valid_targets_array << "\n";
-      std::vector<hakc_compartment_id_t> valid_targets;
-      for (auto itr = valid_targets_array->begin(); itr != valid_targets_array->end(); ++itr){
-        valid_targets.push_back((hakc_compartment_id_t) itr->getAsInteger().value());
+      if (SystemInformation.OutputDebugInfo()) {
+        CommonHAKCAnalysis::getWriter() << "Got valid_targets response: " << valid_targets_array << "\n";
       }
-
-      return valid_targets;
+      for (auto target = valid_targets_array->begin(); target != valid_targets_array->end(); ++target){
+        auto *TargetCompartment = HAKCCompartment::CreateID(target->getAsInteger().value(), SystemInformation.GetModule());
+        Compartment.AddTarget(TargetCompartment);
+      }
     }
 
     HAKCCompartmentP HAKCCompartmentalizationPolicy::CreateCompartment(hakc_compartment_id_t CompartmentID,
@@ -257,10 +246,6 @@ namespace llvm::hakc {
 
         auto Compartment = std::make_shared<HAKCCompartment>(CompartmentID, AccessToken,
                                                              SystemInformation.GetModule().getContext());
-        for (auto TargetCompartmentID: GetValidTargets(CompartmentID)) {
-            auto *TargetCompartment = HAKCCompartment::CreateID(TargetCompartmentID, SystemInformation.GetModule());
-            Compartment->AddTarget(TargetCompartment);
-        }
         Compartments.push_back(Compartment);
         return Compartment;
     }
