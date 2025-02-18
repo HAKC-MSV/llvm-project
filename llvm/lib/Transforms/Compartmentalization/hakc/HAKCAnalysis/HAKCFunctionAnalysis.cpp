@@ -990,10 +990,11 @@ namespace llvm::hakc {
                 bool ValidTransition = false;
 
                 for (auto *Target: CurrentDivision.GetHAKCCompartment().GetValidTargets()) {
-                    CommonHAKCAnalysis::getWriter(DebugActive) << "Testing Target Compartment " << *Target <<
-                            " against "
-                            << *TargetCompartment.GetCompartmentID() << "\n";
-                    if (Target == TargetCompartment.GetCompartmentID()) {
+                    CommonHAKCAnalysis::getWriter(true) << "Testing Target Compartment " << (unsigned int) Target->getSExtValue() <<
+                            " == "
+                            << (unsigned int) TargetCompartment.GetCompartmentID()->getSExtValue() << " -> " << (Target->getSExtValue() == TargetCompartment.GetCompartmentID()->getSExtValue()) << "\n";
+                  // comparing i32 1 and i64 1 returns false (LLVM constant ints), so cast to int64_t
+                  if (Target->getSExtValue() == TargetCompartment.GetCompartmentID()->getSExtValue()) {
                         ValidTransition = true;
                         break;
                     }
