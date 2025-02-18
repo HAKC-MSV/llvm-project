@@ -75,7 +75,16 @@ namespace llvm::hakc {
 
     std::shared_ptr<HAKCTypeInfo> HAKCTypeInfo::GetPointeeType() {
         /* TODO: Implement me */
-        // Look at this
+        // Look at this Derrick
+        // create HAKCTypeInfo (check for cache?)
+        // Q: how do I get the pointee?
+        if (DbgType) {
+          return std::make_shared<HAKCTypeInfo>(Analysis, DbgType->getName(), DebugActive);
+        } else if (LLVMType) {
+          // https://llvm.org/docs/OpaquePointers.html
+          // maybe get the first operand, then get its type -> but then how to create type info
+          return nullptr;
+        }
         return nullptr;
     }
 

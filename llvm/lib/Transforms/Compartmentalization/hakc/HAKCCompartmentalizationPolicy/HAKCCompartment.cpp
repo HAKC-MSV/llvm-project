@@ -39,7 +39,7 @@ namespace llvm::hakc {
     }
 
     hakc_compartment_id_t HAKCCompartment::GetCompartmentIDValue() const {
-        return Compartment->getSExtValue();
+        return Compartment->getSExtValue(); // TODO: Should we use getZExtValue instead? Can a compartment ID ever be negative?
     }
 
     HAKC_Access_Token HAKCCompartment::GetEntryToken() const {

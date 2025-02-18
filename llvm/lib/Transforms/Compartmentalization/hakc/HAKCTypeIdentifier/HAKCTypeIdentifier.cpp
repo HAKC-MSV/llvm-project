@@ -29,7 +29,9 @@ std::shared_ptr<hakc::HAKCTypeInfo> hakc::HAKCTypeIdentifier::FindType(const DIT
 }
 
 void hakc::HAKCTypeIdentifier::AddTypeMapping(const DIType *type, const std::shared_ptr<HAKCTypeInfo> &HAKCType) {
-    CommonHAKCAnalysis::getWriter(AnalysisHelper.GetSystemInfo().OutputDebugInfo()) << "Adding mapping " << *type <<
+    // CommonHAKCAnalysis::getWriter(AnalysisHelper.GetSystemInfo().OutputDebugInfo()) << "Adding mapping " << *type <<
+    //         " -> " << HAKCType->GetName() << "\n";
+  CommonHAKCAnalysis::getWriter(false) << "Adding mapping " << *type <<
             " -> " << HAKCType->GetName() << "\n";
     std::set<dwarf::Tag> TagsToSize = {
         dwarf::DW_TAG_structure_type,

@@ -467,8 +467,9 @@ namespace llvm::hakc {
     }
 
     void CommonHAKCAnalysis::VerifyFunction(Function *F) {
-        if (llvm::verifyFunction(*F, &CommonHAKCAnalysis::getWriter(true).ostream())) {
-            CommonHAKCAnalysis::getWriter(true) << "Verification failed for function\n" << F << "\n";
+        if (llvm::verifyFunction(*F, &CommonHAKCAnalysis::getWriter(false).ostream())) {
+            CommonHAKCAnalysis::getWriter(false) << "Verification failed for function\n" << F << "\n";
+            errs() << *F << "\n";
             throw std::exception();
         }
     }
@@ -567,7 +568,7 @@ namespace llvm::hakc {
                 return false;
             }
         }
-
+        // this should return true for int*, I think, but it's not (foo, kuzu test 11)
         return V->getType()->isPointerTy() && !isa<FunctionType>(V->getType()) &&
                !isa<ConstantPointerNull>(V) && !IsKernelUserPointer(V);
     }

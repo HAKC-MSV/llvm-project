@@ -137,6 +137,7 @@ void hakc::HAKCTransformer::ValidateLocation(Instruction *I) {
 }
 
 void hakc::HAKCTransformer::ValidateHAKCPointer(const HAKCPointerBase &HAKCPointer) {
+  // TODO: this should be implemented
 }
 
 void hakc::HAKCTransformer::ValidateHAKCPointerAndLocation(const HAKCPointerBase &HAKCPointer, Instruction *I) {
@@ -686,7 +687,8 @@ Instruction *
 hakc::HAKCTransformer::CreateCompartmentTransfer(hakc::HAKCPointerBase &HAKCPointer, Instruction *I,
                                                  GlobalValue *Target,
                                                  bool IsData) {
-    ValidateHAKCPointerAndLocation(HAKCPointer, I);
+  // this validation seems to not be working correctly -> the HAKCPointer is not initialized, and passes validation, causing a segfault later
+  ValidateHAKCPointerAndLocation(HAKCPointer, I);
 
     auto ObjectSize = GetObjectSizeInBytes(HAKCPointer);
 
@@ -695,6 +697,11 @@ hakc::HAKCTransformer::CreateCompartmentTransfer(hakc::HAKCPointerBase &HAKCPoin
      * I don't think this is the only case where that happens, so we do another check.
      * Only care about data transfer.
      */
+    if (!ObjectSize) {
+        CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Could not get ObjectSize for " << HAKCPointer << "\n";
+
+        ObjectSize = GetDefaultObjectSize();
+    }
     if (ObjectSize == HAKCIRBuilder.getInt64(1) && IsData && isa<Function>(Target)) {
         /*
          * TODO
@@ -752,11 +759,6 @@ hakc::HAKCTransformer::CreateCompartmentTransfer(hakc::HAKCPointerBase &HAKCPoin
         }
     }
 
-    if (!ObjectSize) {
-        CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Could not get ObjectSize for " << HAKCPointer << "\n";
-
-        ObjectSize = GetDefaultObjectSize();
-    }
 
     return CreateSizedCompartmentTransfer(HAKCPointer, I, Target, IsData, ObjectSize);
 }
@@ -789,10 +791,12 @@ hakc::HAKCTransformer::CreateForwardArgumentTransfers(Function *Target, Function
     bool NoKernelXfers = NoKernelTransfers(Target);
 
     for (auto Arg = TransferFunction->arg_begin(); Arg != TransferFunction->arg_end(); Arg++) {
+        errs() << "Trying to create arg target: " << *Arg << "\n";
         if (!CommonHAKCAnalysis::argShouldTransfer(Arg) || NoKernelXfers) {
             ArgsList.push_back(Arg);
             continue;
         }
+        errs() << "Trying to create arg target: " << *Arg << "\n";
         auto ManagedPointer = CreateNewManagedPointer(Arg);
         bool IsData = !Arg->getType()->isFunctionTy();
         CreateTransferFunctionArg_PreCall(Target, TransferFunction, Arg);
@@ -995,8 +999,10 @@ Function *hakc::HAKCTransformer::PopulateTransferFunction(Function *Target, Func
     auto *Unreachable = HAKCIRBuilder.CreateUnreachable();
     HAKCIRBuilder.SetInsertPoint(Unreachable);
 
+    // This is where the issue with the type info seems to originate
     SmallVector<Value *> TransferredArguments;
     CreateForwardArgumentTransfers(Target, TransferFunction, TransferredArguments);
+    errs() << "Trying to create ForwardArgumentTransfers target: " << *Target << "\n" << "Transfer Function: " << *TransferFunction << "\n" << "with arguments size: " << TransferredArguments.size() << "\n";
     CallInst *TargetFunctionCall = HAKCIRBuilder.CreateCall(Target, TransferredArguments);
 
     if (!Target->doesNotReturn()) {
@@ -1054,6 +1060,15 @@ Value *hakc::HAKCTransformer::CreateBitCast(hakc::HAKCPointerBase &HAKCPointer, 
 
 ConstantInt *hakc::HAKCTransformer::GetObjectSizeInBytes(hakc::HAKCPointerBase &HAKCPointer) {
   CommonHAKCAnalysis::getWriter(DebugIsActive()) << "In Getobjectsizeinbytes, hakc pointer:: " << HAKCPointer << "\n";
+  // temporary workaround which should result in the default size being used
+  // this seems to be called on an uninitialized type (AKA HAKCPointer.GetType() is nullptr, I think), which causes a segfault... trying to fix this
+  if (HAKCPointer.GetType() == nullptr) {
+    CommonHAKCAnalysis::getWriter(false) << "HAKCPointer: " << HAKCPointer << " has GetType of null\n";
+    return nullptr;
+  }
+  else if (!HAKCPointer.GetType()->GetPointeeType()) {
+    return nullptr;
+  }
   return GetObjectSizeInBytes(HAKCPointer.GetType()->GetPointeeType());
 }
 
@@ -1116,6 +1131,9 @@ bool hakc::HAKCTransformer::DebugIsActive() {
 hakc::HAKCPointerBaseP hakc::HAKCTransformer::CreateNewManagedPointer(Value *BaseDefinition) {
     auto ManagedPtr = std::make_shared<HAKCPointerBase>(BaseDefinition, 0);
     auto HAKCTy = ModuleAnalysis.GetTypeIdentifier().FindType(BaseDefinition->getType());
+    if (!HAKCTy) {
+      errs() << "Could not find valid HAKCTy for value: " << *BaseDefinition << "\n";
+    }
     ManagedPtr->SetType(HAKCTy);
     return ManagedPtr;
 }
