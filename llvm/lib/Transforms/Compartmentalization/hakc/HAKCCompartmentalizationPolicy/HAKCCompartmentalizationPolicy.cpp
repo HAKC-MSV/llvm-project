@@ -144,12 +144,12 @@ namespace llvm::hakc {
             {"object", ObjectYaml}
         });
         auto ResponseData = Execute(SystemInformation.GetDatabaseInformation().GetSymbolDivisionEndpoint(), Parameters);
-        auto CompartmentID = ResponseData.getInteger("compartment_id");
+        auto CompartmentID = ResponseData.getInteger("CompartmentID");
         if (!CompartmentID.has_value()) {
             CommonHAKCAnalysis::getWriter(true) << "Could not find CompartmentID for " << *GV << "\n";
             throw std::exception();
         }
-        auto DivisionID = ResponseData.getInteger("division_id");
+        auto DivisionID = ResponseData.getInteger("DivisionID");
         if (!DivisionID.has_value()) {
             CommonHAKCAnalysis::getWriter(true) << "Could not get DivisionID for " << *GV << "\n";
             throw std::exception();
@@ -176,7 +176,7 @@ namespace llvm::hakc {
         );
 
         auto ResponseData = Execute(SystemInformation.GetDatabaseInformation().GetDivisionEndpoint(), Parameters);
-        auto DivisionAccessToken = ResponseData.getInteger("access_token");
+        auto DivisionAccessToken = ResponseData.getInteger("AccessToken");
         if (!DivisionAccessToken.has_value()) {
             CommonHAKCAnalysis::getWriter(true) << "Received No Entry Token for Division " << DivisionID << "\n";
             throw std::exception();
@@ -205,7 +205,7 @@ namespace llvm::hakc {
         );
 
         auto ResponseData = Execute(SystemInformation.GetDatabaseInformation().GetCompartmentEndpoint(), Parameters);
-        auto EntryToken = ResponseData.getInteger("entry_token");
+        auto EntryToken = ResponseData.getInteger("EntryToken");
         if (!EntryToken.has_value()) {
             CommonHAKCAnalysis::getWriter(true) << "Received No Entry Token for Compartment " << CompartmentID << "\n";
             throw std::exception();
