@@ -129,7 +129,7 @@ namespace llvm::hakc {
         }
     }
 
-    hakc::HAKCCompartmentDivision & HAKCCompartmentalizationPolicy::GetDivision(GlobalValue *GV) {
+    hakc::HAKCCompartmentDivision &HAKCCompartmentalizationPolicy::GetDivision(GlobalValue *GV) {
         // Get Division from Global Value -> query for (division_id, access_token, compartment_id, entry_token)
         auto HAKCSymbol = SystemInformation.GetTypeIdentifier().FindSymbol(GV, true);
         if (!HAKCSymbol) {
@@ -145,31 +145,43 @@ namespace llvm::hakc {
             {"object", ObjectYaml}
         });
         auto ResponseData = Execute(SystemInformation.GetDatabaseInformation().GetSymbolDivisionEndpoint(), Parameters);
-        auto DivisionID = ResponseData.getInteger("DivisionID");
-        if (!DivisionID.has_value()) {
-          CommonHAKCAnalysis::getWriter(true) << "Could not get DivisionID for " << *GV << "\n";
-          throw std::exception();
+        auto DivisionYAML = ResponseData.getObject("Division");
+        if (!DivisionYAML) {
+            CommonHAKCAnalysis::getWriter(true) << "Invalid Response for " << *GV << "\n";
+            throw std::exception();
         }
-      auto DivisionAccessToken = ResponseData.getInteger("AccessToken");
-      if (!DivisionAccessToken.has_value()) {
-        CommonHAKCAnalysis::getWriter(true) << "Received No Entry Token for " << *GV << "\n";
-        throw std::exception();
-      }
-      auto CompartmentID = ResponseData.getInteger("CompartmentID");
+        auto CompartmentYAML = ResponseData.getObject("Compartment");
+        if (!CompartmentYAML) {
+            CommonHAKCAnalysis::getWriter(true) << "Invalid Response for " << *GV << "\n";
+            throw std::exception();
+        }
+
+        auto DivisionID = DivisionYAML->getInteger("DivisionID");
+        if (!DivisionID.has_value()) {
+            CommonHAKCAnalysis::getWriter(true) << "Could not get DivisionID for " << *GV << "\n";
+            throw std::exception();
+        }
+        auto DivisionAccessToken = DivisionYAML->getInteger("AccessToken");
+        if (!DivisionAccessToken.has_value()) {
+            CommonHAKCAnalysis::getWriter(true) << "Received No Entry Token for " << *GV << "\n";
+            throw std::exception();
+        }
+        auto CompartmentID = CompartmentYAML->getInteger("CompartmentID");
         if (!CompartmentID.has_value()) {
             CommonHAKCAnalysis::getWriter(true) << "Could not find CompartmentID for " << *GV << "\n";
             throw std::exception();
         }
-        auto EntryToken = ResponseData.getInteger("EntryToken");
+        auto EntryToken = CompartmentYAML->getInteger("EntryToken");
         if (!EntryToken.has_value()) {
-          CommonHAKCAnalysis::getWriter(true) << "Received No Entry Token for " << *GV << "\n";
-          throw std::exception();
+            CommonHAKCAnalysis::getWriter(true) << "Received No Entry Token for " << *GV << "\n";
+            throw std::exception();
         }
         auto Compartment = CreateCompartment(CompartmentID.value(), *EntryToken, false);
         auto Division = std::make_shared<hakc::HAKCCompartmentDivision>(*Compartment,
-                                                                   (hakc_compartment_division_t) DivisionID.value(),
-                                                                   (hakc_access_token_t) *DivisionAccessToken,
-                                                                   SystemInformation.GetModule().getContext());
+                                                                        (hakc_compartment_division_t) DivisionID.
+                                                                        value(),
+                                                                        (hakc_access_token_t) *DivisionAccessToken,
+                                                                        SystemInformation.GetModule().getContext());
         Divisions.push_back(Division);
         return *Division;
     }
@@ -180,8 +192,8 @@ namespace llvm::hakc {
 
     HAKCDivisionP HAKCCompartmentalizationPolicy::GetDivision(hakc_compartment_id_t CompartmentID,
                                                               hakc_compartment_division_t DivisionID) {
-      // Get Division from division_id, compartment_id -> query for (division_id, access_token, compartment_id, entry_token)
-      auto Division = FindCachedDivision(CompartmentID, DivisionID);
+        // Get Division from division_id, compartment_id -> query for (division_id, access_token, compartment_id, entry_token)
+        auto Division = FindCachedDivision(CompartmentID, DivisionID);
         if (Division) {
             return Division;
         }
@@ -233,26 +245,29 @@ namespace llvm::hakc {
     }
 
     void HAKCCompartmentalizationPolicy::GetValidTargets(HAKCCompartment &Compartment) {
-      hakc_compartment_id_t CompartmentID = Compartment.GetCompartmentIDValue();
-      json::Object Parameters(
-          {
-              {"compartment-id", std::to_string(CompartmentID)},
-          }
-      );
+        hakc_compartment_id_t CompartmentID = Compartment.GetCompartmentIDValue();
+        json::Object Parameters(
+            {
+                {"compartment-id", std::to_string(CompartmentID)},
+            }
+        );
 
-      auto ResponseData = Execute(SystemInformation.GetDatabaseInformation().GetValidTargetsEndpoint(), Parameters);
+        auto ResponseData = Execute(SystemInformation.GetDatabaseInformation().GetValidTargetsEndpoint(), Parameters);
+        auto ValidTargets = ResponseData.getArray("ValidTargets");
+        if (!ValidTargets) {
+            CommonHAKCAnalysis::getWriter(true) << "Invalid Response from Server\n";
+            throw std::exception();
+        }
+        for (auto target = ValidTargets->begin(); target != ValidTargets->end(); ++target) {
+            auto *TargetCompartment = HAKCCompartment::CreateID(target->getAsInteger().value(),
+                                                                SystemInformation.GetModule());
 
-      auto valid_targets_array = ResponseData.getArray("valid_targets");
-      if (SystemInformation.OutputDebugInfo()) {
-        CommonHAKCAnalysis::getWriter(false) << "Got valid_targets response: " << valid_targets_array << "\n";
-      }
-      for (auto target = valid_targets_array->begin(); target != valid_targets_array->end(); ++target){
-        auto *TargetCompartment = HAKCCompartment::CreateID(target->getAsInteger().value(), SystemInformation.GetModule());
+            CommonHAKCAnalysis::getWriter(SystemInformation.OutputDebugInfo()) << "Adding target: " << (unsigned int)
+                    target->getAsInteger().value()
+                    << "\n";
 
-        CommonHAKCAnalysis::getWriter(false) << "Adding target: " << (unsigned int)target->getAsInteger().value() << "\n";
-
-        Compartment.AddTarget(TargetCompartment);
-      }
+            Compartment.AddTarget(TargetCompartment);
+        }
     }
 
     HAKCCompartmentP HAKCCompartmentalizationPolicy::CreateCompartment(hakc_compartment_id_t CompartmentID,
@@ -268,8 +283,8 @@ namespace llvm::hakc {
         auto Compartment = std::make_shared<HAKCCompartment>(CompartmentID, AccessToken,
                                                              SystemInformation.GetModule().getContext());
         GetValidTargets(*Compartment);
-        for (auto target : Compartment->GetValidTargets()){
-          CommonHAKCAnalysis::getWriter(false) << "found a target " << (unsigned int)target->getSExtValue() << "\n";
+        for (auto target: Compartment->GetValidTargets()) {
+            CommonHAKCAnalysis::getWriter(false) << "found a target " << (unsigned int) target->getSExtValue() << "\n";
         }
         Compartments.push_back(Compartment);
         return Compartment;
