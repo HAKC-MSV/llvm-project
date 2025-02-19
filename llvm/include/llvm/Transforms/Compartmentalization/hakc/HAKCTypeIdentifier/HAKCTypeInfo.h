@@ -26,7 +26,7 @@ namespace llvm::hakc {
 
         unsigned GetSizeInBits() const;
 
-        const DIType *GetDbgType();
+        const DIType *GetDbgType() const;
 
         void SetDbgType(const DIType *DiDbgType);
 
@@ -48,7 +48,7 @@ namespace llvm::hakc {
 
         bool IsIntegerType() const;
 
-        bool IsPointerType();
+        bool IsPointerType() const;
 
     protected:
         std::map<unsigned, std::set<std::shared_ptr<HAKCTypeInfo> > > Members;
