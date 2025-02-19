@@ -267,12 +267,6 @@ namespace llvm::hakc {
         if (F->isDeclaration()) {
             return false;
         }
-        /*if (CommonHAKCAnalysis::NoKernelTransferFunctionsSet()) {
-            auto Compartment = Policy.GetDivision(F).GetHAKCCompartment();
-            if (Compartment.IsUncompartmentalized()) {
-                return false;
-            }
-        }*/
 
         return CommonHAKCAnalysis::FunctionHasPointerArg(F);
     }
