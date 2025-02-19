@@ -150,12 +150,12 @@ namespace llvm::hakc {
           CommonHAKCAnalysis::getWriter(true) << "Could not get DivisionID for " << *GV << "\n";
           throw std::exception();
         }
-      auto DivisionAccessToken = ResponseData.getInteger("AccessToken");
-      if (!DivisionAccessToken.has_value()) {
-        CommonHAKCAnalysis::getWriter(true) << "Received No Entry Token for " << *GV << "\n";
-        throw std::exception();
-      }
-      auto CompartmentID = ResponseData.getInteger("CompartmentID");
+        auto DivisionAccessToken = ResponseData.getInteger("AccessToken");
+        if (!DivisionAccessToken.has_value()) {
+          CommonHAKCAnalysis::getWriter(true) << "Received No Entry Token for " << *GV << "\n";
+          throw std::exception();
+        }
+        auto CompartmentID = ResponseData.getInteger("CompartmentID");
         if (!CompartmentID.has_value()) {
             CommonHAKCAnalysis::getWriter(true) << "Could not find CompartmentID for " << *GV << "\n";
             throw std::exception();

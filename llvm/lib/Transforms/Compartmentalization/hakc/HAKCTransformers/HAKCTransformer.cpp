@@ -808,6 +808,7 @@ hakc::HAKCTransformer::CreateForwardArgumentTransfers(Function *Target, Function
 
 void hakc::HAKCTransformer::CreateTransferFunctionArg_PreCall(Function *F, Function *TransferFunction, Value *Arg) {
     // TODO - Implement me
+
 }
 
 void hakc::HAKCTransformer::CreateTransferFunctionArg_PostCall(Function *F, Function *TransformFunction, Value *Arg) {
