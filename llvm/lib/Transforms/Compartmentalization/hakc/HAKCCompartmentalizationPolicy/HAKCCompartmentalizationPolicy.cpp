@@ -283,9 +283,6 @@ namespace llvm::hakc {
         auto Compartment = std::make_shared<HAKCCompartment>(CompartmentID, AccessToken,
                                                              SystemInformation.GetModule().getContext());
         GetValidTargets(*Compartment);
-        for (auto target: Compartment->GetValidTargets()) {
-            CommonHAKCAnalysis::getWriter(false) << "found a target " << (unsigned int) target->getSExtValue() << "\n";
-        }
         Compartments.push_back(Compartment);
         return Compartment;
     }

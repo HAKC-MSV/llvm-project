@@ -469,7 +469,6 @@ namespace llvm::hakc {
     void CommonHAKCAnalysis::VerifyFunction(Function *F) {
         if (llvm::verifyFunction(*F, &CommonHAKCAnalysis::getWriter(false).ostream())) {
             CommonHAKCAnalysis::getWriter(false) << "Verification failed for function\n" << F << "\n";
-            errs() << *F << "\n";
             throw std::exception();
         }
     }
@@ -478,8 +477,8 @@ namespace llvm::hakc {
         auto *RetTy = PointerType::get(M.getContext(), AddrSpace);
         Type *ArgTy[] = {
             PointerType::get(M.getContext(), AddrSpace),
-            IntegerType::get(M.getContext(), 64),
-            IntegerType::get(M.getContext(), 64)
+            IntegerType::get(M.getContext(), COMPARTMENT_ID_BIT_LENGTH),
+            IntegerType::get(M.getContext(), COMPARTMENT_ID_BIT_LENGTH)
         };
 
         return FunctionType::get(RetTy, ArgTy, false);
@@ -489,8 +488,10 @@ namespace llvm::hakc {
         auto *RetTy = PointerType::get(M.getContext(), AddrSpace);
         Type *ArgTy[] = {
             PointerType::get(M.getContext(), AddrSpace),
-            IntegerType::get(M.getContext(), 64),
-            IntegerType::get(M.getContext(), 64)
+            IntegerType::get(M.getContext(), COMPARTMENT_ID_BIT_LENGTH), /* DivisionID */
+            IntegerType::get(M.getContext(), COMPARTMENT_ID_BIT_LENGTH), /* Compartment ID */
+            IntegerType::get(M.getContext(), 64), /* Size */
+            IntegerType::get(M.getContext(), 1) /* IsData */
         };
 
         return FunctionType::get(RetTy, ArgTy, false);
@@ -500,8 +501,8 @@ namespace llvm::hakc {
         auto *RetTy = PointerType::get(M.getContext(), AddrSpace);
         Type *ArgTy[] = {
             PointerType::get(M.getContext(), AddrSpace),
-            IntegerType::get(M.getContext(), 64),
-            IntegerType::get(M.getContext(), 64)
+            IntegerType::get(M.getContext(), COMPARTMENT_ID_BIT_LENGTH),
+            IntegerType::get(M.getContext(), COMPARTMENT_ID_BIT_LENGTH)
         };
 
         return FunctionType::get(RetTy, ArgTy, false);

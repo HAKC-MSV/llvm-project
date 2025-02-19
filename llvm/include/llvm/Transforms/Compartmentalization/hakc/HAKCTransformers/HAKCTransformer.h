@@ -326,7 +326,7 @@ namespace llvm::hakc {
         Function *GetTransferFunction(Function *F);
 
         virtual void
-        CreateForwardArgumentTransfers(Function *Target, Function *TransferFunction, SmallVector<Value *> &ArgsList);
+        CreateForwardArgumentTransfers(Function *Target, Function *TransferFunction, SmallVectorImpl<Value *> &ArgsList);
 
         void CreateBackwardArgumentTransfers(Function *Target, Function *TransferFunction);
 
