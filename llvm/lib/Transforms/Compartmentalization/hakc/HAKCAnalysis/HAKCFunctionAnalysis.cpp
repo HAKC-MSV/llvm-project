@@ -642,11 +642,9 @@ namespace llvm::hakc {
          * @param store
          */
     void HAKCFunctionAnalysis::handleStore(StoreInst *store) {
-        RegisterPointerDereference(
-            store->getOperandUse(StoreInst::getPointerOperandIndex()));
+        RegisterPointerDereference(store->getOperandUse(StoreInst::getPointerOperandIndex()));
 
-        if (auto *globalValue = dyn_cast<GlobalValue>(
-            store->getValueOperand())) {
+        if (auto *globalValue = dyn_cast<GlobalValue>(store->getValueOperand())) {
             if (globalShouldBeTransferred(store->getOperandUse(0))) {
                 GlobalArgumentUses[globalValue].insert(store);
             }
@@ -990,11 +988,13 @@ namespace llvm::hakc {
                 bool ValidTransition = false;
 
                 for (auto *Target: CurrentDivision.GetHAKCCompartment().GetValidTargets()) {
-                    CommonHAKCAnalysis::getWriter(true) << "Testing Target Compartment " << (unsigned int) Target->getSExtValue() <<
+                    CommonHAKCAnalysis::getWriter(true) << "Testing Target Compartment " << (unsigned int) Target->
+                            getSExtValue() <<
                             " == "
-                            << (unsigned int) TargetCompartment.GetCompartmentID()->getSExtValue() << " -> " << (Target->getSExtValue() == TargetCompartment.GetCompartmentID()->getSExtValue()) << "\n";
-                  // comparing i32 1 and i64 1 returns false (LLVM constant ints), so cast to int64_t
-                  if (Target->getSExtValue() == TargetCompartment.GetCompartmentID()->getSExtValue()) {
+                            << (unsigned int) TargetCompartment.GetCompartmentID()->getSExtValue() << " -> " << (
+                                Target->getSExtValue() == TargetCompartment.GetCompartmentID()->getSExtValue()) << "\n";
+                    // comparing i32 1 and i64 1 returns false (LLVM constant ints), so cast to int64_t
+                    if (Target->getSExtValue() == TargetCompartment.GetCompartmentID()->getSExtValue()) {
                         ValidTransition = true;
                         break;
                     }

@@ -468,7 +468,8 @@ namespace llvm::hakc {
 
     void CommonHAKCAnalysis::VerifyFunction(Function *F) {
         if (llvm::verifyFunction(*F, &CommonHAKCAnalysis::getWriter(false).ostream())) {
-            CommonHAKCAnalysis::getWriter(false) << "Verification failed for function\n" << F << "\n";
+            CommonHAKCAnalysis::getWriter(false) << "Verification failed for function\n" << F->getName() << "\n" << F->
+                    getParent() << "\n";
             throw std::exception();
         }
     }

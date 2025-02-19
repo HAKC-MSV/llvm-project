@@ -29,10 +29,6 @@ std::shared_ptr<hakc::HAKCTypeInfo> hakc::HAKCTypeIdentifier::FindType(const DIT
 }
 
 void hakc::HAKCTypeIdentifier::AddTypeMapping(const DIType *type, const std::shared_ptr<HAKCTypeInfo> &HAKCType) {
-    // CommonHAKCAnalysis::getWriter(AnalysisHelper.GetSystemInfo().OutputDebugInfo()) << "Adding mapping " << *type <<
-    //         " -> " << HAKCType->GetName() << "\n";
-  CommonHAKCAnalysis::getWriter(false) << "Adding mapping " << *type <<
-            " -> " << HAKCType->GetName() << "\n";
     std::set<dwarf::Tag> TagsToSize = {
         dwarf::DW_TAG_structure_type,
         dwarf::DW_TAG_union_type,
@@ -175,6 +171,20 @@ std::shared_ptr<hakc::HAKCTypeInfo> hakc::HAKCTypeIdentifier::HandleType(const D
         if (auto *BasicType = dyn_cast<DIBasicType>(type)) {
             auto *IntTy = IntegerType::get(GetModule().getContext(), BasicType->getSizeInBits());
             TypeP->SetLLVMType(IntTy);
+        } else if (auto *CompositeTy = dyn_cast<DICompositeType>(type)) {
+            std::string SearchName = ".";
+            SearchName += CompositeTy->getName();
+            StructType *LLVMTy = nullptr;
+            for (auto *StructTy: GetModule().getIdentifiedStructTypes()) {
+                if (StructTy->getName().ends_with(SearchName)) {
+                    LLVMTy = StructTy;
+                    break;
+                }
+            }
+
+            if (LLVMTy) {
+                TypeP->SetLLVMType(LLVMTy);
+            }
         }
         AddTypeMapping(type, TypeP);
     } else if (auto *DerivedTy = dyn_cast<DIDerivedType>(type)) {
@@ -191,9 +201,10 @@ std::shared_ptr<hakc::HAKCTypeInfo> hakc::HAKCTypeIdentifier::HandleType(const D
             auto TypeName = GetTypeName(type);
             TypeP = std::make_shared<HAKCTypeInfo>(AnalysisHelper, TypeName, debug);
             AddTypeMapping(type, TypeP);
+        } else {
+            CommonHAKCAnalysis::getWriter(debug) << "Not handling DITYpe " << type << "\n";
         }
     }
-    CommonHAKCAnalysis::getWriter(debug) << "Not handling DITYpe " << type << "\n";
 
     return TypeP;
 }
@@ -532,7 +543,6 @@ FunctionType *hakc::HAKCTypeIdentifier::GetIndirectCallFunctionType(CallInst *Ca
         errs() << "Trying to get type from a Call that is not an indirect call\n";
         throw std::exception();
     }
-    //    return dyn_cast<FunctionType>(CallI->getCalledOperand()->getType()->getPointerElementType());
     return CallI->getFunctionType();
 }
 

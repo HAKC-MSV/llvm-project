@@ -340,21 +340,8 @@ namespace llvm::hakc {
                 F.setName(NewName);
 
                 auto *alias = GlobalAlias::create(OrigName, transferFunc);
-                CommonHAKCAnalysis::getWriter(debug_output) << "Final Transfer:\n" << *transferFunc << "\nAlias: " << *
-                        alias
-                        << "\n";
-                auto *OrigSP = F.getSubprogram();
-                if (OrigSP) {
-                    DIBuilder DIB(*F.getParent(), false, OrigSP->getUnit());
-                    DISubprogram::DISPFlags SPFlags = DISubprogram::SPFlagDefinition |
-                                                      DISubprogram::SPFlagOptimized |
-                                                      DISubprogram::SPFlagLocalToUnit;
-                    auto NewSP = DIB.createFunction(OrigSP->getScope(), transferFunc->getName(),
-                                                    transferFunc->getName(),
-                                                    OrigSP->getFile(), 0, OrigSP->getType(), 0, DINode::FlagZero,
-                                                    SPFlags);
-                    transferFunc->setSubprogram(NewSP);
-                }
+                CommonHAKCAnalysis::getWriter(debug_output) << "Final Transfer:\n" << *transferFunc << "\nAlias: "
+                        << *alias << "\n";
             }
         }
     }
