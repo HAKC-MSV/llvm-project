@@ -17,6 +17,8 @@ namespace llvm::hakc {
 
         const HAKCCompartment &GetHAKCCompartment() const;
 
+        HAKCCompartment &GetHAKCCompartment();
+
         HAKC_Division_ID GetDivisionID() const;
 
         HAKC_Access_Token GetAccessToken() const;

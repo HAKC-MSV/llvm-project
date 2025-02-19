@@ -478,8 +478,8 @@ namespace llvm::hakc {
         auto *RetTy = PointerType::get(M.getContext(), AddrSpace);
         Type *ArgTy[] = {
             PointerType::get(M.getContext(), AddrSpace),
-            IntegerType::get(M.getContext(), 64),
-            IntegerType::get(M.getContext(), 64)
+            IntegerType::get(M.getContext(), COMPARTMENT_ID_BIT_LENGTH),
+            IntegerType::get(M.getContext(), COMPARTMENT_ID_BIT_LENGTH)
         };
 
         return FunctionType::get(RetTy, ArgTy, false);
@@ -489,8 +489,10 @@ namespace llvm::hakc {
         auto *RetTy = PointerType::get(M.getContext(), AddrSpace);
         Type *ArgTy[] = {
             PointerType::get(M.getContext(), AddrSpace),
-            IntegerType::get(M.getContext(), 64),
-            IntegerType::get(M.getContext(), 64)
+            IntegerType::get(M.getContext(), COMPARTMENT_ID_BIT_LENGTH), /* DivisionID */
+            IntegerType::get(M.getContext(), COMPARTMENT_ID_BIT_LENGTH), /* Compartment ID */
+            IntegerType::get(M.getContext(), 64), /* Size */
+            IntegerType::get(M.getContext(), 1) /* IsData */
         };
 
         return FunctionType::get(RetTy, ArgTy, false);
@@ -500,8 +502,8 @@ namespace llvm::hakc {
         auto *RetTy = PointerType::get(M.getContext(), AddrSpace);
         Type *ArgTy[] = {
             PointerType::get(M.getContext(), AddrSpace),
-            IntegerType::get(M.getContext(), 64),
-            IntegerType::get(M.getContext(), 64)
+            IntegerType::get(M.getContext(), COMPARTMENT_ID_BIT_LENGTH),
+            IntegerType::get(M.getContext(), COMPARTMENT_ID_BIT_LENGTH)
         };
 
         return FunctionType::get(RetTy, ArgTy, false);
@@ -568,7 +570,7 @@ namespace llvm::hakc {
                 return false;
             }
         }
-        // this should return true for int*, I think, but it's not (foo, kuzu test 11)
+
         return V->getType()->isPointerTy() && !isa<FunctionType>(V->getType()) &&
                !isa<ConstantPointerNull>(V) && !IsKernelUserPointer(V);
     }

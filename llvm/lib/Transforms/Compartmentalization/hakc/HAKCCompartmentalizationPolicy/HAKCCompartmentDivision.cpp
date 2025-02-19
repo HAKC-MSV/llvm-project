@@ -28,6 +28,10 @@ namespace llvm::hakc {
         return ParentCompartment;
     }
 
+    HAKCCompartment & HAKCCompartmentDivision::GetHAKCCompartment() {
+        return ParentCompartment;
+    }
+
     HAKC_Division_ID HAKCCompartmentDivision::GetDivisionID() const {
         return DivisionID;
     }

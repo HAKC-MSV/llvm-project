@@ -76,6 +76,8 @@ namespace llvm::hakc {
 
         HAKCDivisionP GetDivisionFromSymbol(hakc::HAKCYamlSymbol symbol);
 
+        void GetValidTargets(HAKCCompartment &Compartment);
+
 
     protected:
         HAKCSystemInformation &SystemInformation;
@@ -102,7 +104,7 @@ namespace llvm::hakc {
         HAKCCompartmentP CreateCompartment(hakc_compartment_id_t CompartmentID, hakc_access_token_t AccessToken,
                                            bool CheckForExisting);
 
-        void GetValidTargets(HAKCCompartment &Compartment);
+        void GetValidCompartmentTargets(HAKCCompartment &Compartment);
     };
 } // hakc
 

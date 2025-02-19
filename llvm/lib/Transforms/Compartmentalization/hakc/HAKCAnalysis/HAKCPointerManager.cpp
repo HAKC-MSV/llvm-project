@@ -328,9 +328,10 @@ namespace llvm::hakc {
         if (!ManagedPointer) {
             ManageNewPointer(V);
             result = true;
+        } else {
+            CommonHAKCAnalysis::getWriter(DebugActive) << "Pointer " << *V << " is already managed: " << *ManagedPointer
+                    << "\n";
         }
-        CommonHAKCAnalysis::getWriter(DebugActive) << "Pointer " << *V << " is already managed: " << *ManagedPointer
-                << "\n";
         return result;
     }
 

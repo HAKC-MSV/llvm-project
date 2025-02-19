@@ -24,7 +24,7 @@ namespace llvm::hakc {
         return SizeInBits;
     }
 
-    const DIType *HAKCTypeInfo::GetDbgType() {
+    const DIType *HAKCTypeInfo::GetDbgType() const {
         return DbgType;
     }
 
@@ -64,7 +64,7 @@ namespace llvm::hakc {
         return false;
     }
 
-    bool HAKCTypeInfo::IsPointerType() {
+    bool HAKCTypeInfo::IsPointerType() const {
         if (DbgType) {
             return DbgType->getTag() == dwarf::DW_TAG_pointer_type;
         } else if (LLVMType) {

@@ -22,7 +22,7 @@ namespace llvm::hakc {
     }
 
     void HAKCWriter::printDIType(const DIType *type, unsigned indents) const {
-        if (debug) {
+        if (!debug) {
             return;
         }
 
@@ -48,7 +48,7 @@ namespace llvm::hakc {
     }
 
     HAKCWriter &HAKCWriter::operator<<(llvm::Value *V) {
-        if (debug) {
+        if (!debug) {
             return *this;
         }
         if (V == nullptr) {
@@ -72,7 +72,7 @@ namespace llvm::hakc {
     }
 
     HAKCWriter &HAKCWriter::operator<<(StringRef str) {
-        if (debug) {
+        if (!debug) {
             return *this;
         }
         os << str;
@@ -80,7 +80,7 @@ namespace llvm::hakc {
     }
 
     HAKCWriter &HAKCWriter::operator<<(unsigned int i) {
-        if (debug) {
+        if (!debug) {
             return *this;
         }
         os << i;
@@ -88,7 +88,7 @@ namespace llvm::hakc {
     }
 
     HAKCWriter &HAKCWriter::operator<<(unsigned long i) {
-        if (debug) {
+        if (!debug) {
             return *this;
         }
         os << i;
@@ -96,7 +96,7 @@ namespace llvm::hakc {
     }
 
     HAKCWriter &HAKCWriter::operator<<(bool b) {
-        if (debug) {
+        if (!debug) {
             return *this;
         }
         os << (b ? "True" : "False");
@@ -104,7 +104,7 @@ namespace llvm::hakc {
     }
 
     HAKCWriter &HAKCWriter::operator<<(const std::string &str) {
-        if (debug) {
+        if (!debug) {
             return *this;
         }
         os << str;
@@ -112,7 +112,7 @@ namespace llvm::hakc {
     }
 
     HAKCWriter &HAKCWriter::operator<<(const char *s) {
-        if (debug) {
+        if (!debug) {
             return *this;
         }
         os << s;
@@ -120,7 +120,7 @@ namespace llvm::hakc {
     }
 
     HAKCWriter &HAKCWriter::operator<<(const Function &F) {
-        if (debug) {
+        if (!debug) {
             return *this;
         }
         F.print(os, nullptr);
@@ -128,7 +128,7 @@ namespace llvm::hakc {
     }
 
     HAKCWriter &HAKCWriter::operator<<(const Module &M) {
-        if (debug) {
+        if (!debug) {
             return *this;
         }
         M.print(os, nullptr);
@@ -146,7 +146,7 @@ namespace llvm::hakc {
     }
 
     HAKCWriter &HAKCWriter::operator<<(const Type &Ty) {
-        if (debug) {
+        if (!debug) {
             return *this;
         }
         os << Ty;
@@ -159,7 +159,7 @@ namespace llvm::hakc {
     }
 
     HAKCWriter &HAKCWriter::operator<<(const DINode &DiNode) {
-        if (debug) {
+        if (!debug) {
             return *this;
         }
         os << DiNode;
@@ -172,7 +172,7 @@ namespace llvm::hakc {
     }
 
     HAKCWriter &HAKCWriter::operator<<(const hakc::HAKCCompartment &Compartment) {
-        if (debug) {
+        if (!debug) {
             return *this;
         }
         os << "Compartment " << Compartment.GetCompartmentIDValue();
@@ -180,7 +180,7 @@ namespace llvm::hakc {
     }
 
     HAKCWriter &HAKCWriter::operator<<(const hakc::HAKCCompartmentDivision &Division) {
-        if (debug) {
+        if (!debug) {
             return *this;
         }
         *this << Division.GetHAKCCompartment();
@@ -189,7 +189,7 @@ namespace llvm::hakc {
     }
 
     HAKCWriter &HAKCWriter::operator<<(const hakc::HAKCTypeInfo &TypeInfo) {
-        if (debug) {
+        if (!debug) {
             return *this;
         }
         TypeInfo >> os;
@@ -197,7 +197,7 @@ namespace llvm::hakc {
     }
 
     HAKCWriter &HAKCWriter::operator<<(const enum HAKCAllocationTypeEnum AllocationType) {
-        if (debug) {
+        if (!debug) {
             return *this;
         }
         switch (AllocationType) {
@@ -224,7 +224,7 @@ namespace llvm::hakc {
     }
 
     HAKCWriter &HAKCWriter::operator<<(const ManagedHAKCPointerUse &HAKCPointerUse) {
-        if (debug) {
+        if (!debug) {
             return *this;
         }
         os << "[" << HAKCPointerUse.getID() << "] Argument " << HAKCPointerUse.getOperandNo() << " of ";
@@ -234,7 +234,7 @@ namespace llvm::hakc {
     }
 
     HAKCWriter &HAKCWriter::operator<<(const HAKCPointerBase &ManagedPointer) {
-        if (debug) {
+        if (!debug) {
             return *this;
         }
         os << "Managed Pointer " << ManagedPointer.GetID();
@@ -255,7 +255,7 @@ namespace llvm::hakc {
     }
 
     HAKCWriter &HAKCWriter::operator<<(const HAKCFunctionInfo &HAKCFuncInfo) {
-        if (debug) {
+        if (!debug) {
             return *this;
         }
         HAKCFuncInfo >> os;
