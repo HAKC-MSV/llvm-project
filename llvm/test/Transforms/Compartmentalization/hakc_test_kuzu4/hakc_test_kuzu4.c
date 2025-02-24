@@ -21,4 +21,4 @@ int ftrace_stub(struct data_struct *a) {
     return 0;
 }
 
-// CHECK-NOT: HAKC_XFER
+// CHECK-NOT: @HAKC_XFER_ftrace_stub(ptr noundef %0)

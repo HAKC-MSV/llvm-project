@@ -21,6 +21,6 @@ int foo() {
 }
 
 // note: incomplete test. need derricks help for expected behavior 
-// CHECK-LABEL: foo
-// CHECK: %1 = tail call i8* @kmalloc(i64 512, i32 3264) #3
-// CHECK: %2 = icmp ugt i8* %1, inttoptr (i64 281474976710655 to i8*)
+// CHECK: call ptr @check_hakc_data_access(ptr %10, i64 1, i64 73728)
+// CHECK: call ptr @kmalloc(i64 noundef 512, i32 noundef 0)
+// CHECK: call ptr @hakc_transfer_to_clique(ptr %3, i64 1, i64 1, i64 13, i1 false)

@@ -13,7 +13,7 @@ namespace llvm::hakc {
     HAKCTypeInfo::HAKCTypeInfo(CommonHAKCAnalysis &Analysis, StringRef Name,
                                bool DebugActive) : HAKCInfo(Analysis, Name, DebugActive), Members(),
                                                    SizeInBits(0), DbgType(nullptr), LLVMType(nullptr),
-                                                   DbgTypeName() {
+                                                    PointeeType(nullptr), DbgTypeName() {
     }
 
     void HAKCTypeInfo::SetSizeInBits(unsigned int Size) {
@@ -44,6 +44,14 @@ namespace llvm::hakc {
         return LLVMType;
     }
 
+    std::shared_ptr<HAKCTypeInfo> HAKCTypeInfo::GetPointeeType() {
+        return PointeeType;
+    }
+
+    void HAKCTypeInfo::SetPointeeType(std::shared_ptr<HAKCTypeInfo> &Type) {
+        PointeeType = Type;
+    }
+
     bool HAKCTypeInfo::IsIntegerType() const {
         if (DbgType) {
             if (auto *DiBasicTy = dyn_cast<DIBasicType>(DbgType)) {
@@ -71,21 +79,6 @@ namespace llvm::hakc {
             return LLVMType->isPointerTy();
         }
         return false;
-    }
-
-    std::shared_ptr<HAKCTypeInfo> HAKCTypeInfo::GetPointeeType() {
-        /* TODO: Implement me */
-        // Look at this Derrick
-        // create HAKCTypeInfo (check for cache?)
-        // Q: how do I get the pointee?
-        if (DbgType) {
-          return std::make_shared<HAKCTypeInfo>(Analysis, DbgType->getName(), DebugActive);
-        } else if (LLVMType) {
-          // https://llvm.org/docs/OpaquePointers.html
-          // maybe get the first operand, then get its type -> but then how to create type info
-          return nullptr;
-        }
-        return nullptr;
     }
 
     const DIType *HAKCTypeInfo::StripTypeModifiers(const DIType *DiType) {

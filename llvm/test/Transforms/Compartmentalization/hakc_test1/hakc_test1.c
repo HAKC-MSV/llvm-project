@@ -22,5 +22,7 @@ int foo(struct data_struct2 *a) {
     return 0;
 }
 
-// CHECK-LABEL: HAKC_XFER_foo
-// CHECK: %7 = call i32 @HAKC_ORIG_foo(%struct.data_struct2* %6)
+// CHECK-LABEL: define dso_local i32 @HAKC_XFER_foo(ptr noundef %0)
+// CHECK-LABEL: HAKCTransferEntry:
+// CHECK: call ptr @hakc_transfer_to_clique(ptr %0, i64 1, i64 1, i64 13, i1 false)
+// CHECK: call i32 @HAKC_ORIG_foo(ptr %1)

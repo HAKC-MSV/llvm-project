@@ -19,10 +19,9 @@ int foo(struct data_struct *a) {
     }
     return 0;
 }
+
 // todo: add better checking, maybe of t.ll after dag too?
-
-// CHECK-LABEL: HAKC_ORIG_foo
-// CHECK: %2 = icmp eq %struct.data_struct* %0, null
-
-// CHECK-LABEL: HAKC_XFER_foo
-// CHECK: %5 = call i8* @hakc_transfer_to_clique(i8* %4, i64 4, i32 6, i32 241, i1 false)
+// CHECK-LABEL: define dso_local i32 @HAKC_XFER_foo(ptr noundef %0)
+// CHECK-LABEL: HAKCTransferEntry:
+// CHECK: call ptr @hakc_transfer_to_clique(ptr %0, i64 1, i64 2, i64 13, i1 false)
+// CHECK: call i32 @HAKC_ORIG_foo(ptr %1)

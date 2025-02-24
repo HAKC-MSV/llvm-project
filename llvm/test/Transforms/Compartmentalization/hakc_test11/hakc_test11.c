@@ -21,9 +21,11 @@ int foo(int _a) {
 }
 
 // todo: add better checking, maybe of t.ll after dag too?
+// CHECK: @foo = alias i32 (ptr), ptr @HAKC_XFER_foo
 
 // CHECK-LABEL: HAKC_ORIG_foo
-// CHECK: %2 = icmp eq %struct.data_struct* %0, null
+// CHECK: call i32 @bar(ptr noundef %5)
 
 // CHECK-LABEL: HAKC_XFER_foo
-// CHECK: %5 = call i8* @hakc_transfer_to_clique(i8* %4, i64 4, i32 6, i32 241, i1 false)
+// CHECK: call ptr @hakc_transfer_to_clique(ptr %0, i64 1, i64 3, i64 13, i1 false)
+// CHECK: call i32 @HAKC_ORIG_foo(ptr %1)

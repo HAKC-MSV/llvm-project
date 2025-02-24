@@ -164,17 +164,13 @@ namespace llvm::hakc {
         }
 
         SignWithDivisionFunction = YamlConfig.SignWithDivision.GetFunction(GetModule());
-
-        for (auto &StructType: YamlConfig.IgnoredTypes) {
-            auto StructTypeName = StructType.StructType;
-            for (auto &StructSubTypeName: StructType.StructSubType) {
-                auto StructName = StructTypeName + StructSubTypeName;
-                auto *Ty = StructType::getTypeByName(GetModule().getContext(), StructName);
-                if (Ty) {
-                    IgnoredTypeSet.insert(Ty);
-                }
-            }
+        for (auto &StructName: YamlConfig.IgnoredTypes) {
+          auto *Ty = StructType::getTypeByName(GetModule().getContext(), StructName);
+          if (Ty) {
+            IgnoredTypeSet.insert(Ty);
+          }
         }
+
 
         for (auto &GlobalName: YamlConfig.IgnoredGlobals) {
             auto *GV = GetModule().getGlobalVariable(GlobalName, true);

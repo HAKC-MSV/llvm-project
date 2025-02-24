@@ -57,14 +57,6 @@ namespace llvm::hakc {
         }
     };
 
-    struct HAKCYAMLStructType {
-        HAKCYAMLStringType StructType;
-        HAKCYAMLStringSequenceType StructSubType;
-
-        HAKCYAMLStructType() : StructType(), StructSubType() {
-        }
-    };
-
 
     struct HAKCYAMLFunctionDefinitionType {
         HAKCYAMLStringType FunctionName;
@@ -160,7 +152,7 @@ namespace llvm::hakc {
         HAKCYAMLSequence<HAKCYAMLAllocationType> AllocationFunctions;
         HAKCYAMLSequence<HAKCYAMLFileType> SeparateNamespacePaths;
         HAKCYAMLSequence<HAKCYAMLFileType> HAKCSourcePaths;
-        HAKCYAMLSequence<HAKCYAMLStructType> IgnoredTypes;
+        HAKCYAMLStringSequenceType IgnoredTypes;
         HAKCYAMLTransferType DefaultCompartmentTransfer;
         HAKCYAMLFunctionDefinitionType SignWithDivision;
         HAKCYAMLTransferType PerCPUCompartmentTransfer;
@@ -176,8 +168,6 @@ LLVM_YAML_IS_SEQUENCE_VECTOR(hakc::HAKCYAMLCustomTransferType)
 LLVM_YAML_IS_SEQUENCE_VECTOR(hakc::HAKCYAMLFunctionDefinitionType)
 
 LLVM_YAML_IS_SEQUENCE_VECTOR(hakc::HAKCYAMLFileType)
-
-LLVM_YAML_IS_SEQUENCE_VECTOR(hakc::HAKCYAMLStructType)
 
 inline void ValidateHAKCDefinition(hakc::HAKCYAMLFunctionDefinitionType &Definition) {
 #define FieldCheck(Def, Field) if (Def.Field != hakc::HAKCTransferFunction::MissingIdx && Def.Field > hakc::HAKCTransferFunction::MaxArgIndex) { errs() << "Invalid Index Value for " << #Field << " : " << Def.Field << "\n"; throw std::exception(); }
@@ -237,14 +227,6 @@ struct yaml::MappingTraits<hakc::HAKCYAMLFunctionDefinitionType> {
         io.mapOptional("size-idx", FunctionDefinition.SizeIdx);
         io.mapOptional("is-code-idx", FunctionDefinition.IsCodeIdx);
         ValidateHAKCDefinition(FunctionDefinition);
-    }
-};
-
-template<>
-struct yaml::MappingTraits<hakc::HAKCYAMLStructType> {
-    static void mapping(yaml::IO &io, hakc::HAKCYAMLStructType &Struct) {
-        io.mapRequired("type", Struct.StructType);
-        io.mapRequired("subtypes", Struct.StructSubType);
     }
 };
 

@@ -24,3 +24,4 @@ CompartmentalizationSupportFunctions:
   - { name: "hakc_sign_pcpu_pointer_with_color", ptr-idx: 0, compartment-idx: 1 }
   - { name: "hakc_sign_pointer", ptr-idx: 0, compartment-idx: 1, division-idx: 2 }
   - { name: "hakc_color_address", ptr-idx: 0, division-idx: 1, size-idx: 2 }
+IgnoredTypes: ["struct list_head", "struct proto", "struct atomic64_s", "struct atomic_s"]

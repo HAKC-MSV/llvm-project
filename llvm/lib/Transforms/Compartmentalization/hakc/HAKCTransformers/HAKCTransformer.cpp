@@ -628,7 +628,7 @@ hakc::HAKCTransformer::CreateVoidCastCompartmentTransfer(hakc::HAKCPointerBase &
         return SafePtr;
     }
 
-
+    auto PointeeType = ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().GetTypeIdentifier().GetPointeeType(HAKCPointer); // TODO: putting this above the pointer to pointer check may cause problems
     if (TypeToUse->IsPointerToPointer()) {
         CommonHAKCAnalysis::getWriter(DebugIsActive()) << "TypeToUse " << *TypeToUse
                 << " is a pointer to a pointer.\nAdding transfer starting at "
@@ -641,16 +641,16 @@ hakc::HAKCTransformer::CreateVoidCastCompartmentTransfer(hakc::HAKCPointerBase &
         auto ManagedPointer = CreateNewManagedPointer(Load);
         CreateVoidCastCompartmentTransfer(*ManagedPointer,
                                           Load->getNextNonDebugInstruction(), Target,
-                                          TypeToUse->GetPointeeType());
+                                          PointeeType);
         auto *FinalTransfer = CreateSizedCompartmentTransfer(HAKCPointer, FinalLocation,
                                                              Target, true, HAKCIRBuilder.getInt64(64));
         return FinalTransfer;
     }
 
-    auto *size = GetObjectSizeInBytes(TypeToUse->GetPointeeType());
+    auto *size = GetObjectSizeInBytes(PointeeType);
 
     if (size->equalsInt(0)) {
-        errs() << "Zero size for HAKCType " << *TypeToUse->GetPointeeType() << "\n";
+        errs() << "Zero size for HAKCType " << *PointeeType << "\n";
         throw std::exception();
     }
 
@@ -1061,10 +1061,12 @@ ConstantInt *hakc::HAKCTransformer::GetObjectSizeInBytes(hakc::HAKCPointerBase &
     if (HAKCPointer.GetType() == nullptr) {
         CommonHAKCAnalysis::getWriter(false) << "HAKCPointer: " << HAKCPointer << " has GetType of null\n";
         return nullptr;
-    } else if (!HAKCPointer.GetType()->GetPointeeType()) {
+    }
+    auto PointeeType = ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().GetTypeIdentifier().GetPointeeType(HAKCPointer);
+    if(!PointeeType) {
         return nullptr;
     }
-    return GetObjectSizeInBytes(HAKCPointer.GetType()->GetPointeeType());
+    return GetObjectSizeInBytes(PointeeType);
 }
 
 ConstantInt *hakc::HAKCTransformer::GetObjectSizeInBytes(hakc::HAKCTypeP HAKCType) {

@@ -5,8 +5,8 @@ edges:
 - key: IsType
   persisted: true
   source: &id001 !HAKCFunction
-    DefiningFile: null
-    DefiningLine: null
+    DefiningFile: _HAKC_SOURCE_PATH_/hakc_test9.c
+    DefiningLine: 15
     Name: bar
     is_function: true
     symbol_hash: 5b70c75c0fe981d6
@@ -24,13 +24,23 @@ edges:
 - key: UsedInCompilationUnit
   persisted: true
   source: *id001
-  target: &id003 !HAKCCompilationUnit
-    filename: _HAKC_SOURCE_PATH_/hakc_test0.c
+  target: &id002 !HAKCCompilationUnit
+    filename: _HAKC_SOURCE_PATH_/hakc_test9.c
+- key: DefinedIn
+  line: 15
+  persisted: true
+  source: *id001
+  target: *id002
 - key: UsedInCompilationUnit
   persisted: true
   source: *id001
-  target: &id005 !HAKCCompilationUnit
-    filename: _HAKC_SOURCE_PATH_/hakc_test_kuzu0.c
+  target: &id003 !HAKCCompilationUnit
+    filename: _HAKC_SOURCE_PATH_/hakc_test_kuzu9.c
+- key: DefinedIn
+  line: 15
+  persisted: true
+  source: *id001
+  target: *id003
 - key: InDivision
   persisted: true
   source: *id001
@@ -40,9 +50,9 @@ edges:
     division_hash: be7396225c569ba9
 - key: IsType
   persisted: true
-  source: &id002 !HAKCFunction
-    DefiningFile: _HAKC_SOURCE_PATH_/hakc_test0.c
-    DefiningLine: 15
+  source: &id004 !HAKCFunction
+    DefiningFile: _HAKC_SOURCE_PATH_/hakc_test9.c
+    DefiningLine: 22
     Name: foo
     is_function: true
     symbol_hash: 52a2d25076b14688
@@ -52,50 +62,50 @@ edges:
     type_hash: ed49f6b712e5420
 - key: HasScope
   persisted: true
-  source: *id002
+  source: *id004
   target: !HAKCScope
     LocalScopeName: global
     Scope: global
     scope_hash: 8001c27439650c5c
 - key: UsedInCompilationUnit
   persisted: true
-  source: *id002
-  target: *id003
+  source: *id004
+  target: *id002
 - key: DefinedIn
-  line: 15
+  line: 22
   persisted: true
-  source: *id002
-  target: *id003
+  source: *id004
+  target: *id002
 - key: UsesSymbol
   persisted: true
-  source: *id002
-  target: &id004 !HAKCFunction
-    DefiningFile: null
-    DefiningLine: null
+  source: *id004
+  target: &id005 !HAKCFunction
+    DefiningFile: _HAKC_SOURCE_PATH_/hakc_test9.c
+    DefiningLine: 15
     Name: bar
     is_function: true
     symbol_hash: 5b70c75c0fe981d6
 - key: DirectCall
   persisted: true
-  source: *id002
-  target: *id004
+  source: *id004
+  target: *id005
 - key: DagEdge
   persisted: true
-  source: *id002
-  target: *id004
+  source: *id004
+  target: *id005
   weight: 2
 - key: UsedInCompilationUnit
   persisted: true
-  source: *id002
-  target: *id005
+  source: *id004
+  target: *id003
 - key: DefinedIn
-  line: 15
+  line: 22
   persisted: true
-  source: *id002
-  target: *id005
+  source: *id004
+  target: *id003
 - key: InDivision
   persisted: true
-  source: *id002
+  source: *id004
   target: &id007 !HAKCDivision
     AccessToken: 139264
     DivisionID: 13
@@ -121,11 +131,11 @@ nodes:
   persisted: true
 - id: *id009
   persisted: true
-- id: *id003
-  persisted: true
 - id: *id002
   persisted: true
-- id: *id005
+- id: *id004
+  persisted: true
+- id: *id003
   persisted: true
 - id: *id006
   persisted: true

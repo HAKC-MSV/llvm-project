@@ -16,6 +16,7 @@
 namespace llvm::hakc {
     class HAKCTypeInfo : public HAKCInfo {
     public:
+
         HAKCTypeInfo(CommonHAKCAnalysis &Analysis, StringRef Name, bool DebugActive);
 
         void AddMember(const std::shared_ptr<HAKCTypeInfo> &TypeUse, unsigned BitOffset);
@@ -46,6 +47,8 @@ namespace llvm::hakc {
 
         std::shared_ptr<HAKCTypeInfo> GetPointeeType();
 
+        void SetPointeeType(std::shared_ptr<HAKCTypeInfo> &Type);
+
         bool IsIntegerType() const;
 
         bool IsPointerType() const;
@@ -56,6 +59,7 @@ namespace llvm::hakc {
         const DIType *DbgType;
         Type *LLVMType;
         std::string DbgTypeName;
+        std::shared_ptr<HAKCTypeInfo> PointeeType;
 
         bool IsPointerToPointer(const DIType *DiType);
 
@@ -109,8 +113,8 @@ namespace llvm::hakc {
             return !(YamlType == TypeInfo);
         }
     };
-
     typedef std::shared_ptr<HAKCTypeInfo> HAKCTypeP;
+
 } // hakc
 
 #endif //HAKC_HAKCTYPEINFO_H
