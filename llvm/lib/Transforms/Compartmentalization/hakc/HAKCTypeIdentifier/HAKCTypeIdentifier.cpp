@@ -608,6 +608,10 @@ void hakc::HAKCTypeIdentifier::FindUsesInFunctions() {
 }
 
 std::shared_ptr<hakc::HAKCTypeInfo> hakc::HAKCTypeIdentifier::FindType(Type *Ty) {
+    if (isa<PointerType>(Ty)) {
+        return nullptr;
+    }
+
     for (auto &it: types) {
         if (it.second->GetLLVMType() && it.second->GetLLVMType() == Ty) {
             return it.second;
@@ -615,6 +619,59 @@ std::shared_ptr<hakc::HAKCTypeInfo> hakc::HAKCTypeIdentifier::FindType(Type *Ty)
     }
 
     return nullptr;
+}
+
+hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindType(HAKCPointerBase &HAKCPointer) {
+    auto HAKCBaseTy = FindPointeeType(HAKCPointer);
+    auto HAKCPointerTy = FindPointerType(HAKCBaseTy);
+    return HAKCPointerTy;
+}
+
+hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindPointeeType(HAKCPointerBase &HAKCPointer) {
+    auto *BaseDef = HAKCPointer.GetBaseDefinition();
+
+    return FindPointeeType(BaseDef);
+}
+
+hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindPointerType(HAKCTypeP &BaseType) {
+    for (auto &it: types) {
+        auto *DebugTy = it.first;
+        if (auto *DerivedTy = dyn_cast<DIDerivedType>(DebugTy)) {
+            if (DerivedTy->getTag() == dwarf::DW_TAG_pointer_type) {
+                auto *BaseDebugType = DerivedTy->getBaseType();
+                if (BaseDebugType == BaseType->GetDbgType()) {
+                    return it.second;
+                }
+            }
+        }
+    }
+    return nullptr;
+}
+
+hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindPointeeType(Value *V) {
+    HAKCTypeP PointeeType = nullptr;
+    Type *BaseType = nullptr;
+    if(isa<LoadInst>(V) || isa<StoreInst>(V)) {
+        BaseType = getLoadStoreType(V);
+    } else if (isa<GetElementPtrInst>(V)) {
+        BaseType = dyn_cast<GetElementPtrInst>(V)->getSourceElementType();
+    }
+
+    if (BaseType) {
+        if (!isa<PointerType>(BaseType)) {
+            PointeeType = FindType(BaseType);
+        } else {
+            for (auto &Use : V->users) {
+                auto BaseHAKCType = FindPointeeType(Use.get());
+                if (BaseHAKCType) {
+                    PointeeType = FindPointerType(BaseHAKCType);
+                    break;
+                }
+            }
+        }
+    }
+
+    return PointeeType;
 }
 
 std::shared_ptr<hakc::HAKCTypeInfo> hakc::HAKCTypeIdentifier::FindCalledFunctionType(FunctionType *FunctionTy) {

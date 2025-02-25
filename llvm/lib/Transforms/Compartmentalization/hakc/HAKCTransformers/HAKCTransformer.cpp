@@ -1123,9 +1123,12 @@ bool hakc::HAKCTransformer::DebugIsActive() {
 
 hakc::HAKCPointerBaseP hakc::HAKCTransformer::CreateNewManagedPointer(Value *BaseDefinition) {
     auto ManagedPtr = std::make_shared<HAKCPointerBase>(BaseDefinition, 0);
-    auto HAKCTy = ModuleAnalysis.GetTypeIdentifier().FindType(BaseDefinition->getType());
+    auto HAKCTy = ModuleAnalysis.GetTypeIdentifier().FindType(ManagedPtr);
     if (!HAKCTy) {
-        errs() << "Could not find valid HAKCTy for value: " << *BaseDefinition << "\n";
+      errs() << "Could not find valid HAKCTy for value: " << *BaseDefinition << "\n";
+    } else if (HAKCTy->getPointeeType() == nullptr) {
+        auto PointeeTy = ModuleAnalysis.GetTypeIdentifier().GetPointeeType(ManagedPtr);
+        HAKCTy->SetPointeeType(PointeeTy);
     }
     ManagedPtr->SetType(HAKCTy);
     return ManagedPtr;

@@ -25,6 +25,7 @@ namespace llvm::hakc {
     typedef std::shared_ptr<HAKCGlobalInfo> HAKCGlobalP;
 
     class CommonHAKCAnalysis;
+    class HAKCPointerBase;
 
     class HAKCTypeIdentifier {
     public:
@@ -36,7 +37,7 @@ namespace llvm::hakc {
 
         HAKCSymbolP FindYamlSymbol(const HAKCYamlSymbol &YamlSymbol);
 
-        HAKCTypeP FindType(Type *Ty);
+        HAKCTypeP FindType(HAKCPointerBase &HAKCPointer);
 
         void ProcessDebugInfo();
 
@@ -45,6 +46,14 @@ namespace llvm::hakc {
         void GetHAKCTypes(SmallVectorImpl<HAKCTypeP> &Results);
 
     protected:
+        HAKCTypeP FindType(Type *Ty);
+
+        HAKCTypeP FindPointeeType(HAKCPointerBase &HAKCPointer);
+
+        HAKCTypeP FindPointeeType(Value *V);
+
+        HAKCTypeP FindPointerType(HAKCTypeP &BaseType);
+
         HAKCTypeP HandleType(const DIType *type);
 
         HAKCTypeP FindType(const DIType *type);
