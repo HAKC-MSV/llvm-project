@@ -13,7 +13,7 @@ namespace llvm::hakc {
     HAKCTypeInfo::HAKCTypeInfo(CommonHAKCAnalysis &Analysis, StringRef Name,
                                bool DebugActive) : HAKCInfo(Analysis, Name, DebugActive), Members(),
                                                    SizeInBits(0), DbgType(nullptr), LLVMType(nullptr),
-                                                   DbgTypeName() {
+                                                   DbgTypeName(), PointeeType(nullptr) {
     }
 
     void HAKCTypeInfo::SetSizeInBits(unsigned int Size) {
@@ -36,12 +36,16 @@ namespace llvm::hakc {
         Members[BitOffset].insert(TypeUse);
     }
 
-    void HAKCTypeInfo::SetDbgTypeName(std::string DbgTypeNameStr) {
+    void HAKCTypeInfo::SetDbgTypeName(const std::string &DbgTypeNameStr) {
         this->DbgTypeName = DbgTypeNameStr;
     }
 
     Type *HAKCTypeInfo::GetLLVMType() {
         return LLVMType;
+    }
+
+    void HAKCTypeInfo::SetPointeeType(const HAKCTypeP &PointeeType) {
+        this->PointeeType = PointeeType;
     }
 
     bool HAKCTypeInfo::IsIntegerType() const {

@@ -39,6 +39,8 @@ namespace llvm::hakc {
 
         HAKCTypeP FindType(HAKCPointerBase &HAKCPointer);
 
+        HAKCTypeP FindHAKCType(Value *V);
+
         void ProcessDebugInfo();
 
         Module &GetModule();
@@ -49,8 +51,6 @@ namespace llvm::hakc {
         HAKCTypeP FindType(Type *Ty);
 
         HAKCTypeP FindPointeeType(HAKCPointerBase &HAKCPointer);
-
-        HAKCTypeP FindPointeeType(Value *V);
 
         HAKCTypeP FindPointerType(HAKCTypeP &BaseType);
 

@@ -622,15 +622,25 @@ std::shared_ptr<hakc::HAKCTypeInfo> hakc::HAKCTypeIdentifier::FindType(Type *Ty)
 }
 
 hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindType(HAKCPointerBase &HAKCPointer) {
+    if (HAKCPointer.GetType()) {
+        return HAKCPointer.GetType();
+    }
+
     auto HAKCBaseTy = FindPointeeType(HAKCPointer);
     auto HAKCPointerTy = FindPointerType(HAKCBaseTy);
+    if (HAKCPointerTy) {
+        if (!HAKCPointerTy->GetPointeeType()) {
+            HAKCPointerTy->SetPointeeType(HAKCBaseTy);
+        }
+        HAKCPointer.SetType(HAKCPointerTy);
+    }
     return HAKCPointerTy;
 }
 
 hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindPointeeType(HAKCPointerBase &HAKCPointer) {
     auto *BaseDef = HAKCPointer.GetBaseDefinition();
 
-    return FindPointeeType(BaseDef);
+    return FindHAKCType(BaseDef);
 }
 
 hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindPointerType(HAKCTypeP &BaseType) {
@@ -648,7 +658,7 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindPointerType(HAKCTypeP &BaseType) {
     return nullptr;
 }
 
-hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindPointeeType(Value *V) {
+hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
     HAKCTypeP PointeeType = nullptr;
     Type *BaseType = nullptr;
     if(isa<LoadInst>(V) || isa<StoreInst>(V)) {
@@ -661,8 +671,8 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindPointeeType(Value *V) {
         if (!isa<PointerType>(BaseType)) {
             PointeeType = FindType(BaseType);
         } else {
-            for (auto &Use : V->users) {
-                auto BaseHAKCType = FindPointeeType(Use.get());
+            for (auto *User : V->users()) {
+                auto BaseHAKCType = FindHAKCType(User);
                 if (BaseHAKCType) {
                     PointeeType = FindPointerType(BaseHAKCType);
                     break;
