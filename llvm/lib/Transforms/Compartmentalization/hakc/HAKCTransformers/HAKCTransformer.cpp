@@ -689,78 +689,15 @@ Instruction *
 hakc::HAKCTransformer::CreateCompartmentTransfer(hakc::HAKCPointerBase &HAKCPointer, Instruction *I,
                                                  GlobalValue *Target,
                                                  bool IsData) {
-    // this validation seems to not be working correctly -> the HAKCPointer is not initialized, and passes validation, causing a segfault later
     ValidateHAKCPointerAndLocation(HAKCPointer, I);
 
     auto ObjectSize = GetObjectSizeInBytes(HAKCPointer);
 
-    /*
-     * If HAKCPointer is of type "void *" ("i8*"), ObjectSize will be 1.
-     * I don't think this is the only case where that happens, so we do another check.
-     * Only care about data transfer.
-     */
     if (!ObjectSize) {
         CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Could not get ObjectSize for " << HAKCPointer << "\n";
 
         ObjectSize = GetDefaultObjectSize();
     }
-    if (ObjectSize == HAKCIRBuilder.getInt64(1) && IsData && isa<Function>(Target)) {
-        /*
-         * TODO
-         *
-         * This functionality could and should be extended.
-         *
-         * Currently it is limited to checking if a transferred "void *" function argument
-         * gets used as a different type in the entry basic block of the Target function.
-         *
-         * This code probably only behaves as expected if there is a single bitcast of the
-         * argument in the entry block.
-         * I do not know what would happen if there were more than one.
-         *
-         * Furthermore, if the bitcast did not occur until a later block, this implementation
-         * will not find it. A single-byte "hakc_transfer_to_clique" call will be emitted.
-         * This is probably not the desired behavior. This should be extended to follow
-         * argument's use-chain through entire Target function.
-         *
-         * Another issue that could arise is an argument being bitcast multiple times,
-         * to different dest types each time. This is usually due to the following:
-         *
-         * HAKCPointer ("argument") is a void* ("func(void *argument) {")
-         * It gets bitcast to some "struct.realtype*" ("casted_argument = (struct realtype*)argument;")
-         * The first field of "struct.realtype" is some other type "other_type";
-         * offsetof(struct realtype, other_type_field) == 0
-         * Some code in Target uses "casted_argument" AND "casted_argument->other_type_field"
-         *
-         * The IR will contain
-         * %a = bitcast i8* %0, %struct.realtype*
-         * ...
-         * %b = bitcast i8* %0, %other_type
-         * ...
-         *
-         * More sophisticated analysis would be required to figure out if this is happening
-         * and only create the struct.realtype transfer.
-         */
-
-        /* look for a bitcast from i8* to a struct type in the entry basic block of Target */
-        auto EntryCastType = FindEntryBitcast(HAKCPointer, I, dyn_cast<Function>(Target));
-        /*
-         * If a bitcast is found in entry block, Target takes HAKCPointer as "void*" but
-         * immediately uses it as if it some other type.
-         * This situation is often found in functions used to run kthreads.
-         */
-        if (EntryCastType) {
-            CommonHAKCAnalysis::getWriter(DebugIsActive()) << Target->getName() <<
-                    " has entry block bitcast from void* to:\n"
-                    << *EntryCastType << "\n";
-
-            /* Void* -> Struct* cast compartment transfers do things slightly differently. */
-            auto *castTransfer = CreateVoidCastCompartmentTransfer(HAKCPointer, I, Target, EntryCastType);
-            if (castTransfer) {
-                return castTransfer;
-            }
-        }
-    }
-
 
     return CreateSizedCompartmentTransfer(HAKCPointer, I, Target, IsData, ObjectSize);
 }
@@ -1055,21 +992,23 @@ Value *hakc::HAKCTransformer::CreateBitCast(hakc::HAKCPointerBase &HAKCPointer, 
 
 
 ConstantInt *hakc::HAKCTransformer::GetObjectSizeInBytes(hakc::HAKCPointerBase &HAKCPointer) {
-    CommonHAKCAnalysis::getWriter(DebugIsActive()) << "In Getobjectsizeinbytes, hakc pointer:: " << HAKCPointer << "\n";
-    // temporary workaround which should result in the default size being used
-    // this seems to be called on an uninitialized type (AKA HAKCPointer.GetType() is nullptr, I think), which causes a segfault... trying to fix this
+    CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Finding size of " << HAKCPointer << "\n";
     if (HAKCPointer.GetType() == nullptr) {
         CommonHAKCAnalysis::getWriter(DebugIsActive()) << "HAKCPointer: " << HAKCPointer << " has GetType of null\n";
         return nullptr;
     } else if (!HAKCPointer.GetType()->GetPointeeType()) {
+        CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Pointee Type of " << HAKCPointer << " Type " << *HAKCPointer.
+                GetType() << " is null\n";
         return nullptr;
     }
+    CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Finding Size of PointeeType " << *HAKCPointer.GetType()->
+            GetPointeeType() << "\n";
     return GetObjectSizeInBytes(HAKCPointer.GetType()->GetPointeeType());
 }
 
 ConstantInt *hakc::HAKCTransformer::GetObjectSizeInBytes(hakc::HAKCTypeP HAKCType) {
+    CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Getting size of HAKCTypeInfo " << *HAKCType << "\n";
     auto bit_size = HAKCType->GetSizeInBits();
-    CommonHAKCAnalysis::getWriter(DebugIsActive()) << "In Getobjectsizeinbytes: bitsize: " << bit_size << "\n";
     return getInt64(bit_size / BITS_PER_BYTE);
 }
 

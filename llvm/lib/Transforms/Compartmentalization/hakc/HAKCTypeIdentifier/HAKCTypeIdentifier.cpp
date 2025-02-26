@@ -626,6 +626,8 @@ std::shared_ptr<hakc::HAKCTypeInfo> hakc::HAKCTypeIdentifier::FindType(Type *Ty)
     if (isa<PointerType>(Ty)) {
         return nullptr;
     }
+    CommonHAKCAnalysis::getWriter(AnalysisHelper.GetSystemInfo().OutputDebugInfo()) <<
+            "Trying to find HAKCTypeInfo for " << *Ty << "\n";
 
     for (auto &it: types) {
         if (it.second->GetLLVMType() && it.second->GetLLVMType() == Ty) {
@@ -668,6 +670,10 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindPointeeType(HAKCPointerBase &HAKCP
 }
 
 hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindPointeeType(HAKCTypeP &BaseType) {
+    if (BaseType->GetPointeeType()) {
+        return BaseType->GetPointeeType();
+    }
+
     DIType *TypeToFind = nullptr;
     if (BaseType->GetDbgType() && BaseType->GetDbgType()->getTag() == dwarf::DW_TAG_pointer_type) {
         TypeToFind = dyn_cast<DIDerivedType>(BaseType->GetDbgType())->getBaseType();
@@ -694,11 +700,53 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::GetArgumentHAKCType(Argument *Arg) {
     auto *DISubprog = F->getSubprogram();
     HAKCTypeP Result = nullptr;
     if (DISubprog) {
-        auto *ArgDIType = DISubprog->getType()->getTypeArray()[Arg->getArgNo()];
-        Result = FindType(ArgDIType);
+        Result = GetArgumentHAKCType(DISubprog->getType(), Arg->getArgNo() + 1);
     }
 
     return Result;
+}
+
+hakc::HAKCTypeP hakc::HAKCTypeIdentifier::GetArgumentHAKCType(const DISubroutineType *FunctionTy, unsigned ArgNo) {
+    HAKCTypeP Result = nullptr;
+    if (FunctionTy) {
+        auto *ArgDIType = FunctionTy->getTypeArray()[ArgNo];
+        Result = FindType(ArgDIType);
+    }
+    return Result;
+}
+
+hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCTypeForUse(Use &U) {
+    CommonHAKCAnalysis::getWriter(AnalysisHelper.GetSystemInfo().OutputDebugInfo()) <<
+            "Attempting to find HAKCTypeInfo for Use " << U << "\n";
+    HAKCTypeP Result = nullptr;
+    if (auto *CallI = dyn_cast<CallInst>(U.getUser())) {
+        auto CallTy = FindType(CallI->getFunctionType());
+        if (CallTy) {
+            Result = GetArgumentHAKCType(dyn_cast<DISubroutineType>(CallTy->GetDbgType()), U.getOperandNo() + 1);
+        }
+    } else if (isa<AllocaInst>(U.get()) && isa<LoadInst>(U.getUser())) {
+        Result = FindHAKCType(U.getUser());
+    } else if (auto *GEPI = dyn_cast<GetElementPtrInst>(U.getUser())) {
+        auto BaseType = FindType(GEPI->getSourceElementType());
+        if (BaseType) {
+            Result = FindPointerType(BaseType);
+        }
+    }
+
+    return Result;
+}
+
+hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindPointerType(HAKCTypeP &BaseType) {
+    for (auto &It: types) {
+        auto *DebugType = It.first;
+        if (DebugType->getTag() == dwarf::DW_TAG_pointer_type) {
+            if (dyn_cast<DIDerivedType>(DebugType)->getBaseType() == BaseType->GetDbgType()) {
+                return It.second;
+            }
+        }
+    }
+
+    return nullptr;
 }
 
 hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
@@ -713,20 +761,41 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
         BaseType = dyn_cast<GetElementPtrInst>(V)->getSourceElementType();
     } else if (auto *Arg = dyn_cast<Argument>(V)) {
         FoundType = GetArgumentHAKCType(Arg);
+    } else if (auto *AllocaI = dyn_cast<AllocaInst>(V)) {
+        BaseType = AllocaI->getAllocatedType();
     }
 
     if (BaseType) {
+        CommonHAKCAnalysis::getWriter(AnalysisHelper.GetSystemInfo().OutputDebugInfo()) << "Using BaseType " << *
+                BaseType << "\n";
         if (!isa<PointerType>(BaseType)) {
             FoundType = FindType(BaseType);
         } else {
-            for (auto *User: V->users()) {
-                auto BaseHAKCType = FindHAKCType(User);
+            for (auto &U: V->uses()) {
+                CommonHAKCAnalysis::getWriter(AnalysisHelper.GetSystemInfo().OutputDebugInfo()) <<
+                        "Finding Type of " << U << "\n";
+                auto BaseHAKCType = FindHAKCTypeForUse(U);
                 if (BaseHAKCType) {
-                    FoundType = FindPointeeType(BaseHAKCType);
+                    FoundType = BaseHAKCType;
                     break;
                 }
             }
         }
+    }
+
+    if (FoundType && FoundType->IsPointerType() && FoundType->GetPointeeType() == nullptr) {
+        auto PointeeType = FindPointeeType(FoundType);
+        if (PointeeType) {
+            FoundType->SetPointeeType(PointeeType);
+        }
+    }
+
+    if (FoundType) {
+        CommonHAKCAnalysis::getWriter(AnalysisHelper.GetSystemInfo().OutputDebugInfo()) << "Found HAKCTypeInfo\n" << *
+                FoundType << "\nfor " << V << "\n";
+    } else {
+        CommonHAKCAnalysis::getWriter(AnalysisHelper.GetSystemInfo().OutputDebugInfo()) <<
+                "Cound not find HAKCTypeInfo for " << V << "\n";
     }
 
     return FoundType;

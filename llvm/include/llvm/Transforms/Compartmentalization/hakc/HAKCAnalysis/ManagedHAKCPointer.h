@@ -49,7 +49,7 @@ namespace llvm::hakc {
 
         unsigned getID() const;
 
-        static void SortUses(SmallVector<ManagedHAKCPointerUseP> &ManagedUses);
+        static void SortUses(SmallVectorImpl<ManagedHAKCPointerUseP> &ManagedUses);
 
     protected:
         ManagedHAKCPointerP ManagedPtr;
@@ -110,7 +110,7 @@ namespace llvm::hakc {
 
         void SetType(HAKCTypeP NewHAKCTy);
 
-        Value *GetAuthenticatedPointer();
+        Value *GetAuthenticatedPointer() const;
 
         virtual void SetAuthenticatedPointer(Value *NewAuthenticatedPointer);
 
@@ -193,7 +193,7 @@ namespace llvm::hakc {
 
         bool ComputeBasePointerAuthenticated();
 
-        std::set<ManagedHAKCPointerUseP> GetAllUses();
+        void GetAllUses(SmallVectorImpl<ManagedHAKCPointerUseP> &Result) const;
 
         void SetProtectedPointer(Value *NewProtectedPointer);
 
@@ -204,7 +204,7 @@ namespace llvm::hakc {
 
         bool AllIncomingValuesWillBeAuthenticated();
 
-        std::set<Value *> GetAllIncomingValues();
+        void GetAllIncomingValues(SmallVectorImpl<Value *> &Result);
 
         bool PointerSetsShouldBeEqual() const;
 

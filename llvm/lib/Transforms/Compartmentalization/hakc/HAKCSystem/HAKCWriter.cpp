@@ -66,6 +66,15 @@ namespace llvm::hakc {
         return *this;
     }
 
+    HAKCWriter &HAKCWriter::operator<<(llvm::Use &U) {
+        if (!debug) {
+            return *this;
+        }
+
+        *this << "Operand " << U.getOperandNo() << " of " << U.getUser() << "\n";
+        return *this;
+    }
+
     HAKCWriter &HAKCWriter::operator<<(llvm::Value &V) {
         *this << &V;
         return *this;

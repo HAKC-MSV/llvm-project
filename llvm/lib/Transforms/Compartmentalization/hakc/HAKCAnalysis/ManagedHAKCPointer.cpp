@@ -45,7 +45,7 @@ namespace llvm::hakc {
         return ID;
     }
 
-    void ManagedHAKCPointerUse::SortUses(SmallVector<ManagedHAKCPointerUseP> &ManagedUses) {
+    void ManagedHAKCPointerUse::SortUses(SmallVectorImpl<ManagedHAKCPointerUseP> &ManagedUses) {
         llvm::sort(ManagedUses.begin(), ManagedUses.end(),
                    [](const ManagedHAKCPointerUseP &LHS, const ManagedHAKCPointerUseP &RHS) {
                        return LHS->getID() < RHS->getID();
@@ -69,7 +69,7 @@ namespace llvm::hakc {
         HAKCTy = std::move(NewHAKCTy);
     }
 
-    Value *HAKCPointerBase::GetAuthenticatedPointer() {
+    Value *HAKCPointerBase::GetAuthenticatedPointer() const {
         return AuthenticatedPointer;
     }
 
@@ -97,7 +97,7 @@ namespace llvm::hakc {
         InitBaseDefinitionInfo();
     }
 
-    std::set<ManagedHAKCPointerUseP> ManagedHAKCPointer::GetAllUses() {
+    void ManagedHAKCPointer::GetAllUses(SmallVectorImpl<ManagedHAKCPointerUseP> &Results) const {
         std::set<ManagedHAKCPointerUseP> Result;
         for (auto &UPtr: AuthenticatedUses) {
             Result.insert(UPtr);
@@ -109,7 +109,7 @@ namespace llvm::hakc {
             Result.insert(UPtr);
         }
 
-        return Result;
+        Results.append(Result.begin(), Result.end());
     }
 
     void ManagedHAKCPointer::InitBaseDefinitionInfo() {
@@ -242,7 +242,7 @@ namespace llvm::hakc {
         return PointerSetsCanBeEqual();
     }
 
-    std::set<Value *> ManagedHAKCPointer::GetAllIncomingValues() {
+    void ManagedHAKCPointer::GetAllIncomingValues(SmallVectorImpl<Value *> &Results) {
         std::set<Value *> ValuesToCheck;
         if (auto *PHI = dyn_cast<PHINode>(BaseDefinition)) {
             for (auto &IncomingValue: PHI->incoming_values()) {
@@ -259,7 +259,7 @@ namespace llvm::hakc {
             throw std::exception();
         }
 
-        return ValuesToCheck;
+        Results.append(ValuesToCheck.begin(), ValuesToCheck.end());
     }
 
     bool ManagedHAKCPointer::AllIncomingValuesAreAuthenticated() {
@@ -268,7 +268,8 @@ namespace llvm::hakc {
             CommonHAKCAnalysis::getWriter(DebugActive) << "Checking incoming values of " << *this
                     << " for authenticated values\n";
             AllValuesAuthenticated = true;
-            auto ValuesToCheck = GetAllIncomingValues();
+            SmallVector<Value *> ValuesToCheck;
+            GetAllIncomingValues(ValuesToCheck);
             for (auto *ValueToCheck: ValuesToCheck) {
                 if (isa<GlobalValue>(ValueToCheck)) {
                     continue;
@@ -296,7 +297,8 @@ namespace llvm::hakc {
             CommonHAKCAnalysis::getWriter(DebugActive) << "Checking incoming values of " << *this
                     << " for authenticated values\n";
             AllValuesAuthenticated = true;
-            auto ValuesToCheck = GetAllIncomingValues();
+            SmallVector<Value *> ValuesToCheck;
+            GetAllIncomingValues(ValuesToCheck);
             for (auto *ValueToCheck: ValuesToCheck) {
                 if (!Manager.ValueWillBeAuthenticated(ValueToCheck)) {
                     CommonHAKCAnalysis::getWriter(DebugActive) << "Incoming Value " << *ValueToCheck << " of "
@@ -500,7 +502,8 @@ namespace llvm::hakc {
             return;
         }
 
-        auto Users = GetAllUses();
+        SmallVector<ManagedHAKCPointerUseP> Users;
+        GetAllUses(Users);
         if (Users.empty()) {
             CommonHAKCAnalysis::getWriter(DebugActive) << "User count of " << *this
                     << " is 0. No Authenticated Pointer needed\n";
@@ -573,8 +576,7 @@ namespace llvm::hakc {
         SmallVector<ManagedHAKCPointerUseP> SortedUses;
         if (DebugActive) {
             CommonHAKCAnalysis::getWriter(DebugActive) << "\n\nCreating Clones of uses of " << *this << ":\n";
-            auto AllUses = GetAllUses();
-            SortedUses.append(AllUses.begin(), AllUses.end());
+            GetAllUses(SortedUses);
             ManagedHAKCPointerUse::SortUses(SortedUses);
             for (auto &Use: SortedUses) {
                 CommonHAKCAnalysis::getWriter(DebugActive) << "\t" << *Use << "\n";
