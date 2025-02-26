@@ -6,11 +6,11 @@
 #define HAKC_COMMONHAKCANALYSIS_H
 
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCFunctionDefinition/HAKCTransferFunction.h"
-#include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCSystemInformation.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartmentalizationPolicy.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCSystemInformation.h"
 
-#include <map>
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCWriter.h"
+#include <map>
 
 namespace llvm::hakc {
     class HAKCTransformer;
@@ -149,6 +149,8 @@ namespace llvm::hakc {
         static bool PointerShouldBeConsideredCode(Value *Pointer);
 
         std::string GetTransformedPath(StringRef Path) const;
+
+        static Function *GetOriginalFunctionFromTransferFunction(Function *F);
 
     private:
         static bool valueHasAttribute(Value *v, Attribute::AttrKind Kind);

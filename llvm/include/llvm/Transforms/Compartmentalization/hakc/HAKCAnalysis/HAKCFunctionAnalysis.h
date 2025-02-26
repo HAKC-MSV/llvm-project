@@ -9,7 +9,6 @@
 
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/CommonHAKCAnalysis.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/HAKCPointerManager.h"
-#include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/HAKCModuleAnalysis.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCTransformer.h"
 
 namespace llvm::hakc {
