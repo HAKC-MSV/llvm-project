@@ -5,6 +5,9 @@
 #include "llvm/IR/InstIterator.h"
 
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/HAKCFunctionAnalysis.h"
+
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/HAKCModuleAnalysis.h"
+
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/ManagedHAKCPointer.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartmentDivision.h"
 
@@ -1213,8 +1216,7 @@ namespace llvm::hakc {
             auto *F = CallI->getFunction();
             HAKCCompartmentDivision Division;
             if (CommonHAKCAnalysis::IsOutsideTransferFunc(F)) {
-                auto transferTargetName = F->getName().substr(OUTSIDE_TRANSFER_PREFIX.size());
-                auto *TransferTarget = F->getParent()->getFunction(transferTargetName);
+                auto *TransferTarget = CommonHAKCAnalysis::GetOriginalFunctionFromTransferFunction(F);
                 Division = Policy.GetDivision(TransferTarget);
             } else {
                 Division = Policy.GetDivision(F);

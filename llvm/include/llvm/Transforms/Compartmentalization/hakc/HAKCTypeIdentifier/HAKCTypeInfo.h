@@ -35,7 +35,7 @@ namespace llvm::hakc {
 
         void SetDbgTypeName(const std::string &DbgTypeNameStr);
 
-        Type *GetLLVMType();
+        Type *GetLLVMType() const;
 
         void SetLLVMType(Type *Ty);
 

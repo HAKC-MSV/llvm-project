@@ -40,7 +40,7 @@ namespace llvm::hakc {
         this->DbgTypeName = DbgTypeNameStr;
     }
 
-    Type *HAKCTypeInfo::GetLLVMType() {
+    Type *HAKCTypeInfo::GetLLVMType() const {
         return LLVMType;
     }
 
