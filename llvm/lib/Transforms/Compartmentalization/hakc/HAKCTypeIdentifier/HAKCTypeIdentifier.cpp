@@ -685,6 +685,7 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindPointeeType(HAKCTypeP &BaseType) {
     for (auto &it: types) {
         auto *DebugTy = it.first;
         if (DebugTy == TypeToFind) {
+            BaseType->SetPointeeType(it.second);
             return it.second;
         }
     }
@@ -700,7 +701,7 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::GetArgumentHAKCType(Argument *Arg) {
     auto *DISubprog = F->getSubprogram();
     HAKCTypeP Result = nullptr;
     if (DISubprog) {
-        Result = GetArgumentHAKCType(DISubprog->getType(), Arg->getArgNo() + 1);
+        Result = GetArgumentHAKCType(DISubprog->getType(), Arg->getArgNo());
     }
 
     return Result;
@@ -709,7 +710,8 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::GetArgumentHAKCType(Argument *Arg) {
 hakc::HAKCTypeP hakc::HAKCTypeIdentifier::GetArgumentHAKCType(const DISubroutineType *FunctionTy, unsigned ArgNo) {
     HAKCTypeP Result = nullptr;
     if (FunctionTy) {
-        auto *ArgDIType = FunctionTy->getTypeArray()[ArgNo];
+        /* The + 1 is for getting the argument value, as the 0th entry in the array is the return value */
+        auto *ArgDIType = FunctionTy->getTypeArray()[ArgNo + 1];
         Result = FindType(ArgDIType);
     }
     return Result;
@@ -722,7 +724,7 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCTypeForUse(Use &U) {
     if (auto *CallI = dyn_cast<CallInst>(U.getUser())) {
         auto CallTy = FindType(CallI->getFunctionType());
         if (CallTy) {
-            Result = GetArgumentHAKCType(dyn_cast<DISubroutineType>(CallTy->GetDbgType()), U.getOperandNo() + 1);
+            Result = GetArgumentHAKCType(dyn_cast<DISubroutineType>(CallTy->GetDbgType()), U.getOperandNo());
         }
     } else if (isa<AllocaInst>(U.get()) && isa<LoadInst>(U.getUser())) {
         Result = FindHAKCType(U.getUser());
