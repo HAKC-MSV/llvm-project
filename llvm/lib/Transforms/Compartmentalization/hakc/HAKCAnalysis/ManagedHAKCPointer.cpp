@@ -64,6 +64,8 @@ namespace llvm::hakc {
     }
 
     void HAKCPointerBase::SetType(HAKCTypeP NewHAKCTy) {
+        // if new type -> get pointee type is null, then search for the pointee type
+        // now use the type identifier
         HAKCTy = std::move(NewHAKCTy);
     }
 

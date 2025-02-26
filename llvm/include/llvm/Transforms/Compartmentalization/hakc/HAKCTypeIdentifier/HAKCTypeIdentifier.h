@@ -13,7 +13,7 @@
 
 #include "HAKCFunctionInfo.h"
 #include "HAKCGlobalInfo.h"
-#include "../HAKCAnalysis/ManagedHAKCPointer.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/ManagedHAKCPointer.h"
 
 #include <map>
 #include <set>
@@ -38,7 +38,7 @@ namespace llvm::hakc {
 
         HAKCSymbolP FindYamlSymbol(const HAKCYamlSymbol &YamlSymbol);
 
-        HAKCTypeP FindType(Type *Ty);
+        HAKCTypeP FindType(HAKCPointerBase &HAKCPointer);
 
         HAKCTypeP GetPointeeType(HAKCPointerBase &HAKCPointer);
 
@@ -52,6 +52,8 @@ namespace llvm::hakc {
         HAKCTypeP HandleType(const DIType *type);
 
         HAKCTypeP FindType(const DIType *type);
+
+        HAKCTypeP FindType(Type *type);
 
         void AddTypeMapping(const DIType *type, const HAKCTypeP &HAKCType);
 

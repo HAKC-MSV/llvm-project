@@ -42,16 +42,18 @@ std::shared_ptr<hakc::HAKCTypeInfo> hakc::HAKCTypeIdentifier::FindPointeeType(ha
   // }
   // else if (HAKCPointer.GetType()->GetLLVMType()) {
     auto value = HAKCPointer.GetBaseDefinition();
-    if (auto *Ty = dyn_cast<LoadInst>(value)) {
-      PointeeType = FindType(Ty->getType());
+    if (auto *LoadInst = dyn_cast<LoadInst>(value)) {
+      PointeeType = FindType(LoadInst->getType());
     }
-    else if(auto *Ty = dyn_cast<StoreInst>(value)){
-      PointeeType = FindType(Ty->getType());
+    else if(auto *StoreInst = dyn_cast<StoreInst>(value)){
+      PointeeType = FindType(StoreInst->getValueOperand()->getType());
     }
     else if(auto *Ty = dyn_cast<GetElementPtrInst>(value)) {
       PointeeType = FindType(Ty->getSourceElementType());
     }
     else if(auto *Ty = dyn_cast<CallInst>(value)) {
+      // pointee type should be the dereferenced type of the return type of the function
+      // int* = foo(), we want to get the int, to do this we need debug info for foo
       PointeeType = FindType(Ty->getFunctionType());
     }
     else if(auto *Ty = dyn_cast<AllocaInst>(value)) {
@@ -61,9 +63,11 @@ std::shared_ptr<hakc::HAKCTypeInfo> hakc::HAKCTypeIdentifier::FindPointeeType(ha
       PointeeType = FindType(Ty->getValueType());
     }
     else if(auto *Ty = dyn_cast<Function>(value)) {
+      // pointee type is null here because it doesnt make sense to transfer a function
       PointeeType = FindType(Ty->getFunctionType()); // CHECK THIS
     }
     else if(auto *Ty = dyn_cast<Argument>(value)) {
+      // should be similar to call inst, look at DI type sub program then DI type for that arg
       PointeeType = FindType(Ty->getPointeeInMemoryValueType()); // CHECK
     }
     else if(auto *Ty = dyn_cast<Instruction>(value)) {
@@ -687,6 +691,7 @@ void hakc::HAKCTypeIdentifier::FindUsesInFunctions() {
 }
 
 std::shared_ptr<hakc::HAKCTypeInfo> hakc::HAKCTypeIdentifier::FindType(Type *Ty) {
+  // remove this functionality, because it would only work for non pointers and is logically incorrect 
     for (auto &it: types) {
         if (it.second->GetLLVMType() && it.second->GetLLVMType() == Ty) {
             return it.second;
