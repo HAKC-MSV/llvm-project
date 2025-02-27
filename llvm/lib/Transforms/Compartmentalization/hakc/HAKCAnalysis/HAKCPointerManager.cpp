@@ -3,6 +3,9 @@
 //
 
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/HAKCPointerManager.h"
+
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/HAKCModuleAnalysis.h"
+
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/HAKCFunctionAnalysis.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/ManagedHAKCPointer.h"
 
@@ -64,6 +67,7 @@ namespace llvm::hakc {
                 << " with BaseDefinition " << BaseDefinition << "\n";
 
         ManagedHAKCPointerP ManagedPointer = std::make_shared<ManagedHAKCPointer>(BaseDefinition, *this, NextID);
+        HAKCAnalysis.GetModuleAnalysis().GetTypeIdentifier().FindType(*ManagedPointer);
         ManagedPointers.insert(ManagedPointer);
         AnalyzedUses.clear();
         ClassifyAllUsesOfDefinition(ManagedPointer->GetBaseDefinition(), ManagedPointer);

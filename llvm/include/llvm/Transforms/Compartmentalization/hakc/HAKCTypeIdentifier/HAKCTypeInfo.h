@@ -14,9 +14,11 @@
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/yaml/HAKCYamlType.h"
 
 namespace llvm::hakc {
+    class HAKCTypeInfo;
+    typedef std::shared_ptr<HAKCTypeInfo> HAKCTypeP;
+
     class HAKCTypeInfo : public HAKCInfo {
     public:
-
         HAKCTypeInfo(CommonHAKCAnalysis &Analysis, StringRef Name, bool DebugActive);
 
         void AddMember(const std::shared_ptr<HAKCTypeInfo> &TypeUse, unsigned BitOffset);
@@ -31,9 +33,9 @@ namespace llvm::hakc {
 
         void SetDbgType(const DIType *DiDbgType);
 
-        void SetDbgTypeName(std::string DbgTypeNameStr);
+        void SetDbgTypeName(const std::string &DbgTypeNameStr);
 
-        Type *GetLLVMType();
+        Type *GetLLVMType() const;
 
         void SetLLVMType(Type *Ty);
 
@@ -45,9 +47,9 @@ namespace llvm::hakc {
 
         bool IsPointerToPointer();
 
-        std::shared_ptr<HAKCTypeInfo> GetPointeeType();
+        HAKCTypeP GetPointeeType();
 
-        void SetPointeeType(std::shared_ptr<HAKCTypeInfo> &Type);
+        void SetPointeeType(const HAKCTypeP &PointeeType);
 
         bool IsIntegerType() const;
 
@@ -59,7 +61,7 @@ namespace llvm::hakc {
         const DIType *DbgType;
         Type *LLVMType;
         std::string DbgTypeName;
-        std::shared_ptr<HAKCTypeInfo> PointeeType;
+        HAKCTypeP PointeeType;
 
         bool IsPointerToPointer(const DIType *DiType);
 

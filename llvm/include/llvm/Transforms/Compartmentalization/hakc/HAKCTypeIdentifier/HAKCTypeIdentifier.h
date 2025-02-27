@@ -40,7 +40,9 @@ namespace llvm::hakc {
 
         HAKCTypeP FindType(HAKCPointerBase &HAKCPointer);
 
-        HAKCTypeP GetPointeeType(HAKCPointerBase &HAKCPointer);
+        HAKCTypeP FindHAKCType(Value *V);
+
+        HAKCTypeP FindHAKCTypeForUse(Use &U);
 
         void ProcessDebugInfo();
 
@@ -49,17 +51,21 @@ namespace llvm::hakc {
         void GetHAKCTypes(SmallVectorImpl<HAKCTypeP> &Results);
 
     protected:
+        HAKCTypeP FindType(Type *Ty);
+
+        HAKCTypeP FindPointeeType(HAKCPointerBase &HAKCPointer);
+
+        HAKCTypeP FindPointeeType(HAKCTypeP &BaseType);
+
+        HAKCTypeP FindPointerType(HAKCTypeP &BaseType);
+
         HAKCTypeP HandleType(const DIType *type);
 
         HAKCTypeP FindType(const DIType *type);
 
-        HAKCTypeP FindType(Type *type);
-
         void AddTypeMapping(const DIType *type, const HAKCTypeP &HAKCType);
 
         std::string GetTypeName(const DIType *type);
-
-        HAKCTypeP FindPointeeType(HAKCPointerBase &HAKCPointer);
 
         HAKCGlobalP HandleGlobal(const DIGlobalVariable *DIGV);
 
@@ -101,6 +107,10 @@ namespace llvm::hakc {
         void FindIndirectCallSource(CallInst *CallI, std::vector<std::shared_ptr<HAKCIndirectCallSourceLink> > &Path);
 
         void CreateIndirectCallSourceLink(Value *V, std::vector<std::shared_ptr<HAKCIndirectCallSourceLink> > &Path);
+
+        HAKCTypeP GetArgumentHAKCType(Argument *Arg);
+
+        HAKCTypeP GetArgumentHAKCType(const DISubroutineType *FunctionTy, unsigned ArgNo);
 
         CommonHAKCAnalysis &AnalysisHelper;
         DebugInfoFinder DbgInfoFinder;

@@ -39,6 +39,8 @@ namespace llvm::hakc {
 
         HAKCWriter &operator<<(llvm::Value &V);
 
+        HAKCWriter &operator<<(llvm::Use &U);
+
         HAKCWriter &operator<<(StringRef str);
 
         HAKCWriter &operator<<(unsigned int i);

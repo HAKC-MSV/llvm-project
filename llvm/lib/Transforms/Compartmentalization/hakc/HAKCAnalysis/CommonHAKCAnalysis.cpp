@@ -462,6 +462,16 @@ namespace llvm::hakc {
         return (F->getName().starts_with(OUTSIDE_TRANSFER_PREFIX));
     }
 
+    Function *CommonHAKCAnalysis::GetOriginalFunctionFromTransferFunction(Function *F) {
+        if (IsOutsideTransferFunc(F)) {
+            auto transferTargetName = F->getName().substr(OUTSIDE_TRANSFER_PREFIX.size());
+            auto *TransferTarget = F->getParent()->getFunction(transferTargetName);
+            return TransferTarget;
+        }
+
+        return F;
+    }
+
     bool CommonHAKCAnalysis::IsCapabilityReassignmentFunc(Function *F) {
         return F->getName().starts_with(CAPABILITY_REASSIGNMENT_PREFIX);
     }
