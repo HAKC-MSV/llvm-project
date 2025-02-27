@@ -39,4 +39,4 @@ int foo(struct data_struct2 *a, int* v1, int* v2) {
 // }
 // note: incomplete test. need derricks help for expected behavior 
 // CHECK-LABEL: HAKC_XFER_foo
-// CHECK: %7 = call i8* @hakc_transfer_to_clique
+// CHECK: %7 = call i8* @hakc_transfer_to_clique˜
