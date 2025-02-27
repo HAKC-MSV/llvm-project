@@ -36,7 +36,7 @@ namespace llvm::hakc {
         Members[BitOffset].insert(TypeUse);
     }
 
-    void HAKCTypeInfo::SetDbgTypeName(std::string DbgTypeNameStr) {
+    void HAKCTypeInfo::SetDbgTypeName(const std::string &DbgTypeNameStr) {
         this->DbgTypeName = DbgTypeNameStr;
     }
 

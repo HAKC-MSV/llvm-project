@@ -30,85 +30,85 @@ std::shared_ptr<hakc::HAKCTypeInfo> hakc::HAKCTypeIdentifier::FindType(const DIT
     return it->second;
 }
 
-std::shared_ptr<hakc::HAKCTypeInfo> hakc::HAKCTypeIdentifier::FindPointeeType(hakc::HAKCPointerBase &HAKCPointer) {
-  // https://llvm.org/docs/OpaquePointers.html
-  // Q: under what circumstances would we want to search for uses of the pointee to determine the type?
-
-  // Now we have a HAKCPointer, we need to figure out what it points to, and then return the type object
-
-  // first, see if the type already exists
-  HAKCTypeP PointeeType;
-  //
-  // if(HAKCPointer.GetType()->GetDbgType()) {
-  //   PointeeType = FindType(HAKCPointer.GetType()->GetDbgType());
-  // }
-  // else if (HAKCPointer.GetType()->GetLLVMType()) {
-    auto value = HAKCPointer.GetBaseDefinition();
-    if (auto *LoadInst = dyn_cast<LoadInst>(value)) {
-      PointeeType = FindType(LoadInst->getType());
-    }
-    else if(auto *StoreInst = dyn_cast<StoreInst>(value)){
-      PointeeType = FindType(StoreInst->getValueOperand()->getType());
-    }
-    else if(auto *Ty = dyn_cast<GetElementPtrInst>(value)) {
-      PointeeType = FindType(Ty->getSourceElementType());
-    }
-    else if(auto *Ty = dyn_cast<CallInst>(value)) {
-      // pointee type should be the dereferenced type of the return type of the function
-      // int* = foo(), we want to get the int, to do this we need debug info for foo
-      PointeeType = FindType(Ty->getFunctionType());
-    }
-    else if(auto *Ty = dyn_cast<AllocaInst>(value)) {
-      PointeeType = FindType(Ty->getAllocatedType());
-    }
-    else if(auto *Ty = dyn_cast<GlobalValue>(value)) {
-      PointeeType = FindType(Ty->getValueType());
-    }
-    else if(auto *Ty = dyn_cast<Function>(value)) {
-      // pointee type is null here because it doesnt make sense to transfer a function
-      PointeeType = FindType(Ty->getFunctionType()); // CHECK THIS
-    }
-    else if(auto *Ty = dyn_cast<Argument>(value)) {
-      // should be similar to call inst, look at DI type sub program then DI type for that arg
-      PointeeType = FindType(Ty->getPointeeInMemoryValueType()); // CHECK
-    }
-    else if(auto *Ty = dyn_cast<Instruction>(value)) {
-      PointeeType = FindType(Ty->getAccessType()); // CHECK
-    }
-    // else if(auto *Ty = dyn_cast<StructType>(value)) {
-    //   PointeeType = FindType(Ty->getElementType(0)); // CHECK THIS
-    // }
-    else if(auto *Ty = dyn_cast<ConstantStruct>(value)) {
-      PointeeType = FindType(Ty->getType()); // CHECK
-    }
-    // else if(auto *Ty = dyn_cast<GlobalObject>(value)) {
-    //   PointeeType = FindType(Ty->());
-    // }
-    else if(auto *Ty = dyn_cast<ConstantArray>(value)) {
-      PointeeType = FindType(Ty->getType()); // CHECK
-    }
-    else if(auto *Ty = dyn_cast<IntToPtrInst>(value)) {
-      PointeeType = FindType(Ty->getDestTy()); // CHECK
-    }
-    else if(auto *Ty = dyn_cast<GEPOperator>(value)) {
-      PointeeType = FindType(Ty->getSourceElementType()); // CHECK
-    }
-  // }
-  // make shared pointer here if it doesnt exist?
-
-  return PointeeType;
-}
-
-std::shared_ptr<hakc::HAKCTypeInfo> hakc::HAKCTypeIdentifier::GetPointeeType(hakc::HAKCPointerBase &HAKCPointer) {
-  /* TODO: Implement me */
-  // TODO: null check of hakcpointer?
-  if (!HAKCPointer.GetAuthenticatedPointer()->getType()->isPointerTy()) {
-    return nullptr;
-  }
-  // now we know that the Value is a pointer type; try to get pointee type using dynamic casts
-  // get the type identifier object (not static function), then find the pointee type
-  return AnalysisHelper.GetSystemInfo().GetTypeIdentifier().FindPointeeType(HAKCPointer);
-}
+// std::shared_ptr<hakc::HAKCTypeInfo> hakc::HAKCTypeIdentifier::FindPointeeType(hakc::HAKCPointerBase &HAKCPointer) {
+//   // https://llvm.org/docs/OpaquePointers.html
+//   // Q: under what circumstances would we want to search for uses of the pointee to determine the type?
+//
+//   // Now we have a HAKCPointer, we need to figure out what it points to, and then return the type object
+//
+//   // first, see if the type already exists
+//   HAKCTypeP PointeeType;
+//   //
+//   // if(HAKCPointer.GetType()->GetDbgType()) {
+//   //   PointeeType = FindType(HAKCPointer.GetType()->GetDbgType());
+//   // }
+//   // else if (HAKCPointer.GetType()->GetLLVMType()) {
+//     auto value = HAKCPointer.GetBaseDefinition();
+//     if (auto *LoadInst = dyn_cast<LoadInst>(value)) {
+//       PointeeType = FindType(LoadInst->getType());
+//     }
+//     else if(auto *StoreInst = dyn_cast<StoreInst>(value)){
+//       PointeeType = FindType(StoreInst->getValueOperand()->getType());
+//     }
+//     else if(auto *Ty = dyn_cast<GetElementPtrInst>(value)) {
+//       PointeeType = FindType(Ty->getSourceElementType());
+//     }
+//     else if(auto *Ty = dyn_cast<CallInst>(value)) {
+//       // pointee type should be the dereferenced type of the return type of the function
+//       // int* = foo(), we want to get the int, to do this we need debug info for foo
+//       PointeeType = FindType(Ty->getFunctionType());
+//     }
+//     else if(auto *Ty = dyn_cast<AllocaInst>(value)) {
+//       PointeeType = FindType(Ty->getAllocatedType());
+//     }
+//     else if(auto *Ty = dyn_cast<GlobalValue>(value)) {
+//       PointeeType = FindType(Ty->getValueType());
+//     }
+//     else if(auto *Ty = dyn_cast<Function>(value)) {
+//       // pointee type is null here because it doesnt make sense to transfer a function
+//       PointeeType = FindType(Ty->getFunctionType()); // CHECK THIS
+//     }
+//     else if(auto *Ty = dyn_cast<Argument>(value)) {
+//       // should be similar to call inst, look at DI type sub program then DI type for that arg
+//       PointeeType = FindType(Ty->getPointeeInMemoryValueType()); // CHECK
+//     }
+//     else if(auto *Ty = dyn_cast<Instruction>(value)) {
+//       PointeeType = FindType(Ty->getAccessType()); // CHECK
+//     }
+//     // else if(auto *Ty = dyn_cast<StructType>(value)) {
+//     //   PointeeType = FindType(Ty->getElementType(0)); // CHECK THIS
+//     // }
+//     else if(auto *Ty = dyn_cast<ConstantStruct>(value)) {
+//       PointeeType = FindType(Ty->getType()); // CHECK
+//     }
+//     // else if(auto *Ty = dyn_cast<GlobalObject>(value)) {
+//     //   PointeeType = FindType(Ty->());
+//     // }
+//     else if(auto *Ty = dyn_cast<ConstantArray>(value)) {
+//       PointeeType = FindType(Ty->getType()); // CHECK
+//     }
+//     else if(auto *Ty = dyn_cast<IntToPtrInst>(value)) {
+//       PointeeType = FindType(Ty->getDestTy()); // CHECK
+//     }
+//     else if(auto *Ty = dyn_cast<GEPOperator>(value)) {
+//       PointeeType = FindType(Ty->getSourceElementType()); // CHECK
+//     }
+//   // }
+//   // make shared pointer here if it doesnt exist?
+//
+//   return PointeeType;
+// }
+//
+// std::shared_ptr<hakc::HAKCTypeInfo> hakc::HAKCTypeIdentifier::GetPointeeType(hakc::HAKCPointerBase &HAKCPointer) {
+//   /* TODO: Implement me */
+//   // TODO: null check of hakcpointer?
+//   if (!HAKCPointer.GetAuthenticatedPointer()->getType()->isPointerTy()) {
+//     return nullptr;
+//   }
+//   // now we know that the Value is a pointer type; try to get pointee type using dynamic casts
+//   // get the type identifier object (not static function), then find the pointee type
+//   return AnalysisHelper.GetSystemInfo().GetTypeIdentifier().FindPointeeType(HAKCPointer);
+// }
 
 void hakc::HAKCTypeIdentifier::AddTypeMapping(const DIType *type, const std::shared_ptr<HAKCTypeInfo> &HAKCType) {
     CommonHAKCAnalysis::getWriter(AnalysisHelper.GetSystemInfo().OutputDebugInfo()) << "Adding mapping " << *type <<

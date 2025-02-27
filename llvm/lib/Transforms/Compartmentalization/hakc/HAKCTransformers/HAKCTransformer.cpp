@@ -1129,18 +1129,6 @@ bool hakc::HAKCTransformer::DebugIsActive() {
 
 hakc::HAKCPointerBaseP hakc::HAKCTransformer::CreateNewManagedPointer(Value *BaseDefinition) {
     auto ManagedPtr = std::make_shared<HAKCPointerBase>(BaseDefinition, 0);
-  // fix the below line, definitely wrong
-  // should be trying to find the associated hakc type, then get the pointee type at the same time
-  // each hakc type info has exactly one DI type, (duplicate objects for each pointee type)
-  // eg if base def is arg, and pointee null, then go and try to find the arg type
-  //   auto HAKCTy = ModuleAnalysis.GetTypeIdentifier().FindType(manager ptr);
-  //   if (hakcty == null) {
-  //     err
-  //   }
-  // else {
-  //   typeidentifier get pointee type (managed ptr)
-  // }
-    ManagedPtr->SetType(HAKCTy);
     auto HAKCTy = ModuleAnalysis.GetTypeIdentifier().FindType(*ManagedPtr);
     if (!HAKCTy) {
         CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Could not find valid HAKCTy for value: " << *BaseDefinition

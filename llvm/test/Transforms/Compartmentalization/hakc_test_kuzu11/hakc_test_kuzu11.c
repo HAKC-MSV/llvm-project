@@ -28,5 +28,5 @@ int foo(int* _a) {
 // CHECK: call i32 @bar(ptr noundef %5)
 
 // CHECK-LABEL: HAKC_XFER_foo
-// CHECK: call ptr @hakc_transfer_to_clique(ptr %0, i64 1, i64 3, i64 13, i1 false)
+// CHECK: call ptr @hakc_transfer_to_clique(ptr %0, i64 4, i64 3, i64 13, i1 false)
 // CHECK: call i32 @HAKC_ORIG_foo(ptr %1)
