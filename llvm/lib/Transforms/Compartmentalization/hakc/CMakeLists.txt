@@ -11,6 +11,8 @@ add_llvm_component_library(LLVMHAKC
         HAKCCompartmentalizationPolicy/HAKCCompartmentDivision.cpp
 
         HAKCFunctionDefinition/HAKCCustomTransfer.cpp
+        HAKCFunctionDefinition/HAKCPreTransferAction.cpp
+        HAKCFunctionDefinition/HAKCPostTargetAction.cpp
         HAKCFunctionDefinition/HAKCFunctionDefinition.cpp
         HAKCFunctionDefinition/HAKCTransferFunction.cpp
 

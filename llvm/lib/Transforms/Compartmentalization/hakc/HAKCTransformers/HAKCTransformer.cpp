@@ -77,7 +77,7 @@ void hakc::HAKCTransformer::CreateCodeAuthArguments(hakc::HAKCPointerBase &HAKCP
     auto AccessToken = Division.GetAccessToken();
 
     if (!ExitTokens->getValueType()->isArrayTy()) {
-        CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Invalid ExitToken Type (" << *ExitTokens->getValueType() << ") for "
+        CommonHAKCAnalysis::getWriter(true) << "Invalid ExitToken Type (" << *ExitTokens->getValueType() << ") for "
                 << *ExitTokens << "\n";
         throw std::exception();
     }
@@ -130,7 +130,7 @@ Module &hakc::HAKCTransformer::getModule() {
 
 void hakc::HAKCTransformer::ValidateLocation(Instruction *I) {
     if (I == nullptr) {
-        CommonHAKCAnalysis::getWriter(DebugIsActive()) << "I is null\n";
+        CommonHAKCAnalysis::getWriter(true) << "I is null\n";
         throw std::exception();
     }
     HAKCIRBuilder.SetInsertPoint(I);
@@ -146,7 +146,7 @@ void hakc::HAKCTransformer::ValidateHAKCPointerAndLocation(const HAKCPointerBase
         ValidateLocation(I);
     } catch (std::exception &e) {
         if (I) {
-            CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Validation failed for " << HAKCPointer <<
+            CommonHAKCAnalysis::getWriter(true) << "Validation failed for " << HAKCPointer <<
                     " for Instruction in "
                     << I->getFunction()->getName() << ": " << *I << "\n";
             throw e;
@@ -158,13 +158,13 @@ Value *hakc::HAKCTransformer::CreateSafePointer(HAKCPointerBase &HAKCPointer, In
     ValidateHAKCPointerAndLocation(HAKCPointer, I);
 
     if (isa<PHINode>(I)) {
-        CommonHAKCAnalysis::getWriter(DebugIsActive()) << "exception in CreateSafePointer\n";
-        CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Trying to insert data auth check at " << *I << " for " << HAKCPointer
+        CommonHAKCAnalysis::getWriter(true) << "exception in CreateSafePointer\n";
+        CommonHAKCAnalysis::getWriter(true) << "Trying to insert data auth check at " << *I << " for " << HAKCPointer
                 << "\n" << *I->getFunction() << "\n";
         throw std::exception();
     } else if (isa<ConstantPointerNull>(HAKCPointer.GetBaseDefinition())) {
-        CommonHAKCAnalysis::getWriter(DebugIsActive()) << "exception in CreateSafePointer\n";
-        CommonHAKCAnalysis::getWriter(DebugIsActive()) << "HAKCPointerBase is a ConstantPointerNull: " << HAKCPointer << "\n";
+        CommonHAKCAnalysis::getWriter(true) << "exception in CreateSafePointer\n";
+        CommonHAKCAnalysis::getWriter(true) << "HAKCPointerBase is a ConstantPointerNull: " << HAKCPointer << "\n";
         throw std::exception();
     }
 
@@ -196,7 +196,7 @@ Value *hakc::HAKCTransformer::CreateSafePointer(HAKCPointerBase &HAKCPointer, In
     // auto *SafePtr = CreateSafePointer(HAKCPointer, I);
 
     if (SafePtr->getType() != HAKCPointer.GetBaseDefinition()->getType()) {
-        CommonHAKCAnalysis::getWriter(DebugIsActive()) << "SafePtr and HAKCPointerBase are not the same Type!\n"
+        CommonHAKCAnalysis::getWriter(true) << "SafePtr and HAKCPointerBase are not the same Type!\n"
                 << "SafePtr: " << SafePtr->getType() << "\nHAKCPointerBase: " << HAKCPointer.GetBaseDefinition()->
                 getType() << "\n";
         throw std::exception();
@@ -213,8 +213,8 @@ Value *hakc::HAKCTransformer::CreateDataAuthentication(hakc::HAKCPointerBase &HA
     }
 
     if (isa<PHINode>(I)) {
-        CommonHAKCAnalysis::getWriter(DebugIsActive()) << "exception in CreateDataAuthentication\n";
-        CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Trying to insert data auth check at " << *I << " for " << HAKCPointer
+        CommonHAKCAnalysis::getWriter(true) << "exception in CreateDataAuthentication\n";
+        CommonHAKCAnalysis::getWriter(true) << "Trying to insert data auth check at " << *I << " for " << HAKCPointer
                 << "\n" << *I->getFunction();
         throw std::exception();
     }
@@ -226,7 +226,7 @@ Value *hakc::HAKCTransformer::CreateDataAuthentication(hakc::HAKCPointerBase &HA
     CreateDataAuthArguments(HAKCPointer, I, Args);
     for (unsigned i = 0; i < DataAuthFuncTy->getNumParams(); i++) {
         if (Args[i]->getType() != DataAuthFuncTy->getParamType(i)) {
-            CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Types do not match at index " << std::to_string(i) << "\n"
+            CommonHAKCAnalysis::getWriter(true) << "Types do not match at index " << std::to_string(i) << "\n"
                     << *DataAuthFuncTy << "\n" << *Args[i] << "\n";
             throw std::exception();
         }
@@ -241,7 +241,7 @@ Value *hakc::HAKCTransformer::CreateDataAuthentication(hakc::HAKCPointerBase &HA
 
 Value *hakc::HAKCTransformer::CreateReturnCast(hakc::HAKCPointerBase &HAKCPointer, Value *V) {
     if (!V) {
-        CommonHAKCAnalysis::getWriter(DebugIsActive()) << "NULL V\n";
+        CommonHAKCAnalysis::getWriter(true) << "NULL V\n";
         throw std::exception();
     }
     if (HAKCPointer.GetBaseDefinition()->getType()->isIntegerTy()) {
@@ -253,7 +253,7 @@ Value *hakc::HAKCTransformer::CreateReturnCast(hakc::HAKCPointerBase &HAKCPointe
 
 Value *hakc::HAKCTransformer::CreatePointerCast(hakc::HAKCPointerBase &HAKCPointer, PointerType *PointerTy) {
     if (!PointerTy) {
-        CommonHAKCAnalysis::getWriter(DebugIsActive()) << "NULL PointerTy\n";
+        CommonHAKCAnalysis::getWriter(true) << "NULL PointerTy\n";
         throw std::exception();
     }
 
@@ -283,7 +283,7 @@ GlobalVariable *hakc::HAKCTransformer::GetValidTargetCompartments(Function *F) {
     EntryTokenArray = getModule().getNamedGlobal(name);
     if (EntryTokenArray) {
         if (!EntryTokenArray->getValueType()->isArrayTy()) {
-            CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Invalid type for " << *EntryTokenArray << "\n";
+            CommonHAKCAnalysis::getWriter(true) << "Invalid type for " << *EntryTokenArray << "\n";
             throw std::exception();
         }
         return EntryTokenArray;
@@ -291,7 +291,7 @@ GlobalVariable *hakc::HAKCTransformer::GetValidTargetCompartments(Function *F) {
 
     auto Targets = Division.GetHAKCCompartment().GetValidTargets();
     if (Targets.empty()) {
-        CommonHAKCAnalysis::getWriter(DebugIsActive()) << "No valid transitions exist for " << F->getName() << " in Compartment "
+        CommonHAKCAnalysis::getWriter(true) << "No valid transitions exist for " << F->getName() << " in Compartment "
                 << std::to_string(CompartmentID->getZExtValue()) << "\n";
         throw std::exception();
     }
@@ -378,7 +378,7 @@ CallInst *hakc::HAKCTransformer::CreateCall(StringRef name, Type *RetTy, ArrayRe
 
     auto Func = ModuleAnalysis.GetFunctionByName(name, FunctionCallTy);
     if (!Func) {
-        CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Could not find function " << name << " of type " << FunctionCallTy
+        CommonHAKCAnalysis::getWriter(true) << "Could not find function " << name << " of type " << FunctionCallTy
                 << " to be inserted into\n" << HAKCIRBuilder.GetInsertBlock()->getParent()
                 << "\n";
         throw std::exception();
@@ -395,7 +395,7 @@ hakc::HAKCTransformer::CreateSizedCompartmentTransfer(hakc::HAKCPointerBase &HAK
         auto *V = CreateSafePointer(HAKCPointer, &*HAKCIRBuilder.GetInsertPoint());
         auto *SafePtr = dyn_cast<Instruction>(V);
         if (!SafePtr) {
-            CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Unexpected Safe Pointer Type: " << *V << "\n";
+            CommonHAKCAnalysis::getWriter(true) << "Unexpected Safe Pointer Type: " << *V << "\n";
             throw std::exception();
         }
         return SafePtr;
@@ -415,7 +415,7 @@ hakc::HAKCTransformer::CreateCustomTransfer(hakc::HAKCPointerBase &HAKCPointer, 
                                             ConstantInt *Size) {
     auto CustomTransfer = GetCustomTransferFunction(HAKCPointer);
     if (!CustomTransfer) {
-        CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Could not find Transfer Function for "
+        CommonHAKCAnalysis::getWriter(true) << "Could not find Transfer Function for "
                 << HAKCPointer.GetBaseDefinition()->getType() << "\n";
         throw std::exception();
     }
@@ -624,7 +624,7 @@ hakc::HAKCTransformer::CreateVoidCastCompartmentTransfer(hakc::HAKCPointerBase &
         auto *V = CreateSafePointer(HAKCPointer, &*HAKCIRBuilder.GetInsertPoint());
         auto *SafePtr = dyn_cast<Instruction>(V);
         if (!SafePtr) {
-            CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Unexpected Safe Pointer Type: " << *V << "\n";
+            CommonHAKCAnalysis::getWriter(true) << "Unexpected Safe Pointer Type: " << *V << "\n";
             throw std::exception();
         }
         return SafePtr;
@@ -693,74 +693,6 @@ hakc::HAKCTransformer::CreateCompartmentTransfer(hakc::HAKCPointerBase &HAKCPoin
 
     auto ObjectSize = GetObjectSizeInBytes(HAKCPointer);
 
-    /*
-     * If HAKCPointer is of type "void *" ("i8*"), ObjectSize will be 1.
-     * I don't think this is the only case where that happens, so we do another check.
-     * Only care about data transfer.
-     */
-    if (!ObjectSize) {
-        CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Could not get ObjectSize for " << HAKCPointer << "\n";
-
-        ObjectSize = GetDefaultObjectSize();
-    }
-    if (ObjectSize == HAKCIRBuilder.getInt64(1) && IsData && isa<Function>(Target)) {
-        /*
-         * TODO
-         *
-         * This functionality could and should be extended.
-         *
-         * Currently it is limited to checking if a transferred "void *" function argument
-         * gets used as a different type in the entry basic block of the Target function.
-         *
-         * This code probably only behaves as expected if there is a single bitcast of the
-         * argument in the entry block.
-         * I do not know what would happen if there were more than one.
-         *
-         * Furthermore, if the bitcast did not occur until a later block, this implementation
-         * will not find it. A single-byte "hakc_transfer_to_clique" call will be emitted.
-         * This is probably not the desired behavior. This should be extended to follow
-         * argument's use-chain through entire Target function.
-         *
-         * Another issue that could arise is an argument being bitcast multiple times,
-         * to different dest types each time. This is usually due to the following:
-         *
-         * HAKCPointer ("argument") is a void* ("func(void *argument) {")
-         * It gets bitcast to some "struct.realtype*" ("casted_argument = (struct realtype*)argument;")
-         * The first field of "struct.realtype" is some other type "other_type";
-         * offsetof(struct realtype, other_type_field) == 0
-         * Some code in Target uses "casted_argument" AND "casted_argument->other_type_field"
-         *
-         * The IR will contain
-         * %a = bitcast i8* %0, %struct.realtype*
-         * ...
-         * %b = bitcast i8* %0, %other_type
-         * ...
-         *
-         * More sophisticated analysis would be required to figure out if this is happening
-         * and only create the struct.realtype transfer.
-         */
-
-        /* look for a bitcast from i8* to a struct type in the entry basic block of Target */
-        auto EntryCastType = FindEntryBitcast(HAKCPointer, I, dyn_cast<Function>(Target));
-        /*
-         * If a bitcast is found in entry block, Target takes HAKCPointer as "void*" but
-         * immediately uses it as if it some other type.
-         * This situation is often found in functions used to run kthreads.
-         */
-        if (EntryCastType) {
-            CommonHAKCAnalysis::getWriter(DebugIsActive()) << Target->getName() <<
-                    " has entry block bitcast from void* to:\n"
-                    << *EntryCastType << "\n";
-
-            /* Void* -> Struct* cast compartment transfers do things slightly differently. */
-            auto *castTransfer = CreateVoidCastCompartmentTransfer(HAKCPointer, I, Target, EntryCastType);
-            if (castTransfer) {
-                return castTransfer;
-            }
-        }
-    }
-
-
     return CreateSizedCompartmentTransfer(HAKCPointer, I, Target, IsData, ObjectSize);
 }
 
@@ -768,7 +700,7 @@ Function *hakc::HAKCTransformer::GetTransferFunction(Function *F) {
     auto TransferFunctionName = ModuleAnalysis.GetCommonAnalysis().GetOutsideTransferName(F);
     auto *TransferFunction = ModuleAnalysis.GetFunctionByName(TransferFunctionName, F->getFunctionType());
     if (TransferFunction == nullptr) {
-        CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Could not create HAKC transfer function " << TransferFunctionName
+        CommonHAKCAnalysis::getWriter(true) << "Could not create HAKC transfer function " << TransferFunctionName
                 << "\n";
         throw std::exception();
     }
@@ -801,16 +733,56 @@ hakc::HAKCTransformer::CreateForwardArgumentTransfers(Function *Target, Function
         CreateTransferFunctionArg_PreCall(Target, TransferFunction, Arg);
         Instruction *Transfer = CreateCompartmentTransfer(*ManagedPointer, &*HAKCIRBuilder.GetInsertPoint(), Target,
                                                           IsData);
+        // CreateTransferFunctionArg_PostCall(Target, TransferFunction, Arg); // actually, pretty sure this gets called later
         ArgsList.push_back(Transfer);
     }
 }
 
 void hakc::HAKCTransformer::CreateTransferFunctionArg_PreCall(Function *F, Function *TransferFunction, Value *Arg) {
     // TODO - Implement me
+    // Q:
+    // Run the defined PreTransferActions from the configuration yaml, e.g., get_hakc_address_color
+    for (auto &it: ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().PreTransferActions()) {
+      CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Trying to create PreTransferAction " << it->GetFunction() << "\n";
+      auto PreTransferFunction = it->GetFunction();
+      auto PreTransferLabel = it->GetLabel(); // TODO: omitting label for now
+      // PreTransferActions:
+      //   - { label: "step0", name: "get_hakc_address_color" }
+      // PostTargetActions:
+      //   - { name: "hakc_color_address", arg: { idx: 1, val: "step0" } }
+      // want to call function on target, then pass that pointer to the transfer function
+      // so, we have some pointer ptr we want to transfer
+      // before we transfer, we need to get the current color of the pointer
+      // %0 = call @get_hakc_address_color(ptr)
+      // then, call the transfer function
+      // %1 = call ptr @hakc_transfer_to_clique(ptr %0, i64 4, i64 3, i64 13, i1 false)
+      // %2 = call i32 @HAKC_ORIG_foo(ptr %1)
+      // %3 = call @hakc_color_address(ptr %0)
+      // need to cast the ptr to i64 to match get_hakc_address_color type
+      auto arg_int = HAKCIRBuilder.CreatePtrToInt(Arg, PreTransferFunction->getArg(0)->getType());
+      SmallVector<Value *> Args;
+      Args.push_back(arg_int);
+      auto *PreTransferFunctionCall = CreateCall(PreTransferFunction, Args);
+      CastCallToType(PreTransferFunctionCall, arg_int);
+
+    }
+
 }
 
 void hakc::HAKCTransformer::CreateTransferFunctionArg_PostCall(Function *F, Function *TransformFunction, Value *Arg) {
     // TODO - Implement me
+    // Run the defined PostTargetActions from the configuration yaml, e.g., hakc_color_address
+    for (auto &it: ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().PostTargetActions()) {
+      CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Trying to create PostTargetAction " << it->GetFunction() << "\n";
+      auto PostTargetFunction = it->GetFunction();
+      auto PostTargetIndex = it->GetIdx();
+      auto PostTargetValue = it->GetVal();
+      SmallVector<Value *> Args;
+      auto arg_int = HAKCIRBuilder.CreatePtrToInt(Arg, PostTargetFunction->getArg(0)->getType());
+      Args.push_back(arg_int);
+      auto *PostTargetFunctionCall = CreateCall(PostTargetFunction, Args);
+      CastCallToType(PostTargetFunctionCall, arg_int);
+    }
 }
 
 void hakc::HAKCTransformer::CreateBackwardArgumentTransfers(Function *Target, Function *TransferFunction) {
@@ -827,10 +799,10 @@ void hakc::HAKCTransformer::CreateBackwardArgumentTransfers(Function *Target, Fu
 
 Function *hakc::HAKCTransformer::CreateTransferFunction(Function *F) {
     if (F->isIntrinsic()) {
-        CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Trying to create a HAKC Transfer function for " << F->getName() << "\n";
+        CommonHAKCAnalysis::getWriter(true) << "Trying to create a HAKC Transfer function for " << F->getName() << "\n";
         throw std::exception();
     } else if (F->isVarArg()) {
-        CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Trying to create HAKC Transfer function for variadic function " <<
+        CommonHAKCAnalysis::getWriter(true) << "Trying to create HAKC Transfer function for variadic function " <<
                 F->getName() << "\n";
         throw std::exception();
     }
@@ -843,11 +815,11 @@ Function *hakc::HAKCTransformer::CreateTransferFunction(Function *F) {
 Function *hakc::HAKCTransformer::CreateTransferToVariadic(CallInst *Call) {
     auto *Target = Call->getCalledFunction();
     if (!Target) {
-        CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Null Call target\n";
+        CommonHAKCAnalysis::getWriter(true) << "Null Call target\n";
         throw std::exception();
     }
     if (Target->isIntrinsic()) {
-        CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Trying to create a HAKC Transfer function for " << Target->getName() <<
+        CommonHAKCAnalysis::getWriter(true) << "Trying to create a HAKC Transfer function for " << Target->getName() <<
                 "\n";
         throw std::exception();
     }
@@ -980,7 +952,7 @@ void hakc::HAKCTransformer::InitNewFunction(Function *F, StringRef EntryBlockNam
 
     auto *EntryBB = BasicBlock::Create(getModule().getContext(), EntryBlockName, F);
     if (EntryBB != &F->getEntryBlock()) {
-        CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Invalid Entry BasicBlock created\n";
+        CommonHAKCAnalysis::getWriter(true) << "Invalid Entry BasicBlock created\n";
         throw std::exception();
     }
 
@@ -1022,7 +994,7 @@ Function *hakc::HAKCTransformer::PopulateTransferFunction(Function *Target, Func
 
 Function *hakc::HAKCTransformer::CreateNonVariadicTransferFunction(Function *F) {
     if (F->isIntrinsic()) {
-        CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Trying to create a HAKC Transfer function for " << F->getName() << "\n";
+        CommonHAKCAnalysis::getWriter(true) << "Trying to create a HAKC Transfer function for " << F->getName() << "\n";
         throw std::exception();
     }
 
@@ -1039,7 +1011,7 @@ Value *hakc::HAKCTransformer::CreateBitCast(hakc::HAKCPointerBase &HAKCPointer, 
     auto AddrSpace = GetPointerAddrSpace(HAKCPointer);
 
     if (TargetType->isPointerTy() && TargetType->getPointerAddressSpace() != AddrSpace) {
-        CommonHAKCAnalysis::getWriter(DebugIsActive()) << "TargetType " << *TargetType << " has AddrSpace when casting "
+        CommonHAKCAnalysis::getWriter(true) << "TargetType " << *TargetType << " has AddrSpace when casting "
                 << HAKCPointer
                 << "\n" << *I->getFunction() << "\n";
         throw std::exception();

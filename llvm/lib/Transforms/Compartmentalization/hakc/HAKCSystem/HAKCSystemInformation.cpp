@@ -4,6 +4,8 @@
 
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCSystemInformation.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/CommonHAKCAnalysis.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCFunctionDefinition/HAKCPostTargetAction.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCFunctionDefinition/HAKCPreTransferAction.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/yaml/HAKCYaml.h"
 
 namespace llvm::hakc {
@@ -52,7 +54,7 @@ namespace llvm::hakc {
         DataValidationFunction(nullptr), SignWithDivisionFunction(nullptr), DefaultCompartmentTransfer(nullptr),
         PerCPUCompartmentTransfer(nullptr), CompartmentalizationSupportFunctionList(), SymbolsToOutputDebugInfo(),
         SeparateNamespacePathList(), HAKCSourcePathList(), SafeTransitionFunctionList(), IgnoredTypeSet(),
-        IgnoredGlobalList(), AllocationFunctionList(), CustomTransferList() {
+        IgnoredGlobalList(), AllocationFunctionList(), CustomTransferList(), PreTransferActionList(), PostTargetActionList() {
     }
 
     void HAKCSystemInformation::operator<<(HAKCYamlConfig &YamlConfig) {
@@ -63,7 +65,6 @@ namespace llvm::hakc {
         DagAnalysisRootPath = YamlConfig.DagAnalysisRootPath;
         PassMode = YamlConfig.PassMode;
         DebugOutput = YamlConfig.OutputAllDebugInfo;
-
         DatabaseInformation << YamlConfig.DatabaseConfig;
 
         for (auto &FunctionName: YamlConfig.NoTransferFunctions) {
@@ -171,7 +172,6 @@ namespace llvm::hakc {
           }
         }
 
-
         for (auto &GlobalName: YamlConfig.IgnoredGlobals) {
             auto *GV = GetModule().getGlobalVariable(GlobalName, true);
             if (GV) {
@@ -203,6 +203,34 @@ namespace llvm::hakc {
                 }
             }
         }
+      // Loop through the pre transfer actions and construct HAKCPreTransferAction object
+      for (auto &PreTransferActionDefinition: YamlConfig.PreTransferActions) {
+        CommonAnalysis.getWriter(true) << "found pre transfer action: " << PreTransferActionDefinition.ActionName << "\n";
+        // find the HAKC Function pointer that matches the function name
+        auto *F = GetModule().getFunction(PreTransferActionDefinition.ActionName);
+        if (F) {
+          CommonAnalysis.getWriter(HAKCSystemInformation::OutputDebugInfo()) << "Found PreTransferAction " << PreTransferActionDefinition.ActionName << "\n";
+          auto PreTransferAction = std::make_shared<HAKCPreTransferAction>(F, PreTransferActionDefinition.ActionLabel);
+          PreTransferActionList.push_back(PreTransferAction);
+        }
+        else {
+          CommonAnalysis.getWriter(true) << "Could not find PreTransferAction " << PreTransferActionDefinition.ActionName << "\n";
+          std::exception(); // TODO: Derrick, can I throw a standard exception here?
+        }
+      }
+      for (auto &PostTargetActionDefinition: YamlConfig.PostTargetActions) {
+        // find the HAKC Function pointer that matches the function name
+        auto *F = GetModule().getFunction(PostTargetActionDefinition.ActionName);
+        if (F) {
+          CommonAnalysis.getWriter(HAKCSystemInformation::OutputDebugInfo()) << "Found PostTargetAction " << PostTargetActionDefinition.ActionName << "\n";
+          auto PostTargetAction = std::make_shared<HAKCPostTargetAction>(F, PostTargetActionDefinition.Arguments.idx, PostTargetActionDefinition.Arguments.val);
+          PostTargetActionList.push_back(PostTargetAction);
+        }
+        else {
+          CommonAnalysis.getWriter(true) << "Could not find PostTargetAction " << PostTargetActionDefinition.ActionName << "\n";
+          std::exception(); // TODO: can I throw an exception here?
+        }
+      }
     }
 
     bool HAKCSystemInformation::OutputDebugInfo() const {
@@ -240,7 +268,6 @@ namespace llvm::hakc {
     Function *HAKCSystemInformation::CodeValidation() const {
         return CodeValidationFunction;
     }
-
 
     Function *HAKCSystemInformation::DataValidation() const {
         return DataValidationFunction;
@@ -281,6 +308,16 @@ namespace llvm::hakc {
     iterator_range<FunctionList::iterator> HAKCSystemInformation::CompartmentalizationSupportFunctions() {
         return make_range(CompartmentalizationSupportFunctionList.begin(),
                           CompartmentalizationSupportFunctionList.end());
+    }
+
+    iterator_range<HAKCPreTransferActionList::iterator> HAKCSystemInformation::PreTransferActions() {
+      return make_range(PreTransferActionList.begin(),
+                        PreTransferActionList.end());
+    }
+
+    iterator_range<HAKCPostTargetActionList::iterator> HAKCSystemInformation::PostTargetActions() {
+      return make_range(PostTargetActionList.begin(),
+                        PostTargetActionList.end());
     }
 
     iterator_range<FunctionList::iterator> HAKCSystemInformation::SafeTransitionFunctions() {

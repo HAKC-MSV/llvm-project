@@ -254,8 +254,7 @@ namespace llvm::hakc {
         auto ResponseData = Execute(SystemInformation.GetDatabaseInformation().GetValidTargetsEndpoint(), Parameters);
         auto ValidTargets = ResponseData.getArray("ValidTargets");
         if (!ValidTargets) {
-            CommonHAKCAnalysis::getWriter(true) << "No ValidTargets found for CompartmentID: " << CompartmentID << "\n";
-            // throw std::exception();
+            CommonHAKCAnalysis::getWriter(SystemInformation.OutputDebugInfo()) << "No ValidTargets found for CompartmentID: " << CompartmentID << "\n";
             return;
         }
         for (auto target = ValidTargets->begin(); target != ValidTargets->end(); ++target) {

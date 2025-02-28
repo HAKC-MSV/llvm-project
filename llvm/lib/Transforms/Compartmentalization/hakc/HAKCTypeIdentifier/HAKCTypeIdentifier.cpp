@@ -119,33 +119,6 @@ std::string hakc::HAKCTypeIdentifier::GetTypeName(const DIType *type) {
                 out << GetTypeName(DerivedTy->getBaseType());
             }
         }
-        else if (DerivedTy->getTag() == dwarf::DW_TAG_member) {
-              // TODO: Check
-            CommonHAKCAnalysis::getWriter(true) << "T" <<  DerivedTy->getBaseType() << "\n";
-            if (!DerivedTy->getBaseType()) {
-              out << "void";
-            } else {
-              out << GetTypeName(DerivedTy->getBaseType());
-            }
-          }
-        // else if (DerivedTy->getTag() == dwarf::DW_TAG_reference_type) {
-        //
-        // }
-        // else if (DerivedTy->getTag() == dwarf::DW_TAG_inheritance) {
-        //
-        // }
-        // else if (DerivedTy->getTag() == dwarf::DW_TAG_ptr_to_member_type) {
-        //
-        // }
-        // else if (DerivedTy->getTag() == dwarf::DW_TAG_friend) {
-        //
-        // }
-        // else if (DerivedTy->getTag() == dwarf::DW_TAG_atomic_type) {
-        //
-        // }
-        // else if (DerivedTy->getTag() == dwarf::DW_TAG_immutable_type) {
-        //
-        // }
         else {
             CommonHAKCAnalysis::getWriter(AnalysisHelper.GetSystemInfo().OutputDebugInfo()) << "Unhandled DIDerivedType tag\n" << DerivedTy << "\n";
             throw std::exception();
@@ -226,21 +199,28 @@ std::shared_ptr<hakc::HAKCTypeInfo> hakc::HAKCTypeIdentifier::HandleType(const D
         }
         AddTypeMapping(type, TypeP);
     } else if (auto *DerivedTy = dyn_cast<DIDerivedType>(type)) {
-        std::set<unsigned> TagsToConsider = {
+        if (DerivedTy->getTag() == dwarf::DW_TAG_member) {
+          if (DerivedTy->getBaseType()) {
+            HandleType(DerivedTy->getBaseType());
+          }
+        }
+        else {
+          std::set<unsigned> TagsToConsider = {
             dwarf::DW_TAG_pointer_type,
             dwarf::DW_TAG_array_type,
             dwarf::DW_TAG_const_type,
             dwarf::DW_TAG_typedef,
             dwarf::DW_TAG_volatile_type,
             dwarf::DW_TAG_restrict_type,
-        };
-        if (TagsToConsider.contains(DerivedTy->getTag())) {
+          };
+          if (TagsToConsider.contains(DerivedTy->getTag())) {
             CommonHAKCAnalysis::getWriter(debug) << "Creating HAKCTypeInfo for\n" << type << "\n";
             auto TypeName = GetTypeName(type);
             TypeP = std::make_shared<HAKCTypeInfo>(AnalysisHelper, TypeName, debug);
             AddTypeMapping(type, TypeP);
-        } else {
+          } else {
             CommonHAKCAnalysis::getWriter(debug) << "Not handling DITYpe " << type << "\n";
+          }
         }
     }
 
@@ -796,12 +776,14 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
         FoundType = GetArgumentHAKCType(Arg);
     } else if (auto *AllocaI = dyn_cast<AllocaInst>(V)) {
         BaseType = AllocaI->getAllocatedType();
-    } else if(auto *GlobalI = dyn_cast<GlobalValue>(V)) {
-        BaseType = GlobalI->getValueType();
+    } else if(auto *GlobalVar = dyn_cast<GlobalVariable>(V)) {
+      BaseType = GlobalVar->getValueType(); // or getType()?
+    }
+    else if (auto *Func = dyn_cast<Function>(V)) {
+      BaseType = Func->getReturnType();
     }
     else if (auto *CallI = dyn_cast<CallInst>(V)) {
-      // TODO: double check
-      BaseType = CallI->getFunctionType();
+      BaseType = CallI->getType();
     }
 
     if (BaseType) {
@@ -846,7 +828,11 @@ std::shared_ptr<hakc::HAKCTypeInfo> hakc::HAKCTypeIdentifier::FindCalledFunction
         throw std::exception();
     }
 
-    return FindType(FunctionTy);
+    auto FoundType = FindType(FunctionTy);
+    if (!FoundType) {
+
+    }
+    return FoundType;
 }
 
 std::shared_ptr<hakc::HAKCFunctionInfo> hakc::HAKCTypeIdentifier::FindFunction(Function *F, bool SearchUnmapped) {
