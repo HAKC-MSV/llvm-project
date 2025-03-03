@@ -42,7 +42,7 @@ namespace llvm::hakc {
          */
         ManagedHAKCPointerP GetManagedPointer(Value *V);
 
-        bool empty();
+        bool empty() const;
 
         Value *GetDef(Value *V);
 
@@ -101,7 +101,7 @@ namespace llvm::hakc {
 
         void SetFunctionIsCompartmentalized(bool FunctionIsCompartmentalized);
 
-        HAKCCompartmentalizationPolicy &GetPolicy();
+        HAKCCompartmentalizationPolicy &GetPolicy() const;
 
         Instruction *CloneInstruction(Instruction *I);
 

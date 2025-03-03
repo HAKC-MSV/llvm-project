@@ -366,7 +366,7 @@ namespace llvm::hakc {
         return nullptr;
     }
 
-    bool HAKCPointerManager::empty() {
+    bool HAKCPointerManager::empty() const {
         return ManagedPointers.empty();
     }
 
@@ -763,8 +763,17 @@ namespace llvm::hakc {
         if (Managed) {
             return Managed;
         }
+        auto ManagedPointer = GetManagedPointer(Pointer);
+        if (!ManagedPointer) {
+            CommonHAKCAnalysis::getWriter(true) << "Could not find Managed Pointer for " << *Pointer << "\n";
+            throw std::exception();
+        } else if (!ManagedPointer->GetType()) {
+            CommonHAKCAnalysis::getWriter(true) << "Managed Pointer " << *ManagedPointer << " found for Value " << *
+                    Pointer << " does not have a HAKCType\n";
+            throw std::exception();
+        }
 
-        if (CommonHAKCAnalysis::PointerShouldBeConsideredCode(Pointer)) {
+        if (CommonHAKCAnalysis::PointerShouldBeConsideredCode(ManagedPointer)) {
             CodeAuthenticationsAdded++;
             return GetFunctionAnalysis().AddCodeAuthCheckAtLocation(Pointer, InsertLocation);
         } else {
@@ -773,7 +782,7 @@ namespace llvm::hakc {
         }
     }
 
-    HAKCCompartmentalizationPolicy &HAKCPointerManager::GetPolicy() {
+    HAKCCompartmentalizationPolicy &HAKCPointerManager::GetPolicy() const {
         return Policy;
     }
 

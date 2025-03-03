@@ -606,10 +606,11 @@ namespace llvm::hakc {
                    [](Function *LHS, Function *RHS) { return LHS->getName().str() < RHS->getName().str(); });
     }
 
-    bool CommonHAKCAnalysis::PointerShouldBeConsideredCode(Value *Pointer) {
-        if (Pointer->getType()->isPointerTy()) {
-            /*return Pointer->getType()->getPointerElementType()->isFunctionTy();*/
-            return Pointer->getType()->isFunctionTy();
+    bool CommonHAKCAnalysis::PointerShouldBeConsideredCode(ManagedHAKCPointerP &ManagedPointer) {
+        auto HAKCType = ManagedPointer->GetType();
+        if (HAKCType && HAKCType->IsPointerType() && HAKCType->GetPointeeType()) {
+            return HAKCType->GetPointeeType()->GetLLVMType() && isa<FunctionType>(
+                       HAKCType->GetPointeeType()->GetLLVMType());
         }
         return false;
     }

@@ -113,6 +113,10 @@ namespace llvm::hakc {
 
         HAKCTypeP GetArgumentHAKCType(const DISubroutineType *FunctionTy, unsigned ArgNo);
 
+        FunctionType *GetLLVMFunctionTy(const DISubroutineType *FunctionTy);
+
+        Type *GetLLVMType(const DIType *);
+
         CommonHAKCAnalysis &AnalysisHelper;
         DebugInfoFinder DbgInfoFinder;
         std::map<const DIType *, HAKCTypeP> types;

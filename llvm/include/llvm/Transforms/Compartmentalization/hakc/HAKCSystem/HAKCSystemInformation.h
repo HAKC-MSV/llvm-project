@@ -12,7 +12,6 @@
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCAllocationSize.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/yaml/HAKCYaml.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTypeIdentifier/HAKCTypeIdentifier.h"
-#include <string>
 
 typedef std::shared_ptr<llvm::hakc::HAKCAllocationSize> HAKCCustomAllocation;
 

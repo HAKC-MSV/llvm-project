@@ -1063,6 +1063,7 @@ bool hakc::HAKCTransformer::DebugIsActive() {
 }
 
 hakc::HAKCPointerBaseP hakc::HAKCTransformer::CreateNewManagedPointer(Value *BaseDefinition) {
+    CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Creating new managed pointer for " << *BaseDefinition << "\n";
     auto ManagedPtr = std::make_shared<HAKCPointerBase>(BaseDefinition, 0);
     auto HAKCTy = ModuleAnalysis.GetTypeIdentifier().FindType(*ManagedPtr);
     if (!HAKCTy) {
