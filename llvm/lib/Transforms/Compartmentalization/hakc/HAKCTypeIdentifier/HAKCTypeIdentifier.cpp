@@ -809,7 +809,16 @@ std::shared_ptr<hakc::HAKCTypeInfo> hakc::HAKCTypeIdentifier::FindCalledFunction
         throw std::exception();
     }
 
-    return FindType(FunctionTy);
+    auto FoundType = FindType(FunctionTy);
+    if (!FoundType) {
+        for (auto &it: IndirectCallsTypes) {
+            if (it.second->GetLLVMType() == FunctionTy) {
+                FoundType = it.second;
+                break;
+            }
+        }
+    }
+    return FoundType;
 }
 
 std::shared_ptr<hakc::HAKCFunctionInfo> hakc::HAKCTypeIdentifier::FindFunction(Function *F, bool SearchUnmapped) {
@@ -914,11 +923,7 @@ void hakc::HAKCTypeIdentifier::FindTypesInFunctions() {
                 HAKCType->SetLLVMType(LLVMTy);
             } else if (auto *CallI = dyn_cast<CallInst>(I)) {
                 if (CallI->isIndirectCall()) {
-                    auto *FunctionTy = GetIndirectCallFunctionType(CallI);
-                    auto HAKCType = FindCalledFunctionType(FunctionTy);
-                    if (!HAKCType) {
-                        HAKCType = CreateNoDebugType(FunctionTy);
-                    }
+                    HandleIndirectCall(CallI);
                 }
             }
         }
@@ -944,11 +949,26 @@ std::shared_ptr<hakc::HAKCTypeInfo> hakc::HAKCTypeIdentifier::CreateNoDebugType(
     return HAKCType;
 }
 
-hakc::HAKCTypeIdentifier::HAKCTypeIdentifier(CommonHAKCAnalysis &AnalysisHelper)
-    : AnalysisHelper(AnalysisHelper), DbgInfoFinder(), types(), globals(), functions(), CurrentAnonID(0) {
+hakc::HAKCTypeP hakc::HAKCTypeIdentifier::HandleIndirectCall(CallInst *CallI) {
+    if (IndirectCallsTypes.contains(CallI)) {
+        return IndirectCallsTypes[CallI];
+    }
+
+    auto *FunctionTy = GetIndirectCallFunctionType(CallI);
+    auto HAKCType = FindCalledFunctionType(FunctionTy);
+    if (!HAKCType) {
+        HAKCType = CreateNoDebugType(FunctionTy);
+    }
+    IndirectCallsTypes[CallI] = HAKCType;
+    return HAKCType;
 }
 
-Module &hakc::HAKCTypeIdentifier::GetModule() {
+hakc::HAKCTypeIdentifier::HAKCTypeIdentifier(CommonHAKCAnalysis &AnalysisHelper)
+    : AnalysisHelper(AnalysisHelper), DbgInfoFinder(), types(), globals(), functions(), IndirectCallsTypes(),
+      CurrentAnonID(0) {
+}
+
+Module &hakc::HAKCTypeIdentifier::GetModule() const {
     return AnalysisHelper.GetModule();
 }
 

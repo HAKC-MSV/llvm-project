@@ -45,7 +45,7 @@ namespace llvm::hakc {
 
         void ProcessDebugInfo();
 
-        Module &GetModule();
+        Module &GetModule() const;
 
         void GetHAKCTypes(SmallVectorImpl<HAKCTypeP> &Results);
 
@@ -93,6 +93,8 @@ namespace llvm::hakc {
         void AddUsedGlobals(std::set<GlobalObject *> &GlobalObjects,
                             const HAKCSymbolP &UserSymbol);
 
+        HAKCTypeP HandleIndirectCall(CallInst *CallI);
+
         static FunctionType *GetIndirectCallFunctionType(CallInst *CallI);
 
         HAKCFunctionP FindFunction(Function *F, bool SearchUnmapped = false);
@@ -119,6 +121,7 @@ namespace llvm::hakc {
         std::map<const DIType *, unsigned> AnonymousNumberMapping;
         std::set<HAKCGlobalP> UnmappedGlobals;
         std::set<HAKCFunctionP> UnmappedFunctions;
+        std::map<CallInst *, HAKCTypeP> IndirectCallsTypes;
         unsigned CurrentAnonID;
     };
 } // namespace hakc

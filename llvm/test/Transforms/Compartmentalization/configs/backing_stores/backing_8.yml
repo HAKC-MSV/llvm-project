@@ -1,411 +1,237 @@
-&id049 !!python/object:hakc.HAKCCompartmentalization.HAKCCompartmentalization
-__networkx_cache__: {}
-_adj: &id048
-  ? &id017 !HAKCFunction
-    DefiningFile: _HAKC_SOURCE_PATH_/hakc_test8.c
-    DefiningLine: 32
-    Name: bar
-    Scope: &id002 !HAKCScope
-      computed_hash: 9223867316266404956
-      is_global_scope: true
-      is_local_scope: false
-      local_scope_name: global
-      scope: global
-    Type: &id001 !HAKCType
+!HAKCCompartmentalization
+directed: true
+division_count: 16
+edges:
+  - key: IsType
+    persisted: true
+    source: &id001 !HAKCFunction
+      DefiningFile: _HAKC_SOURCE_PATH_/hakc_test8.c
+      DefiningLine: 32
+      Name: bar
+      is_function: true
+      symbol_hash: e6ddbcd69f68b74c
+    target: &id010 !HAKCType
       DebugType: int ()
       LLVMType: i32 ()
-      _debug_type_is_known: true
-      _debug_type_transformed: int ()
-      _llvm_type_is_known: true
-      computed_hash: 18011968377481497783
-    UsedSymbols:
-    - &id003 !HAKCGlobalVariable
+      type_hash: f9f75dcecd5a8cb7
+  - key: HasScope
+    persisted: true
+    source: *id001
+    target: &id011 !HAKCScope
+      LocalScopeName: global
+      Scope: global
+      scope_hash: 8001c27439650c5c
+  - key: UsedInCompilationUnit
+    persisted: true
+    source: *id001
+    target: &id002 !HAKCCompilationUnit
+      filename: _HAKC_SOURCE_PATH_/hakc_test8.c
+  - key: DefinedIn
+    line: 32
+    persisted: true
+    source: *id001
+    target: *id002
+  - key: UsesSymbol
+    persisted: true
+    source: *id001
+    target: &id003 !HAKCGlobalVariable
       DefiningFile: _HAKC_SOURCE_PATH_/hakc_test8.c
       DefiningLine: 10
       Name: kmalloc_caches
-      Scope: !HAKCScope
-        computed_hash: 9223867316266404956
-        is_global_scope: true
-        is_local_scope: false
-        local_scope_name: global
-        scope: global
-      Type: !HAKCType
-        DebugType: int
-        LLVMType: i32
-        _debug_type_is_known: true
-        _debug_type_transformed: int
-        _llvm_type_is_known: true
-        computed_hash: 7901719704309484609
-      UsedSymbols: []
-      computed_hash: 15842798698598706533
-    - &id004 !HAKCGlobalVariable
+      is_function: false
+      symbol_hash: dbdced7a45ff2d65
+  - key: DagEdge
+    persisted: true
+    source: *id001
+    target: *id003
+    weight: 1
+  - key: UsesSymbol
+    persisted: true
+    source: *id001
+    target: &id004 !HAKCGlobalVariable
       DefiningFile: _HAKC_SOURCE_PATH_/hakc_test8.c
       DefiningLine: 11
       Name: somevar
-      Scope: !HAKCScope
-        computed_hash: 9223867316266404956
-        is_global_scope: true
-        is_local_scope: false
-        local_scope_name: global
-        scope: global
-      Type: !HAKCType
-        DebugType: int
-        LLVMType: i32
-        _debug_type_is_known: true
-        _debug_type_transformed: int
-        _llvm_type_is_known: true
-        computed_hash: 7901719704309484609
-      UsedSymbols: []
-      computed_hash: 6210766439606843270
-    - &id005 !HAKCFunction
+      is_function: false
+      symbol_hash: 5631132bb7aef786
+  - key: DagEdge
+    persisted: true
+    source: *id001
+    target: *id004
+    weight: 1
+  - key: UsesSymbol
+    persisted: true
+    source: *id001
+    target: &id005 !HAKCFunction
       DefiningFile: _HAKC_SOURCE_PATH_/hakc_test8.c
       DefiningLine: 21
       Name: foo
-      Scope: !HAKCScope
-        computed_hash: 9223867316266404956
-        is_global_scope: true
-        is_local_scope: false
-        local_scope_name: global
-        scope: global
-      Type: !HAKCType
-        DebugType: int (struct data_struct2*, int*, int*)
-        LLVMType: i32 (ptr, ptr, ptr)
-        _debug_type_is_known: true
-        _debug_type_transformed: int (struct data_struct2*, int*, int*)
-        _llvm_type_is_known: true
-        computed_hash: 13383953049142307167
-      UsedSymbols: []
-      computed_hash: 12058747366569621790
-      direct_calls: []
-      indirect_calls: []
-    computed_hash: 16635660228559943500
-    direct_calls:
-    - !HAKCFunction
-      DefiningFile: _HAKC_SOURCE_PATH_/hakc_test8.c
-      DefiningLine: 21
-      Name: foo
-      Scope: !HAKCScope
-        computed_hash: 9223867316266404956
-        is_global_scope: true
-        is_local_scope: false
-        local_scope_name: global
-        scope: global
-      Type: !HAKCType
-        DebugType: int (struct data_struct2*, int*, int*)
-        LLVMType: i32 (ptr, ptr, ptr)
-        _debug_type_is_known: true
-        _debug_type_transformed: int (struct data_struct2*, int*, int*)
-        _llvm_type_is_known: true
-        computed_hash: 13383953049142307167
-      UsedSymbols: []
-      computed_hash: 12058747366569621790
-      direct_calls: []
-      indirect_calls: []
-    indirect_calls: []
-  : *id001: &id018
-      IsType:
-        persisted: true
-    *id002: &id019
-      HasScope:
-        persisted: true
-    ? &id006 !HAKCCompilationUnit
-      computed_hash: 2242453771005949302
-      filename: _HAKC_SOURCE_PATH_/hakc_test8.c
-    : &id027
-      DefinedIn:
-        line: 32
-        persisted: true
-      UsedInCompilationUnit:
-        persisted: true
-    *id003: &id034
-      UsesSymbol:
-        persisted: true
-    *id004: &id035
-      UsesSymbol:
-        persisted: true
-    *id005: &id036
-      DirectCall:
-        persisted: true
-      UsesSymbol:
-        persisted: true
-    ? &id009 !HAKCDivision
-      access_token: 73728
-      compartment_id: 1
-      computed_hash: 13723477563850267561
-      division_count: 16
-      division_id: 13
-    : &id040
-      InDivision:
-        persisted: true
-  *id001: {}
-  *id002: {}
-  *id006: {}
-  *id003:
-    ? &id008 !HAKCType
+      is_function: true
+      symbol_hash: a75946d7048f391e
+  - key: DirectCall
+    persisted: true
+    source: *id001
+    target: *id005
+  - key: DagEdge
+    persisted: true
+    source: *id001
+    target: *id005
+    weight: 2
+  - key: InDivision
+    persisted: true
+    source: *id001
+    target: &id006 !HAKCDivision
+      AccessToken: 73728
+      DivisionID: 13
+      division_hash: be7396225c569ba9
+  - key: IsType
+    persisted: true
+    source: *id003
+    target: &id013 !HAKCType
       DebugType: int
       LLVMType: i32
-      _debug_type_is_known: true
-      _debug_type_transformed: int
-      _llvm_type_is_known: true
-      computed_hash: 7901719704309484609
-    : &id038
-      IsType:
-        persisted: true
-    ? &id022 !HAKCScope
-      computed_hash: 9223867316266404956
-      is_global_scope: true
-      is_local_scope: false
-      local_scope_name: global
-      scope: global
-    : &id023
-      HasScope:
-        persisted: true
-    *id006: &id031
-      DefinedIn:
-        line: 10
-        persisted: true
-      UsedInCompilationUnit:
-        persisted: true
-    ? &id011 !HAKCDivision
-      access_token: 139264
-      compartment_id: 2
-      computed_hash: 5402183023691450300
-      division_count: 16
-      division_id: 13
-    : &id042
-      InDivision:
-        persisted: true
-  *id004:
-    ? &id025 !HAKCType
+      type_hash: 6da88c34ba124c41
+  - key: HasScope
+    persisted: true
+    source: *id003
+    target: !HAKCScope
+      LocalScopeName: global
+      Scope: global
+      scope_hash: 8001c27439650c5c
+  - key: UsedInCompilationUnit
+    persisted: true
+    source: *id003
+    target: *id002
+  - key: DefinedIn
+    line: 10
+    persisted: true
+    source: *id003
+    target: *id002
+  - key: InDivision
+    persisted: true
+    source: *id003
+    target: &id007 !HAKCDivision
+      AccessToken: 139264
+      DivisionID: 13
+      division_hash: 4af868d68ac647bc
+  - key: IsType
+    persisted: true
+    source: *id004
+    target: !HAKCType
       DebugType: int
       LLVMType: i32
-      _debug_type_is_known: true
-      _debug_type_transformed: int
-      _llvm_type_is_known: true
-      computed_hash: 7901719704309484609
-    : &id039
-      IsType:
-        persisted: true
-    ? &id024 !HAKCScope
-      computed_hash: 9223867316266404956
-      is_global_scope: true
-      is_local_scope: false
-      local_scope_name: global
-      scope: global
-    : &id026
-      HasScope:
-        persisted: true
-    *id006: &id033
-      DefinedIn:
-        line: 11
-        persisted: true
-      UsedInCompilationUnit:
-        persisted: true
-    ? &id013 !HAKCDivision
-      access_token: 204800
-      compartment_id: 3
-      computed_hash: 5927710326979111020
-      division_count: 16
-      division_id: 13
-    : &id044
-      InDivision:
-        persisted: true
-  *id005:
-    ? &id007 !HAKCType
+      type_hash: 6da88c34ba124c41
+  - key: HasScope
+    persisted: true
+    source: *id004
+    target: !HAKCScope
+      LocalScopeName: global
+      Scope: global
+      scope_hash: 8001c27439650c5c
+  - key: UsedInCompilationUnit
+    persisted: true
+    source: *id004
+    target: *id002
+  - key: DefinedIn
+    line: 11
+    persisted: true
+    source: *id004
+    target: *id002
+  - key: InDivision
+    persisted: true
+    source: *id004
+    target: &id008 !HAKCDivision
+      AccessToken: 204800
+      DivisionID: 13
+      division_hash: 52437522d301286c
+  - key: IsType
+    persisted: true
+    source: *id005
+    target: &id012 !HAKCType
       DebugType: int (struct data_struct2*, int*, int*)
       LLVMType: i32 (ptr, ptr, ptr)
-      _debug_type_is_known: true
-      _debug_type_transformed: int (struct data_struct2*, int*, int*)
-      _llvm_type_is_known: true
-      computed_hash: 13383953049142307167
-    : &id037
-      IsType:
-        persisted: true
-    ? &id020 !HAKCScope
-      computed_hash: 9223867316266404956
-      is_global_scope: true
-      is_local_scope: false
-      local_scope_name: global
-      scope: global
-    : &id021
-      HasScope:
-        persisted: true
-    *id006: &id029
-      DefinedIn:
-        line: 21
-        persisted: true
-      UsedInCompilationUnit:
-        persisted: true
-    ? &id015 !HAKCDivision
-      access_token: 270336
-      compartment_id: 4
-      computed_hash: 10911554487036959020
-      division_count: 16
-      division_id: 13
-    : &id046
-      InDivision:
-        persisted: true
-  *id007: {}
-  *id008: {}
-  *id009:
-    ? &id010 !HAKCCompartment
-      compartment_id: 1
-      computed_hash: null
-      division_count: 16
-      divisions: !!set
-        *id009: null
-      entry_token: 73728
-    : &id041
-      InCompartment:
-        persisted: true
-  *id010: {}
-  *id011:
-    ? &id012 !HAKCCompartment
-      compartment_id: 2
-      computed_hash: null
-      division_count: 16
-      divisions: !!set
-        *id011: null
-      entry_token: 139264
-    : &id043
-      InCompartment:
-        persisted: true
-  *id012: {}
-  *id013:
-    ? &id014 !HAKCCompartment
-      compartment_id: 3
-      computed_hash: null
-      division_count: 16
-      divisions: !!set
-        *id013: null
-      entry_token: 204800
-    : &id045
-      InCompartment:
-        persisted: true
-  *id014: {}
-  *id015:
-    ? &id016 !HAKCCompartment
-      compartment_id: 4
-      computed_hash: null
-      division_count: 16
-      divisions: !!set
-        *id015: null
-      entry_token: 270336
-    : &id047
-      InCompartment:
-        persisted: true
-  *id016: {}
-_node: &id050
-  *id017:
+      type_hash: b9bd5a6310a2295f
+  - key: HasScope
     persisted: true
-  *id001:
+    source: *id005
+    target: !HAKCScope
+      LocalScopeName: global
+      Scope: global
+      scope_hash: 8001c27439650c5c
+  - key: UsedInCompilationUnit
     persisted: true
-  *id002:
+    source: *id005
+    target: *id002
+  - key: DefinedIn
+    line: 21
     persisted: true
-  *id006:
+    source: *id005
+    target: *id002
+  - key: InDivision
     persisted: true
-  *id003:
+    source: *id005
+    target: &id009 !HAKCDivision
+      AccessToken: 270336
+      DivisionID: 13
+      division_hash: 976da0fe7b28592c
+  - key: InCompartment
     persisted: true
-  *id004:
+    source: *id006
+    target: &id014 !HAKCCompartment
+      CompartmentID: 1
+      EntryToken: 73728
+  - key: InCompartment
     persisted: true
-  *id005:
+    source: *id007
+    target: &id015 !HAKCCompartment
+      CompartmentID: 2
+      EntryToken: 139264
+  - key: InCompartment
     persisted: true
-  *id007:
+    source: *id008
+    target: &id016 !HAKCCompartment
+      CompartmentID: 3
+      EntryToken: 204800
+  - key: InCompartment
     persisted: true
-  *id008:
+    source: *id009
+    target: &id017 !HAKCCompartment
+      CompartmentID: 4
+      EntryToken: 270336
+graph: { }
+multigraph: true
+nodes:
+  - id: *id001
     persisted: true
-  *id009:
+  - id: *id010
     persisted: true
-  *id010:
+  - id: *id011
     persisted: true
-  *id011:
+  - id: *id002
     persisted: true
-  *id012:
+  - id: *id003
     persisted: true
-  *id013:
+  - id: *id004
     persisted: true
-  *id014:
+  - id: *id005
     persisted: true
-  *id015:
+  - id: *id012
     persisted: true
-  *id016:
+  - id: *id013
     persisted: true
-_pred:
-  *id017: {}
-  *id001:
-    *id017: *id018
-  *id002:
-    *id017: *id019
-    ? &id028 !HAKCFunction
-      DefiningFile: _HAKC_SOURCE_PATH_/hakc_test8.c
-      DefiningLine: 21
-      Name: foo
-      Scope: *id020
-      Type: *id007
-      UsedSymbols: []
-      computed_hash: 12058747366569621790
-      direct_calls: []
-      indirect_calls: []
-    : *id021
-    ? &id030 !HAKCGlobalVariable
-      DefiningFile: _HAKC_SOURCE_PATH_/hakc_test8.c
-      DefiningLine: 10
-      Name: kmalloc_caches
-      Scope: *id022
-      Type: *id008
-      UsedSymbols: []
-      computed_hash: 15842798698598706533
-    : *id023
-    ? &id032 !HAKCGlobalVariable
-      DefiningFile: _HAKC_SOURCE_PATH_/hakc_test8.c
-      DefiningLine: 11
-      Name: somevar
-      Scope: *id024
-      Type: *id025
-      UsedSymbols: []
-      computed_hash: 6210766439606843270
-    : *id026
-  *id006:
-    *id017: *id027
-    *id028: *id029
-    *id030: *id031
-    *id032: *id033
-  *id003:
-    *id017: *id034
-  *id004:
-    *id017: *id035
-  *id005:
-    *id017: *id036
-  *id007:
-    *id028: *id037
-  *id008:
-    *id030: *id038
-    *id032: *id039
-  *id009:
-    *id017: *id040
-  *id010:
-    *id009: *id041
-  *id011:
-    *id003: *id042
-  *id012:
-    *id011: *id043
-  *id013:
-    *id004: *id044
-  *id014:
-    *id013: *id045
-  *id015:
-    *id005: *id046
-  *id016:
-    *id015: *id047
-_succ: *id048
-adj: !!python/object:networkx.classes.coreviews.MultiAdjacencyView
-  _atlas: *id048
-division_count: 16
-edges: !!python/object:networkx.classes.reportviews.OutMultiEdgeView
-  _adjdict: *id048
-  _graph: *id049
-graph: {}
-nodes: !!python/object:networkx.classes.reportviews.NodeView
-  _nodes: *id050
-succ: !!python/object:networkx.classes.coreviews.MultiAdjacencyView
-  _atlas: *id048
+  - id: *id006
+    persisted: true
+  - id: *id014
+    persisted: true
+  - id: *id007
+    persisted: true
+  - id: *id015
+    persisted: true
+  - id: *id008
+    persisted: true
+  - id: *id016
+    persisted: true
+  - id: *id009
+    persisted: true
+  - id: *id017
+    persisted: true
