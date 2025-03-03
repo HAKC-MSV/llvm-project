@@ -217,7 +217,7 @@ std::shared_ptr<hakc::HAKCTypeInfo> hakc::HAKCTypeIdentifier::HandleType(const D
     return TypeP;
 }
 
-GlobalVariable *hakc::HAKCTypeIdentifier::FindGlobal(const DIGlobalVariable *DIGV) {
+GlobalVariable *hakc::HAKCTypeIdentifier::FindGlobal(const DIGlobalVariable *DIGV) const {
     auto *Scope = DIGV->getScope();
     std::string Name;
     llvm::raw_string_ostream sstream(Name);
@@ -423,7 +423,7 @@ std::shared_ptr<hakc::HAKCSymbolInfo> hakc::HAKCTypeIdentifier::AddUnmappedGloba
     }
 }
 
-void hakc::HAKCTypeIdentifier::AddUsedGlobals(std::set<GlobalObject *> &GlobalObjects,
+void hakc::HAKCTypeIdentifier::AddUsedGlobals(const std::set<GlobalObject *> &GlobalObjects,
                                               const std::shared_ptr<hakc::HAKCSymbolInfo> &UserSymbol) {
     for (auto *UsedGlobal: GlobalObjects) {
         auto debug = AnalysisHelper.GetSystemInfo().OutputDebugInfo(UsedGlobal);
@@ -553,7 +553,7 @@ void hakc::HAKCTypeIdentifier::FindIndirectCallSource(CallInst *CallI,
             << "\n";
 }
 
-FunctionType *hakc::HAKCTypeIdentifier::GetIndirectCallFunctionType(CallInst *CallI) {
+FunctionType *hakc::HAKCTypeIdentifier::GetIndirectCallFunctionType(const CallInst *CallI) {
     if (!CallI->isIndirectCall()) {
         CommonHAKCAnalysis::getWriter(true) << "Trying to get type from a Call that is not an indirect call\n";
         throw std::exception();
@@ -669,7 +669,7 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindPointeeType(HAKCPointerBase &HAKCP
     return PointeeType;
 }
 
-hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindPointeeType(HAKCTypeP &BaseType) {
+hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindPointeeType(const HAKCTypeP &BaseType) {
     if (BaseType->GetPointeeType()) {
         return BaseType->GetPointeeType();
     }
@@ -738,7 +738,7 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCTypeForUse(Use &U) {
     return Result;
 }
 
-hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindPointerType(HAKCTypeP &BaseType) {
+hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindPointerType(const HAKCTypeP &BaseType) {
     for (auto &It: types) {
         auto *DebugType = It.first;
         if (DebugType->getTag() == dwarf::DW_TAG_pointer_type) {
@@ -821,7 +821,7 @@ std::shared_ptr<hakc::HAKCTypeInfo> hakc::HAKCTypeIdentifier::FindCalledFunction
     return FoundType;
 }
 
-std::shared_ptr<hakc::HAKCFunctionInfo> hakc::HAKCTypeIdentifier::FindFunction(Function *F, bool SearchUnmapped) {
+std::shared_ptr<hakc::HAKCFunctionInfo> hakc::HAKCTypeIdentifier::FindFunction(const Function *F, bool SearchUnmapped) {
     for (auto &it: functions) {
         if (it.second->GetFunction() == F) {
             return it.second;
@@ -837,7 +837,8 @@ std::shared_ptr<hakc::HAKCFunctionInfo> hakc::HAKCTypeIdentifier::FindFunction(F
     return nullptr;
 }
 
-std::shared_ptr<hakc::HAKCGlobalInfo> hakc::HAKCTypeIdentifier::FindGlobal(GlobalVariable *GV, bool SearchUnmapped) {
+std::shared_ptr<hakc::HAKCGlobalInfo> hakc::HAKCTypeIdentifier::FindGlobal(
+    const GlobalVariable *GV, bool SearchUnmapped) {
     for (auto &it: globals) {
         if (it.second->GetGlobalVariable() == GV) {
             return it.second;
@@ -930,7 +931,7 @@ void hakc::HAKCTypeIdentifier::FindTypesInFunctions() {
     }
 }
 
-std::shared_ptr<hakc::HAKCTypeInfo> hakc::HAKCTypeIdentifier::CreateNoDebugType(Type *Ty) {
+std::shared_ptr<hakc::HAKCTypeInfo> hakc::HAKCTypeIdentifier::CreateNoDebugType(Type *Ty) const {
     std::string Name;
     llvm::raw_string_ostream sstream(Name);
     if (auto *StructTy = dyn_cast<StructType>(Ty)) {
@@ -1001,7 +1002,7 @@ void hakc::HAKCTypeIdentifier::ProcessDebugInfo() {
     FindUsesInFunctions();
 }
 
-void hakc::HAKCTypeIdentifier::OutputYAML(raw_ostream &out) {
+void hakc::HAKCTypeIdentifier::OutputYAML(raw_ostream &out) const {
     auto RealPath = CommonHAKCAnalysis::GetModuleFullPath(GetModule());
 
     out << "---\n";
@@ -1050,7 +1051,7 @@ void hakc::HAKCTypeIdentifier::OutputYAML(raw_ostream &out) {
     }
 }
 
-void hakc::HAKCTypeIdentifier::GetHAKCTypes(SmallVectorImpl<HAKCTypeP> &Results) {
+void hakc::HAKCTypeIdentifier::GetHAKCTypes(SmallVectorImpl<HAKCTypeP> &Results) const {
     for (auto &it: types) {
         Results.push_back(it.second);
     }

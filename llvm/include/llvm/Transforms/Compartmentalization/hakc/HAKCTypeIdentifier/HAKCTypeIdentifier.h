@@ -31,7 +31,7 @@ namespace llvm::hakc {
     public:
         explicit HAKCTypeIdentifier(CommonHAKCAnalysis &Analysis);
 
-        void OutputYAML(raw_ostream &out);
+        void OutputYAML(raw_ostream &out) const;
 
         HAKCSymbolP FindSymbol(Value *V, bool SearchUnmapped = false);
 
@@ -47,16 +47,16 @@ namespace llvm::hakc {
 
         Module &GetModule() const;
 
-        void GetHAKCTypes(SmallVectorImpl<HAKCTypeP> &Results);
+        void GetHAKCTypes(SmallVectorImpl<HAKCTypeP> &Results) const;
 
     protected:
         HAKCTypeP FindType(Type *Ty);
 
         HAKCTypeP FindPointeeType(HAKCPointerBase &HAKCPointer);
 
-        HAKCTypeP FindPointeeType(HAKCTypeP &BaseType);
+        HAKCTypeP FindPointeeType(const HAKCTypeP &BaseType);
 
-        HAKCTypeP FindPointerType(HAKCTypeP &BaseType);
+        HAKCTypeP FindPointerType(const HAKCTypeP &BaseType);
 
         HAKCTypeP HandleType(const DIType *type);
 
@@ -70,7 +70,7 @@ namespace llvm::hakc {
 
         void AddGlobalMapping(const DIGlobalVariable *DIGV, const HAKCGlobalP &HAKCSymbol);
 
-        GlobalVariable *FindGlobal(const DIGlobalVariable *DIGV);
+        GlobalVariable *FindGlobal(const DIGlobalVariable *DIGV) const;
 
         HAKCFunctionP HandleFunction(const DISubprogram *SubProg);
 
@@ -90,20 +90,20 @@ namespace llvm::hakc {
 
         HAKCFunctionP AddUnmappedFunction(Function *F);
 
-        void AddUsedGlobals(std::set<GlobalObject *> &GlobalObjects,
+        void AddUsedGlobals(const std::set<GlobalObject *> &GlobalObjects,
                             const HAKCSymbolP &UserSymbol);
 
         HAKCTypeP HandleIndirectCall(CallInst *CallI);
 
-        static FunctionType *GetIndirectCallFunctionType(CallInst *CallI);
+        static FunctionType *GetIndirectCallFunctionType(const CallInst *CallI);
 
-        HAKCFunctionP FindFunction(Function *F, bool SearchUnmapped = false);
+        HAKCFunctionP FindFunction(const Function *F, bool SearchUnmapped = false);
 
-        HAKCGlobalP FindGlobal(GlobalVariable *GV, bool SearchUnmapped = false);
+        HAKCGlobalP FindGlobal(const GlobalVariable *GV, bool SearchUnmapped = false);
 
         HAKCTypeP FindCalledFunctionType(FunctionType *FunctionTy);
 
-        HAKCTypeP CreateNoDebugType(Type *Ty);
+        HAKCTypeP CreateNoDebugType(Type *Ty) const;
 
         void FindIndirectCallSource(CallInst *CallI, std::vector<std::shared_ptr<HAKCIndirectCallSourceLink> > &Path);
 
