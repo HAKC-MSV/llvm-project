@@ -34,6 +34,8 @@ namespace llvm::hakc {
 
         static HAKC_Compartment_ID CreateID(hakc_compartment_id_t ID, Module &M);
 
+        static IntegerType *GetEntryTokenType(LLVMContext &Ctx);
+
         friend bool operator==(const HAKCCompartment &lhs, const HAKCCompartment &rhs) {
             return lhs.Compartment == rhs.Compartment;
         }

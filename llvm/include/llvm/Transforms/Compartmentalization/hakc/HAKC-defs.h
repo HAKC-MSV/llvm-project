@@ -16,6 +16,7 @@
 
 #define DIVISION_ID_BIT_LENGTH 64
 #define COMPARTMENT_ID_BIT_LENGTH 64
+#define ENTRY_TOKEN_BIT_LENGTH 64
 
 constexpr size_t BITS_PER_BYTE = 8;
 

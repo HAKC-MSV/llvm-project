@@ -71,7 +71,11 @@ namespace llvm::hakc {
         ManagedPointers.insert(ManagedPointer);
         AnalyzedUses.clear();
         ClassifyAllUsesOfDefinition(ManagedPointer->GetBaseDefinition(), ManagedPointer);
-        CommonHAKCAnalysis::getWriter(DebugActive) << "Managing " << *ManagedPointer << "\n";
+        CommonHAKCAnalysis::getWriter(DebugActive) << "Managing " << *ManagedPointer;
+        if (ManagedPointer->GetType()) {
+            CommonHAKCAnalysis::getWriter(DebugActive) << " with HAKCType " << *ManagedPointer->GetType();
+        }
+        CommonHAKCAnalysis::getWriter(DebugActive) << "\n";
     }
 
     bool HAKCPointerManager::UseIsAnalyzed(const ManagedHAKCPointerUseP &UseP) {
@@ -772,6 +776,8 @@ namespace llvm::hakc {
                     Pointer << " does not have a HAKCType\n";
             throw std::exception();
         }
+        CommonHAKCAnalysis::getWriter(DebugActive) << "Adding Authenticated Pointer for " << *ManagedPointer
+                << " with HAKCType " << *ManagedPointer->GetType() << "\n" << " at " << *InsertLocation << "\n";
 
         if (CommonHAKCAnalysis::PointerShouldBeConsideredCode(ManagedPointer)) {
             CodeAuthenticationsAdded++;

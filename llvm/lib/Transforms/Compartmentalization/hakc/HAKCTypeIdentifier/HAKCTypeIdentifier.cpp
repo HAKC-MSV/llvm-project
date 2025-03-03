@@ -751,7 +751,9 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::GetArgumentHAKCType(Argument *Arg) {
 hakc::HAKCTypeP hakc::HAKCTypeIdentifier::GetArgumentHAKCType(const DISubroutineType *FunctionTy, unsigned ArgNo) {
     HAKCTypeP Result = nullptr;
     if (FunctionTy) {
-        auto *ArgDIType = FunctionTy->getTypeArray()[ArgNo];
+        // The + 1 comes from the fact that the type array stores the return type (including void, which is a null
+        // pointer) at index 0
+        auto *ArgDIType = FunctionTy->getTypeArray()[ArgNo + 1];
         Result = FindType(ArgDIType);
     }
     return Result;
@@ -764,7 +766,12 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCTypeForUse(Use &U) {
     if (auto *CallI = dyn_cast<CallInst>(U.getUser())) {
         auto CallTy = FindCalledFunctionType(CallI->getFunctionType());
         if (CallTy) {
-            Result = GetArgumentHAKCType(dyn_cast<DISubroutineType>(CallTy->GetDbgType()), U.getOperandNo());
+            if (U.getOperandNo() == CallI->getCalledOperandUse().getOperandNo()) {
+                auto FuncTy = FindType(dyn_cast<DISubroutineType>(CallTy->GetDbgType()));
+                Result = FindPointerType(FuncTy);
+            } else {
+                Result = GetArgumentHAKCType(dyn_cast<DISubroutineType>(CallTy->GetDbgType()), U.getOperandNo());
+            }
         }
     } else if (isa<AllocaInst>(U.get()) && isa<LoadInst>(U.getUser())) {
         Result = FindHAKCType(U.getUser());
@@ -818,6 +825,8 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
                         "Finding Type of " << U << "\n";
                 auto BaseHAKCType = FindHAKCTypeForUse(U);
                 if (BaseHAKCType) {
+                    CommonHAKCAnalysis::getWriter(AnalysisHelper.GetSystemInfo().OutputDebugInfo()) << "Found " << *
+                            BaseHAKCType << " for " << U << "\n";
                     FoundType = BaseHAKCType;
                     break;
                 }

@@ -15,7 +15,8 @@ namespace llvm::hakc {
                                                                                Context, COMPARTMENT_ID_BIT_LENGTH),
                                                                            Compartment)),
                                                                    EntryToken(ConstantInt::get(
-                                                                       IntegerType::get(Context, 64), EntryToken)),
+                                                                       HAKCCompartment::GetEntryTokenType(Context),
+                                                                       EntryToken)),
                                                                    Targets() {
     }
 
@@ -39,7 +40,8 @@ namespace llvm::hakc {
     }
 
     hakc_compartment_id_t HAKCCompartment::GetCompartmentIDValue() const {
-        return Compartment->getSExtValue(); // TODO: Should we use getZExtValue instead? Can a compartment ID ever be negative?
+        return Compartment->getSExtValue();
+        // TODO: Should we use getZExtValue instead? Can a compartment ID ever be negative?
     }
 
     HAKC_Access_Token HAKCCompartment::GetEntryToken() const {
@@ -48,5 +50,9 @@ namespace llvm::hakc {
 
     HAKC_Compartment_ID HAKCCompartment::CreateID(hakc_compartment_id_t ID, Module &M) {
         return ConstantInt::get(IntegerType::get(M.getContext(), CompartmentIDBitCount), ID);
+    }
+
+    IntegerType *HAKCCompartment::GetEntryTokenType(LLVMContext &Ctx) {
+        return IntegerType::get(Ctx, ENTRY_TOKEN_BIT_LENGTH);
     }
 } // hakc

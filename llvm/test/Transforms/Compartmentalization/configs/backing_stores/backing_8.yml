@@ -9,11 +9,9 @@ edges:
       DefiningLine: 32
       Name: bar
       is_function: true
-      symbol_hash: e6ddbcd69f68b74c
     target: &id010 !HAKCType
-      DebugType: int ()
-      LLVMType: i32 ()
-      type_hash: f9f75dcecd5a8cb7
+      DebugType: int (struct data_struct2*)
+      LLVMType: i32 (ptr)
   - key: HasScope
     persisted: true
     source: *id001
@@ -68,14 +66,10 @@ edges:
       Name: foo
       is_function: true
       symbol_hash: a75946d7048f391e
-  - key: DirectCall
-    persisted: true
-    source: *id001
-    target: *id005
   - key: DagEdge
     persisted: true
-    source: *id001
-    target: *id005
+    source: *id005
+    target: *id001
     weight: 2
   - key: InDivision
     persisted: true

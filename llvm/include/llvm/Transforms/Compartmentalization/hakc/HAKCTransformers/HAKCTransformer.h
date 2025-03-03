@@ -195,7 +195,7 @@ namespace llvm::hakc {
 
         std::string getKstrtab_entry_name(Function *F);
 
-        std::string getKstrtabns_entry_name(Function *F);
+        std::string getKstrtabns_entry_name(const Function *F);
 
         /**
          * Checks that ManagedHAKCPointer and I are valid, and sets the HAKCIRBuilder location to I
@@ -241,7 +241,7 @@ namespace llvm::hakc {
          * Return the type that HAKC Compartment Entry Tokens are in the source
          * @return
          */
-        Type *GetEntryTokenType(unsigned AddrSpace);
+        Type *GetEntryTokenType(unsigned AddrSpace) const;
 
         virtual ConstantInt *GetObjectSizeInBytes(hakc::HAKCPointerBase &HAKCPointer);
 
@@ -338,7 +338,7 @@ namespace llvm::hakc {
 
         virtual bool TransferShouldBeCreated(Value *V, GlobalValue *Target);
 
-        bool DebugIsActive();
+        bool DebugIsActive() const;
 
         virtual HAKCTypeP FindEntryBitcast(hakc::HAKCPointerBase &HAKCPointerP, Instruction *I, Function *Target);
 
