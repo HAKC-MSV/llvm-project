@@ -16,8 +16,8 @@ hakc::HAKCTransformer::HAKCTransformer(HAKCCompartmentalizationPolicy &Policy,
                                                                            VariadicTransferFunctions() {
 }
 
-Type *hakc::HAKCTransformer::GetEntryTokenType(unsigned AddrSpace) {
-    return HAKCIRBuilder.getPtrTy(AddrSpace);
+Type *hakc::HAKCTransformer::GetEntryTokenType(unsigned AddrSpace) const {
+    return HAKCCompartment::GetEntryTokenType(HAKCIRBuilder.getContext());
 }
 
 std::string hakc::HAKCTransformer::getUniqueAddressable_Name(Function *F) {
@@ -37,7 +37,7 @@ std::string hakc::HAKCTransformer::getKstrtab_entry_name(Function *F) {
     return ksymtab_symbol_name;
 }
 
-std::string hakc::HAKCTransformer::getKstrtabns_entry_name(Function *F) {
+std::string hakc::HAKCTransformer::getKstrtabns_entry_name(const Function *F) {
     std::string ksymtabns_symbol_name = "__kstrtabns_";
     ksymtabns_symbol_name += F->getName();
     return ksymtabns_symbol_name;
@@ -290,11 +290,6 @@ GlobalVariable *hakc::HAKCTransformer::GetValidTargetCompartments(Function *F) {
     }
 
     auto Targets = Division.GetHAKCCompartment().GetValidTargets();
-    if (Targets.empty()) {
-        CommonHAKCAnalysis::getWriter(true) << "No valid transitions exist for " << F->getName() << " in Compartment "
-                << std::to_string(CompartmentID->getZExtValue()) << "\n";
-        throw std::exception();
-    }
 
     SmallVector<Constant *> EntryTokenValues;
     SmallVector<hakc_compartment_id_t> IDs;
@@ -1094,12 +1089,13 @@ GlobalVariable *hakc::HAKCTransformer::AddCompartmentMetadataEntry(HAKCCompartme
     return nullptr;
 }
 
-bool hakc::HAKCTransformer::DebugIsActive() {
+bool hakc::HAKCTransformer::DebugIsActive() const {
     return ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().OutputDebugInfo(
         HAKCIRBuilder.GetInsertPoint()->getFunction());
 }
 
 hakc::HAKCPointerBaseP hakc::HAKCTransformer::CreateNewManagedPointer(Value *BaseDefinition) {
+    CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Creating new managed pointer for " << *BaseDefinition << "\n";
     auto ManagedPtr = std::make_shared<HAKCPointerBase>(BaseDefinition, 0);
     auto HAKCTy = ModuleAnalysis.GetTypeIdentifier().FindType(*ManagedPtr);
     if (!HAKCTy) {

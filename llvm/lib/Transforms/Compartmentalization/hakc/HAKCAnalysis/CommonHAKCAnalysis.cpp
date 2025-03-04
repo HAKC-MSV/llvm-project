@@ -486,9 +486,9 @@ namespace llvm::hakc {
     FunctionType *CommonHAKCAnalysis::GetDataAuthenticationFunctionType(Module &M, unsigned AddrSpace) {
         auto *RetTy = PointerType::get(M.getContext(), AddrSpace);
         Type *ArgTy[] = {
-            PointerType::get(M.getContext(), AddrSpace),
-            IntegerType::get(M.getContext(), COMPARTMENT_ID_BIT_LENGTH),
-            IntegerType::get(M.getContext(), COMPARTMENT_ID_BIT_LENGTH)
+            PointerType::get(M.getContext(), AddrSpace), /* pointer */
+            IntegerType::get(M.getContext(), COMPARTMENT_ID_BIT_LENGTH), /* Compartment ID */
+            IntegerType::get(M.getContext(), COMPARTMENT_ID_BIT_LENGTH), /* Division ID */
         };
 
         return FunctionType::get(RetTy, ArgTy, false);
@@ -510,9 +510,11 @@ namespace llvm::hakc {
     FunctionType *CommonHAKCAnalysis::GetCodeAuthenticationFunctionType(Module &M, unsigned AddrSpace) {
         auto *RetTy = PointerType::get(M.getContext(), AddrSpace);
         Type *ArgTy[] = {
-            PointerType::get(M.getContext(), AddrSpace),
-            IntegerType::get(M.getContext(), COMPARTMENT_ID_BIT_LENGTH),
-            IntegerType::get(M.getContext(), COMPARTMENT_ID_BIT_LENGTH)
+            PointerType::get(M.getContext(), AddrSpace), /* Function pointer */
+            IntegerType::get(M.getContext(), COMPARTMENT_ID_BIT_LENGTH), /* Compartment ID */
+            IntegerType::get(M.getContext(), COMPARTMENT_ID_BIT_LENGTH), /* Division ID */
+            PointerType::get(M.getContext(), AddrSpace), /* Access Token array */
+            IntegerType::get(M.getContext(), 64), /* Number of Access Tokens */
         };
 
         return FunctionType::get(RetTy, ArgTy, false);
@@ -605,10 +607,11 @@ namespace llvm::hakc {
                    [](Function *LHS, Function *RHS) { return LHS->getName().str() < RHS->getName().str(); });
     }
 
-    bool CommonHAKCAnalysis::PointerShouldBeConsideredCode(Value *Pointer) {
-        if (Pointer->getType()->isPointerTy()) {
-            /*return Pointer->getType()->getPointerElementType()->isFunctionTy();*/
-            return Pointer->getType()->isFunctionTy();
+    bool CommonHAKCAnalysis::PointerShouldBeConsideredCode(const ManagedHAKCPointerP &ManagedPointer) {
+        auto HAKCType = ManagedPointer->GetType();
+        if (HAKCType && HAKCType->IsPointerType() && HAKCType->GetPointeeType()) {
+            return HAKCType->GetPointeeType()->GetLLVMType() && isa<FunctionType>(
+                       HAKCType->GetPointeeType()->GetLLVMType());
         }
         return false;
     }

@@ -71,7 +71,11 @@ namespace llvm::hakc {
         ManagedPointers.insert(ManagedPointer);
         AnalyzedUses.clear();
         ClassifyAllUsesOfDefinition(ManagedPointer->GetBaseDefinition(), ManagedPointer);
-        CommonHAKCAnalysis::getWriter(DebugActive) << "Managing " << *ManagedPointer << "\n";
+        CommonHAKCAnalysis::getWriter(DebugActive) << "Managing " << *ManagedPointer;
+        if (ManagedPointer->GetType()) {
+            CommonHAKCAnalysis::getWriter(DebugActive) << " with HAKCType " << *ManagedPointer->GetType();
+        }
+        CommonHAKCAnalysis::getWriter(DebugActive) << "\n";
     }
 
     bool HAKCPointerManager::UseIsAnalyzed(const ManagedHAKCPointerUseP &UseP) {
@@ -366,7 +370,7 @@ namespace llvm::hakc {
         return nullptr;
     }
 
-    bool HAKCPointerManager::empty() {
+    bool HAKCPointerManager::empty() const {
         return ManagedPointers.empty();
     }
 
@@ -763,8 +767,19 @@ namespace llvm::hakc {
         if (Managed) {
             return Managed;
         }
+        auto ManagedPointer = GetManagedPointer(Pointer);
+        if (!ManagedPointer) {
+            CommonHAKCAnalysis::getWriter(true) << "Could not find Managed Pointer for " << *Pointer << "\n";
+            throw std::exception();
+        } else if (!ManagedPointer->GetType()) {
+            CommonHAKCAnalysis::getWriter(true) << "Managed Pointer " << *ManagedPointer << " found for Value " << *
+                    Pointer << " does not have a HAKCType\n";
+            throw std::exception();
+        }
+        CommonHAKCAnalysis::getWriter(DebugActive) << "Adding Authenticated Pointer for " << *ManagedPointer
+                << " with HAKCType " << *ManagedPointer->GetType() << "\n" << " at " << *InsertLocation << "\n";
 
-        if (CommonHAKCAnalysis::PointerShouldBeConsideredCode(Pointer)) {
+        if (CommonHAKCAnalysis::PointerShouldBeConsideredCode(ManagedPointer)) {
             CodeAuthenticationsAdded++;
             return GetFunctionAnalysis().AddCodeAuthCheckAtLocation(Pointer, InsertLocation);
         } else {
@@ -773,7 +788,7 @@ namespace llvm::hakc {
         }
     }
 
-    HAKCCompartmentalizationPolicy &HAKCPointerManager::GetPolicy() {
+    HAKCCompartmentalizationPolicy &HAKCPointerManager::GetPolicy() const {
         return Policy;
     }
 
