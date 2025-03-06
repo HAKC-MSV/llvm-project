@@ -115,6 +115,8 @@ namespace llvm::hakc {
             return !(YamlType == TypeInfo);
         }
     };
+    typedef std::shared_ptr<HAKCTypeInfo> HAKCTypeP;
+
 } // hakc
 
 #endif //HAKC_HAKCTYPEINFO_H

@@ -57,14 +57,6 @@ namespace llvm::hakc {
         }
     };
 
-    struct HAKCYAMLStructType {
-        HAKCYAMLStringType StructType;
-        HAKCYAMLStringSequenceType StructSubType;
-
-        HAKCYAMLStructType() : StructType(), StructSubType() {
-        }
-    };
-
 
     struct HAKCYAMLFunctionDefinitionType {
         HAKCYAMLStringType FunctionName;
@@ -123,6 +115,23 @@ namespace llvm::hakc {
         }
     };
 
+    struct HAKCYAMLPreTransferActions {
+      HAKCYAMLStringType ActionLabel;
+      HAKCYAMLStringType ActionName;
+    };
+
+    struct HAKCYAMLPostTargetArgument {
+      unsigned idx;
+      HAKCYAMLStringType val;
+    };
+
+    struct HAKCYAMLPostTargetActions {
+      HAKCYAMLStringType ActionName;
+      // TODO: should we have multiple arguments here?
+      // HAKCYAMLSequence<HAKCYAMLPostTargetArgument> Arguments;
+      HAKCYAMLPostTargetArgument Arguments;
+    };
+
     struct HAKCYamlDatabaseConfig {
         HAKCYAMLStringType ServerURL;
         HAKCYAMLStringType GetCompartmentEndpoint;
@@ -160,7 +169,9 @@ namespace llvm::hakc {
         HAKCYAMLSequence<HAKCYAMLAllocationType> AllocationFunctions;
         HAKCYAMLSequence<HAKCYAMLFileType> SeparateNamespacePaths;
         HAKCYAMLSequence<HAKCYAMLFileType> HAKCSourcePaths;
-        HAKCYAMLSequence<HAKCYAMLStructType> IgnoredTypes;
+        HAKCYAMLSequence<HAKCYAMLPreTransferActions> PreTransferActions;
+        HAKCYAMLSequence<HAKCYAMLPostTargetActions> PostTargetActions;
+        HAKCYAMLStringSequenceType IgnoredTypes;
         HAKCYAMLTransferType DefaultCompartmentTransfer;
         HAKCYAMLFunctionDefinitionType SignWithDivision;
         HAKCYAMLTransferType PerCPUCompartmentTransfer;
@@ -177,7 +188,11 @@ LLVM_YAML_IS_SEQUENCE_VECTOR(hakc::HAKCYAMLFunctionDefinitionType)
 
 LLVM_YAML_IS_SEQUENCE_VECTOR(hakc::HAKCYAMLFileType)
 
-LLVM_YAML_IS_SEQUENCE_VECTOR(hakc::HAKCYAMLStructType)
+LLVM_YAML_IS_SEQUENCE_VECTOR(hakc::HAKCYAMLPreTransferActions)
+
+LLVM_YAML_IS_SEQUENCE_VECTOR(hakc::HAKCYAMLPostTargetActions)
+
+LLVM_YAML_IS_SEQUENCE_VECTOR(hakc::HAKCYAMLPostTargetArgument)
 
 inline void ValidateHAKCDefinition(hakc::HAKCYAMLFunctionDefinitionType &Definition) {
 #define FieldCheck(Def, Field) if (Def.Field != hakc::HAKCTransferFunction::MissingIdx && Def.Field > hakc::HAKCTransferFunction::MaxArgIndex) { errs() << "Invalid Index Value for " << #Field << " : " << Def.Field << "\n"; throw std::exception(); }
@@ -241,19 +256,35 @@ struct yaml::MappingTraits<hakc::HAKCYAMLFunctionDefinitionType> {
 };
 
 template<>
-struct yaml::MappingTraits<hakc::HAKCYAMLStructType> {
-    static void mapping(yaml::IO &io, hakc::HAKCYAMLStructType &Struct) {
-        io.mapRequired("type", Struct.StructType);
-        io.mapRequired("subtypes", Struct.StructSubType);
-    }
-};
-
-template<>
 struct yaml::MappingTraits<hakc::HAKCYAMLFileType> {
     static void mapping(yaml::IO &io, hakc::HAKCYAMLFileType &File) {
         io.mapRequired("path_root", File.PathRoot);
         io.mapRequired("file_names", File.Files);
     }
+};
+
+template<>
+struct yaml::MappingTraits<hakc::HAKCYAMLPreTransferActions> {
+  static void mapping(yaml::IO &io, hakc::HAKCYAMLPreTransferActions &PreTransferActions) {
+    io.mapRequired("label", PreTransferActions.ActionLabel);
+    io.mapRequired("name", PreTransferActions.ActionName);
+  }
+};
+
+template<>
+struct yaml::MappingTraits<hakc::HAKCYAMLPostTargetActions> {
+  static void mapping(yaml::IO &io, hakc::HAKCYAMLPostTargetActions &PostTargetActions) {
+    io.mapRequired("arg", PostTargetActions.Arguments);
+    io.mapRequired("name", PostTargetActions.ActionName);
+  }
+};
+
+template<>
+struct yaml::MappingTraits<hakc::HAKCYAMLPostTargetArgument> {
+  static void mapping(yaml::IO &io, hakc::HAKCYAMLPostTargetArgument &PostTargetArgument) {
+    io.mapRequired("idx", PostTargetArgument.idx);
+    io.mapRequired("val", PostTargetArgument.val);
+  }
 };
 
 template<>
@@ -329,6 +360,8 @@ struct yaml::MappingTraits<hakc::HAKCYamlConfig> {
             io.mapOptional("DebugOutputSymbols", YamlConfig.PassDebugSymbols);
             io.mapOptional("PerCPUCompartmentTransferFunction", YamlConfig.PerCPUCompartmentTransfer);
             io.mapOptional("CustomTransferFunctions", YamlConfig.CustomTransferFunctions);
+            io.mapOptional("PreTransferActions", YamlConfig.PreTransferActions);
+            io.mapOptional("PostTargetActions", YamlConfig.PostTargetActions);
 
             if (YamlConfig.PassMode == hakc::RunCompartmentalization) {
                 io.mapRequired("Database", YamlConfig.DatabaseConfig);
@@ -361,6 +394,8 @@ struct yaml::MappingTraits<hakc::HAKCYamlConfig> {
             io.mapOptional("PerCPUCompartmentTransferFunction", YamlConfig.PerCPUCompartmentTransfer);
             io.mapOptional("CustomTransferFunctions", YamlConfig.CustomTransferFunctions);
             io.mapOptional("Database", YamlConfig.DatabaseConfig);
+            io.mapOptional("PreTransferActions", YamlConfig.PreTransferActions);
+            io.mapOptional("PostTargetActions", YamlConfig.PostTargetActions);
         } else if (YamlConfig.TestMode == hakc::TestModeSuppliedDAG) {
             // TODO
         }

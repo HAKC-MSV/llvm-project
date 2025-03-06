@@ -31,6 +31,8 @@ std::shared_ptr<hakc::HAKCTypeInfo> hakc::HAKCTypeIdentifier::FindType(const DIT
 }
 
 void hakc::HAKCTypeIdentifier::AddTypeMapping(const DIType *type, const std::shared_ptr<HAKCTypeInfo> &HAKCType) {
+    CommonHAKCAnalysis::getWriter(AnalysisHelper.GetSystemInfo().OutputDebugInfo()) << "Adding mapping " << *type <<
+            " -> " << HAKCType->GetName() << "\n";
     std::set<dwarf::Tag> TagsToSize = {
         dwarf::DW_TAG_structure_type,
         dwarf::DW_TAG_union_type,
@@ -237,7 +239,13 @@ std::shared_ptr<hakc::HAKCTypeInfo> hakc::HAKCTypeIdentifier::HandleType(const D
         }
         AddTypeMapping(type, TypeP);
     } else if (auto *DerivedTy = dyn_cast<DIDerivedType>(type)) {
-        std::set<unsigned> TagsToConsider = {
+        if (DerivedTy->getTag() == dwarf::DW_TAG_member) {
+          if (DerivedTy->getBaseType()) {
+            HandleType(DerivedTy->getBaseType());
+          }
+        }
+        else {
+          std::set<unsigned> TagsToConsider = {
             dwarf::DW_TAG_pointer_type,
             dwarf::DW_TAG_array_type,
             dwarf::DW_TAG_const_type,
@@ -664,6 +672,7 @@ void hakc::HAKCTypeIdentifier::FindUsesInFunctions() {
 }
 
 std::shared_ptr<hakc::HAKCTypeInfo> hakc::HAKCTypeIdentifier::FindType(Type *Ty) {
+  // remove this functionality, because it would only work for non pointers and is logically incorrect
     if (isa<PointerType>(Ty)) {
         return nullptr;
     }
@@ -813,6 +822,17 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
     } else if (auto *AllocaI = dyn_cast<AllocaInst>(V)) {
         BaseType = AllocaI->getAllocatedType();
     }
+    // maybe remove below
+      else if(auto *GlobalVar = dyn_cast<GlobalVariable>(V)) {
+      BaseType = GlobalVar->getValueType(); // or getType()?
+    }
+    else if (auto *Func = dyn_cast<Function>(V)) {
+      BaseType = Func->getReturnType();
+    }
+    else if (auto *CallI = dyn_cast<CallInst>(V)) {
+      BaseType = CallI->getType();
+    }
+      // maybe remove above
 
     if (BaseType) {
         CommonHAKCAnalysis::getWriter(AnalysisHelper.GetSystemInfo().OutputDebugInfo()) << "Using BaseType " << *

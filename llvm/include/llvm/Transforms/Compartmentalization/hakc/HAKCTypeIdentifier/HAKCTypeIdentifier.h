@@ -13,6 +13,7 @@
 
 #include "HAKCFunctionInfo.h"
 #include "HAKCGlobalInfo.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/ManagedHAKCPointer.h"
 
 #include <map>
 #include <set>

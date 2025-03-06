@@ -5,15 +5,15 @@ edges:
 - key: IsType
   persisted: true
   source: &id001 !HAKCFunction
-    DefiningFile: null
-    DefiningLine: null
-    Name: bar
+    DefiningFile: _HAKC_SOURCE_PATH_/hakc_test5.c
+    DefiningLine: 14
+    Name: foo
     is_function: true
-    symbol_hash: 5b70c75c0fe981d6
+    symbol_hash: c6d239b8155b41ac
   target: &id007 !HAKCType
-    DebugType: int (struct data_struct*)
-    LLVMType: i32 (ptr)
-    type_hash: ed49f6b712e5420
+    DebugType: int ()
+    LLVMType: i32 ()
+    type_hash: f9f75dcecd5a8cb7
 - key: HasScope
   persisted: true
   source: *id001
@@ -24,8 +24,41 @@ edges:
 - key: UsedInCompilationUnit
   persisted: true
   source: *id001
-  target: &id003 !HAKCCompilationUnit
-    filename: _HAKC_SOURCE_PATH_/hakc_test0.c
+  target: &id002 !HAKCCompilationUnit
+    filename: _HAKC_SOURCE_PATH_/hakc_test5.c
+- key: DefinedIn
+  line: 14
+  persisted: true
+  source: *id001
+  target: *id002
+- key: UsesSymbol
+  persisted: true
+  source: *id001
+  target: &id003 !HAKCFunction
+    DefiningFile: null
+    DefiningLine: null
+    Name: kmalloc
+    is_function: true
+    symbol_hash: 4f422de1b7a07299
+- key: DirectCall
+  persisted: true
+  source: *id001
+  target: *id003
+- key: DagEdge
+  persisted: true
+  source: *id001
+  target: *id003
+  weight: 2
+- key: UsedInCompilationUnit
+  persisted: true
+  source: *id001
+  target: &id004 !HAKCCompilationUnit
+    filename: _HAKC_SOURCE_PATH_/hakc_test_kuzu5.c
+- key: DefinedIn
+  line: 14
+  persisted: true
+  source: *id001
+  target: *id004
 - key: InDivision
   persisted: true
   source: *id001
@@ -35,53 +68,29 @@ edges:
     division_hash: be7396225c569ba9
 - key: IsType
   persisted: true
-  source: &id002 !HAKCFunction
-    DefiningFile: _HAKC_SOURCE_PATH_/hakc_test0.c
-    DefiningLine: 15
-    Name: foo
-    is_function: true
-    symbol_hash: 52a2d25076b14688
-  target: !HAKCType
-    DebugType: int (struct data_struct*)
-    LLVMType: i32 (ptr)
-    type_hash: ed49f6b712e5420
+  source: *id003
+  target: &id009 !HAKCType
+    DebugType: '@UNKNOWN@'
+    LLVMType: ptr (i64, i32)
+    type_hash: d07eacabe65186ea
 - key: HasScope
   persisted: true
-  source: *id002
+  source: *id003
   target: !HAKCScope
     LocalScopeName: global
     Scope: global
     scope_hash: 8001c27439650c5c
 - key: UsedInCompilationUnit
   persisted: true
-  source: *id002
-  target: *id003
-- key: DefinedIn
-  line: 15
+  source: *id003
+  target: *id002
+- key: UsedInCompilationUnit
   persisted: true
-  source: *id002
-  target: *id003
-- key: UsesSymbol
-  persisted: true
-  source: *id002
-  target: &id004 !HAKCFunction
-    DefiningFile: null
-    DefiningLine: null
-    Name: bar
-    is_function: true
-    symbol_hash: 5b70c75c0fe981d6
-- key: DirectCall
-  persisted: true
-  source: *id002
+  source: *id003
   target: *id004
-- key: DagEdge
-  persisted: true
-  source: *id002
-  target: *id004
-  weight: 2
 - key: InDivision
   persisted: true
-  source: *id002
+  source: *id003
   target: &id006 !HAKCDivision
     AccessToken: 139264
     DivisionID: 13
@@ -89,13 +98,13 @@ edges:
 - key: InCompartment
   persisted: true
   source: *id005
-  target: &id009 !HAKCCompartment
+  target: &id010 !HAKCCompartment
     CompartmentID: 1
     EntryToken: 73728
 - key: InCompartment
   persisted: true
   source: *id006
-  target: &id010 !HAKCCompartment
+  target: &id011 !HAKCCompartment
     CompartmentID: 2
     EntryToken: 139264
 graph: {}
@@ -107,15 +116,19 @@ nodes:
   persisted: true
 - id: *id008
   persisted: true
-- id: *id003
-  persisted: true
 - id: *id002
   persisted: true
-- id: *id005
+- id: *id003
   persisted: true
 - id: *id009
   persisted: true
-- id: *id006
+- id: *id004
+  persisted: true
+- id: *id005
   persisted: true
 - id: *id010
+  persisted: true
+- id: *id006
+  persisted: true
+- id: *id011
   persisted: true

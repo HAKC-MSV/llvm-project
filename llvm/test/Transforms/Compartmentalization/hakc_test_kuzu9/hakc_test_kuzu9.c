@@ -28,12 +28,17 @@ int foo(struct data_struct *a) {
     return 0;
 }
 
-// note: incomplete test. need derricks help for expected behavior 
-// CHECK-LABEL: HAKC_XFER_foo
-// CHECK: %2 = call i32 @HAKC_ORIG_foo(%struct.data_struct2* %0)
-// CHECK: ret i32 %2
+// note: incomplete test. need derricks help for expected behavior
+// CHECK: call ptr @check_hakc_data_access(ptr %8, i64 2, i64 139264)
+// CHECK: getelementptr inbounds %struct.data_struct, ptr %9, i32 0, i32 0
+// CHECK: getelementptr inbounds %struct.data_struct, ptr %8, i32 0, i32 0
 
-// CHECK-LABEL: HAKC_XFER_bar
-// CHECK: %2 = call i32 @HAKC_ORIG_bar(%struct.data_struct* %0)
-// CHECK: ret i32 %2
+// CHECK: define dso_local i32 @HAKC_XFER_bar(ptr noundef %0)
+// CHECK: HAKCTransferEntry:
+// CHECK: call ptr @hakc_transfer_to_clique(ptr %0, i64 4, i64 1, i64 13, i1 false)
+// CHECK: call i32 @HAKC_ORIG_bar(ptr %1)
 
+// CHECK: define dso_local i32 @HAKC_XFER_foo(ptr noundef %0)
+// CHECK: HAKCTransferEntry:
+// CHECK: call ptr @hakc_transfer_to_clique(ptr %0, i64 4, i64 2, i64 13, i1 false)
+// CHECK: call i32 @HAKC_ORIG_foo(ptr %1)

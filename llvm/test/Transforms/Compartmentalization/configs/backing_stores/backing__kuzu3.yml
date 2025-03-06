@@ -25,12 +25,12 @@ edges:
   persisted: true
   source: *id001
   target: &id003 !HAKCCompilationUnit
-    filename: _HAKC_SOURCE_PATH_/hakc_test0.c
+    filename: _HAKC_SOURCE_PATH_/hakc_test3.c
 - key: UsedInCompilationUnit
   persisted: true
   source: *id001
   target: &id005 !HAKCCompilationUnit
-    filename: _HAKC_SOURCE_PATH_/hakc_test_kuzu0.c
+    filename: _HAKC_SOURCE_PATH_/hakc_test_kuzu3.c
 - key: InDivision
   persisted: true
   source: *id001
@@ -41,8 +41,8 @@ edges:
 - key: IsType
   persisted: true
   source: &id002 !HAKCFunction
-    DefiningFile: _HAKC_SOURCE_PATH_/hakc_test0.c
-    DefiningLine: 15
+    DefiningFile: _HAKC_SOURCE_PATH_/hakc_test3.c
+    DefiningLine: 16
     Name: foo
     is_function: true
     symbol_hash: 52a2d25076b14688
@@ -62,7 +62,7 @@ edges:
   source: *id002
   target: *id003
 - key: DefinedIn
-  line: 15
+  line: 16
   persisted: true
   source: *id002
   target: *id003

@@ -146,7 +146,7 @@ void hakc::HAKCTransformer::ValidateHAKCPointerAndLocation(const HAKCPointerBase
         ValidateLocation(I);
     } catch (std::exception &e) {
         if (I) {
-            CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Validation failed for " << HAKCPointer <<
+            CommonHAKCAnalysis::getWriter(true) << "Validation failed for " << HAKCPointer <<
                     " for Instruction in "
                     << I->getFunction()->getName() << ": " << *I << "\n";
             throw e;
@@ -321,12 +321,12 @@ GlobalVariable *hakc::HAKCTransformer::GetValidTargetCompartments(Function *F) {
     EntryTokenArray->setConstant(true);
     EntryTokenArray->setLinkage(GlobalValue::InternalLinkage);
     if (DebugIsActive()) {
-        CommonHAKCAnalysis::getWriter(true) << "Setting initializer for " << EntryTokenArray->getName() << " to be "
+        CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Setting initializer for " << EntryTokenArray->getName() << " to be "
                 << Initializer << " from token values ";
         for (auto *TokenValue: EntryTokenValues) {
-            CommonHAKCAnalysis::getWriter(true) << "\n\t" << TokenValue;
+            CommonHAKCAnalysis::getWriter(DebugIsActive()) << "\n\t" << TokenValue;
         }
-        CommonHAKCAnalysis::getWriter(true) << "\n";
+        CommonHAKCAnalysis::getWriter(DebugIsActive()) << "\n";
     }
     EntryTokenArray->setInitializer(Initializer);
 
@@ -688,12 +688,6 @@ hakc::HAKCTransformer::CreateCompartmentTransfer(hakc::HAKCPointerBase &HAKCPoin
 
     auto ObjectSize = GetObjectSizeInBytes(HAKCPointer);
 
-    if (!ObjectSize) {
-        CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Could not get ObjectSize for " << HAKCPointer << "\n";
-
-        ObjectSize = GetDefaultObjectSize();
-    }
-
     return CreateSizedCompartmentTransfer(HAKCPointer, I, Target, IsData, ObjectSize);
 }
 
@@ -734,16 +728,56 @@ hakc::HAKCTransformer::CreateForwardArgumentTransfers(Function *Target, Function
         CreateTransferFunctionArg_PreCall(Target, TransferFunction, Arg);
         Instruction *Transfer = CreateCompartmentTransfer(*ManagedPointer, &*HAKCIRBuilder.GetInsertPoint(), Target,
                                                           IsData);
+        // CreateTransferFunctionArg_PostCall(Target, TransferFunction, Arg); // actually, pretty sure this gets called later
         ArgsList.push_back(Transfer);
     }
 }
 
 void hakc::HAKCTransformer::CreateTransferFunctionArg_PreCall(Function *F, Function *TransferFunction, Value *Arg) {
     // TODO - Implement me
+    // Q:
+    // Run the defined PreTransferActions from the configuration yaml, e.g., get_hakc_address_color
+    for (auto &it: ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().PreTransferActions()) {
+      CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Trying to create PreTransferAction " << it->GetFunction() << "\n";
+      auto PreTransferFunction = it->GetFunction();
+      auto PreTransferLabel = it->GetLabel(); // TODO: omitting label for now
+      // PreTransferActions:
+      //   - { label: "step0", name: "get_hakc_address_color" }
+      // PostTargetActions:
+      //   - { name: "hakc_color_address", arg: { idx: 1, val: "step0" } }
+      // want to call function on target, then pass that pointer to the transfer function
+      // so, we have some pointer ptr we want to transfer
+      // before we transfer, we need to get the current color of the pointer
+      // %0 = call @get_hakc_address_color(ptr)
+      // then, call the transfer function
+      // %1 = call ptr @hakc_transfer_to_clique(ptr %0, i64 4, i64 3, i64 13, i1 false)
+      // %2 = call i32 @HAKC_ORIG_foo(ptr %1)
+      // %3 = call @hakc_color_address(ptr %0)
+      // need to cast the ptr to i64 to match get_hakc_address_color type
+      auto arg_int = HAKCIRBuilder.CreatePtrToInt(Arg, PreTransferFunction->getArg(0)->getType());
+      SmallVector<Value *> Args;
+      Args.push_back(arg_int);
+      auto *PreTransferFunctionCall = CreateCall(PreTransferFunction, Args);
+      CastCallToType(PreTransferFunctionCall, arg_int);
+
+    }
+
 }
 
 void hakc::HAKCTransformer::CreateTransferFunctionArg_PostCall(Function *F, Function *TransformFunction, Value *Arg) {
     // TODO - Implement me
+    // Run the defined PostTargetActions from the configuration yaml, e.g., hakc_color_address
+    for (auto &it: ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().PostTargetActions()) {
+      CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Trying to create PostTargetAction " << it->GetFunction() << "\n";
+      auto PostTargetFunction = it->GetFunction();
+      auto PostTargetIndex = it->GetIdx();
+      auto PostTargetValue = it->GetVal();
+      SmallVector<Value *> Args;
+      auto arg_int = HAKCIRBuilder.CreatePtrToInt(Arg, PostTargetFunction->getArg(0)->getType());
+      Args.push_back(arg_int);
+      auto *PostTargetFunctionCall = CreateCall(PostTargetFunction, Args);
+      CastCallToType(PostTargetFunctionCall, arg_int);
+    }
 }
 
 void hakc::HAKCTransformer::CreateBackwardArgumentTransfers(Function *Target, Function *TransferFunction) {
@@ -945,6 +979,9 @@ Function *hakc::HAKCTransformer::PopulateTransferFunction(Function *Target, Func
         }
         Unreachable->eraseFromParent();
     }
+
+    //    CreateTransferFunctionFinalize_Arch(Target, TransferFunction);
+
     CommonHAKCAnalysis::VerifyFunction(TransferFunction);
 
     return TransferFunction;

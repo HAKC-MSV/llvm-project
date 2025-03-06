@@ -21,4 +21,7 @@ int foo(struct data_struct *a) {
 }
 
 // this output is probably wrong (not seeing the pointer being checked)
-// CHECK: %10 = getelementptr inbounds %struct.data_struct, %struct.data_struct* %9, i64 0, i32 0
+// CHECK-LABEL: @HAKC_XFER_foo(ptr noundef %0)
+// CHECK-LABEL: HAKCTransferEntry:
+// CHECK: call ptr @hakc_transfer_to_clique(ptr %0, i64 4, i64 2, i64 13, i1 false)
+// CHECK: call i32 @HAKC_ORIG_foo(ptr %1)

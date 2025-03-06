@@ -7,8 +7,10 @@
 
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/IR/Module.h"
-#include "llvm/Transforms/Compartmentalization/hakc/HAKCFunctionDefinition/HAKCCustomTransfer.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCFunctionDefinition/HAKCTransferFunction.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCFunctionDefinition/HAKCPreTransferAction.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCFunctionDefinition/HAKCCustomTransfer.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCFunctionDefinition/HAKCPostTargetAction.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCAllocationSize.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/yaml/HAKCYaml.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTypeIdentifier/HAKCTypeIdentifier.h"
@@ -24,6 +26,8 @@ typedef SmallVector<Function *> FunctionList;
 typedef SmallPtrSet<Type *, 16> HAKCTypeSet;
 typedef SmallVector<std::string, 16> HAKCStringList;
 typedef SmallVector<HAKCCustomAllocation> HAKCCustomAllocationList;
+typedef SmallVector<llvm::hakc::hakc_pre_transfer_action_def_t> HAKCPreTransferActionList;
+typedef SmallVector<llvm::hakc::hakc_post_target_action_def_t> HAKCPostTargetActionList;
 
 namespace llvm::hakc {
     class CommonHAKCAnalysis;
@@ -90,6 +94,10 @@ namespace llvm::hakc {
 
         iterator_range<HAKCCustomTransferList::iterator> HAKCCustomTransfers();
 
+        iterator_range<HAKCPreTransferActionList::iterator> PreTransferActions();
+
+        iterator_range<HAKCPostTargetActionList::iterator> PostTargetActions();
+
         iterator_range<HAKCCustomAllocationList::iterator> AllocationFunctions();
 
         iterator_range<HAKCStringList::iterator> IncludePaths();
@@ -144,6 +152,8 @@ namespace llvm::hakc {
         HAKCGlobalVariableList IgnoredGlobalList;
         HAKCCustomAllocationList AllocationFunctionList;
         HAKCCustomTransferList CustomTransferList;
+        HAKCPreTransferActionList PreTransferActionList;
+        HAKCPostTargetActionList PostTargetActionList;
     };
 } // hakc
 

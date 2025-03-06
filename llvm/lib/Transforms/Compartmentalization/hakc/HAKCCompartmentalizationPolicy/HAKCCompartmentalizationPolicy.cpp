@@ -88,7 +88,7 @@ namespace llvm::hakc {
         }
         auto NewConnection = raw_socket_stream::createConnectedUnix(ServerURL);
         while (!NewConnection) {
-            // connection failed, try again with a timeout 
+            // connection failed, try again with a timeout
             NewConnection = raw_socket_stream::createConnectedUnix(ServerURL);
             if (current_try >= max_tries) {
                 CommonHAKCAnalysis::getWriter(true) << "Could not connect to " << ServerURL << "\n";
@@ -192,7 +192,6 @@ namespace llvm::hakc {
 
     HAKCDivisionP HAKCCompartmentalizationPolicy::GetDivision(hakc_compartment_id_t CompartmentID,
                                                               hakc_compartment_division_t DivisionID) {
-        // Get Division from division_id, compartment_id -> query for (division_id, access_token, compartment_id, entry_token)
         auto Division = FindCachedDivision(CompartmentID, DivisionID);
         if (Division) {
             return Division;
@@ -255,18 +254,13 @@ namespace llvm::hakc {
         auto ResponseData = Execute(SystemInformation.GetDatabaseInformation().GetValidTargetsEndpoint(), Parameters);
         auto ValidTargets = ResponseData.getArray("ValidTargets");
         if (!ValidTargets) {
-            CommonHAKCAnalysis::getWriter(true) << "Invalid Response from Server\n";
-            throw std::exception();
+            CommonHAKCAnalysis::getWriter(SystemInformation.OutputDebugInfo()) << "No ValidTargets found for CompartmentID: " << CompartmentID << "\n";
+            return;
         }
         for (auto target = ValidTargets->begin(); target != ValidTargets->end(); ++target) {
-            auto *TargetCompartment = HAKCCompartment::CreateID(target->getAsInteger().value(),
-                                                                SystemInformation.GetModule());
-
-            CommonHAKCAnalysis::getWriter(SystemInformation.OutputDebugInfo()) << "Adding target: " << (unsigned int)
-                    target->getAsInteger().value()
-                    << "\n";
-
-            Compartment.AddTarget(TargetCompartment);
+          CommonHAKCAnalysis::getWriter(SystemInformation.OutputDebugInfo()) << "Adding target: " << (hakc_compartment_id_t) target->getAsInteger().value() << "\n";
+          auto *TargetCompartment = HAKCCompartment::CreateID((hakc_compartment_id_t) target->getAsInteger().value(), SystemInformation.GetModule());
+          Compartment.AddTarget(TargetCompartment);
         }
     }
 
