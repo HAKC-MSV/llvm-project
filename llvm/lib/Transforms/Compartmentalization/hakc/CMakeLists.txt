@@ -11,16 +11,18 @@ add_llvm_component_library(LLVMHAKC
         HAKCCompartmentalizationPolicy/HAKCCompartmentDivision.cpp
 
         HAKCFunctionDefinition/HAKCCustomTransfer.cpp
-        HAKCFunctionDefinition/HAKCPreTransferAction.cpp
-        HAKCFunctionDefinition/HAKCPostTargetAction.cpp
-        HAKCFunctionDefinition/HAKCFunctionDefinition.cpp
         HAKCFunctionDefinition/HAKCTransferFunction.cpp
+        HAKCFunctionDefinition/HAKCFunctionDefinition.cpp
 
         HAKCSystem/HAKCAllocationSize.cpp
         HAKCSystem/HAKCSystemInformation.cpp
         HAKCSystem/HAKCWriter.cpp
 
+        HAKCTransformers/HAKCPostTargetAction.cpp
+        HAKCTransformers/HAKCPreTransferAction.cpp
+        HAKCTransformers/HAKCTransferAction.cpp
         HAKCTransformers/HAKCTransformer.cpp
+        HAKCTransformers/HAKCTransferState.cpp
 
         HAKCTypeIdentifier/HAKCFunctionInfo.cpp
         HAKCTypeIdentifier/HAKCGlobalInfo.cpp

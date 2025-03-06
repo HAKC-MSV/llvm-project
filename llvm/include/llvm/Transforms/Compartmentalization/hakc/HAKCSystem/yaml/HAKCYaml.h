@@ -59,7 +59,8 @@ namespace llvm::hakc {
 
 
     struct HAKCYAMLFunctionDefinitionType {
-        HAKCYAMLStringType FunctionDefinition;
+        HAKCYAMLStringType FunctionName;
+        HAKCYAMLStringType TypeName;
         unsigned PointerIdx;
         unsigned SizeIdx;
         unsigned CompartmentIdx;
@@ -67,39 +68,23 @@ namespace llvm::hakc {
         unsigned IsCodeIdx;
 
         HAKCYAMLFunctionDefinitionType()
-            : FunctionName(), PointerIdx(HAKCTransferFunction::MissingIdx),
+            : FunctionName(), TypeName(), PointerIdx(HAKCTransferFunction::MissingIdx),
               SizeIdx(HAKCTransferFunction::MissingIdx), CompartmentIdx(HAKCTransferFunction::MissingIdx),
               DivisionIdx(HAKCTransferFunction::MissingIdx), IsCodeIdx(HAKCTransferFunction::MissingIdx) {
         }
 
         bool IsValid() const { return !FunctionName.empty(); }
 
-        Function *GetFunction(Module &M) {
+        Function *GetFunction(HAKCTypeIdentifier &TypeIdentifier) {
             if (!IsValid()) {
                 return nullptr;
             }
-            unsigned BitCount = 64;
-            SmallVector<Type *, HAKCTransferFunction::MaxArgIndex> ArgTypes = {
-                PointerType::get(M.getContext(), 0)
-            };
-            if (PointerIdx != HAKCTransferFunction::MissingIdx) {
-                ArgTypes[PointerIdx] = IntegerType::get(M.getContext(), BitCount);
+            auto *FuncType = TypeIdentifier.GetTypeFromString(TypeName);
+            if (!FuncType) {
+                return nullptr;
             }
-            if (SizeIdx != HAKCTransferFunction::MissingIdx) {
-                ArgTypes[SizeIdx] = IntegerType::get(M.getContext(), BitCount);
-            }
-            if (CompartmentIdx != HAKCTransferFunction::MissingIdx) {
-                ArgTypes[CompartmentIdx] = IntegerType::get(M.getContext(), BitCount);
-            }
-            if (DivisionIdx != HAKCTransferFunction::MissingIdx) {
-                ArgTypes[DivisionIdx] = IntegerType::get(M.getContext(), BitCount);
-            }
-            if (IsCodeIdx != HAKCTransferFunction::MissingIdx) {
-                ArgTypes[IsCodeIdx] = IntegerType::get(M.getContext(), 1);
-            }
-
-            auto *FuncType = FunctionType::get(PointerType::get(M.getContext(), 0), ArgTypes, false);
-            return dyn_cast<Function>(M.getOrInsertFunction(FunctionName, FuncType).getCallee());
+            return dyn_cast<Function>(
+                TypeIdentifier.GetModule().getOrInsertFunction(FunctionName, FuncType).getCallee());
         }
     };
 
@@ -116,20 +101,18 @@ namespace llvm::hakc {
     };
 
     struct HAKCYAMLPreTransferActions {
-      HAKCYAMLStringType ActionLabel;
-      HAKCYAMLStringType ActionDefinition;
+        HAKCYAMLStringType ActionLabel;
+        HAKCYAMLStringType ActionName;
     };
 
     struct HAKCYAMLPostTargetArgument {
-      unsigned idx;
-      HAKCYAMLStringType val;
+        unsigned idx;
+        HAKCYAMLStringType val;
     };
 
-    struct HAKCYAMLPostTargetActions {
-      HAKCYAMLStringType ActionName;
-      // TODO: should we have multiple arguments here?
-      // HAKCYAMLSequence<HAKCYAMLPostTargetArgument> Arguments;
-      HAKCYAMLPostTargetArgument Arguments;
+    struct HAKCYAMLPostTargetAction {
+        HAKCYAMLStringType ActionName;
+        HAKCYAMLSequence<HAKCYAMLPostTargetArgument> Arguments;
     };
 
     struct HAKCYamlDatabaseConfig {
@@ -148,8 +131,8 @@ namespace llvm::hakc {
         HAKCYAMLStringType SourcePath;
         HAKCYAMLStringType BuildPath;
         HAKCYAMLStringType DagAnalysisRootPath;
-        HAKCYAMLStringType CodeValidationFunction;
-        HAKCYAMLStringType DataValidationFunction;
+        HAKCYAMLFunctionDefinitionType CodeValidationFunction;
+        HAKCYAMLFunctionDefinitionType DataValidationFunction;
         HAKCPassModeTypeEnum PassMode;
         HAKCYAMLStringSequenceType NoTransferFunctions;
         HAKCYAMLStringSequenceType SafeTransitionFunctions;
@@ -170,7 +153,7 @@ namespace llvm::hakc {
         HAKCYAMLSequence<HAKCYAMLFileType> SeparateNamespacePaths;
         HAKCYAMLSequence<HAKCYAMLFileType> HAKCSourcePaths;
         HAKCYAMLSequence<HAKCYAMLPreTransferActions> PreTransferActions;
-        HAKCYAMLSequence<HAKCYAMLPostTargetActions> PostTargetActions;
+        HAKCYAMLSequence<HAKCYAMLPostTargetAction> PostTargetActions;
         HAKCYAMLStringSequenceType IgnoredTypes;
         HAKCYAMLTransferType DefaultCompartmentTransfer;
         HAKCYAMLFunctionDefinitionType SignWithDivision;
@@ -190,7 +173,7 @@ LLVM_YAML_IS_SEQUENCE_VECTOR(hakc::HAKCYAMLFileType)
 
 LLVM_YAML_IS_SEQUENCE_VECTOR(hakc::HAKCYAMLPreTransferActions)
 
-LLVM_YAML_IS_SEQUENCE_VECTOR(hakc::HAKCYAMLPostTargetActions)
+LLVM_YAML_IS_SEQUENCE_VECTOR(hakc::HAKCYAMLPostTargetAction)
 
 LLVM_YAML_IS_SEQUENCE_VECTOR(hakc::HAKCYAMLPostTargetArgument)
 
@@ -265,26 +248,26 @@ struct yaml::MappingTraits<hakc::HAKCYAMLFileType> {
 
 template<>
 struct yaml::MappingTraits<hakc::HAKCYAMLPreTransferActions> {
-  static void mapping(yaml::IO &io, hakc::HAKCYAMLPreTransferActions &PreTransferActions) {
-    io.mapRequired("label", PreTransferActions.ActionLabel);
-    io.mapRequired("name", PreTransferActions.ActionName);
-  }
+    static void mapping(yaml::IO &io, hakc::HAKCYAMLPreTransferActions &PreTransferActions) {
+        io.mapRequired("label", PreTransferActions.ActionLabel);
+        io.mapRequired("name", PreTransferActions.ActionName);
+    }
 };
 
 template<>
-struct yaml::MappingTraits<hakc::HAKCYAMLPostTargetActions> {
-  static void mapping(yaml::IO &io, hakc::HAKCYAMLPostTargetActions &PostTargetActions) {
-    io.mapRequired("arg", PostTargetActions.Arguments);
-    io.mapRequired("name", PostTargetActions.ActionName);
-  }
+struct yaml::MappingTraits<hakc::HAKCYAMLPostTargetAction> {
+    static void mapping(yaml::IO &io, hakc::HAKCYAMLPostTargetAction &PostTargetActions) {
+        io.mapRequired("arg", PostTargetActions.Arguments);
+        io.mapRequired("name", PostTargetActions.ActionName);
+    }
 };
 
 template<>
 struct yaml::MappingTraits<hakc::HAKCYAMLPostTargetArgument> {
-  static void mapping(yaml::IO &io, hakc::HAKCYAMLPostTargetArgument &PostTargetArgument) {
-    io.mapRequired("idx", PostTargetArgument.idx);
-    io.mapRequired("val", PostTargetArgument.val);
-  }
+    static void mapping(yaml::IO &io, hakc::HAKCYAMLPostTargetArgument &PostTargetArgument) {
+        io.mapRequired("idx", PostTargetArgument.idx);
+        io.mapRequired("val", PostTargetArgument.val);
+    }
 };
 
 template<>
@@ -321,8 +304,10 @@ struct yaml::MappingTraits<hakc::HAKCYamlDatabaseConfig> {
         io.mapOptional("server-timeout", YamlConfig.ServerTimeout, 1000);
         io.mapOptional("get-compartment-by-id-endpoint", YamlConfig.GetCompartmentEndpoint, "get-compartment-id");
         io.mapOptional("get-division-by-id-endpoint", YamlConfig.GetDivisionEndpoint, "get-division-id");
-        io.mapOptional("get-division-from-symbol-endpoint", YamlConfig.GetSymbolDivisionEndpoint, "get-division-from-symbol");
-        io.mapOptional("get-valid-targets-from-compartment-id-endpoint", YamlConfig.GetValidTargetsEndpoint, "get-valid-targets-from-compartment-id");
+        io.mapOptional("get-division-from-symbol-endpoint", YamlConfig.GetSymbolDivisionEndpoint,
+                       "get-division-from-symbol");
+        io.mapOptional("get-valid-targets-from-compartment-id-endpoint", YamlConfig.GetValidTargetsEndpoint,
+                       "get-valid-targets-from-compartment-id");
     }
 };
 

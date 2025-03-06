@@ -7,19 +7,15 @@
 
 #include <map>
 
+#include "HAKCTransferState.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Module.h"
-#include "llvm/IR/Verifier.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
-#include "llvm/Transforms/Compartmentalization/hakc/HAKCTypeIdentifier/HAKCTypeIdentifier.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCFunctionDefinition/HAKCCustomTransfer.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartmentalizationPolicy.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/ManagedHAKCPointer.h"
-#include "llvm/Transforms/Compartmentalization/hakc/HAKC-defs.h"
-
-#include <sstream>
 
 
 using namespace llvm;
@@ -140,18 +136,22 @@ namespace llvm::hakc {
          * @param F
          * @param TransferFunction
          * @param Arg
+         * @param TransferState
          */
-        void CreateTransferFunctionArg_PreCall(Function *F, Function *TransferFunction, Value *Arg);
+        void CreateTransferFunctionArg_PreCall(Function *F, Function *TransferFunction, Value *Arg,
+                                               HAKCTransferState &TransferState);
 
         /**
          * Perform architecture specific transformations after the cross compartment function call
          * @param F
          * @param TransformFunction
          * @param Arg
+         * @param TransferState
          */
-        void CreateTransferFunctionArg_PostCall(Function *F, Function *TransformFunction, Value *Arg);
+        void CreateTransferFunctionArg_PostCall(Function *F, Function *TransformFunction, Value *Arg,
+                                                HAKCTransferState &TransferState);
 
-        Module &getModule();
+        Module &getModule() const;
 
         virtual Type *HAKCAuthenticationRetType(unsigned AddrSpace);
 
@@ -323,12 +323,13 @@ namespace llvm::hakc {
 
         Function *PopulateTransferFunction(Function *Target, Function *TransferFunction);
 
-        Function *GetTransferFunction(Function *F);
+        Function *GetTransferFunction(Function *F) const;
 
         virtual void
-        CreateForwardArgumentTransfers(Function *Target, Function *TransferFunction, SmallVectorImpl<Value *> &ArgsList);
+        CreateForwardArgumentTransfers(Function *Target, Function *TransferFunction, HAKCTransferState &TransferState);
 
-        void CreateBackwardArgumentTransfers(Function *Target, Function *TransferFunction);
+        void CreateBackwardArgumentTransfers(Function *Target, Function *TransferFunction,
+                                             HAKCTransferState &TransferState);
 
         virtual bool TargetIsKernel(GlobalValue *Target);
 
@@ -339,8 +340,6 @@ namespace llvm::hakc {
         virtual bool TransferShouldBeCreated(Value *V, GlobalValue *Target);
 
         bool DebugIsActive() const;
-
-        virtual HAKCTypeP FindEntryBitcast(hakc::HAKCPointerBase &HAKCPointerP, Instruction *I, Function *Target);
 
         virtual hakc_custom_transfer_def_t GetCustomTransferFunctionForType(HAKCTypeP HAKCType);
 
