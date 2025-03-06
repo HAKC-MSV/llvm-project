@@ -741,6 +741,12 @@ void hakc::HAKCTransformer::CreateTransferFunctionArg_PreCall(Function *F, Funct
       CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Trying to create PreTransferAction " << it->GetFunction() << "\n";
       auto PreTransferFunction = it->GetFunction();
       auto PreTransferLabel = it->GetLabel(); // TODO: omitting label for now
+      //
+      // std::unique_ptr<Module> llvm::parseAssemblyString(StringRef AsmString,
+      //                                             SMDiagnostic &Err,
+      //                                             LLVMContext &Context,
+      //                                             SlotMapping *Slots) {
+
       // PreTransferActions:
       //   - { label: "step0", name: "get_hakc_address_color" }
       // PostTargetActions:

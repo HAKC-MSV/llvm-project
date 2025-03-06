@@ -253,13 +253,14 @@ std::shared_ptr<hakc::HAKCTypeInfo> hakc::HAKCTypeIdentifier::HandleType(const D
             dwarf::DW_TAG_volatile_type,
             dwarf::DW_TAG_restrict_type,
         };
-        if (TagsToConsider.contains(DerivedTy->getTag())) {
+          if (TagsToConsider.contains(DerivedTy->getTag())) {
             CommonHAKCAnalysis::getWriter(debug) << "Creating HAKCTypeInfo for\n" << type << "\n";
             auto TypeName = GetTypeName(type);
             TypeP = std::make_shared<HAKCTypeInfo>(AnalysisHelper, TypeName, debug);
             AddTypeMapping(type, TypeP);
-        } else {
+          } else {
             CommonHAKCAnalysis::getWriter(debug) << "Not handling DITYpe " << type << "\n";
+          }
         }
     }
 

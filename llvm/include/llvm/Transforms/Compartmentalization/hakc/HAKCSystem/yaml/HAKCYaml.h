@@ -59,7 +59,7 @@ namespace llvm::hakc {
 
 
     struct HAKCYAMLFunctionDefinitionType {
-        HAKCYAMLStringType FunctionName;
+        HAKCYAMLStringType FunctionDefinition;
         unsigned PointerIdx;
         unsigned SizeIdx;
         unsigned CompartmentIdx;
@@ -117,7 +117,7 @@ namespace llvm::hakc {
 
     struct HAKCYAMLPreTransferActions {
       HAKCYAMLStringType ActionLabel;
-      HAKCYAMLStringType ActionName;
+      HAKCYAMLStringType ActionDefinition;
     };
 
     struct HAKCYAMLPostTargetArgument {

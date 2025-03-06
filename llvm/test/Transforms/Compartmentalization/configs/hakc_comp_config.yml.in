@@ -13,20 +13,20 @@ OutputDebugInfo: true
 PassMode: @PASS_MODE@
 IncludePaths: [ ]
 PreTransferActions:
-  - { label: "step0", name: "i32 get_hakc_address_color(ptr)"}
+  - { label: "step0", name: "i32 get_hakc_address_color(ptr)" }
 PostTargetActions:
-  - { name: "void hakc_color_address(ptr, i32, i64)", arg: { idx: 1, value: "step0" } }
+  - { definition: "void hakc_color_address(ptr step0, i32, i64)" }
 CustomTransferFunctions:
   - { type: "char *", name: "hakc_transfer_string", ptr-idx: 0, compartment-idx: 1, division-idx: 2 }
   - { type: "struct sk_buff*", name: "hakc_transfer_skb", ptr-idx: 0, compartment-idx: 1, division-idx: 2 }
   - { type: "const struct nlattr * const", name: "hakc_transfer_nla", ptr-idx: 0, compartment-idx: 2, division-idx: 3, size-idx: 1 }
   - { type: "struct file *", name: "hakc_transfer_file_struct", ptr-idx: 0, compartment-idx: 1, division-idx: 2 }
   - { type: "struct socket *", name: "hakc_transfer_socket", ptr-idx: 0, compartment-idx: 1, division-idx: 2 }
-CodeValidationFunction: "ptr check_hakc_code_access(ptr, i64, i64, ptr, i64)"
-DataValidationFunction: "ptr check_hakc_data_access(ptr, i64, i64)"
-SignWithDivisionFunction: { name: "ptr hakc_sign_pointer_with_color(ptr, i32, i8)", ptr-idx: 0, compartment-idx: 1, is-code-idx: 2 }
-DefaultCompartmentTransferFunction: { name: "ptr hakc_transfer_to_clique(ptr, i64, i64, i32, i8)", ptr-idx: 0, size-idx: 1, compartment-idx: 2, division-idx: 3 }
-PerCPUCompartmentTransferFunction: { name: "ptr hakc_transfer_percpu_to_clique(ptr, i64, i64, i32)", ptr-idx: 0, size-idx: 1, compartment-idx: 2, division-idx: 3 }
+CodeValidationFunction: { definition: "ptr check_hakc_code_access(ptr, i64, i64, ptr, i64)" }
+DataValidationFunction: { definition: "ptr check_hakc_data_access(ptr, i64, i64)" }
+SignWithDivisionFunction: { definition: "ptr hakc_sign_pointer_with_color(ptr, i32, i8)", ptr-idx: 0, compartment-idx: 1, is-code-idx: 2 }
+DefaultCompartmentTransferFunction: { definition: "ptr hakc_transfer_to_clique(ptr, i64, i64, i32, i8)", ptr-idx: 0, size-idx: 1, compartment-idx: 2, division-idx: 3 }
+PerCPUCompartmentTransferFunction: { definition: "ptr hakc_transfer_percpu_to_clique(ptr, i64, i64, i32)", ptr-idx: 0, size-idx: 1, compartment-idx: 2, division-idx: 3 }
 CompartmentalizationSupportFunctions:
   - { definition: "i32 get_hakc_color_by_name(i32 color_name)" }
   - { definition: "i32 get_hakc_percpu_color(ptr)", ptr-idx: 0 }
