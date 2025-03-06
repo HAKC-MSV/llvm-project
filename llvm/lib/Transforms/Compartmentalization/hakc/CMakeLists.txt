@@ -21,6 +21,7 @@ add_llvm_component_library(LLVMHAKC
         HAKCSystem/HAKCWriter.cpp
 
         HAKCTransformers/HAKCTransformer.cpp
+        HAKCTransformers/HAKCTransferState.cpp
 
         HAKCTypeIdentifier/HAKCFunctionInfo.cpp
         HAKCTypeIdentifier/HAKCGlobalInfo.cpp

@@ -7,6 +7,7 @@
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/HAKCModuleAnalysis.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartmentDivision.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCFunctionDefinition/HAKCCustomTransfer.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCTransferState.h"
 
 hakc::HAKCTransformer::HAKCTransformer(HAKCCompartmentalizationPolicy &Policy,
                                        HAKCModuleAnalysis &HAKCAnalysis) : HAKCIRBuilder(
@@ -124,7 +125,7 @@ hakc::HAKCTransformer::CreateTransferArguments(hakc::HAKCPointerBase &HAKCPointe
     Result.append(FullArgSet);
 }
 
-Module &hakc::HAKCTransformer::getModule() {
+Module &hakc::HAKCTransformer::getModule() const {
     return ModuleAnalysis.GetModule();
 }
 
@@ -321,7 +322,8 @@ GlobalVariable *hakc::HAKCTransformer::GetValidTargetCompartments(Function *F) {
     EntryTokenArray->setConstant(true);
     EntryTokenArray->setLinkage(GlobalValue::InternalLinkage);
     if (DebugIsActive()) {
-        CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Setting initializer for " << EntryTokenArray->getName() << " to be "
+        CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Setting initializer for " << EntryTokenArray->getName() <<
+                " to be "
                 << Initializer << " from token values ";
         for (auto *TokenValue: EntryTokenValues) {
             CommonHAKCAnalysis::getWriter(DebugIsActive()) << "\n\t" << TokenValue;
@@ -371,7 +373,7 @@ CallInst *hakc::HAKCTransformer::CreateCall(StringRef name, Type *RetTy, ArrayRe
 
     FunctionType *FunctionCallTy = FunctionType::get(RetTy, FunctionParamTypes, false);
 
-    auto Func = ModuleAnalysis.GetFunctionByName(name, FunctionCallTy);
+    auto *Func = ModuleAnalysis.GetFunctionByName(name, FunctionCallTy);
     if (!Func) {
         CommonHAKCAnalysis::getWriter(true) << "Could not find function " << name << " of type " << FunctionCallTy
                 << " to be inserted into\n" << HAKCIRBuilder.GetInsertBlock()->getParent()
@@ -444,8 +446,6 @@ hakc::HAKCTransformer::CreateSignWithDivision(hakc::HAKCPointerBase &HAKCPointer
     return CreateCallWithResultCast(ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().SignWithDivision()->getName(),
                                     HAKCAuthenticationRetType(AddrSpace),
                                     Args, HAKCPointer.GetBaseDefinition());
-    // return CreateCallWithResultCast(ModuleAnalysis.HAKCSignWithColor(), HAKCAuthenticationRetType(AddrSpace),
-    //                                 Args, HAKCPointer.GetBaseDefinition());
 }
 
 bool hakc::HAKCTransformer::HAKCPointerHasCustomTransfer(hakc::HAKCPointerBase &HAKCPointer) {
@@ -512,92 +512,6 @@ Instruction *hakc::HAKCTransformer::CastCallToType(CallInst *Call, Value *ValueT
     }
 
     return Result;
-}
-
-/* Called with Values of type "void *" ("i8*") */
-hakc::HAKCTypeP
-hakc::HAKCTransformer::FindEntryBitcast(hakc::HAKCPointerBase &HAKCPointer, Instruction *I, Function *Target) {
-    /*
-     * Checking V to see if it is an argument of the function that contains instruction I.
-     * I is contained within a pass-generated HAKC_XFER function.
-     *
-     * If V is an argument, we determine V's argument index for the function.
-     * The argument will have the same index in Target.
-     */
-    Argument *TargetV = nullptr;
-    Value *BitcastV = nullptr;
-    User *BitcastUser = nullptr;
-    for (auto &Arg: I->getFunction()->args()) {
-        if (HAKCPointer.GetBaseDefinition() == &Arg) {
-            TargetV = Target->getArg(Arg.getArgNo());
-            break;
-        }
-    }
-
-    /* not an argument, nothing to return */
-    if (!TargetV) {
-        return nullptr;
-    }
-
-    std::set<Use *> WorkingList;
-    for (auto &TargetUse: TargetV->uses()) {
-        WorkingList.insert(&TargetUse);
-    }
-
-    while (!WorkingList.empty()) {
-        auto *CurrentUse = *WorkingList.begin();
-        auto *CurrentUser = CurrentUse->getUser();
-        WorkingList.erase(CurrentUse);
-
-        if (auto *BitCastOp = dyn_cast<BitCastOperator>(CurrentUser)) {
-            BitcastV = BitCastOp;
-            BitcastUser = CurrentUser;
-            break;
-        } else if (auto *BitCastI = dyn_cast<BitCastInst>(CurrentUser)) {
-            BitcastV = BitCastI;
-            BitcastUser = CurrentUser;
-            break;
-        } else if (auto *StoreI = dyn_cast<StoreInst>(CurrentUser)) {
-            /* This may be unoptimized code that does
-             *     %tmp     = alloca i8*
-             *                store i8* %arg, i8** %tmp
-             *     %voidarg = load i8*, i8** %tmp
-             *     %bcarg   = bitcast i8* %voidarg to %struct.type*
-             * instead of just directly bitcasting the argument
-             *
-             * the following code will only handle this case correctly in the event that
-             *   there is only the one level of indirection through memory
-             */
-            if (CurrentUse->getOperandNo() != StoreInst::getPointerOperandIndex()) {
-                auto *StorePtrDef = ModuleAnalysis.GetCommonAnalysis().getDef(StoreI->getPointerOperand(), false);
-                if (isa<AllocaInst>(StorePtrDef)) {
-                    for (auto *AllocaUser: StorePtrDef->users()) {
-                        if (isa<LoadInst>(AllocaUser)) {
-                            for (auto &LoadUse: AllocaUser->uses()) {
-                                if (isa<BitCastInst>(LoadUse.getUser()) ||
-                                    isa<BitCastOperator>(LoadUse.getUser())) {
-                                    WorkingList.insert(&LoadUse);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    if (DebugIsActive()) {
-        CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Value " << HAKCPointer;
-        if (BitcastV && BitcastUser) {
-            CommonHAKCAnalysis::getWriter(DebugIsActive()) << " is cast to " << *BitcastV->getType() <<
-                    " by Instruction " << *BitcastUser;
-        } else {
-            CommonHAKCAnalysis::getWriter(DebugIsActive()) << " is not bitcast";
-        }
-        CommonHAKCAnalysis::getWriter(DebugIsActive()) << " in function " << Target->getName() << "\n";
-    }
-
-    return ModuleAnalysis.GetTypeIdentifier().FindHAKCType(BitcastV);
 }
 
 /**
@@ -691,7 +605,7 @@ hakc::HAKCTransformer::CreateCompartmentTransfer(hakc::HAKCPointerBase &HAKCPoin
     return CreateSizedCompartmentTransfer(HAKCPointer, I, Target, IsData, ObjectSize);
 }
 
-Function *hakc::HAKCTransformer::GetTransferFunction(Function *F) {
+Function *hakc::HAKCTransformer::GetTransferFunction(Function *F) const {
     auto TransferFunctionName = ModuleAnalysis.GetCommonAnalysis().GetOutsideTransferName(F);
     auto *TransferFunction = ModuleAnalysis.GetFunctionByName(TransferFunctionName, F->getFunctionType());
     if (TransferFunction == nullptr) {
@@ -709,85 +623,86 @@ Function *hakc::HAKCTransformer::GetTransferFunction(Function *F) {
 }
 
 bool hakc::HAKCTransformer::NoKernelTransfers(Function *Target) {
-    return hakc::CommonHAKCAnalysis::IsUncompartmentalizedSymbol(Target, CompartmentalizationPolicy) /*&&
-           !CommonHAKCAnalysis::NoKernelTransferFunctionsSet()*/;
+    return hakc::CommonHAKCAnalysis::IsUncompartmentalizedSymbol(Target, CompartmentalizationPolicy);
 }
 
 void
 hakc::HAKCTransformer::CreateForwardArgumentTransfers(Function *Target, Function *TransferFunction,
-                                                      SmallVectorImpl<Value *> &ArgsList) {
+                                                      HAKCTransferState &TransferState) {
     bool NoKernelXfers = NoKernelTransfers(Target);
 
-    for (auto Arg = TransferFunction->arg_begin(); Arg != TransferFunction->arg_end(); Arg++) {
+    for (auto *Arg = TransferFunction->arg_begin(); Arg != TransferFunction->arg_end(); Arg++) {
         if (!CommonHAKCAnalysis::argShouldTransfer(Arg) || NoKernelXfers) {
-            ArgsList.push_back(Arg);
+            TransferState.AddTransferredArgument(Arg);
             continue;
         }
         auto ManagedPointer = CreateNewManagedPointer(Arg);
         bool IsData = !Arg->getType()->isFunctionTy();
-        CreateTransferFunctionArg_PreCall(Target, TransferFunction, Arg);
+        CreateTransferFunctionArg_PreCall(Target, TransferFunction, Arg, TransferState);
         Instruction *Transfer = CreateCompartmentTransfer(*ManagedPointer, &*HAKCIRBuilder.GetInsertPoint(), Target,
                                                           IsData);
-        // CreateTransferFunctionArg_PostCall(Target, TransferFunction, Arg); // actually, pretty sure this gets called later
-        ArgsList.push_back(Transfer);
+        TransferState.AddTransferredArgument(Transfer);
     }
 }
 
-void hakc::HAKCTransformer::CreateTransferFunctionArg_PreCall(Function *F, Function *TransferFunction, Value *Arg) {
+void hakc::HAKCTransformer::CreateTransferFunctionArg_PreCall(Function *F, Function *TransferFunction, Value *Arg,
+                                                              HAKCTransferState &TransferState) {
     // TODO - Implement me
     // Q:
     // Run the defined PreTransferActions from the configuration yaml, e.g., get_hakc_address_color
     for (auto &it: ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().PreTransferActions()) {
-      CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Trying to create PreTransferAction " << it->GetFunction() << "\n";
-      auto PreTransferFunction = it->GetFunction();
-      auto PreTransferLabel = it->GetLabel(); // TODO: omitting label for now
-      // PreTransferActions:
-      //   - { label: "step0", name: "get_hakc_address_color" }
-      // PostTargetActions:
-      //   - { name: "hakc_color_address", arg: { idx: 1, val: "step0" } }
-      // want to call function on target, then pass that pointer to the transfer function
-      // so, we have some pointer ptr we want to transfer
-      // before we transfer, we need to get the current color of the pointer
-      // %0 = call @get_hakc_address_color(ptr)
-      // then, call the transfer function
-      // %1 = call ptr @hakc_transfer_to_clique(ptr %0, i64 4, i64 3, i64 13, i1 false)
-      // %2 = call i32 @HAKC_ORIG_foo(ptr %1)
-      // %3 = call @hakc_color_address(ptr %0)
-      // need to cast the ptr to i64 to match get_hakc_address_color type
-      auto arg_int = HAKCIRBuilder.CreatePtrToInt(Arg, PreTransferFunction->getArg(0)->getType());
-      SmallVector<Value *> Args;
-      Args.push_back(arg_int);
-      auto *PreTransferFunctionCall = CreateCall(PreTransferFunction, Args);
-      CastCallToType(PreTransferFunctionCall, arg_int);
-
+        CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Trying to create PreTransferAction " << it->GetFunction() <<
+                "\n";
+        auto PreTransferFunction = it->GetFunction();
+        auto PreTransferLabel = it->GetLabel(); // TODO: omitting label for now
+        // PreTransferActions:
+        //   - { label: "step0", name: "get_hakc_address_color" }
+        // PostTargetActions:
+        //   - { name: "hakc_color_address", arg: { idx: 1, val: "step0" } }
+        // want to call function on target, then pass that pointer to the transfer function
+        // so, we have some pointer ptr we want to transfer
+        // before we transfer, we need to get the current color of the pointer
+        // %0 = call @get_hakc_address_color(ptr)
+        // then, call the transfer function
+        // %1 = call ptr @hakc_transfer_to_clique(ptr %0, i64 4, i64 3, i64 13, i1 false)
+        // %2 = call i32 @HAKC_ORIG_foo(ptr %1)
+        // %3 = call @hakc_color_address(ptr %0)
+        // need to cast the ptr to i64 to match get_hakc_address_color type
+        auto *arg_int = HAKCIRBuilder.CreatePtrToInt(Arg, PreTransferFunction->getArg(0)->getType());
+        SmallVector<Value *> Args = {arg_int};
+        auto *PreTransferFunctionCall = CreateCall(PreTransferFunction, Args);
+        auto *Cast = CastCallToType(PreTransferFunctionCall, arg_int);
+        TransferState.AddPretransferAction(it, Cast);
     }
-
 }
 
-void hakc::HAKCTransformer::CreateTransferFunctionArg_PostCall(Function *F, Function *TransformFunction, Value *Arg) {
+void hakc::HAKCTransformer::CreateTransferFunctionArg_PostCall(Function *F, Function *TransformFunction, Value *Arg,
+                                                               HAKCTransferState &TransferState) {
     // TODO - Implement me
     // Run the defined PostTargetActions from the configuration yaml, e.g., hakc_color_address
     for (auto &it: ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().PostTargetActions()) {
-      CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Trying to create PostTargetAction " << it->GetFunction() << "\n";
-      auto PostTargetFunction = it->GetFunction();
-      auto PostTargetIndex = it->GetIdx();
-      auto PostTargetValue = it->GetVal();
-      SmallVector<Value *> Args;
-      auto arg_int = HAKCIRBuilder.CreatePtrToInt(Arg, PostTargetFunction->getArg(0)->getType());
-      Args.push_back(arg_int);
-      auto *PostTargetFunctionCall = CreateCall(PostTargetFunction, Args);
-      CastCallToType(PostTargetFunctionCall, arg_int);
+        CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Trying to create PostTargetAction " << it->GetFunction() <<
+                "\n";
+        auto PostTargetFunction = it->GetFunction();
+        auto PostTargetIndex = it->GetIdx();
+        auto PostTargetValue = it->GetVal();
+        SmallVector<Value *> Args;
+        auto arg_int = HAKCIRBuilder.CreatePtrToInt(Arg, PostTargetFunction->getArg(0)->getType());
+        Args.push_back(arg_int);
+        auto *PostTargetFunctionCall = CreateCall(PostTargetFunction, Args);
+        CastCallToType(PostTargetFunctionCall, arg_int);
     }
 }
 
-void hakc::HAKCTransformer::CreateBackwardArgumentTransfers(Function *Target, Function *TransferFunction) {
+void hakc::HAKCTransformer::CreateBackwardArgumentTransfers(Function *Target, Function *TransferFunction,
+                                                            HAKCTransferState &TransferState) {
     bool NoKernelXfers = NoKernelTransfers(Target);
 
     for (auto Arg = TransferFunction->arg_begin(); Arg != TransferFunction->arg_end(); Arg++) {
         if (!CommonHAKCAnalysis::argShouldTransfer(Arg) || NoKernelXfers) {
             continue;
         }
-        CreateTransferFunctionArg_PostCall(Target, TransferFunction, Arg);
+        CreateTransferFunctionArg_PostCall(Target, TransferFunction, Arg, TransferState);
     }
 }
 
@@ -966,12 +881,12 @@ Function *hakc::HAKCTransformer::PopulateTransferFunction(Function *Target, Func
     HAKCIRBuilder.SetInsertPoint(Unreachable);
 
     // This is where the issue with the type info seems to originate
-    SmallVector<Value *> TransferredArguments;
-    CreateForwardArgumentTransfers(Target, TransferFunction, TransferredArguments);
-    CallInst *TargetFunctionCall = HAKCIRBuilder.CreateCall(Target, TransferredArguments);
+    HAKCTransferState TransferState;
+    CreateForwardArgumentTransfers(Target, TransferFunction, TransferState);
+    CallInst *TargetFunctionCall = HAKCIRBuilder.CreateCall(Target, TransferState.GetTransferredArguments());
 
     if (!Target->doesNotReturn()) {
-        CreateBackwardArgumentTransfers(Target, TransferFunction);
+        CreateBackwardArgumentTransfers(Target, TransferFunction, TransferState);
         if (!Target->getReturnType()->isVoidTy()) {
             HAKCIRBuilder.CreateRet(TargetFunctionCall);
         } else {
