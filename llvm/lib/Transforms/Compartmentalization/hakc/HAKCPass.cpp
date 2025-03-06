@@ -104,4 +104,4 @@ namespace llvm {
     PreservedAnalyses HAKCPass::run(Module &M, ModuleAnalysisManager &MAM) {
         return RunHAKCAnalysis(M) ? PreservedAnalyses::none() : PreservedAnalyses::all();
     }
-}
+} // namespace llvm
