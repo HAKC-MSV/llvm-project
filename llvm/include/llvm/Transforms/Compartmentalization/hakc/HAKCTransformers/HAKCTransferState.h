@@ -7,7 +7,7 @@
 
 #include "llvm/IR/Value.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/Transforms/Compartmentalization/hakc/HAKCFunctionDefinition/HAKCPreTransferAction.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCPreTransferAction.h"
 #include <map>
 
 using namespace llvm;

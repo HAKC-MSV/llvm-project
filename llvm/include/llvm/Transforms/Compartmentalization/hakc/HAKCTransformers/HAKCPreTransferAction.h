@@ -4,12 +4,10 @@
 
 #ifndef HAKC_HAKCPRETRANSFERACTION_H
 #define HAKC_HAKCPRETRANSFERACTION_H
-
-#include "llvm/IR/IRBuilder.h"
-#include "HAKCFunctionDefinition.h"
+#include "HAKCTransferAction.h"
 
 namespace llvm::hakc {
-    class HAKCPreTransferAction : public HAKCFunctionDefinition {
+    class HAKCPreTransferAction : public HAKCTransferAction {
     public:
         HAKCPreTransferAction(Function *PreTransferAction, StringRef Label);
 
@@ -18,7 +16,7 @@ namespace llvm::hakc {
         StringRef GetLabel() const;
 
     protected:
-        StringRef Label;
+        std::string Label;
     };
 
     typedef std::shared_ptr<HAKCPreTransferAction> hakc_pre_transfer_action_def_t;

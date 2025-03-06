@@ -651,9 +651,10 @@ void hakc::HAKCTransformer::CreateTransferFunctionArg_PreCall(Function *F, Funct
     // Q:
     // Run the defined PreTransferActions from the configuration yaml, e.g., get_hakc_address_color
     for (auto &it: ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().PreTransferActions()) {
-        CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Trying to create PreTransferAction " << it->GetFunction() <<
+        CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Trying to create PreTransferAction " << it->
+                GetActionFunction() <<
                 "\n";
-        auto PreTransferFunction = it->GetFunction();
+        auto PreTransferFunction = it->GetActionFunction();
         auto PreTransferLabel = it->GetLabel(); // TODO: omitting label for now
         // PreTransferActions:
         //   - { label: "step0", name: "get_hakc_address_color" }
@@ -681,9 +682,10 @@ void hakc::HAKCTransformer::CreateTransferFunctionArg_PostCall(Function *F, Func
     // TODO - Implement me
     // Run the defined PostTargetActions from the configuration yaml, e.g., hakc_color_address
     for (auto &it: ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().PostTargetActions()) {
-        CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Trying to create PostTargetAction " << it->GetFunction() <<
+        CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Trying to create PostTargetAction " << it->
+                GetActionFunction() <<
                 "\n";
-        auto PostTargetFunction = it->GetFunction();
+        auto PostTargetFunction = it->GetActionFunction();
         auto PostTargetIndex = it->GetIdx();
         auto PostTargetValue = it->GetVal();
         SmallVector<Value *> Args;

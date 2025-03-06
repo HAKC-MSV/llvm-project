@@ -4,12 +4,10 @@
 
 #ifndef HAKC_HAKCPOSTTARGETACTION_H
 #define HAKC_HAKCPOSTTARGETACTION_H
-
-#include "llvm/IR/IRBuilder.h"
-#include "HAKCFunctionDefinition.h"
+#include "HAKCTransferAction.h"
 
 namespace llvm::hakc {
-    class HAKCPostTargetAction : public HAKCFunctionDefinition {
+    class HAKCPostTargetAction : public HAKCTransferAction {
     public:
         // TODO: for now, assuming one arg, but expand in the future
         HAKCPostTargetAction(Function *PostTargetAction, unsigned Idx, StringRef Val);
@@ -21,8 +19,8 @@ namespace llvm::hakc {
         StringRef GetVal() const;
 
     protected:
-      unsigned Idx;
-      StringRef Val;
+        unsigned Idx;
+        StringRef Val;
     };
 
     typedef std::shared_ptr<HAKCPostTargetAction> hakc_post_target_action_def_t;
