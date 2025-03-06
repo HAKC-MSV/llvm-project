@@ -23,6 +23,8 @@ namespace llvm::hakc {
 
         void AddPretransferAction(hakc_pre_transfer_action_def_t Action, Value *Value);
 
+        Value *GetPreactionValue(hakc_pre_transfer_action_def_t Action);
+
     protected:
         SmallVector<Value *> TransferredArguments;
         std::map<hakc_pre_transfer_action_def_t, Value *> PreActionSteps;

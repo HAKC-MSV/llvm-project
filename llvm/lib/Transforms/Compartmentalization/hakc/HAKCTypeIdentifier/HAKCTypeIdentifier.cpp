@@ -2,6 +2,9 @@
 // Created by derrick on 9/8/21.
 //
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTypeIdentifier/HAKCTypeIdentifier.h"
+
+#include "llvm/AsmParser/Parser.h"
+
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/CommonHAKCAnalysis.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTypeIdentifier/HAKCFunctionInfo.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTypeIdentifier/HAKCGlobalInfo.h"
@@ -1148,4 +1151,10 @@ void hakc::HAKCTypeIdentifier::GetHAKCTypes(SmallVectorImpl<HAKCTypeP> &Results)
     for (auto &it: types) {
         Results.push_back(it.second);
     }
+}
+
+Type *hakc::HAKCTypeIdentifier::GetTypeFromString(StringRef TypeStr) {
+    SMDiagnostic Err;
+    auto *ParsedType = parseType(TypeStr, Err, GetModule());
+    return ParsedType;
 }

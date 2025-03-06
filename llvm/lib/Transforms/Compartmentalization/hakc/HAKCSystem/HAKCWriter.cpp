@@ -270,4 +270,14 @@ namespace llvm::hakc {
         HAKCFuncInfo >> os;
         return *this;
     }
+
+    HAKCWriter &HAKCWriter::operator<<(const HAKCPostTargetAction &PostTargetAction) {
+        *this << "PostTargetAction Name: " << PostTargetAction.GetActionFunction()->getName() << "\n";
+        return *this;
+    }
+
+    HAKCWriter &HAKCWriter::operator<<(const HAKCYAMLPostTargetAction &PostTargetAction) {
+        *this << "PostTargetAction Name: " << PostTargetAction.ActionName << "\n";
+        return *this;
+    }
 } // namespace llvm::hakc

@@ -6,15 +6,8 @@
 
 using namespace llvm;
 
-hakc::HAKCPostTargetAction::HAKCPostTargetAction(Function *PostTargetAction, unsigned Idx,
-                                                 StringRef Val) : HAKCTransferAction(PostTargetAction), Idx(Idx),
-                                                                  Val(Val) {
-}
-
-unsigned hakc::HAKCPostTargetAction::GetIdx() const {
-    return Idx;
-}
-
-StringRef hakc::HAKCPostTargetAction::GetVal() const {
-    return Val;
+hakc::HAKCPostTargetAction::HAKCPostTargetAction(Function *PostTargetAction,
+                                                 std::map<unsigned, StringRef> &
+                                                 PretransferReferences) : HAKCTransferAction(PostTargetAction),
+                                                                          PretransferReferences(PretransferReferences) {
 }

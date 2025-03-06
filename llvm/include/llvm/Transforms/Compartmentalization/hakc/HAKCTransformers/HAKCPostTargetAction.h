@@ -5,22 +5,18 @@
 #ifndef HAKC_HAKCPOSTTARGETACTION_H
 #define HAKC_HAKCPOSTTARGETACTION_H
 #include "HAKCTransferAction.h"
+#include <map>
 
 namespace llvm::hakc {
     class HAKCPostTargetAction : public HAKCTransferAction {
     public:
         // TODO: for now, assuming one arg, but expand in the future
-        HAKCPostTargetAction(Function *PostTargetAction, unsigned Idx, StringRef Val);
+        HAKCPostTargetAction(Function *PostTargetAction, std::map<unsigned, StringRef> &PretransferReferences);
 
         ~HAKCPostTargetAction() = default;
 
-        unsigned GetIdx() const;
-
-        StringRef GetVal() const;
-
     protected:
-        unsigned Idx;
-        StringRef Val;
+        std::map<unsigned, StringRef> PretransferReferences;
     };
 
     typedef std::shared_ptr<HAKCPostTargetAction> hakc_post_target_action_def_t;

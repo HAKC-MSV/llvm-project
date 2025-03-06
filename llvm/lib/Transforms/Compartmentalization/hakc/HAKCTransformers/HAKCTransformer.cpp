@@ -655,11 +655,10 @@ void hakc::HAKCTransformer::CreateTransferFunctionArg_PreCall(Function *F, Funct
                 GetActionFunction() <<
                 "\n";
         auto PreTransferFunction = it->GetActionFunction();
-        auto PreTransferLabel = it->GetLabel(); // TODO: omitting label for now
         // PreTransferActions:
         //   - { label: "step0", name: "get_hakc_address_color" }
         // PostTargetActions:
-        //   - { name: "hakc_color_address", arg: { idx: 1, val: "step0" } }
+        //   - { name: "hakc_color_address", arg: [{idx: 2, val: "step0"}, { idx: 1, val: "step0" }] }
         // want to call function on target, then pass that pointer to the transfer function
         // so, we have some pointer ptr we want to transfer
         // before we transfer, we need to get the current color of the pointer
@@ -686,8 +685,6 @@ void hakc::HAKCTransformer::CreateTransferFunctionArg_PostCall(Function *F, Func
                 GetActionFunction() <<
                 "\n";
         auto PostTargetFunction = it->GetActionFunction();
-        auto PostTargetIndex = it->GetIdx();
-        auto PostTargetValue = it->GetVal();
         SmallVector<Value *> Args;
         auto arg_int = HAKCIRBuilder.CreatePtrToInt(Arg, PostTargetFunction->getArg(0)->getType());
         Args.push_back(arg_int);
