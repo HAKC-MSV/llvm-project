@@ -92,6 +92,8 @@ namespace llvm::hakc {
         HAKCWriter &operator<<(const HAKCPreTransferAction &PreTransferAction);
 
         HAKCWriter &operator<<(const HAKCPostTargetAction &PostTargetAction);
+
+        HAKCWriter &operator<<(const HAKCFunctionDefinition &FunctionDefinition);
     };
 } // hakc
 

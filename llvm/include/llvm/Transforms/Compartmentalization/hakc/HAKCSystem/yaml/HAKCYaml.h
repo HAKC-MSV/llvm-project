@@ -86,17 +86,6 @@ namespace llvm::hakc {
 
         bool IsValid() const { return (!ReturnType.empty() || !Name.empty()); }
 
-        bool GetArgUseIdx(HAKCFunctionArgumentUse ArgUse, unsigned *Idx) const {
-            for (auto &Arg: Arguments) {
-                if (Arg.ArgUse == ArgUse) {
-                    *Idx = Arg.Idx;
-                    return true;
-                }
-            }
-            return false;
-        }
-
-
         Function *GetFunction(HAKCTypeIdentifier &TypeIdentifier) {
             if (!IsValid()) {
                 return nullptr;
@@ -131,26 +120,17 @@ namespace llvm::hakc {
         }
     };
 
+    struct HAKCYAMLActionArgument {
+        HAKCYAMLStringType Label;
+        unsigned Idx;
+    };
+
     struct HAKCYAMLActionType {
-        HAKCYAMLStringType Type;
-        HAKCYAMLStringType Name;
-        HAKCYAMLSequence<HAKCYAMLFunctionArgument> Arguments;
-        // TODO: expand with more options, e.g., call? load? store?
-        HAKCYAMLActionType() : Type(), Name() {
-        }
-    };
+        HAKCYAMLStringType FunctionName;
+        HAKCYAMLStringType Label;
+        HAKCYAMLSequence<HAKCYAMLActionArgument> Arguments;
 
-    struct HAKCYAMLPreTransferActionsType {
-        HAKCYAMLSequence<HAKCYAMLActionType> Actions;
-
-        HAKCYAMLPreTransferActionsType() : Actions() {
-        }
-    };
-
-    struct HAKCYAMLPostTargetActionType {
-        HAKCYAMLSequence<HAKCYAMLActionType> Actions;
-
-        HAKCYAMLPostTargetActionType() : Actions() {
+        HAKCYAMLActionType() : FunctionName(), Label(), Arguments() {
         }
     };
 
@@ -208,13 +188,11 @@ LLVM_YAML_IS_SEQUENCE_VECTOR(hakc::HAKCYAMLFunctionDefinition)
 
 LLVM_YAML_IS_SEQUENCE_VECTOR(hakc::HAKCYAMLFileType)
 
-LLVM_YAML_IS_SEQUENCE_VECTOR(hakc::HAKCYAMLPreTransferActionsType)
-
-LLVM_YAML_IS_SEQUENCE_VECTOR(hakc::HAKCYAMLPostTargetActionType)
-
 LLVM_YAML_IS_SEQUENCE_VECTOR(hakc::HAKCYAMLFunctionArgument)
 
 LLVM_YAML_IS_SEQUENCE_VECTOR(hakc::HAKCYAMLActionType)
+
+LLVM_YAML_IS_SEQUENCE_VECTOR(hakc::HAKCYAMLActionArgument)
 
 template<>
 struct yaml::ScalarEnumerationTraits<hakc::HAKCAllocationTypeEnum> {
@@ -269,11 +247,19 @@ struct yaml::MappingTraits<hakc::HAKCYAMLAllocationType> {
 };
 
 template<>
+struct yaml::MappingTraits<hakc::HAKCYAMLActionArgument> {
+    static void mapping(yaml::IO &io, hakc::HAKCYAMLActionArgument &ActionArg) {
+        io.mapRequired("label", ActionArg.Label);
+        io.mapRequired("idx", ActionArg.Idx);
+    }
+};
+
+template<>
 struct yaml::MappingTraits<hakc::HAKCYAMLActionType> {
     static void mapping(yaml::IO &io, hakc::HAKCYAMLActionType &ActionType) {
-        io.mapRequired("type", ActionType.Type);
-        io.mapRequired("name", ActionType.Name);
-        io.mapRequired("args", ActionType.Arguments);
+        io.mapRequired("name", ActionType.FunctionName);
+        io.mapOptional("label", ActionType.Label, "");
+        io.mapOptional("args", ActionType.Arguments);
     }
 };
 
@@ -297,24 +283,6 @@ struct yaml::MappingTraits<hakc::HAKCYAMLFileType> {
     static void mapping(yaml::IO &io, hakc::HAKCYAMLFileType &File) {
         io.mapRequired("path_root", File.PathRoot);
         io.mapRequired("file_names", File.Files);
-    }
-};
-
-template<>
-struct yaml::MappingTraits<hakc::HAKCYAMLPreTransferActionsType> {
-    static void
-    mapping(yaml::IO &io,
-            hakc::HAKCYAMLPreTransferActionsType &HAKCYAMLPreTransferActions) {
-        io.mapRequired("actions", HAKCYAMLPreTransferActions.Actions);
-    }
-};
-
-template<>
-struct yaml::MappingTraits<hakc::HAKCYAMLPostTargetActionType> {
-    static void
-    mapping(yaml::IO &io,
-            hakc::HAKCYAMLPostTargetActionType &HAKCYAMLPostTargetAction) {
-        io.mapRequired("actions", HAKCYAMLPostTargetAction.Actions);
     }
 };
 

@@ -145,6 +145,8 @@ namespace llvm::hakc {
 
         static bool IsFunctionInFunctionList(Function *F, iterator_range<FunctionList::iterator> Range);
 
+        static bool IsFunctionInFunctionList(Function *F, iterator_range<HAKCFunctionList::iterator> Range);
+
         static bool PointerShouldBeConsideredCode(const ManagedHAKCPointerP &ManagedPointer);
 
         std::string GetTransformedPath(StringRef Path) const;

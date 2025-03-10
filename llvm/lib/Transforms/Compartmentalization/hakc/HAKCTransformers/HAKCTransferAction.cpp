@@ -4,25 +4,14 @@
 
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCTransferAction.h"
 
-llvm::hakc::HAKCTransferAction::HAKCTransferAction(
-    Function *F, std::map<hakc_arg_t, hakc_label_ref_t> ArgToLabel)
-    : ActionFunction(F), ArgToLabel(ArgToLabel) {}
-
-llvm::Function *llvm::hakc::HAKCTransferAction::GetActionFunction() const {
-    return ActionFunction;
+hakc::HAKCTransferAction::HAKCTransferAction(HAKCFunctionDefinition &HAKCActionFunction,
+                                             StringRef Label) : Label(Label), HAKCActionFunction(HAKCActionFunction) {
 }
 
-llvm::hakc::hakc_label_ref_t
-llvm::hakc::HAKCTransferAction::GetActionLabel(hakc_arg_t arg) const {
-  auto it = ArgToLabel.find(arg);
-  if (it == ArgToLabel.end()) {
-    // return StringRef("");
-    throw std::exception();
-  }
-  return StringRef(it->second);
+StringRef hakc::HAKCTransferAction::GetLabel() const {
+    return Label;
 }
 
-const std::map<llvm::hakc::hakc_arg_t, llvm::hakc::hakc_label_ref_t> &
-llvm::hakc::HAKCTransferAction::GetArgToLabel() {
-  return ArgToLabel;
+hakc::HAKCFunctionDefinition &hakc::HAKCTransferAction::GetHAKCActionFunction() const {
+    return HAKCActionFunction;
 }

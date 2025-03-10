@@ -16,6 +16,17 @@ namespace llvm::hakc {
         return IsFunctionInFunctionList(F, SystemInfo.NoTransferFunctions());
     }
 
+    bool CommonHAKCAnalysis::IsFunctionInFunctionList(Function *F, iterator_range<HAKCFunctionList::iterator> Range) {
+        if (!F) {
+            return false;
+        }
+
+        auto Search = [F](llvm::hakc::function_def_t &Func) {
+            return F == Func->GetFunction();
+        };
+        return llvm::any_of(Range, Search);
+    }
+
     bool CommonHAKCAnalysis::IsFunctionInFunctionList(Function *F, iterator_range<FunctionList::iterator> Range) {
         if (!F) {
             return false;

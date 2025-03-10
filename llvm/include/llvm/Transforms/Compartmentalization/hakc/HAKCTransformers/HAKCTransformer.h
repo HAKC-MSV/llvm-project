@@ -13,6 +13,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCFunctionDefinition/HAKCFunctionDefinition.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCFunctionDefinition/HAKCCustomTransfer.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartmentalizationPolicy.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/ManagedHAKCPointer.h"
@@ -224,6 +225,8 @@ namespace llvm::hakc {
          * @return
          */
         CallInst *CreateCall(StringRef name, Type *RetTy, ArrayRef<Value *> Args);
+
+        CallInst *CreateCall(const hakc::function_def_t &Callee, ArrayRef<Value *> Args);
 
         CallInst *CreateCall(Function *Callee, ArrayRef<Value *> Args);
 

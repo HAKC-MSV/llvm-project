@@ -37,8 +37,7 @@ namespace llvm::hakc {
         return Timeout;
     }
 
-    void HAKCDatabaseInformation::operator<<(
-        HAKCYamlDatabaseConfig &DatabaseConfig) {
+    void HAKCDatabaseInformation::operator<<(const HAKCYamlDatabaseConfig &DatabaseConfig) {
         ServerURL = DatabaseConfig.ServerURL;
         CompartmentEndpoint = DatabaseConfig.GetCompartmentEndpoint;
         DivisionEndpoint = DatabaseConfig.GetDivisionEndpoint;
@@ -58,7 +57,7 @@ namespace llvm::hakc {
           CompartmentalizationSupportFunctionList(), SymbolsToOutputDebugInfo(),
           SeparateNamespacePathList(), HAKCSourcePathList(),
           SafeTransitionFunctionList(), IgnoredTypeSet(), IgnoredGlobalList(),
-          AllocationFunctionList(), CustomTransferList(), TransferState() {
+          AllocationFunctionList(), CustomTransferList(), PreTransferActionList(), PostTransferActionList() {
     }
 
     hakc::function_def_t
@@ -102,6 +101,15 @@ namespace llvm::hakc {
         }
     }
 
+    void HAKCSystemInformation::GetAllDefinedHAKCFunctions(SmallVectorImpl<hakc::function_def_t> &Results) {
+        Results.append({
+            CodeValidationFunction, DataValidationFunction, SignWithDivisionFunction, DefaultCompartmentTransfer,
+            PerCPUCompartmentTransfer
+        });
+        Results.append(CustomTransferList.begin(), CustomTransferList.end());
+        Results.append(CompartmentalizationSupportFunctionList.begin(), CompartmentalizationSupportFunctionList.end());
+    }
+
     void HAKCSystemInformation::operator<<(HAKCYamlConfig &YamlConfig) {
         Arch = YamlConfig.Arch;
         Platform = YamlConfig.Platform;
@@ -134,16 +142,14 @@ namespace llvm::hakc {
             }
         }
 
-        CodeValidationFunction =
-                YamlConfig.CodeValidationFunction.GetFunction(TypeIdentifier);
+        CodeValidationFunction = CreateHAKCFunction(YamlConfig.CodeValidationFunction, TypeIdentifier);
         if (!CodeValidationFunction) {
             CommonHAKCAnalysis::getWriter(true)
                     << "Could not get CodeValidationFunction "
                     << YamlConfig.CodeValidationFunction.Name << "\n";
             throw std::exception();
         }
-        DataValidationFunction =
-                YamlConfig.DataValidationFunction.GetFunction(TypeIdentifier);
+        DataValidationFunction = CreateHAKCFunction(YamlConfig.DataValidationFunction, TypeIdentifier);
         if (!DataValidationFunction) {
             CommonHAKCAnalysis::getWriter(true)
                     << "Could not get DataValidationFunction "
@@ -206,16 +212,12 @@ namespace llvm::hakc {
 
         SmallVector<HAKCTypeP> Types;
         TypeIdentifier.GetHAKCTypes(Types);
-        for (auto &SupportFunctionDefinition:
-             YamlConfig.CompartmentalizationSupportFunctions) {
-            auto *F = SupportFunctionDefinition.GetFunction(TypeIdentifier);
-            if (F) {
-                CompartmentalizationSupportFunctionList.push_back(F);
-            }
+        for (auto &SupportFunctionDefinition: YamlConfig.CompartmentalizationSupportFunctions) {
+            auto SupportFunction = CreateHAKCFunction(SupportFunctionDefinition, TypeIdentifier);
+            CompartmentalizationSupportFunctionList.push_back(SupportFunction);
         }
 
-        SignWithDivisionFunction =
-                YamlConfig.SignWithDivision.GetFunction(TypeIdentifier);
+        SignWithDivisionFunction = CreateHAKCFunction(YamlConfig.SignWithDivision, TypeIdentifier);
         for (auto &StructName: YamlConfig.IgnoredTypes) {
             auto *Ty = StructType::getTypeByName(GetModule().getContext(), StructName);
             if (Ty) {
@@ -234,85 +236,25 @@ namespace llvm::hakc {
             }
         }
 
-        // Loop through the pre transfer actions and construct HAKCPreTransferAction
-        // object
+        SmallVector<hakc::function_def_t> DefinedFunctions;
+        GetAllDefinedHAKCFunctions(DefinedFunctions);
         for (auto &PreTransferActionDefinition: YamlConfig.PreTransferActions) {
-            CommonAnalysis.getWriter(true)
-                    << "found pre transfer action: " << PreTransferActionDefinition.Name
-                    << "\n";
-            auto *F = GetModule().getFunction(PreTransferActionDefinition.Name);
-            if (F) {
-                CommonAnalysis.getWriter(HAKCSystemInformation::OutputDebugInfo())
-                        << "Found PreTransferAction " << PreTransferActionDefinition.Name
-                        << "\n";
-                // construct a PreTransferAction object, and create state later
-                std::map<hakc_arg_t, hakc_label_ref_t> ArgToLabel;
-                for (auto Arg: PreTransferActionDefinition.Arguments) {
-                    hakc_label_ref_t label_ref =
-                            TransferState.AddActionArgumentLabel(Arg.Label);
-                    ArgToLabel[Arg.Idx] = label_ref;
+            for (auto &FuncDef: DefinedFunctions) {
+                if (FuncDef->GetName() == PreTransferActionDefinition.FunctionName) {
+                    auto Action = std::make_shared<HAKCPreTransferAction>(*FuncDef, PreTransferActionDefinition.Label);
+                    PreTransferActionList.push_back(Action);
+                    break;
                 }
-                auto PreTransferAction =
-                        std::make_shared<HAKCPreTransferAction>(F, ArgToLabel);
-                TransferState.AddPreTransferAction(PreTransferAction);
-            } else {
-                CommonAnalysis.getWriter(true)
-                        << "Could not find PreTransferAction "
-                        << PreTransferActionDefinition.Name << "\n";
-                throw std::exception();
             }
         }
         for (auto &PostTargetActionDefinition: YamlConfig.PostTargetActions) {
-            // find the HAKC Function pointer that matches the function name
-            auto *F = GetModule().getFunction(PostTargetActionDefinition.Name);
-            if (F) {
-                CommonAnalysis.getWriter(HAKCSystemInformation::OutputDebugInfo())
-                        << "Found PostTargetAction " << PostTargetActionDefinition.Name
-                        << "\n";
-                std::map<hakc_arg_t, hakc_label_ref_t> ArgToLabel;
-                for (auto Arg: PostTargetActionDefinition.Arguments) {
-                    hakc_label_ref_t label_ref =
-                            TransferState.AddActionArgumentLabel(Arg.Label);
-                    ArgToLabel[Arg.Idx] = label_ref;
+            for (auto &FuncDef: DefinedFunctions) {
+                if (FuncDef->GetName() == PostTargetActionDefinition.FunctionName) {
+                    auto Action = std::make_shared<HAKCPostTargetAction>(*FuncDef, PostTargetActionDefinition.Label);
+                    PostTransferActionList.push_back(Action);
+                    break;
                 }
-                auto PostTargetAction =
-                        std::make_shared<HAKCPostTargetAction>(F, ArgToLabel);
-                TransferState.AddPostTargetAction(PostTargetAction);
-            } else {
-                CommonAnalysis.getWriter(true) << "Could not find PostTargetAction "
-                        << PostTargetActionDefinition.Name << "\n";
-                throw std::exception();
             }
-        }
-
-        CommonAnalysis.getWriter(HAKCSystemInformation::OutputDebugInfo())
-                << "CodeValidationFunction: " << *CodeValidationFunction << "\n";;
-        CommonAnalysis.getWriter(HAKCSystemInformation::OutputDebugInfo())
-                << "DataValidationFunction: " << *DataValidationFunction << "\n";;
-
-        CommonAnalysis.getWriter(HAKCSystemInformation::OutputDebugInfo())
-                << "CompartmentalizationSupportFunctions:\n";
-        for (auto fn: CompartmentalizationSupportFunctionList) {
-            CommonAnalysis.getWriter(HAKCSystemInformation::OutputDebugInfo())
-                    << *fn << "\n";
-        }
-
-        // print out transfer state values
-        CommonAnalysis.getWriter(HAKCSystemInformation::OutputDebugInfo())
-                << "TransferState Labels:\n";
-        for (auto Label: TransferState.GetActionArgumentLabels()) {
-            CommonAnalysis.getWriter(HAKCSystemInformation::OutputDebugInfo())
-                    << Label << "\n";
-        }
-        CommonAnalysis.getWriter(HAKCSystemInformation::OutputDebugInfo())
-                << "TransferState Actions:\n";
-        for (auto Action: TransferState.GetPreTransferActions()) {
-            CommonAnalysis.getWriter(HAKCSystemInformation::OutputDebugInfo())
-                    << *Action << "\n";
-        }
-        for (auto Action: TransferState.GetPostTargetActions()) {
-            CommonAnalysis.getWriter(HAKCSystemInformation::OutputDebugInfo())
-                    << *Action << "\n";
         }
     }
 
@@ -324,7 +266,7 @@ namespace llvm::hakc {
         return OutputDebugInfo() || llvm::any_of(SymbolsToOutputDebugInfo, Search);
     }
 
-    Module &HAKCSystemInformation::GetModule() {
+    Module &HAKCSystemInformation::GetModule() const {
         return CommonAnalysis.GetModule();
     }
 
@@ -340,15 +282,15 @@ namespace llvm::hakc {
         return DagAnalysisRootPath;
     }
 
-    Function *HAKCSystemInformation::CodeValidation() const {
+    llvm::hakc::function_def_t HAKCSystemInformation::CodeValidation() const {
         return CodeValidationFunction;
     }
 
-    Function *HAKCSystemInformation::DataValidation() const {
+    llvm::hakc::function_def_t HAKCSystemInformation::DataValidation() const {
         return DataValidationFunction;
     }
 
-    Function *HAKCSystemInformation::SignWithDivision() const {
+    llvm::hakc::function_def_t HAKCSystemInformation::SignWithDivision() const {
         return SignWithDivisionFunction;
     }
 
@@ -385,7 +327,7 @@ namespace llvm::hakc {
                           CompartmentTransferFunctionList.end());
     }
 
-    iterator_range<FunctionList::iterator>
+    iterator_range<HAKCFunctionList::iterator>
     HAKCSystemInformation::CompartmentalizationSupportFunctions() {
         return make_range(CompartmentalizationSupportFunctionList.begin(),
                           CompartmentalizationSupportFunctionList.end());
@@ -397,7 +339,7 @@ namespace llvm::hakc {
                           SafeTransitionFunctionList.end());
     }
 
-    iterator_range<HAKCTypeSet::iterator> HAKCSystemInformation::IgnoredTypes() {
+    iterator_range<HAKCTypeSet::iterator> HAKCSystemInformation::IgnoredTypes() const {
         return make_range(IgnoredTypeSet.begin(), IgnoredTypeSet.end());
     }
 
@@ -432,6 +374,14 @@ namespace llvm::hakc {
         return make_range(IncludePathsList.begin(), IncludePathsList.end());
     }
 
+    iterator_range<HAKCPreTransferActionList::iterator> HAKCSystemInformation::PreTransferActions() {
+        return make_range(PreTransferActionList.begin(), PreTransferActionList.end());
+    }
+
+    iterator_range<HAKCPostTransferActionList::iterator> HAKCSystemInformation::PostTransferActions() {
+        return make_range(PostTransferActionList.begin(), PostTransferActionList.end());
+    }
+
     StringRef HAKCSystemInformation::GetArch() const { return Arch; }
 
     StringRef HAKCSystemInformation::GetPlatform() const { return Platform; }
@@ -439,9 +389,5 @@ namespace llvm::hakc {
     const HAKCDatabaseInformation &
     HAKCSystemInformation::GetDatabaseInformation() const {
         return DatabaseInformation;
-    }
-
-    HAKCTransferState &HAKCSystemInformation::GetTransferState() {
-        return TransferState;
     }
 } // namespace llvm::hakc

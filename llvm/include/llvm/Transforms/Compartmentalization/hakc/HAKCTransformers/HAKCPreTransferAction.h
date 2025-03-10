@@ -11,18 +11,10 @@
 namespace llvm::hakc {
     class HAKCPreTransferAction : public HAKCTransferAction {
     public:
-      HAKCPreTransferAction(Function *PreTransferAction,
-                            std::map<hakc_arg_t, hakc_label_ref_t> ArgToLabel);
-
-      ~HAKCPreTransferAction() = default;
-
-      void AddValue(hakc_label_ref_t Label, Value *val);
-
-    protected:
-      std::map<hakc_label_ref_t, Value *> LabelToValue;
+        HAKCPreTransferAction(HAKCFunctionDefinition &HAKCActionFunction, StringRef Label);
     };
 
-    typedef std::shared_ptr<HAKCPreTransferAction> hakc_pre_transfer_action_def_t;
+    typedef std::shared_ptr<HAKCPreTransferAction> pre_transfer_action_def_t;
 }
 
 
