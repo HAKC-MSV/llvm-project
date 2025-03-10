@@ -10,14 +10,14 @@ edges:
     Name: bar
     is_function: true
     symbol_hash: e6ddbcd69f68b74c
-  target: &id010 !HAKCType
+  target: &id011 !HAKCType
     DebugType: int ()
     LLVMType: i32 ()
     type_hash: f9f75dcecd5a8cb7
 - key: HasScope
   persisted: true
   source: *id001
-  target: &id011 !HAKCScope
+  target: &id012 !HAKCScope
     LocalScopeName: global
     Scope: global
     scope_hash: 8001c27439650c5c
@@ -80,14 +80,14 @@ edges:
 - key: InDivision
   persisted: true
   source: *id001
-  target: &id006 !HAKCDivision
+  target: &id007 !HAKCDivision
     AccessToken: 73728
     DivisionID: 13
     division_hash: be7396225c569ba9
 - key: IsType
   persisted: true
   source: *id003
-  target: &id013 !HAKCType
+  target: &id014 !HAKCType
     DebugType: int
     LLVMType: i32
     type_hash: 6da88c34ba124c41
@@ -107,10 +107,20 @@ edges:
   persisted: true
   source: *id003
   target: *id002
+- key: UsedInCompilationUnit
+  persisted: true
+  source: *id003
+  target: &id006 !HAKCCompilationUnit
+    filename: _HAKC_SOURCE_PATH_/hakc_test_kuzu8.c
+- key: DefinedIn
+  line: 10
+  persisted: true
+  source: *id003
+  target: *id006
 - key: InDivision
   persisted: true
   source: *id003
-  target: &id007 !HAKCDivision
+  target: &id008 !HAKCDivision
     AccessToken: 139264
     DivisionID: 13
     division_hash: 4af868d68ac647bc
@@ -137,17 +147,26 @@ edges:
   persisted: true
   source: *id004
   target: *id002
+- key: UsedInCompilationUnit
+  persisted: true
+  source: *id004
+  target: *id006
+- key: DefinedIn
+  line: 11
+  persisted: true
+  source: *id004
+  target: *id006
 - key: InDivision
   persisted: true
   source: *id004
-  target: &id008 !HAKCDivision
+  target: &id009 !HAKCDivision
     AccessToken: 204800
     DivisionID: 13
     division_hash: 52437522d301286c
 - key: IsType
   persisted: true
   source: *id005
-  target: &id012 !HAKCType
+  target: &id013 !HAKCType
     DebugType: int (struct data_struct2*, int*, int*)
     LLVMType: i32 (ptr, ptr, ptr)
     type_hash: b9bd5a6310a2295f
@@ -167,35 +186,51 @@ edges:
   persisted: true
   source: *id005
   target: *id002
+- key: UsedInCompilationUnit
+  persisted: true
+  source: *id005
+  target: *id006
+- key: DefinedIn
+  line: 21
+  persisted: true
+  source: *id005
+  target: *id006
+- key: IndirectCall
+  persisted: true
+  source: *id005
+  target: &id015 !HAKCType
+    DebugType: int (struct data_struct*)
+    LLVMType: i32 (ptr)
+    type_hash: ed49f6b712e5420
 - key: InDivision
   persisted: true
   source: *id005
-  target: &id009 !HAKCDivision
+  target: &id010 !HAKCDivision
     AccessToken: 270336
     DivisionID: 13
     division_hash: 976da0fe7b28592c
 - key: InCompartment
   persisted: true
-  source: *id006
-  target: &id014 !HAKCCompartment
+  source: *id007
+  target: &id016 !HAKCCompartment
     CompartmentID: 1
     EntryToken: 73728
 - key: InCompartment
   persisted: true
-  source: *id007
-  target: &id015 !HAKCCompartment
+  source: *id008
+  target: &id017 !HAKCCompartment
     CompartmentID: 2
     EntryToken: 139264
 - key: InCompartment
   persisted: true
-  source: *id008
-  target: &id016 !HAKCCompartment
+  source: *id009
+  target: &id018 !HAKCCompartment
     CompartmentID: 3
     EntryToken: 204800
 - key: InCompartment
   persisted: true
-  source: *id009
-  target: &id017 !HAKCCompartment
+  source: *id010
+  target: &id019 !HAKCCompartment
     CompartmentID: 4
     EntryToken: 270336
 graph: {}
@@ -203,9 +238,9 @@ multigraph: true
 nodes:
 - id: *id001
   persisted: true
-- id: *id010
-  persisted: true
 - id: *id011
+  persisted: true
+- id: *id012
   persisted: true
 - id: *id002
   persisted: true
@@ -215,23 +250,27 @@ nodes:
   persisted: true
 - id: *id005
   persisted: true
-- id: *id012
-  persisted: true
 - id: *id013
-  persisted: true
-- id: *id006
   persisted: true
 - id: *id014
   persisted: true
-- id: *id007
+- id: *id006
   persisted: true
 - id: *id015
   persisted: true
-- id: *id008
+- id: *id007
   persisted: true
 - id: *id016
   persisted: true
-- id: *id009
+- id: *id008
   persisted: true
 - id: *id017
+  persisted: true
+- id: *id009
+  persisted: true
+- id: *id018
+  persisted: true
+- id: *id010
+  persisted: true
+- id: *id019
   persisted: true

@@ -271,13 +271,22 @@ namespace llvm::hakc {
         return *this;
     }
 
-    HAKCWriter &HAKCWriter::operator<<(const HAKCPostTargetAction &PostTargetAction) {
-        *this << "PostTargetAction Name: " << PostTargetAction.GetActionFunction()->getName() << "\n";
+    HAKCWriter &
+    HAKCWriter::operator<<(const HAKCPreTransferAction &PreTransferAction) {
+      if (!debug) {
         return *this;
+      }
+      os << *PreTransferAction.GetActionFunction() << "\n";
+      return *this;
     }
 
-    HAKCWriter &HAKCWriter::operator<<(const HAKCYAMLPostTargetAction &PostTargetAction) {
-        *this << "PostTargetAction Name: " << PostTargetAction.ActionName << "\n";
+    HAKCWriter &
+    HAKCWriter::operator<<(const HAKCPostTargetAction &PostTargetAction) {
+      if (!debug) {
         return *this;
+      }
+      os << *PostTargetAction.GetActionFunction() << "\n";
+      return *this;
     }
-} // namespace llvm::hakc
+
+    } // namespace llvm::hakc
