@@ -5,7 +5,6 @@
 #ifndef HAKC_COMMONHAKCANALYSIS_H
 #define HAKC_COMMONHAKCANALYSIS_H
 
-#include "llvm/Transforms/Compartmentalization/hakc/HAKCFunctionDefinition/HAKCTransferFunction.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartmentalizationPolicy.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCSystemInformation.h"
 
@@ -138,7 +137,7 @@ namespace llvm::hakc {
 
         bool ValueIsUsedAsPointer(Value *V);
 
-        hakc_transfer_def_t GetHAKCTransferDefinition(Function *F);
+        hakc::function_def_t GetHAKCTransferDefinition(Function *F);
 
         HAKCCustomAllocation GetAllocationDefinition(Function *F);
 

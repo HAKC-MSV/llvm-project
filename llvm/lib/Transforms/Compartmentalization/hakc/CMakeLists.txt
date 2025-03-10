@@ -11,7 +11,6 @@ add_llvm_component_library(LLVMHAKC
         HAKCCompartmentalizationPolicy/HAKCCompartmentDivision.cpp
 
         HAKCFunctionDefinition/HAKCCustomTransfer.cpp
-        HAKCFunctionDefinition/HAKCTransferFunction.cpp
         HAKCFunctionDefinition/HAKCFunctionDefinition.cpp
 
         HAKCSystem/HAKCAllocationSize.cpp

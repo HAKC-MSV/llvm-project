@@ -1204,7 +1204,7 @@ namespace llvm::hakc {
 
     void
     HAKCFunctionAnalysis::UpdateHAKCFunctionParameters(CallInst *CallI, HAKCCompartment &TargetCompartment,
-                                                       hakc_transfer_def_t &HAKCTransferFunction) {
+                                                       hakc::function_def_t &HAKCTransferFunction) {
         CommonHAKCAnalysis::getWriter(DebugActive) << "Setting "
                 << *CallI->getArgOperand(
                     HAKCTransferFunction->GetCompartmentIdIdx()->getZExtValue())

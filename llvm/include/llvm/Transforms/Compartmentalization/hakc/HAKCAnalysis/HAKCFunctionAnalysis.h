@@ -129,7 +129,7 @@ namespace llvm::hakc {
         bool IsCallInIntrinsicSet(CallBase *Call, ArrayRef<Intrinsic::ID> IDs);
 
         void UpdateHAKCFunctionParameters(CallInst *CallI, HAKCCompartment &TargetCompartment,
-                                          hakc_transfer_def_t &HAKCTransferFunction);
+                                          hakc::function_def_t &HAKCTransferFunction);
 
     public:
         virtual ~HAKCFunctionAnalysis() = default;

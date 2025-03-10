@@ -3,12 +3,13 @@
 //
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCTransferState.h"
 
-#include "../../../../../../../install/include/llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCSystemInformation.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCSystemInformation.h"
 
 hakc::HAKCTransferState::HAKCTransferState()
-    : TransferredArgumentValues(), ActionArgumentLabels(),
-      ActionArgumentLabelToValue(), PreTransferActionList(),
-      PostTargetActionList() {}
+  : TransferredArgumentValues(), ActionArgumentLabels(),
+    ActionArgumentLabelToValue(), PreTransferActionList(),
+    PostTargetActionList() {
+}
 
 void hakc::HAKCTransferState::AddTransferredArgument(Value *Arg) {
   TransferredArgumentValues.push_back(Arg);
@@ -19,17 +20,17 @@ SmallVectorImpl<Value *> &hakc::HAKCTransferState::GetTransferredArguments() {
 }
 
 void hakc::HAKCTransferState::AddPreTransferAction(
-    hakc_pre_transfer_action_def_t Action) {
+  hakc_pre_transfer_action_def_t Action) {
   PreTransferActionList.push_back(Action);
 }
 
 void hakc::HAKCTransferState::AddPostTargetAction(
-    hakc_post_target_action_def_t Action) {
+  hakc_post_target_action_def_t Action) {
   PostTargetActionList.push_back(Action);
 }
 
 iterator_range<
-    SmallVector<llvm::hakc::hakc_pre_transfer_action_def_t>::iterator>
+  SmallVector<llvm::hakc::hakc_pre_transfer_action_def_t>::iterator>
 hakc::HAKCTransferState::GetPreTransferActions() {
   return make_range(PreTransferActionList.begin(), PreTransferActionList.end());
 }
@@ -40,10 +41,10 @@ hakc::HAKCTransferState::GetPostTargetActions() {
 }
 
 void hakc::HAKCTransferState::AddPreTransferValue(
-    llvm::hakc::hakc_label_ref_t Label, Value *Value) {
+  llvm::hakc::hakc_label_ref_t Label, Value *Value) {
   // loop through all the PreTransferAction to match label and add value to the
   // action locally and globally
-  for (auto PreTransferAction : GetPreTransferActions()) {
+  for (auto PreTransferAction: GetPreTransferActions()) {
     // PreTransferAction->AddValue will only succeed if the label is already
     // present
     PreTransferAction->AddValue(Label, Value);
@@ -52,7 +53,7 @@ void hakc::HAKCTransferState::AddPreTransferValue(
 
 void hakc::HAKCTransferState::AddPostTargetValue(hakc_label_ref_t Label,
                                                  Value *Value) {
-  for (auto PostTargetAction : GetPostTargetActions()) {
+  for (auto PostTargetAction: GetPostTargetActions()) {
     // PostTargetAction->AddValue will only succeed if the label is already
     // present
     PostTargetAction->AddValue(Label, Value);

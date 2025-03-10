@@ -6,22 +6,19 @@
 #define HAKC_HAKCCUSTOMTRANSFER_H
 
 #include "llvm/IR/IRBuilder.h"
-#include "HAKCTransferFunction.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartmentalizationPolicy.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/ManagedHAKCPointer.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCFunctionDefinition/HAKCFunctionDefinition.h"
 
 using namespace llvm;
 
 namespace llvm::hakc {
-    class HAKCCustomTransfer : public HAKCTransferFunction {
+    class HAKCCustomTransfer : public HAKCFunctionDefinition {
     public:
-        HAKCCustomTransfer(Function *CustomFunction, HAKCTypeP TargetType, unsigned SignedPtrIdx,
-                           unsigned CompartmentIdIdx, int DivisionIdx);
+        HAKCCustomTransfer(Function *CustomFunction, const HAKCTypeP &TargetType,
+                           SmallVectorImpl<HAKCFunctionArgumentDefinition> &Args);
 
-        HAKCCustomTransfer(Function *CustomFunction, HAKCTypeP TargetType, unsigned SignedPtrIdx,
-                           unsigned CompartmentIdIdx, unsigned DivisionIdx, unsigned SizeIdx);
-
-        ~HAKCCustomTransfer() = default;
+        ~HAKCCustomTransfer() override = default;
 
         HAKCTypeP GetTargetType() const;
 
@@ -34,13 +31,13 @@ namespace llvm::hakc {
                                 HAKCTypeP dstTy, bool IsData);
 
     protected:
-        HAKCTypeP TargetType;
+        HAKCTypeP TypeToTransfer;
 
         virtual Instruction *CreateTransfer(IRBuilder<> &HAKCIRBuilder, HAKCCompartmentDivision &CompartmentDivision,
                                             Value *Pointer, Value *Size, bool IsData);
     };
 
-    typedef std::shared_ptr<HAKCCustomTransfer> hakc_custom_transfer_def_t;
+    typedef std::shared_ptr<HAKCCustomTransfer> custom_transfer_def_t;
 }
 
 

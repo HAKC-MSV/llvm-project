@@ -3,10 +3,30 @@
 //
 
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCFunctionDefinition/HAKCFunctionDefinition.h"
-// should call parses type, then do get or insertm odule or get function
-// pre ref to ir builder, and value, and use that ir builder to create the call to the pre transfer action function, and supply the pointer arg
+
+#include <llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/CommonHAKCAnalysis.h>
+
 namespace llvm::hakc {
-    HAKCFunctionDefinition::HAKCFunctionDefinition(Function *F) : F(F) {
+    HAKCFunctionArgumentDefinition::HAKCFunctionArgumentDefinition(Type *ArgTy, unsigned Idx, StringRef Label,
+                                                                   HAKCFunctionArgumentUse Use) : ArgTy(ArgTy),
+        Idx(Idx), Label(Label), ArgUse(Use) {
+        if (!ArgTy) {
+            CommonHAKCAnalysis::getWriter(true) << "ArgTy is null\n";
+            throw std::exception();
+        }
+        if (Label.empty()) {
+            llvm::raw_string_ostream os(this->Label);
+            os << "arg_" << Idx;
+        }
+    }
+
+    HAKCFunctionDefinition::HAKCFunctionDefinition(Function *F,
+                                                   SmallVectorImpl<HAKCFunctionArgumentDefinition> &
+                                                   Args) : F(F), Args(Args.begin(), Args.end()) {
+        if (!F) {
+            CommonHAKCAnalysis::getWriter(true) << "F is null\n";
+            throw std::exception();
+        }
     }
 
     StringRef HAKCFunctionDefinition::GetName() const {
@@ -16,4 +36,34 @@ namespace llvm::hakc {
     Function *HAKCFunctionDefinition::GetFunction() const {
         return F;
     }
-} // hakc
+
+    ConstantInt *HAKCFunctionDefinition::GetSignedPtrIdx() const {
+        return GetArgLLVMByUse(SignedPtr);
+    }
+
+    ConstantInt *HAKCFunctionDefinition::GetCompartmentIdIdx() const {
+        return GetArgLLVMByUse(Comp);
+    }
+
+    ConstantInt *HAKCFunctionDefinition::GetDivisionIdIdx() const {
+        return GetArgLLVMByUse(Div);
+    }
+
+    ConstantInt *HAKCFunctionDefinition::GetArgLLVMByUse(HAKCFunctionArgumentUse Use) const {
+        unsigned Idx;
+        if (GetArgIdxByUse(Use, &Idx)) {
+            return ConstantInt::get(IntegerType::get(F->getContext(), 32), Idx);
+        }
+        return nullptr;
+    }
+
+    bool HAKCFunctionDefinition::GetArgIdxByUse(HAKCFunctionArgumentUse Use, unsigned *Idx) const {
+        for (auto &Arg: Args) {
+            if (Arg.ArgUse == Use) {
+                *Idx = Arg.Idx;
+                return true;
+            }
+        }
+        return false;
+    }
+} // namespace llvm::hakc

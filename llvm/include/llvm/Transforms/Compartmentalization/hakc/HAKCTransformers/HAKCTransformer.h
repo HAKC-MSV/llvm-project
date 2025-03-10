@@ -317,7 +317,7 @@ namespace llvm::hakc {
          * @param HAKCPointer
          * @return
          */
-        virtual hakc_custom_transfer_def_t GetCustomTransferFunction(hakc::HAKCPointerBase &HAKCPointer);
+        virtual custom_transfer_def_t GetCustomTransferFunction(hakc::HAKCPointerBase &HAKCPointer);
 
         void ValidateLocation(Instruction *I);
 
@@ -345,7 +345,7 @@ namespace llvm::hakc {
 
         bool DebugIsActive() const;
 
-        virtual hakc_custom_transfer_def_t GetCustomTransferFunctionForType(HAKCTypeP HAKCType);
+        virtual custom_transfer_def_t GetCustomTransferFunctionForType(HAKCTypeP HAKCType);
 
         virtual Instruction *
         CreateVoidCastCompartmentTransfer(hakc::HAKCPointerBase &HAKCPointer, Instruction *I, GlobalValue *Target,

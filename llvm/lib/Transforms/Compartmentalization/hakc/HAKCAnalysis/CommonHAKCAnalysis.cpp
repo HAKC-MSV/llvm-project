@@ -33,7 +33,7 @@ namespace llvm::hakc {
             return false;
         }
 
-        auto Search = [F](hakc_transfer_def_t &Func) {
+        auto Search = [F](function_def_t &Func) {
             return F == Func->GetFunction();
         };
         return llvm::any_of(Range, Search);
@@ -168,8 +168,8 @@ namespace llvm::hakc {
         return Result;
     }
 
-    hakc_transfer_def_t CommonHAKCAnalysis::GetHAKCTransferDefinition(Function *F) {
-        SmallVector<hakc_transfer_def_t> HAKCFunctions;
+    function_def_t CommonHAKCAnalysis::GetHAKCTransferDefinition(Function *F) {
+        SmallVector<function_def_t> HAKCFunctions;
         for (const auto &HAKCFunction: SystemInfo.CompartmentTransferFunctions()) {
             HAKCFunctions.push_back(HAKCFunction);
         }

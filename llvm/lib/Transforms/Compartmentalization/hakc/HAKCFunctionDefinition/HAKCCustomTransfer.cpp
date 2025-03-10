@@ -2,60 +2,40 @@
 // Created by de29664 on 6/21/23.
 //
 
+#include <map>
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCFunctionDefinition/HAKCCustomTransfer.h"
-
-#include <utility>
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/CommonHAKCAnalysis.h"
 
-hakc::HAKCCustomTransfer::HAKCCustomTransfer(Function *CustomFunction, hakc::HAKCTypeP TargetType,
-                                             unsigned int SignedPtrIdx, unsigned int CompartmentIdIdx,
-                                             int DivisionIdx) : HAKCTransferFunction(CustomFunction, SignedPtrIdx,
-                                                                    CompartmentIdIdx, DivisionIdx),
-                                                                TargetType(std::move(TargetType)) {
-}
-
-hakc::HAKCCustomTransfer::HAKCCustomTransfer(Function *CustomFunction, hakc::HAKCTypeP TargetType,
-                                             unsigned int SignedPtrIdx, unsigned int CompartmentIdIdx,
-                                             unsigned int DivisionIdx, unsigned int SizeIdx) : HAKCTransferFunction(
-        CustomFunction, SignedPtrIdx, CompartmentIdIdx, DivisionIdx, SizeIdx), TargetType(std::move(TargetType)) {
+hakc::HAKCCustomTransfer::HAKCCustomTransfer(Function *CustomFunction, const HAKCTypeP &TargetType,
+                                             SmallVectorImpl<HAKCFunctionArgumentDefinition> &
+                                             Args) : HAKCFunctionDefinition(CustomFunction, Args),
+                                                     TypeToTransfer(TargetType) {
 }
 
 hakc::HAKCTypeP hakc::HAKCCustomTransfer::GetTargetType() const {
-    return TargetType;
+    return TypeToTransfer;
 }
 
 Instruction *hakc::HAKCCustomTransfer::CreateTransfer(IRBuilder<> &HAKCIRBuilder,
                                                       HAKCCompartmentDivision &CompartmentDivision, Value *Pointer,
-                                                      Value *Size, bool IsData) {
-    SmallVector<Value *, hakc::HAKCTransferFunction::MaxArgIndex> Args;
-
-    if (!SignedPtrIdx) {
-        CommonHAKCAnalysis::getWriter(true) << "No signed pointer index for " << GetFunction()->getName() << "\n";
-        throw std::exception();
-    }
-    Args[SignedPtrIdx->getZExtValue()] = Pointer;
-
-    if (!DivisionIdIdx) {
-        CommonHAKCAnalysis::getWriter(true) << "No Division index for " << GetFunction()->getName() << "\n";
-        throw std::exception();
-    }
-    Args[DivisionIdIdx->getZExtValue()] = CompartmentDivision.GetDivisionID();
-
-    if (!CompartmentIdIdx) {
-        CommonHAKCAnalysis::getWriter(true) << "No Compartment index for " << GetFunction()->getName() << "\n";
-        throw std::exception();
-    }
-    Args[CompartmentIdIdx->getZExtValue()] = CompartmentDivision.GetHAKCCompartment().GetCompartmentID();
-
-    if (Size) {
-        if (!SizeIdx) {
-            CommonHAKCAnalysis::getWriter(true) << "No size index for " << GetFunction()->getName() << "\n";
-            throw std::exception();
+                                                      Value *ObjectSize, bool IsData) {
+    SmallVector<Value *> CallArgs;
+    std::map<HAKCFunctionArgumentUse, Value *> ArgMap = {
+        {SignedPtr, Pointer},
+        {Comp, CompartmentDivision.GetHAKCCompartment().GetCompartmentID()},
+        {Div, CompartmentDivision.GetDivisionID()},
+        {Size, ObjectSize},
+        {IsCode, ConstantInt::getBool(HAKCIRBuilder.getContext(), !IsData)}
+    };
+    CallArgs.reserve(ArgMap.size());
+    for (auto &it: ArgMap) {
+        unsigned Idx;
+        if (GetArgIdxByUse(it.first, &Idx)) {
+            CallArgs[Idx] = it.second;
         }
-        Args[SizeIdx->getZExtValue()] = Size;
     }
 
-    return HAKCIRBuilder.CreateCall(GetFunction(), Args);
+    return HAKCIRBuilder.CreateCall(GetFunction(), CallArgs);
 }
 
 Instruction *hakc::HAKCCustomTransfer::CreateTransfer(IRBuilder<> &HAKCIRBuilder,

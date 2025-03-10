@@ -8,7 +8,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCFunctionDefinition/HAKCCustomTransfer.h"
-#include "llvm/Transforms/Compartmentalization/hakc/HAKCFunctionDefinition/HAKCTransferFunction.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCFunctionDefinition/HAKCFunctionDefinition.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCAllocationSize.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/yaml/HAKCYaml.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCPostTargetAction.h"
@@ -18,19 +18,15 @@
 
 typedef std::shared_ptr<llvm::hakc::HAKCAllocationSize> HAKCCustomAllocation;
 
-typedef SmallVector<llvm::hakc::hakc_function_def_t> HAKCFunctionList;
-typedef SmallVector<llvm::hakc::hakc_transfer_def_t> HAKCTransferList;
-typedef SmallVector<llvm::hakc::hakc_custom_transfer_def_t> HAKCCustomTransferList;
+typedef SmallVector<llvm::hakc::function_def_t> HAKCFunctionList;
+typedef SmallVector<llvm::hakc::function_def_t> HAKCTransferList;
+typedef SmallVector<llvm::hakc::custom_transfer_def_t> HAKCCustomTransferList;
 typedef SmallVector<GlobalVariable *> HAKCGlobalVariableList;
 typedef SmallVector<GlobalValue *> HAKCSymbolList;
 typedef SmallVector<Function *> FunctionList;
 typedef SmallPtrSet<Type *, 16> HAKCTypeSet;
 typedef SmallVector<std::string, 16> HAKCStringList;
 typedef SmallVector<HAKCCustomAllocation> HAKCCustomAllocationList;
-// typedef SmallVector<llvm::hakc::hakc_pre_transfer_action_def_t>
-// HAKCPreTransferActionList; typedef
-// SmallVector<llvm::hakc::hakc_post_target_action_def_t>
-// HAKCPostTargetActionList;
 
 namespace llvm::hakc {
     class CommonHAKCAnalysis;
@@ -107,7 +103,7 @@ namespace llvm::hakc {
 
         Function *SignWithDivision() const;
 
-        hakc_transfer_def_t CompartmentTransfer(bool PerCPU) const;
+        function_def_t CompartmentTransfer(bool PerCPU) const;
 
         HAKCTypeIdentifier &GetTypeIdentifier();
 
@@ -125,7 +121,7 @@ namespace llvm::hakc {
 
         HAKCTransferState &GetTransferState();
 
-      protected:
+    protected:
         CommonHAKCAnalysis &CommonAnalysis;
         HAKCTypeIdentifier TypeIdentifier;
         HAKCDatabaseInformation DatabaseInformation;
@@ -142,8 +138,8 @@ namespace llvm::hakc {
         Function *CodeValidationFunction;
         Function *DataValidationFunction;
         Function *SignWithDivisionFunction;
-        hakc::hakc_transfer_def_t DefaultCompartmentTransfer;
-        hakc::hakc_transfer_def_t PerCPUCompartmentTransfer;
+        hakc::function_def_t DefaultCompartmentTransfer;
+        hakc::function_def_t PerCPUCompartmentTransfer;
         FunctionList CompartmentalizationSupportFunctionList;
         HAKCSymbolList SymbolsToOutputDebugInfo;
         HAKCStringList SeparateNamespacePathList;
@@ -154,6 +150,17 @@ namespace llvm::hakc {
         HAKCCustomAllocationList AllocationFunctionList;
         HAKCCustomTransferList CustomTransferList;
         HAKCTransferState TransferState;
+
+        static hakc::function_def_t CreateHAKCFunction(HAKCYAMLFunctionDefinition &YAMLFunctionDef,
+                                                       HAKCTypeIdentifier &TypeIdentifier);
+
+        static hakc::custom_transfer_def_t CreateCustomTransferFunction(HAKCYAMLCustomTransferType &YAMLCustomTransfer,
+                                                                        HAKCTypeP HAKCTy,
+                                                                        HAKCTypeIdentifier &TypeIdentifier);
+
+        static void PopulateHAKCFunctionArgs(SmallVectorImpl<HAKCFunctionArgumentDefinition> &Args,
+                                             HAKCYAMLFunctionDefinition &YAMLFunctionDef,
+                                             HAKCTypeIdentifier &TypeIdentifier);
     };
 } // hakc
 
