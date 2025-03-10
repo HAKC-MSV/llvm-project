@@ -16,7 +16,7 @@ namespace llvm::hakc {
 
       ~HAKCPostTargetAction() = default;
 
-      void AddValue(hakc_label_ref_t Label, Value* val);
+      void AddValue(hakc_label_ref_t Label, Value *val);
 
     protected:
       // get the label from the arg value (superclass), then query state object

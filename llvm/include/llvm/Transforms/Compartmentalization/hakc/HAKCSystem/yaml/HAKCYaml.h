@@ -8,9 +8,9 @@
 #include <vector>
 #include <string>
 
-#include "llvm/Transforms/Compartmentalization/hakc/HAKCFunctionDefinition/HAKCTransferFunction.h"
 #include "llvm/AsmParser/Parser.h"
 #include "llvm/IR/Module.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCFunctionDefinition/HAKCTransferFunction.h"
 
 typedef std::string HAKCYAMLStringType;
 
@@ -63,16 +63,14 @@ namespace llvm::hakc {
       unsigned idx;
       HAKCYAMLStringType name;
 
-      HAKCYAMLFunctionParameterType() : idx(), name() {
-      }
+      HAKCYAMLFunctionParameterType() : idx(), name() {}
     };
 
     // the function argument values (the parameter values set when called)
     struct HAKCYAMLFunctionArgumentType {
       unsigned idx;
       HAKCYAMLStringType label;
-      HAKCYAMLFunctionArgumentType() : idx(), label() {
-      }
+      HAKCYAMLFunctionArgumentType() : idx(), label() {}
     };
 
     struct HAKCYAMLCFunctionDefinitionType {
@@ -86,9 +84,10 @@ namespace llvm::hakc {
 
       HAKCYAMLCFunctionDefinitionType()
           : Type(), Name(), PointerIdx(HAKCTransferFunction::MissingIdx),
-            SizeIdx(HAKCTransferFunction::MissingIdx), CompartmentIdx(HAKCTransferFunction::MissingIdx),
-            DivisionIdx(HAKCTransferFunction::MissingIdx), IsCodeIdx(HAKCTransferFunction::MissingIdx) {
-      }
+            SizeIdx(HAKCTransferFunction::MissingIdx),
+            CompartmentIdx(HAKCTransferFunction::MissingIdx),
+            DivisionIdx(HAKCTransferFunction::MissingIdx),
+            IsCodeIdx(HAKCTransferFunction::MissingIdx) {}
 
       bool IsValid() const { return (!Type.empty() || !Name.empty()); }
 
@@ -103,62 +102,68 @@ namespace llvm::hakc {
         auto *FType = dyn_cast<llvm::FunctionType>(FoundTypes);
         if (!FType) {
           // TODO: what is the right ostream to use here?
-          errs() << "Failed to parse Function " << Name << " with Type " << Type << "\n";
+          errs() << "Failed to parse Function " << Name << " with Type " << Type
+                 << "\n";
           return nullptr;
         }
-        auto *F = dyn_cast<Function>(TypeIdentifier.GetModule().getOrInsertFunction(Name, FType).getCallee());
-        errs() << "inserted function: " << *F << "\n" ;
+        auto *F = dyn_cast<Function>(TypeIdentifier.GetModule()
+                                         .getOrInsertFunction(Name, FType)
+                                         .getCallee());
+        errs() << "inserted function: " << *F << "\n";
         return F;
       }
     };
 
     struct HAKCYAMLFunctionDefinitionType {
-        // updated function definition (llvm only types, currently)
-        HAKCYAMLStringType Type;
-        HAKCYAMLStringType Name;
-        HAKCYAMLSequence<HAKCYAMLFunctionParameterType> Parameters;
-        std::map<HAKCYAMLStringType, uint64_t> ParameterNameToIndex;
-        SMDiagnostic Err;
+      // updated function definition (llvm only types, currently)
+      HAKCYAMLStringType Type;
+      HAKCYAMLStringType Name;
+      HAKCYAMLSequence<HAKCYAMLFunctionParameterType> Parameters;
+      std::map<HAKCYAMLStringType, uint64_t> ParameterNameToIndex;
+      SMDiagnostic Err;
 
-        HAKCYAMLFunctionDefinitionType()
-            : Type(), Name(), Parameters(), ParameterNameToIndex(), Err() {
-            for (auto param: Parameters) {
-              ParameterNameToIndex[param.name] = param.idx;
-            }
+      HAKCYAMLFunctionDefinitionType()
+          : Type(), Name(), Parameters(), ParameterNameToIndex(), Err() {
+        for (auto param : Parameters) {
+          ParameterNameToIndex[param.name] = param.idx;
+        }
+      }
+
+      bool IsValid() const { return (!Type.empty() || !Name.empty()); }
+
+      Function *GetFunction(HAKCTypeIdentifier &TypeIdentifier) {
+        if (!IsValid()) {
+          return nullptr;
+        }
+        errs() << "Parsing function: " << Name << " with type [" << Type
+               << "]: ";
+        auto *FoundTypes = parseType(Type, Err, TypeIdentifier.GetModule());
+        // Cast from Type* to FunctionType* needed to properly insert the
+        // function
+        auto *FType = dyn_cast<llvm::FunctionType>(FoundTypes);
+        if (!FType) {
+          // TODO: what is the right ostream to use here?
+          errs() << "Failed to parse Function " << Name << " with Type " << Type
+                 << ": " << Err.getMessage() << "\n";
+          return nullptr;
         }
 
-        bool IsValid() const { return (!Type.empty() || !Name.empty()); }
-
-        Function *GetFunction(HAKCTypeIdentifier &TypeIdentifier) {
-            if (!IsValid()) {
-                return nullptr;
-            }
-            errs() << "Parsing function: " << Name << " with type [" << Type << "]: ";
-            auto *FoundTypes = parseType(Type, Err, TypeIdentifier.GetModule());
-            // Cast from Type* to FunctionType* needed to properly insert the function
-            auto *FType = dyn_cast<llvm::FunctionType>(FoundTypes);
-            if (!FType) {
-              // TODO: what is the right ostream to use here?
-              errs() << "Failed to parse Function " << Name << " with Type " << Type << ": " << Err.getMessage() << "\n";
-              return nullptr;
-            }
-
-            auto F = dyn_cast<Function>(TypeIdentifier.GetModule()
-                                          .getOrInsertFunction(Name, FType)
-                                          .getCallee());
-            errs() << "inserted function: " << *F << "\n" ;
-            return F;
-        }
+        auto F = dyn_cast<Function>(TypeIdentifier.GetModule()
+                                        .getOrInsertFunction(Name, FType)
+                                        .getCallee());
+        errs() << "inserted function: " << *F << "\n";
+        return F;
+      }
     };
 
     struct HAKCYAMLTransferType : public HAKCYAMLCFunctionDefinitionType {
-        HAKCYAMLTransferType() : HAKCYAMLCFunctionDefinitionType() {}
+      HAKCYAMLTransferType() : HAKCYAMLCFunctionDefinitionType() {}
     };
 
     struct HAKCYAMLCustomTransferType : public HAKCYAMLTransferType {
-        HAKCYAMLStringType TypeName;
+      HAKCYAMLStringType TypeName;
 
-        HAKCYAMLCustomTransferType() : HAKCYAMLTransferType(), TypeName() {}
+      HAKCYAMLCustomTransferType() : HAKCYAMLTransferType(), TypeName() {}
     };
 
     struct HAKCYAMLActionType {
@@ -166,20 +171,17 @@ namespace llvm::hakc {
       HAKCYAMLStringType Name;
       HAKCYAMLSequence<HAKCYAMLFunctionArgumentType> Arguments;
       // TODO: expand with more options, e.g., call? load? store?
-      HAKCYAMLActionType() : Type(), Name() {
-      }
+      HAKCYAMLActionType() : Type(), Name() {}
     };
 
     struct HAKCYAMLPreTransferActionsType {
-        HAKCYAMLSequence<HAKCYAMLActionType> Actions;
-        HAKCYAMLPreTransferActionsType(): Actions() {
-      }
+      HAKCYAMLSequence<HAKCYAMLActionType> Actions;
+      HAKCYAMLPreTransferActionsType() : Actions() {}
     };
 
     struct HAKCYAMLPostTargetActionType {
-        HAKCYAMLSequence<HAKCYAMLActionType> Actions;
-        HAKCYAMLPostTargetActionType() : Actions() {
-        }
+      HAKCYAMLSequence<HAKCYAMLActionType> Actions;
+      HAKCYAMLPostTargetActionType() : Actions() {}
     };
 
     struct HAKCYamlDatabaseConfig {
@@ -201,8 +203,10 @@ namespace llvm::hakc {
         HAKCYAMLFunctionDefinitionType CodeValidationFunction;
         HAKCYAMLFunctionDefinitionType DataValidationFunction;
         // TODO: need multiple?
-        // HAKCYAMLSequence<HAKCYAMLFunctionDefinitionType> CodeValidationFunction;
-        // HAKCYAMLSequence<HAKCYAMLFunctionDefinitionType> DataValidationFunction;
+        // HAKCYAMLSequence<HAKCYAMLFunctionDefinitionType>
+        // CodeValidationFunction;
+        // HAKCYAMLSequence<HAKCYAMLFunctionDefinitionType>
+        // DataValidationFunction;
         HAKCPassModeTypeEnum PassMode;
         HAKCYAMLStringSequenceType NoTransferFunctions;
         HAKCYAMLStringSequenceType SafeTransitionFunctions;
@@ -225,7 +229,7 @@ namespace llvm::hakc {
         HAKCYAMLSequence<HAKCYAMLActionType> PreTransferActions;
         HAKCYAMLSequence<HAKCYAMLActionType> PostTargetActions;
         HAKCYAMLStringSequenceType IgnoredTypes;
-      // TODO: revert to transfer type?
+        // TODO: revert to transfer type?
         HAKCYAMLFunctionDefinitionType DefaultCompartmentTransfer;
         HAKCYAMLFunctionDefinitionType SignWithDivision;
         HAKCYAMLFunctionDefinitionType PerCPUCompartmentTransfer;
@@ -252,7 +256,8 @@ LLVM_YAML_IS_SEQUENCE_VECTOR(hakc::HAKCYAMLFunctionParameterType)
 
 LLVM_YAML_IS_SEQUENCE_VECTOR(hakc::HAKCYAMLActionType)
 
-inline void ValidateHAKCDefinition(hakc::HAKCYAMLCFunctionDefinitionType &Definition) {
+inline void
+ValidateHAKCDefinition(hakc::HAKCYAMLCFunctionDefinitionType &Definition) {
 #define FieldCheck(Def, Field) if (Def.Field != hakc::HAKCTransferFunction::MissingIdx && Def.Field > hakc::HAKCTransferFunction::MaxArgIndex) { errs() << "Invalid Index Value for " << #Field << " : " << Def.Field << "\n"; throw std::exception(); }
     FieldCheck(Definition, CompartmentIdx);
     FieldCheck(Definition, DivisionIdx);
@@ -300,8 +305,7 @@ struct yaml::MappingTraits<hakc::HAKCYAMLAllocationType> {
     }
 };
 
-template<>
-struct yaml::MappingTraits<hakc::HAKCYAMLActionType> {
+template <> struct yaml::MappingTraits<hakc::HAKCYAMLActionType> {
   static void mapping(yaml::IO &io, hakc::HAKCYAMLActionType &ActionType) {
     io.mapRequired("type", ActionType.Type);
     io.mapRequired("name", ActionType.Name);
@@ -309,22 +313,24 @@ struct yaml::MappingTraits<hakc::HAKCYAMLActionType> {
   }
 };
 
-template<>
-struct yaml::MappingTraits<hakc::HAKCYAMLCFunctionDefinitionType> {
-    static void mapping(yaml::IO &io, hakc::HAKCYAMLCFunctionDefinitionType &CFunctionDefinition) {
-        io.mapRequired("name", CFunctionDefinition.Name);
-        io.mapOptional("ptr-idx", CFunctionDefinition.PointerIdx);
-        io.mapOptional("compartment-idx", CFunctionDefinition.CompartmentIdx);
-        io.mapOptional("division-idx", CFunctionDefinition.DivisionIdx);
-        io.mapOptional("size-idx", CFunctionDefinition.SizeIdx);
-        io.mapOptional("is-code-idx", CFunctionDefinition.IsCodeIdx);
-        ValidateHAKCDefinition(CFunctionDefinition);
-    }
+template <> struct yaml::MappingTraits<hakc::HAKCYAMLCFunctionDefinitionType> {
+  static void
+  mapping(yaml::IO &io,
+          hakc::HAKCYAMLCFunctionDefinitionType &CFunctionDefinition) {
+    io.mapRequired("name", CFunctionDefinition.Name);
+    io.mapOptional("ptr-idx", CFunctionDefinition.PointerIdx);
+    io.mapOptional("compartment-idx", CFunctionDefinition.CompartmentIdx);
+    io.mapOptional("division-idx", CFunctionDefinition.DivisionIdx);
+    io.mapOptional("size-idx", CFunctionDefinition.SizeIdx);
+    io.mapOptional("is-code-idx", CFunctionDefinition.IsCodeIdx);
+    ValidateHAKCDefinition(CFunctionDefinition);
+  }
 };
 
-template<>
-struct yaml::MappingTraits<hakc::HAKCYAMLFunctionDefinitionType> {
-  static void mapping(yaml::IO &io, hakc::HAKCYAMLFunctionDefinitionType &FunctionDefinition) {
+template <> struct yaml::MappingTraits<hakc::HAKCYAMLFunctionDefinitionType> {
+  static void
+  mapping(yaml::IO &io,
+          hakc::HAKCYAMLFunctionDefinitionType &FunctionDefinition) {
     io.mapRequired("type", FunctionDefinition.Type);
     io.mapRequired("name", FunctionDefinition.Name);
     io.mapRequired("params", FunctionDefinition.Parameters);
@@ -340,31 +346,35 @@ struct yaml::MappingTraits<hakc::HAKCYAMLFileType> {
     }
 };
 
-template<>
-struct yaml::MappingTraits<hakc::HAKCYAMLPreTransferActionsType> {
-    static void mapping(yaml::IO &io, hakc::HAKCYAMLPreTransferActionsType &HAKCYAMLPreTransferActions) {
-        io.mapRequired("actions", HAKCYAMLPreTransferActions.Actions);
-    }
+template <> struct yaml::MappingTraits<hakc::HAKCYAMLPreTransferActionsType> {
+  static void
+  mapping(yaml::IO &io,
+          hakc::HAKCYAMLPreTransferActionsType &HAKCYAMLPreTransferActions) {
+    io.mapRequired("actions", HAKCYAMLPreTransferActions.Actions);
+  }
 };
 
-template<>
-struct yaml::MappingTraits<hakc::HAKCYAMLPostTargetActionType> {
-    static void mapping(yaml::IO &io, hakc::HAKCYAMLPostTargetActionType &HAKCYAMLPostTargetAction) {
-      io.mapRequired("actions", HAKCYAMLPostTargetAction.Actions);
-    }
+template <> struct yaml::MappingTraits<hakc::HAKCYAMLPostTargetActionType> {
+  static void
+  mapping(yaml::IO &io,
+          hakc::HAKCYAMLPostTargetActionType &HAKCYAMLPostTargetAction) {
+    io.mapRequired("actions", HAKCYAMLPostTargetAction.Actions);
+  }
 };
 
-template<>
-struct yaml::MappingTraits<hakc::HAKCYAMLFunctionArgumentType> {
-    static void mapping(yaml::IO &io, hakc::HAKCYAMLFunctionArgumentType &HAKCYAMLFunctionArgument) {
-        io.mapRequired("idx", HAKCYAMLFunctionArgument.idx);
-        io.mapRequired("label", HAKCYAMLFunctionArgument.label);
-    }
+template <> struct yaml::MappingTraits<hakc::HAKCYAMLFunctionArgumentType> {
+  static void
+  mapping(yaml::IO &io,
+          hakc::HAKCYAMLFunctionArgumentType &HAKCYAMLFunctionArgument) {
+    io.mapRequired("idx", HAKCYAMLFunctionArgument.idx);
+    io.mapRequired("label", HAKCYAMLFunctionArgument.label);
+  }
 };
 
-template<>
-struct yaml::MappingTraits<hakc::HAKCYAMLFunctionParameterType> {
-  static void mapping(yaml::IO &io, hakc::HAKCYAMLFunctionParameterType &HAKCYAMLFunctionParameter) {
+template <> struct yaml::MappingTraits<hakc::HAKCYAMLFunctionParameterType> {
+  static void
+  mapping(yaml::IO &io,
+          hakc::HAKCYAMLFunctionParameterType &HAKCYAMLFunctionParameter) {
     io.mapRequired("idx", HAKCYAMLFunctionParameter.idx);
     io.mapRequired("name", HAKCYAMLFunctionParameter.name);
   }
@@ -385,9 +395,10 @@ struct yaml::MappingTraits<hakc::HAKCYAMLTransferType> {
 
 template<>
 struct yaml::MappingTraits<hakc::HAKCYAMLCustomTransferType> {
-    static void mapping(yaml::IO &io, hakc::HAKCYAMLCustomTransferType &CustomTransfer) {
-        io.mapRequired("name", CustomTransfer.Name);
-        io.mapRequired("ptr-idx", CustomTransfer.PointerIdx);
+  static void mapping(yaml::IO &io,
+                      hakc::HAKCYAMLCustomTransferType &CustomTransfer) {
+    io.mapRequired("name", CustomTransfer.Name);
+    io.mapRequired("ptr-idx", CustomTransfer.PointerIdx);
         io.mapRequired("compartment-idx", CustomTransfer.CompartmentIdx);
         io.mapRequired("division-idx", CustomTransfer.DivisionIdx);
         io.mapRequired("type", CustomTransfer.TypeName);

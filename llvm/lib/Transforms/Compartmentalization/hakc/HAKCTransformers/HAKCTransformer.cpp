@@ -635,7 +635,8 @@ hakc::HAKCTransformer::CreateForwardArgumentTransfers(Function *Target, Function
             TransferState.AddTransferredArgument(Arg);
             continue;
         }
-      CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Forward Argument Transfer with Arg: " << *Arg << "\n";
+        CommonHAKCAnalysis::getWriter(DebugIsActive())
+            << "Forward Argument Transfer with Arg: " << *Arg << "\n";
         auto ManagedPointer = CreateNewManagedPointer(Arg);
         bool IsData = !Arg->getType()->isFunctionTy();
         CreateTransferFunctionArg_PreCall(Target, TransferFunction, Arg, TransferState);
@@ -645,79 +646,101 @@ hakc::HAKCTransformer::CreateForwardArgumentTransfers(Function *Target, Function
     }
 }
 
-void hakc::HAKCTransformer::CreateTransferFunctionArg_PreCall(Function *F, Function *TransferFunction, Argument *Arg,
-                                                              HAKCTransferState &TransferState) {
-    // TODO - Implement me
-      // Run the defined PreTransferActions from the configuration yaml, e.g., get_hakc_address_color
-    // Note: Type Value* changed to Argument* for Arg to get access to the argument number
+void hakc::HAKCTransformer::CreateTransferFunctionArg_PreCall(
+    Function *F, Function *TransferFunction, Argument *Arg,
+    HAKCTransferState &TransferState) {
+  // TODO - Implement me
+  // Run the defined PreTransferActions from the configuration yaml, e.g.,
+  // get_hakc_address_color
+  // Note: Type Value* changed to Argument* for Arg to get access to the
+  // argument number
 
+  for (auto &it : TransferState.GetPreTransferActions()) {
+    // check to ensure that this is only run on the valid arg index
 
-    for (auto &it: TransferState.GetPreTransferActions()) {
-        // check to ensure that this is only run on the valid arg index
+    CommonHAKCAnalysis::getWriter(DebugIsActive())
+        << "Trying to create PreTransferAction " << *it << "\n"
+        << "With Arg: " << *Arg << "\n";
+    auto PreTransferFunction = it->GetActionFunction();
+    // TODO: make this more generalized
+    // loop through all the args
+    for (auto arg : it->GetArgToLabel()) {
+      if (arg.first == Arg->getArgNo()) {
+        auto Label = it->GetActionLabel(arg.first);
+        // TODO: Q: any special casting or storing of value required?
+        // auto *arg_int = HAKCIRBuilder.CreatePtrToInt(Arg,
+        // PreTransferFunction->getArg(0)->getType()); // arg 0 is the function
+        // return type SmallVector<Value *> Args = {arg_int};
+        auto *PreTransferFunctionCall = CreateCall(PreTransferFunction, Arg);
 
-        CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Trying to create PreTransferAction " << *it << "\n" << "With Arg: " << *Arg << "\n";
-        auto PreTransferFunction = it->GetActionFunction();
-        // TODO: make this more generalized
-        // loop through all the args
-        for (auto arg: it->GetArgToLabel()) {
-          if (arg.first == Arg->getArgNo()) {
-            auto Label = it->GetActionLabel(arg.first);
-            // TODO: Q: any special casting or storing of value required?
-            // auto *arg_int = HAKCIRBuilder.CreatePtrToInt(Arg, PreTransferFunction->getArg(0)->getType()); // arg 0 is the function return type
-            // SmallVector<Value *> Args = {arg_int};
-            auto *PreTransferFunctionCall = CreateCall(PreTransferFunction, Arg);
-
-            // save this value for later
-            TransferState.AddActionArgumentValue(Label, PreTransferFunctionCall);
-            CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Created PreTransferAction: " << *TransferFunction << "\n";
-          }
-        }
+        // save this value for later
+        TransferState.AddActionArgumentValue(Label, PreTransferFunctionCall);
+        CommonHAKCAnalysis::getWriter(DebugIsActive())
+            << "Created PreTransferAction: " << *TransferFunction << "\n";
+      }
     }
+  }
 }
 
-void hakc::HAKCTransformer::CreateTransferFunctionArg_PostCall(Function *F, Function *TransformFunction, Argument *Arg,
-                                                               HAKCTransferState &TransferState) {
-    // TODO - Implement me
-    // Run the defined PostTargetActions from the configuration yaml, e.g., hakc_color_address
-    for (auto &it: TransferState.GetPostTargetActions()) {
-        CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Trying to create PostTargetAction " << *it <<"\n"  << "With Arg: " << *Arg << "\n";
-        auto PostTargetFunction = it->GetActionFunction();
-        for (auto arg: it->GetArgToLabel()) {
-          if (arg.first == Arg->getArgNo()) {
-            auto Label = it->GetActionLabel(arg.first);
-            // now that we have the label, we need to search for the value associated with it from the pre transfer action
-            auto *PostTargetFunctionCall = CreateCall(PostTargetFunction, Arg);
-            if (!PostTargetFunctionCall) {
-              CommonHAKCAnalysis::getWriter(true) << "Creation of PostTargetFunction"<< *PostTargetFunction << " has failed\n" << "\n";
-              throw std::exception();
-            }
-            auto Value = TransferState.GetActionArgumentValue(Label);
-            if (!Value) {
-              CommonHAKCAnalysis::getWriter(true) << "Could not find Value for Label: " << Label << "\n";
-              throw std::exception();
-            }
-            CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Mid creation PostTargetAction: " << *TransformFunction << "\n";
-            // TODO: add assert that the argument and value types match; if not, then something is wrong
-            // TODO: figure out why the next line segfaults, even though Value is not null
-            PostTargetFunctionCall->setArgOperand(arg.first, Value);
-            CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Created PostTargetAction: " << *TransformFunction << "\n";
-          }
+void hakc::HAKCTransformer::CreateTransferFunctionArg_PostCall(
+    Function *F, Function *TransformFunction, Argument *Arg,
+    HAKCTransferState &TransferState) {
+  // TODO - Implement me
+  // Run the defined PostTargetActions from the configuration yaml, e.g.,
+  // hakc_color_address
+  for (auto &it : TransferState.GetPostTargetActions()) {
+    CommonHAKCAnalysis::getWriter(DebugIsActive())
+        << "Trying to create PostTargetAction " << *it << "\n"
+        << "With Arg: " << *Arg << "\n";
+    auto PostTargetFunction = it->GetActionFunction();
+    for (auto arg : it->GetArgToLabel()) {
+      if (arg.first == Arg->getArgNo()) {
+        auto Label = it->GetActionLabel(arg.first);
+        // now that we have the label, we need to search for the value
+        // associated with it from the pre transfer action
+        auto *PostTargetFunctionCall = CreateCall(PostTargetFunction, Arg);
+        if (!PostTargetFunctionCall) {
+          CommonHAKCAnalysis::getWriter(true)
+              << "Creation of PostTargetFunction" << *PostTargetFunction
+              << " has failed\n"
+              << "\n";
+          throw std::exception();
         }
+        auto Value = TransferState.GetActionArgumentValue(Label);
+        if (!Value) {
+          CommonHAKCAnalysis::getWriter(true)
+              << "Could not find Value for Label: " << Label << "\n";
+          throw std::exception();
+        }
+        CommonHAKCAnalysis::getWriter(DebugIsActive())
+            << "Mid creation PostTargetAction: " << *TransformFunction << "\n";
+        // TODO: add assert that the argument and value types match; if not,
+        // then something is wrong
+        // TODO: figure out why the next line segfaults, even though Value is
+        // not null
+        PostTargetFunctionCall->setArgOperand(arg.first, Value);
+        CommonHAKCAnalysis::getWriter(DebugIsActive())
+            << "Created PostTargetAction: " << *TransformFunction << "\n";
+      }
     }
+  }
 }
 
-void hakc::HAKCTransformer::CreateBackwardArgumentTransfers(Function *Target, Function *TransferFunction,
-                                                            HAKCTransferState &TransferState) {
-    bool NoKernelXfers = NoKernelTransfers(Target);
-    for (auto Arg = TransferFunction->arg_begin(); Arg != TransferFunction->arg_end(); Arg++) {
-        if (!CommonHAKCAnalysis::argShouldTransfer(Arg) || NoKernelXfers) {
+void hakc::HAKCTransformer::CreateBackwardArgumentTransfers(
+    Function *Target, Function *TransferFunction,
+    HAKCTransferState &TransferState) {
+  bool NoKernelXfers = NoKernelTransfers(Target);
+  for (auto Arg = TransferFunction->arg_begin();
+       Arg != TransferFunction->arg_end(); Arg++) {
+    if (!CommonHAKCAnalysis::argShouldTransfer(Arg) || NoKernelXfers) {
             continue;
         }
-        CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Backward Argument Transfer with Arg: " << *Arg << "\n";
-        CreateTransferFunctionArg_PostCall(Target, TransferFunction, Arg, TransferState);
-    }
+    CommonHAKCAnalysis::getWriter(DebugIsActive())
+        << "Backward Argument Transfer with Arg: " << *Arg << "\n";
+    CreateTransferFunctionArg_PostCall(Target, TransferFunction, Arg,
+                                       TransferState);
+  }
 }
-
 
 Function *hakc::HAKCTransformer::CreateTransferFunction(Function *F) {
     if (F->isIntrinsic()) {
@@ -892,9 +915,11 @@ Function *hakc::HAKCTransformer::PopulateTransferFunction(Function *Target, Func
     auto *Unreachable = HAKCIRBuilder.CreateUnreachable();
     HAKCIRBuilder.SetInsertPoint(Unreachable);
 
-    // TODO: go over this with Derrick; pretty sure the empty TransferState was used for debugging the compilation
+    // TODO: go over this with Derrick; pretty sure the empty TransferState was
+    // used for debugging the compilation
     // This is where the issue with the type info seems to originate
-    HAKCTransferState TransferState = ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().GetTransferState();
+    HAKCTransferState TransferState =
+        ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().GetTransferState();
     CreateForwardArgumentTransfers(Target, TransferFunction, TransferState);
     CallInst *TargetFunctionCall = HAKCIRBuilder.CreateCall(Target, TransferState.GetTransferredArguments());
 

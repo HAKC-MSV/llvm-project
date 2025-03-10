@@ -88,6 +88,7 @@ hakc::HAKCTransferState::AddActionArgumentLabel(hakc_label_t Label) {
   return StringRef(ActionArgumentLabels.back());
 }
 
-SmallVector<llvm::hakc::hakc_label_t> hakc::HAKCTransferState::GetActionArgumentLabels() {
+SmallVector<llvm::hakc::hakc_label_t>
+hakc::HAKCTransferState::GetActionArgumentLabels() {
   return ActionArgumentLabels;
 }

@@ -132,24 +132,28 @@ namespace llvm::hakc {
         //        void CreateTransferFunctionFinalize_Arch(Function *Original, Function *Transfer);
 
         /**
-         * Perform architecture specific transformations prior to an argument transfer to a target compartment
+         * Perform architecture specific transformations prior to an argument
+         * transfer to a target compartment
          * @param F
          * @param TransferFunction
          * @param Arg
          * @param TransferState
          */
-        void CreateTransferFunctionArg_PreCall(Function *F, Function *TransferFunction, Argument *Arg,
-                                               HAKCTransferState &TransferState);
+        void CreateTransferFunctionArg_PreCall(
+            Function *F, Function *TransferFunction, Argument *Arg,
+            HAKCTransferState &TransferState);
 
         /**
-         * Perform architecture specific transformations after the cross compartment function call
+         * Perform architecture specific transformations after the cross
+         * compartment function call
          * @param F
          * @param TransformFunction
          * @param Arg
          * @param TransferState
          */
-        void CreateTransferFunctionArg_PostCall(Function *F, Function *TransformFunction, Argument *Arg,
-                                                HAKCTransferState &TransferState);
+        void CreateTransferFunctionArg_PostCall(
+            Function *F, Function *TransformFunction, Argument *Arg,
+            HAKCTransferState &TransferState);
 
         Module &getModule() const;
 

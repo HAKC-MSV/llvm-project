@@ -20,24 +20,24 @@ class HAKCTransferAction {
   // the action itself consists of an argument number, an argument label, and a
   // function
 public:
-      HAKCTransferAction(Function *F,
+  HAKCTransferAction(Function *F,
                      std::map<hakc_arg_t, hakc_label_ref_t> ArgToLabel);
 
   Function *GetActionFunction() const;
 
-      hakc_label_ref_t GetActionLabel(hakc_arg_t arg) const;
+  hakc_label_ref_t GetActionLabel(hakc_arg_t arg) const;
 
-      const std::map<llvm::hakc::hakc_arg_t, llvm::hakc::hakc_label_ref_t> &
-      GetArgToLabel();
+  const std::map<llvm::hakc::hakc_arg_t, llvm::hakc::hakc_label_ref_t> &
+  GetArgToLabel();
 
-    protected:
-      // Should be instantiated from yaml data and never changed; store Value *
-      // in state
-      Function *ActionFunction;
-      const std::map<hakc_arg_t, hakc_label_ref_t> ArgToLabel;
+protected:
+  // Should be instantiated from yaml data and never changed; store Value *
+  // in state
+  Function *ActionFunction;
+  const std::map<hakc_arg_t, hakc_label_ref_t> ArgToLabel;
 };
 
-} // hakc
-} // llvm
+} // namespace hakc
+} // namespace llvm
 
-#endif //HAKCTRANSFERACTION_H
+#endif // HAKCTRANSFERACTION_H

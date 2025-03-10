@@ -125,7 +125,7 @@ namespace llvm::hakc {
 
         HAKCTransferState &GetTransferState();
 
-    protected:
+      protected:
         CommonHAKCAnalysis &CommonAnalysis;
         HAKCTypeIdentifier TypeIdentifier;
         HAKCDatabaseInformation DatabaseInformation;
