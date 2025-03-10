@@ -287,7 +287,7 @@ namespace llvm::hakc {
         auto Response = Client.HandleRequest(Request);
         if (!Response) {
             CommonHAKCAnalysis::getWriter(true) << "Error Handling Request to " << Endpoint << "\n";
-            throw std::exception();
+          throw std::exception();
         }
         auto ParsedJson = Response.GetJSON();
         if (!ParsedJson) {

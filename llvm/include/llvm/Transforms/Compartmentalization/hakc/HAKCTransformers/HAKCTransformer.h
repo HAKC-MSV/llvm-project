@@ -138,7 +138,7 @@ namespace llvm::hakc {
          * @param Arg
          * @param TransferState
          */
-        void CreateTransferFunctionArg_PreCall(Function *F, Function *TransferFunction, Value *Arg,
+        void CreateTransferFunctionArg_PreCall(Function *F, Function *TransferFunction, Argument *Arg,
                                                HAKCTransferState &TransferState);
 
         /**
@@ -148,7 +148,7 @@ namespace llvm::hakc {
          * @param Arg
          * @param TransferState
          */
-        void CreateTransferFunctionArg_PostCall(Function *F, Function *TransformFunction, Value *Arg,
+        void CreateTransferFunctionArg_PostCall(Function *F, Function *TransformFunction, Argument *Arg,
                                                 HAKCTransferState &TransferState);
 
         Module &getModule() const;

@@ -3,11 +3,12 @@
 //
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCPreTransferAction.h"
 
-llvm::hakc::HAKCPreTransferAction::HAKCPreTransferAction(Function *PreTransferAction,
-                                                         StringRef Label) : HAKCTransferAction(PreTransferAction),
-                                                                            Label(Label) {
-}
+llvm::hakc::HAKCPreTransferAction::HAKCPreTransferAction(
+    Function *PreTransferAction,
+    std::map<hakc_arg_t, hakc_label_ref_t> ArgToLabel)
+    : HAKCTransferAction(PreTransferAction, ArgToLabel) {}
 
-llvm::StringRef llvm::hakc::HAKCPreTransferAction::GetLabel() const {
-    return Label;
+void llvm::hakc::HAKCPreTransferAction::AddValue(hakc_label_ref_t Label,
+                                                 Value *val) {
+  LabelToValue[Label] = val;
 }

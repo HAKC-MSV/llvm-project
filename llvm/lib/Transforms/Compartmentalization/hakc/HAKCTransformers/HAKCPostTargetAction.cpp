@@ -6,8 +6,13 @@
 
 using namespace llvm;
 
-hakc::HAKCPostTargetAction::HAKCPostTargetAction(Function *PostTargetAction,
-                                                 std::map<unsigned, StringRef> &
-                                                 PretransferReferences) : HAKCTransferAction(PostTargetAction),
-                                                                          PretransferReferences(PretransferReferences) {
+hakc::HAKCPostTargetAction::HAKCPostTargetAction(
+    Function *PostTargetAction,
+    std::map<hakc_arg_t, hakc_label_ref_t> ArgToLabel)
+    : HAKCTransferAction(PostTargetAction, ArgToLabel) {}
+
+void llvm::hakc::HAKCPostTargetAction::AddValue(hakc_label_ref_t Label,
+                                                Value *val) {
+  // auto it = LabelToValue.find(Label);
+  LabelToValue[Label] = val;
 }

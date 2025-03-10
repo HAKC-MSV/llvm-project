@@ -5,20 +5,24 @@
 #ifndef HAKC_HAKCPOSTTARGETACTION_H
 #define HAKC_HAKCPOSTTARGETACTION_H
 #include "HAKCTransferAction.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKC-defs.h"
 #include <map>
 
 namespace llvm::hakc {
     class HAKCPostTargetAction : public HAKCTransferAction {
     public:
-        // TODO: for now, assuming one arg, but expand in the future
-        HAKCPostTargetAction(Function *PostTargetAction, std::map<unsigned, StringRef> &PretransferReferences);
+      HAKCPostTargetAction(Function *PostTargetAction,
+                           std::map<hakc_arg_t, hakc_label_ref_t> ArgToLabel);
 
-        ~HAKCPostTargetAction() = default;
+      ~HAKCPostTargetAction() = default;
+
+      void AddValue(hakc_label_ref_t Label, Value* val);
 
     protected:
-        std::map<unsigned, StringRef> PretransferReferences;
+      // get the label from the arg value (superclass), then query state object
+      // TODO: might not need this, but could be helpful. might also rename
+      std::map<hakc_label_ref_t, Value *> LabelToValue;
     };
-
     typedef std::shared_ptr<HAKCPostTargetAction> hakc_post_target_action_def_t;
 }
 

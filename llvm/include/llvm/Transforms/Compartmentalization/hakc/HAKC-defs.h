@@ -24,6 +24,9 @@ namespace llvm::hakc {
     typedef uint64_t hakc_compartment_id_t;
     typedef uint64_t hakc_access_token_t;
     typedef uint64_t hakc_compartment_division_t;
+    typedef uint64_t hakc_arg_t;
+    typedef std::string hakc_label_t;
+    typedef StringRef hakc_label_ref_t;
 
     typedef ConstantInt *HAKC_Compartment_ID;
     typedef ConstantInt *HAKC_Access_Token;

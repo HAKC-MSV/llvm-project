@@ -5,18 +5,21 @@
 #ifndef HAKC_HAKCPRETRANSFERACTION_H
 #define HAKC_HAKCPRETRANSFERACTION_H
 #include "HAKCTransferAction.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKC-defs.h"
+#include <map>
 
 namespace llvm::hakc {
     class HAKCPreTransferAction : public HAKCTransferAction {
     public:
-        HAKCPreTransferAction(Function *PreTransferAction, StringRef Label);
+      HAKCPreTransferAction(Function *PreTransferAction,
+                            std::map<hakc_arg_t, hakc_label_ref_t> ArgToLabel);
 
-        ~HAKCPreTransferAction() = default;
+      ~HAKCPreTransferAction() = default;
 
-        StringRef GetLabel() const;
+      void AddValue(hakc_label_ref_t Label, Value *val);
 
     protected:
-        std::string Label;
+      std::map<hakc_label_ref_t, Value *> LabelToValue;
     };
 
     typedef std::shared_ptr<HAKCPreTransferAction> hakc_pre_transfer_action_def_t;
