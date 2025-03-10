@@ -733,8 +733,8 @@ void hakc::HAKCTransformer::CreateBackwardArgumentTransfers(
   for (auto Arg = TransferFunction->arg_begin();
        Arg != TransferFunction->arg_end(); Arg++) {
     if (!CommonHAKCAnalysis::argShouldTransfer(Arg) || NoKernelXfers) {
-            continue;
-        }
+      continue;
+    }
     CommonHAKCAnalysis::getWriter(DebugIsActive())
         << "Backward Argument Transfer with Arg: " << *Arg << "\n";
     CreateTransferFunctionArg_PostCall(Target, TransferFunction, Arg,

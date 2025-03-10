@@ -399,8 +399,8 @@ struct yaml::MappingTraits<hakc::HAKCYAMLCustomTransferType> {
                       hakc::HAKCYAMLCustomTransferType &CustomTransfer) {
     io.mapRequired("name", CustomTransfer.Name);
     io.mapRequired("ptr-idx", CustomTransfer.PointerIdx);
-        io.mapRequired("compartment-idx", CustomTransfer.CompartmentIdx);
-        io.mapRequired("division-idx", CustomTransfer.DivisionIdx);
+    io.mapRequired("compartment-idx", CustomTransfer.CompartmentIdx);
+    io.mapRequired("division-idx", CustomTransfer.DivisionIdx);
         io.mapRequired("type", CustomTransfer.TypeName);
         io.mapOptional("size-idx", CustomTransfer.SizeIdx);
         io.mapOptional("is-code-idx", CustomTransfer.IsCodeIdx);
