@@ -15,3 +15,7 @@ StringRef hakc::HAKCTransferAction::GetLabel() const {
 hakc::HAKCFunctionDefinition &hakc::HAKCTransferAction::GetHAKCActionFunction() const {
     return HAKCActionFunction;
 }
+
+bool hakc::HAKCTransferAction::operator<(const HAKCTransferAction &rhs) const {
+    return HAKCActionFunction.GetName() < rhs.GetHAKCActionFunction().GetName();
+}

@@ -332,11 +332,11 @@ namespace llvm::hakc {
 
         Function *GetTransferFunction(Function *F) const;
 
-        virtual void
-        CreateForwardArgumentTransfers(Function *Target, Function *TransferFunction, HAKCTransferState &TransferState);
+        // virtual void
+        // CreateForwardArgumentTransfers(Function *Target, Function *TransferFunction, HAKCTransferState &TransferState);
 
-        void CreateBackwardArgumentTransfers(Function *Target, Function *TransferFunction,
-                                             HAKCTransferState &TransferState);
+        // void CreateBackwardArgumentTransfers(Function *Target, Function *TransferFunction,
+        //                                      HAKCTransferState &TransferState);
 
         virtual bool TargetIsKernel(GlobalValue *Target);
 
