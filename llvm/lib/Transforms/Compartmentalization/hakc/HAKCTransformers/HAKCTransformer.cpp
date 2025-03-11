@@ -630,25 +630,25 @@ bool hakc::HAKCTransformer::NoKernelTransfers(Function *Target) {
     return hakc::CommonHAKCAnalysis::IsUncompartmentalizedSymbol(Target, CompartmentalizationPolicy);
 }
 
-void
-hakc::HAKCTransformer::CreateForwardArgumentTransfers(Function *Target, Function *TransferFunction,
-                                                      HAKCTransferState &TransferState) {
-    bool NoKernelXfers = NoKernelTransfers(Target);
-    for (auto *Arg = TransferFunction->arg_begin(); Arg != TransferFunction->arg_end(); Arg++) {
-        if (!CommonHAKCAnalysis::argShouldTransfer(Arg) || NoKernelXfers) {
-            TransferState.AddTransferredArgument(Arg);
-            continue;
-        }
-        CommonHAKCAnalysis::getWriter(DebugIsActive())
-                << "Forward Argument Transfer with Arg: " << *Arg << "\n";
-        auto ManagedPointer = CreateNewManagedPointer(Arg);
-        bool IsData = !Arg->getType()->isFunctionTy();
-        CreateTransferFunctionArg_PreCall(Target, TransferFunction, Arg, TransferState);
-        Instruction *Transfer = CreateCompartmentTransfer(*ManagedPointer, &*HAKCIRBuilder.GetInsertPoint(), Target,
-                                                          IsData);
-        TransferState.AddTransferredArgument(Transfer);
-    }
-}
+// void
+// hakc::HAKCTransformer::CreateForwardArgumentTransfers(Function *Target, Function *TransferFunction,
+//                                                       HAKCTransferState &TransferState) {
+//     bool NoKernelXfers = NoKernelTransfers(Target);
+//     for (auto *Arg = TransferFunction->arg_begin(); Arg != TransferFunction->arg_end(); Arg++) {
+//         if (!CommonHAKCAnalysis::argShouldTransfer(Arg) || NoKernelXfers) {
+//             TransferState.AddTransferredArgument(Arg);
+//             continue;
+//         }
+//         CommonHAKCAnalysis::getWriter(DebugIsActive())
+//                 << "Forward Argument Transfer with Arg: " << *Arg << "\n";
+//         auto ManagedPointer = CreateNewManagedPointer(Arg);
+//         bool IsData = !Arg->getType()->isFunctionTy();
+//         CreateTransferFunctionArg_PreCall(Target, TransferFunction, Arg, TransferState);
+//         Instruction *Transfer = CreateCompartmentTransfer(*ManagedPointer, &*HAKCIRBuilder.GetInsertPoint(), Target,
+//                                                           IsData);
+//         TransferState.AddTransferredArgument(Transfer);
+//     }
+// }
 
 void hakc::HAKCTransformer::CreateTransferFunctionArg_PreCall(Function *F, Function *TransferFunction, Argument *Arg,
                                                               HAKCTransferState &TransferState) {
@@ -676,19 +676,19 @@ void hakc::HAKCTransformer::CreateTransferFunctionArg_PostCall(Function *F, Func
     }
 }
 
-void hakc::HAKCTransformer::CreateBackwardArgumentTransfers(
-    Function *Target, Function *TransferFunction,
-    HAKCTransferState &TransferState) {
-    bool NoKernelXfers = NoKernelTransfers(Target);
-    for (auto &Arg: TransferFunction->args()) {
-        if (!CommonHAKCAnalysis::argShouldTransfer(&Arg) || NoKernelXfers) {
-            continue;
-        }
-        CommonHAKCAnalysis::getWriter(DebugIsActive())
-                << "Backward Argument Transfer with Arg: " << Arg << "\n";
-        CreateTransferFunctionArg_PostCall(Target, TransferFunction, &Arg, TransferState);
-    }
-}
+// void hakc::HAKCTransformer::CreateBackwardArgumentTransfers(
+//     Function *Target, Function *TransferFunction,
+//     HAKCTransferState &TransferState) {
+//     bool NoKernelXfers = NoKernelTransfers(Target);
+//     for (auto &Arg: TransferFunction->args()) {
+//         if (!CommonHAKCAnalysis::argShouldTransfer(&Arg) || NoKernelXfers) {
+//             continue;
+//         }
+//         CommonHAKCAnalysis::getWriter(DebugIsActive())
+//                 << "Backward Argument Transfer with Arg: " << Arg << "\n";
+//         CreateTransferFunctionArg_PostCall(Target, TransferFunction, &Arg, TransferState);
+//     }
+// }
 
 Function *hakc::HAKCTransformer::CreateTransferFunction(Function *F) {
     if (F->isIntrinsic()) {
@@ -858,25 +858,49 @@ Function *hakc::HAKCTransformer::PopulateTransferFunction(Function *Target, Func
     }
 
     InitNewFunction(TransferFunction, "HAKCTransferEntry");
+    HAKCIRBuilder.SetInsertPoint(&TransferFunction->getEntryBlock());
 
-    // Create a temporary terminator
-    auto *Unreachable = HAKCIRBuilder.CreateUnreachable();
-    HAKCIRBuilder.SetInsertPoint(Unreachable);
-
-    HAKCTransferState TransferState;
-    CreateForwardArgumentTransfers(Target, TransferFunction, TransferState);
+    bool NoKernelXfers = NoKernelTransfers(Target);
     SmallVector<Value *> Args;
-    TransferState.GetTransferredArguments(Args);
-    CallInst *TargetFunctionCall = HAKCIRBuilder.CreateCall(Target, Args);
+    for (auto &Arg: TransferFunction->args()) {
+        Args.push_back(&Arg);
+    }
+    CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Creating Target call in Transfer function " << TransferFunction->
+            getName() << " to " << Target->getName() << " with arguments\n";
+    for (auto *A: Args) {
+        CommonHAKCAnalysis::getWriter(DebugIsActive()) << "\t" << A << "\n";
+    }
 
-    if (!Target->doesNotReturn()) {
-        CreateBackwardArgumentTransfers(Target, TransferFunction, TransferState);
-        if (!Target->getReturnType()->isVoidTy()) {
-            HAKCIRBuilder.CreateRet(TargetFunctionCall);
-        } else {
+    CallInst *TargetFunctionCall = HAKCIRBuilder.CreateCall(Target, Args);
+    if (Target->doesNotReturn()) {
+        HAKCIRBuilder.CreateUnreachable();
+    } else {
+        if (Target->getReturnType()->isVoidTy()) {
             HAKCIRBuilder.CreateRetVoid();
+        } else {
+            HAKCIRBuilder.CreateRet(TargetFunctionCall);
         }
-        Unreachable->eraseFromParent();
+    }
+
+    for (auto &Arg: TransferFunction->args()) {
+        if (!CommonHAKCAnalysis::argShouldTransfer(&Arg) || NoKernelXfers) {
+            continue;
+        }
+        HAKCIRBuilder.SetInsertPoint(TargetFunctionCall);
+        CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Forward Argument Transfer with Arg: " << Arg << "\n";
+        auto ManagedPointer = CreateNewManagedPointer(&Arg);
+        HAKCTransferState TransferState;
+        bool IsData = !Arg.getType()->isFunctionTy();
+        CreateTransferFunctionArg_PreCall(Target, TransferFunction, &Arg, TransferState);
+        auto *Transfer = CreateCompartmentTransfer(*ManagedPointer, &*HAKCIRBuilder.GetInsertPoint(), Target,
+                                                   IsData);
+        TargetFunctionCall->setArgOperand(Arg.getArgNo(), Transfer);
+
+        if (!Target->doesNotReturn()) {
+            HAKCIRBuilder.SetInsertPoint(TargetFunctionCall->getNextNonDebugInstruction());
+            CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Backward Argument Transfer with Arg: " << Arg << "\n";
+            CreateTransferFunctionArg_PostCall(Target, TransferFunction, &Arg, TransferState);
+        }
     }
 
     //    CreateTransferFunctionFinalize_Arch(Target, TransferFunction);

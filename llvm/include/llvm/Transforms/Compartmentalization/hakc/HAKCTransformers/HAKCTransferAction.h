@@ -26,6 +26,8 @@ namespace llvm {
 
       HAKCFunctionDefinition &GetHAKCActionFunction() const;
 
+      bool operator<(const HAKCTransferAction &rhs) const;
+
     protected:
       std::string Label;
       HAKCFunctionDefinition &HAKCActionFunction;

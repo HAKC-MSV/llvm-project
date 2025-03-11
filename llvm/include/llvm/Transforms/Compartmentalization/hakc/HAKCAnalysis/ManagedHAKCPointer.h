@@ -8,7 +8,6 @@
 #include <set>
 #include "llvm/IR/Value.h"
 #include "llvm/IR/User.h"
-#include "llvm/IR/Instructions.h"
 
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTypeIdentifier/HAKCTypeInfo.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartmentalizationPolicy.h"
