@@ -650,16 +650,30 @@ hakc::HAKCTransformer::CreateForwardArgumentTransfers(Function *Target, Function
     }
 }
 
-void hakc::HAKCTransformer::CreateTransferFunctionArg_PreCall(
-    Function *F, Function *TransferFunction, Argument *Arg,
-    HAKCTransferState &TransferState) {
-    // TODO: Implement Me
+void hakc::HAKCTransformer::CreateTransferFunctionArg_PreCall(Function *F, Function *TransferFunction, Argument *Arg,
+                                                              HAKCTransferState &TransferState) {
+    for (auto &Preaction: ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().PreTransferActions()) {
+        SmallVector<Value *> Args;
+        /* For each argument type in Preaction, fetch the relevant data, and place it into Args */
+        /* Create Call to Preaction function with Args */
+        /* Associate the Call with the Preaction in TransferState */
+        Value *Call = nullptr; /* TODO: Actually create the call */
+        TransferState.AddTransferActionValue(*Preaction, Call);
+    }
 }
 
-void hakc::HAKCTransformer::CreateTransferFunctionArg_PostCall(
-    Function *F, Function *TransformFunction, Argument *Arg,
-    HAKCTransferState &TransferState) {
-    // TODO: Implement me
+void hakc::HAKCTransformer::CreateTransferFunctionArg_PostCall(Function *F, Function *TransformFunction, Argument *Arg,
+                                                               HAKCTransferState &TransferState) {
+    for (auto &Postaction: ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().PostTransferActions()) {
+        SmallVector<Value *> Args;
+        /* For each argument type in Postaction, fetch the relevant data, and place it into Args */
+        /* For each labeled arg in Postaction, get the associated Value* that matches the labeled Preaction,
+         * and replace the Index Value* with the Preaction Value* in Args */
+        /* Create Call to Postaction Function with Args */
+        /* Associate the Call with Postaction in TransferState */
+        Value *Call = nullptr; /* TODO: Actually create the call */
+        TransferState.AddTransferActionValue(*Postaction, Call);
+    }
 }
 
 void hakc::HAKCTransformer::CreateBackwardArgumentTransfers(
