@@ -20,7 +20,8 @@ namespace llvm::hakc {
         IsCode,
         AccessToken,
         ValidTargets,
-        ValidTargetSize
+        ValidTargetSize,
+        Void
     };
 
     struct HAKCFunctionArgumentDefinition {

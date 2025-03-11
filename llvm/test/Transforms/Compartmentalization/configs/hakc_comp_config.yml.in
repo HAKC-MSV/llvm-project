@@ -15,7 +15,7 @@ IncludePaths: [ ]
 PreTransferActions:
   - { name: "get_hakc_address_color", label: "saved-color" }
 PostTargetActions:
-  - { name: "hakc_color_address", args: [ { idx: 2, label: "saved-color" } ] }
+  - { name: "hakc_color_address", arguments: [ { idx: 2, label: "saved-color" } ] }
 CustomTransferFunctions:
   - transfer-obj-type: "char *"
     name: hakc_transfer_string

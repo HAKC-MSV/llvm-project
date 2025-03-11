@@ -488,8 +488,9 @@ namespace llvm::hakc {
     }
 
     void CommonHAKCAnalysis::VerifyFunction(Function *F) {
-        if (llvm::verifyFunction(*F, &CommonHAKCAnalysis::getWriter(false).ostream())) {
+        if (llvm::verifyFunction(*F, &CommonHAKCAnalysis::getWriter(true).ostream())) {
             CommonHAKCAnalysis::getWriter(true) << "Verification failed for function\n" << F << "\n";
+            CommonHAKCAnalysis::getWriter(true) << "Function: " << *F << "Num args: " << F->getNumOperands() << " of type: " <<  F->getFunctionType() << " calling conv: " << F->getCallingConv() << "\n";
             throw std::exception();
         }
     }

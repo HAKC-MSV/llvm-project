@@ -654,6 +654,11 @@ void hakc::HAKCTransformer::CreateTransferFunctionArg_PreCall(
     Function *F, Function *TransferFunction, Argument *Arg,
     HAKCTransferState &TransferState) {
     // TODO: Implement Me
+    // ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().Get
+    for (auto PreTransferAction: ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().PreTransferActions()) {
+      ModuleAnalysis.GetCommonAnalysis().getWriter(DebugIsActive()) <<
+        "Processing PreTransferAction: " << *PreTransferAction << "\n";
+    }
 }
 
 void hakc::HAKCTransformer::CreateTransferFunctionArg_PostCall(

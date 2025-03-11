@@ -256,7 +256,7 @@ std::shared_ptr<hakc::HAKCTypeInfo> hakc::HAKCTypeIdentifier::HandleType(const D
             };
             if (TagsToConsider.contains(DerivedTy->getTag())) {
               CommonHAKCAnalysis::getWriter(debug)
-                  << "___ Creating HAKCTypeInfo for\n"
+                  << "Creating HAKCTypeInfo for\n"
                   << type << "\n";
               auto TypeName = GetTypeName(type);
               TypeP = std::make_shared<HAKCTypeInfo>(AnalysisHelper, TypeName,
@@ -1163,6 +1163,20 @@ void hakc::HAKCTypeIdentifier::GetHAKCTypes(SmallVectorImpl<HAKCTypeP> &Results)
 
 Type *hakc::HAKCTypeIdentifier::GetTypeFromString(StringRef TypeStr) {
     SMDiagnostic Err;
-    auto *ParsedType = parseType(TypeStr, Err, GetModule());
-    return ParsedType;
+    // when TypeStr is void, an error is thrown: "void type only allowed for function results"
+    // Fix -> probably enable allow void in parseType
+    // a version of parseType will allow us to enable "AllowVoid" exists, but is buried pretty deep
+    // bool LLParser::parseType(Type *&Result, const Twine &Msg, bool AllowVoid) {
+    // This fix is not ideal, but is the cleanest way to do it as far as I know
+    if (TypeStr == "void") {
+      return Type::getVoidTy(GetModule().getContext());
+    }
+    else {
+      auto *ParsedType = parseType(TypeStr, Err, GetModule());
+      if (!ParsedType) {
+        CommonHAKCAnalysis::getWriter(true) << "Error in ParsedType: " << Err.getMessage() << "\n";
+        throw std::exception();
+      }
+      return ParsedType;
+    }
 }
