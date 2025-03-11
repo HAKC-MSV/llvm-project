@@ -67,6 +67,9 @@ namespace llvm::hakc {
         if (!TransferFunc) {
             CommonHAKCAnalysis::getWriter(true) << "Could not find function " << YAMLFunctionDef.Name << "\n";
             throw std::exception();
+        } else {
+            CommonHAKCAnalysis::getWriter(OutputDebugInfo()) << "Found Function " << TransferFunc << " with Type " <<
+                    TransferFunc->getType() << "\n";
         }
         SmallVector<HAKCFunctionArgumentDefinition> Args;
         PopulateHAKCFunctionArgs(Args, YAMLFunctionDef, TypeIdentifier);

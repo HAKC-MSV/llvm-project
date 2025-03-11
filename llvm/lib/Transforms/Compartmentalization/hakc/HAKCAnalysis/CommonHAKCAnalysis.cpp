@@ -97,7 +97,7 @@ namespace llvm::hakc {
         InitConfig(ConfigPath);
     }
 
-    Module &CommonHAKCAnalysis::GetModule() {
+    Module &CommonHAKCAnalysis::GetModule() const {
         return M;
     }
 
@@ -488,9 +488,9 @@ namespace llvm::hakc {
     }
 
     void CommonHAKCAnalysis::VerifyFunction(Function *F) {
-        if (llvm::verifyFunction(*F, &CommonHAKCAnalysis::getWriter(true).ostream())) {
-            CommonHAKCAnalysis::getWriter(true) << "Verification failed for function\n" << F << "\n";
-            CommonHAKCAnalysis::getWriter(true) << "Function: " << *F << "Num args: " << F->getNumOperands() << " of type: " <<  F->getFunctionType() << " calling conv: " << F->getCallingConv() << "\n";
+        if (llvm::verifyFunction(*F, &CommonHAKCAnalysis::getWriter(false).ostream())) {
+            CommonHAKCAnalysis::getWriter(true) << "Verification failed for function\n" << F->getName() << "\n" << F->
+                    getParent() << "\n";
             throw std::exception();
         }
     }

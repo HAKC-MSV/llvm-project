@@ -95,25 +95,20 @@ namespace llvm::hakc {
             if (!ReturnTy) {
                 return nullptr;
             }
-            std::string FunctionTypeString = std::string(ReturnType + " (");
-            // lean on llvm type system
-            for (uint64_t i = 0; i < Arguments.size(); i++) {
-                FunctionTypeString = std::string(FunctionTypeString + Arguments[i].TypeStr);
-                if (i != Arguments.size() - 1) {
-                    FunctionTypeString = std::string(FunctionTypeString + ", ");
+            SmallVector<Type *> ArgTys;
+            for (auto &Arg: Arguments) {
+                auto *ArgTy = Arg.GetType(TypeIdentifier);
+                if (!ArgTy) {
+                    return nullptr;
                 }
+                ArgTys.push_back(ArgTy);
             }
-            FunctionTypeString = std::string(FunctionTypeString + ")");
-            SMDiagnostic Err;
-            auto *FType = parseType(FunctionTypeString, Err, TypeIdentifier.GetModule());
-            auto *FuncType = dyn_cast<FunctionType>(FType);
-            if (FuncType){
-                auto *F = dyn_cast<Function>(TypeIdentifier.GetModule()
-                .getOrInsertFunction(Name, FuncType)
+
+            auto *FType = FunctionType::get(ReturnTy, ArgTys, false);
+            auto *F = dyn_cast<Function>(TypeIdentifier.GetModule()
+                .getOrInsertFunction(Name, FType)
                 .getCallee());
-                return F;
-            }
-            return nullptr;
+            return F;
         }
     };
 

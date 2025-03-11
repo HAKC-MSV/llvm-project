@@ -50,7 +50,7 @@ namespace llvm::hakc {
 
         void GetHAKCTypes(SmallVectorImpl<HAKCTypeP> &Results) const;
 
-        Type *GetTypeFromString(StringRef TypeStr);
+        Type *GetTypeFromString(StringRef TypeStr) const;
 
     protected:
         HAKCTypeP FindType(Type *Ty);

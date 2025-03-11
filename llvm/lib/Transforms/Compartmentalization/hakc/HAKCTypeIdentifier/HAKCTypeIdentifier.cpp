@@ -1161,7 +1161,12 @@ void hakc::HAKCTypeIdentifier::GetHAKCTypes(SmallVectorImpl<HAKCTypeP> &Results)
     }
 }
 
-Type *hakc::HAKCTypeIdentifier::GetTypeFromString(StringRef TypeStr) {
+Type *hakc::HAKCTypeIdentifier::GetTypeFromString(StringRef TypeStr) const {
+    if (TypeStr == "void") {
+        /* parseType only allows parsing void types for functions so explicitly check for that */
+        return Type::getVoidTy(GetModule().getContext());
+    }
+
     SMDiagnostic Err;
     // when TypeStr is void, an error is thrown: "void type only allowed for function results"
     // Fix -> probably enable allow void in parseType

@@ -159,8 +159,8 @@ namespace llvm::hakc {
 
         void GetAllDefinedHAKCFunctions(SmallVectorImpl<hakc::function_def_t> &Results);
 
-        static hakc::function_def_t CreateHAKCFunction(HAKCYAMLFunctionDefinition &YAMLFunctionDef,
-                                                       HAKCTypeIdentifier &TypeIdentifier);
+        hakc::function_def_t CreateHAKCFunction(HAKCYAMLFunctionDefinition &YAMLFunctionDef,
+                                                HAKCTypeIdentifier &TypeIdentifier);
 
         static hakc::custom_transfer_def_t CreateCustomTransferFunction(HAKCYAMLCustomTransferType &YAMLCustomTransfer,
                                                                         HAKCTypeP HAKCTy,
