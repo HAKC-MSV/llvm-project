@@ -35,7 +35,7 @@ namespace llvm::hakc {
 
         HAKCSystemInformation &GetSystemInfo();
 
-        Module &GetModule();
+        Module &GetModule() const;
 
         Value *getDef(Value *V, bool followLoad);
 

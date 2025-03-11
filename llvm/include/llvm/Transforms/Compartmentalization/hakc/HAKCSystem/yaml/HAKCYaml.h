@@ -84,7 +84,25 @@ namespace llvm::hakc {
             : ReturnType(), Name(), Arguments() {
         }
 
-        bool IsValid() const { return (!ReturnType.empty() || !Name.empty()); }
+        bool IsValid() {
+            bool Result = !ReturnType.empty() || !Name.empty();
+            if (Result) {
+                auto ByIndex = [&](const HAKCYAMLFunctionArgument &Arg0, const HAKCYAMLFunctionArgument &Arg1) {
+                    return Arg0.Idx < Arg1.Idx;
+                };
+                llvm::sort(Arguments, ByIndex);
+                unsigned Previous = 0;
+                for (auto &Arg: Arguments) {
+                    if (Arg.Idx > 0) {
+                        if (Arg.Idx != Previous + 1) {
+                            return false;
+                        }
+                        Previous = Arg.Idx;
+                    }
+                }
+            }
+            return Result;
+        }
 
         Function *GetFunction(HAKCTypeIdentifier &TypeIdentifier) {
             if (!IsValid()) {
@@ -96,16 +114,16 @@ namespace llvm::hakc {
                 return nullptr;
             }
             SmallVector<Type *> ArgTys;
-            ArgTys.reserve(Arguments.size());
             for (auto &Arg: Arguments) {
                 auto *ArgTy = Arg.GetType(TypeIdentifier);
                 if (!ArgTy) {
                     return nullptr;
                 }
-                ArgTys[Arg.Idx] = ArgTy;
+                ArgTys.push_back(ArgTy);
             }
 
             auto *FType = FunctionType::get(ReturnTy, ArgTys, false);
+            errs() << "FType = " << *FType << "\n";
             auto *F = dyn_cast<Function>(TypeIdentifier.GetModule()
                 .getOrInsertFunction(Name, FType)
                 .getCallee());
@@ -216,6 +234,7 @@ struct yaml::ScalarEnumerationTraits<hakc::HAKCFunctionArgumentUse> {
         io.enumCase(value, "access-token", hakc::AccessToken);
         io.enumCase(value, "valid-targets", hakc::ValidTargets);
         io.enumCase(value, "valid-target-size", hakc::ValidTargetSize);
+        io.enumCase(value, "other", hakc::Other);
     }
 };
 
@@ -266,7 +285,7 @@ struct yaml::MappingTraits<hakc::HAKCYAMLActionType> {
 static void YAMLFunctionMapping(yaml::IO &io, hakc::HAKCYAMLFunctionDefinition &FunctionDefinition) {
     io.mapRequired("name", FunctionDefinition.Name);
     io.mapRequired("return-type", FunctionDefinition.ReturnType);
-    io.mapOptional("params", FunctionDefinition.Arguments);
+    io.mapOptional("arguments", FunctionDefinition.Arguments);
 }
 
 template<>
@@ -303,7 +322,7 @@ struct yaml::MappingTraits<hakc::HAKCYAMLCustomTransferType> {
     static void mapping(yaml::IO &io,
                         hakc::HAKCYAMLCustomTransferType &CustomTransfer) {
         YAMLFunctionMapping(io, CustomTransfer);
-        io.mapRequired("type", CustomTransfer.TransferObjectTypeName);
+        io.mapRequired("transfer-obj-type", CustomTransfer.TransferObjectTypeName);
     }
 };
 
