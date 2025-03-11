@@ -123,7 +123,6 @@ namespace llvm::hakc {
             }
 
             auto *FType = FunctionType::get(ReturnTy, ArgTys, false);
-            errs() << "FType = " << *FType << "\n";
             auto *F = dyn_cast<Function>(TypeIdentifier.GetModule()
                 .getOrInsertFunction(Name, FType)
                 .getCallee());
