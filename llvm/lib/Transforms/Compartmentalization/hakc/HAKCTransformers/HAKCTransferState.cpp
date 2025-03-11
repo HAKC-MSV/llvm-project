@@ -16,3 +16,15 @@ void hakc::HAKCTransferState::AddTransferredArgument(Value *Arg) {
 void hakc::HAKCTransferState::GetTransferredArguments(SmallVectorImpl<Value *> &Results) const {
   Results.append(TransferredArgumentValues.begin(), TransferredArgumentValues.end());
 }
+
+void hakc::HAKCTransferState::AddTransferActionValue(HAKCTransferAction &Action, Value *V) {
+  ActionValues[Action] = V;
+}
+
+Value *hakc::HAKCTransferState::GetTransferActionValue(HAKCTransferAction &Action) {
+  auto it = ActionValues.find(Action);
+  if (it == ActionValues.end()) {
+    return nullptr;
+  }
+  return it->second;
+}
