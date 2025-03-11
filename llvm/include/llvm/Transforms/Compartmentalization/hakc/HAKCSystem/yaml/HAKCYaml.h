@@ -95,6 +95,7 @@ namespace llvm::hakc {
             if (!ReturnTy) {
                 return nullptr;
             }
+            // TODO: ensure that arguments can be specified out of order, but be inserted in the correct order
             SmallVector<Type *> ArgTys;
             for (auto &Arg: Arguments) {
                 auto *ArgTy = Arg.GetType(TypeIdentifier);

@@ -665,6 +665,7 @@ void hakc::HAKCTransformer::CreateTransferFunctionArg_PreCall(
         // create call to action function, save return value
         // fill in args correctly
         // save mapping of label to return value
+
       }
     }
 
@@ -863,8 +864,9 @@ Function *hakc::HAKCTransformer::PopulateTransferFunction(Function *Target, Func
     auto *Unreachable = HAKCIRBuilder.CreateUnreachable();
     HAKCIRBuilder.SetInsertPoint(Unreachable);
 
-    HAKCTransferState TransferState;
-    CreateForwardArgumentTransfers(Target, TransferFunction, TransferState);
+    //  TransferState;
+    SmallVector<HAKCTransferState> TransferStates;
+    CreateForwardArgumentTransfers(Target, TransferFunction, TransferStates);
     SmallVector<Value *> Args;
     TransferState.GetTransferredArguments(Args);
     CallInst *TargetFunctionCall = HAKCIRBuilder.CreateCall(Target, Args);
