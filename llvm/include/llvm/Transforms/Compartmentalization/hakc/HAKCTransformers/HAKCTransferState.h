@@ -22,8 +22,13 @@ namespace llvm::hakc {
 
         void GetTransferredArguments(SmallVectorImpl<Value *> &Results) const;
 
+        void AddTransferActionValue(HAKCTransferAction &Action, Value *V);
+
+        Value *GetTransferActionValue(HAKCTransferAction &Action);
+
     protected:
         SmallVector<Value *> TransferredArgumentValues;
+        std::map<HAKCTransferAction, Value *> ActionValues;
     };
 } // namespace llvm::hakc
 
