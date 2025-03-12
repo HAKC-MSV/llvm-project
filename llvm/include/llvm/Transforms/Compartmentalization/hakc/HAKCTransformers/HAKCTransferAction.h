@@ -7,46 +7,54 @@
 
 #include "llvm/IR/Function.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKC-defs.h"
-#include <map>
 #include <llvm/Transforms/Compartmentalization/hakc/HAKCFunctionDefinition/HAKCFunctionDefinition.h>
 
 namespace llvm {
-  namespace hakc {
-  struct HAKCActionArgument {
-      HAKCActionArgument(unsigned Idx, std::string Label) : Idx(Idx), Label(Label){};
+    namespace hakc {
+        class HAKCActionArgument {
+        public:
+            HAKCActionArgument(unsigned Idx, std::string Label) : Idx(Idx), Label(Label) {
+            };
 
-      unsigned Idx;
-      std::string Label;
-    };
-    class HAKCTransferAction {
-      // pretransfer: step0 = check_color
-      // posttarget: color_address(step0)
+            StringRef GetLabel() const { return Label; }
+            unsigned GetIdx() const { return Idx; }
 
-      // transfer action should be executed, which creates a transfer state
-      // the action itself consists of an argument number, an argument label, and a
-      // function
-    public:
-      HAKCTransferAction(HAKCFunctionDefinition &HAKCActionFunction, StringRef Label, SmallVector<HAKCActionArgument> Arguments);
+        protected:
+            unsigned Idx;
+            std::string Label;
+        };
 
-      HAKCTransferAction(HAKCFunctionDefinition &HAKCActionFunction, StringRef Label);
+        class HAKCTransferAction {
+            // pretransfer: step0 = check_color
+            // posttarget: color_address(step0)
 
-      virtual ~HAKCTransferAction() = default;
+            // transfer action should be executed, which creates a transfer state
+            // the action itself consists of an argument number, an argument label, and a
+            // function
+        public:
+            HAKCTransferAction(HAKCFunctionDefinition &HAKCActionFunction, StringRef Label,
+                               SmallVector<HAKCActionArgument> Arguments);
 
-      StringRef GetLabel() const;
+            HAKCTransferAction(HAKCFunctionDefinition &HAKCActionFunction, StringRef Label);
 
-      SmallVector<HAKCActionArgument> GetArguments();
+            virtual ~HAKCTransferAction() = default;
 
-      HAKCFunctionDefinition &GetHAKCActionFunction() const;
+            StringRef GetLabel() const;
 
-      bool operator<(const HAKCTransferAction &rhs) const;
+            iterator_range<SmallVector<HAKCActionArgument>::iterator> GetArguments();
 
-    protected:
-      std::string Label;
-      HAKCFunctionDefinition &HAKCActionFunction;
-      SmallVector<HAKCActionArgument> Arguments;
-    };
-    typedef std::shared_ptr<HAKCTransferAction> transfer_action_def_t;
-  } // namespace hakc
+            HAKCFunctionDefinition &GetHAKCActionFunction() const;
+
+            bool operator<(const HAKCTransferAction &rhs) const;
+
+        protected:
+            std::string Label;
+            HAKCFunctionDefinition &HAKCActionFunction;
+            SmallVector<HAKCActionArgument> Arguments;
+        };
+
+        typedef std::shared_ptr<HAKCTransferAction> transfer_action_def_t;
+    } // namespace hakc
 } // namespace llvm
 
 #endif // HAKCTRANSFERACTION_H

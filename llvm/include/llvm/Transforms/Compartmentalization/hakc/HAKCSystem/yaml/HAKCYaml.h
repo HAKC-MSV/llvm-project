@@ -224,15 +224,9 @@ struct yaml::ScalarEnumerationTraits<hakc::HAKCAllocationTypeEnum> {
 template<>
 struct yaml::ScalarEnumerationTraits<hakc::HAKCFunctionArgumentUse> {
     static void enumeration(IO &io, hakc::HAKCFunctionArgumentUse &value) {
-        io.enumCase(value, "size", hakc::Size);
-        io.enumCase(value, "signed-ptr", hakc::SignedPtr);
-        io.enumCase(value, "compartment", hakc::Comp);
-        io.enumCase(value, "division", hakc::Div);
-        io.enumCase(value, "is-code", hakc::IsCode);
-        io.enumCase(value, "access-token", hakc::AccessToken);
-        io.enumCase(value, "valid-targets", hakc::ValidTargets);
-        io.enumCase(value, "valid-target-size", hakc::ValidTargetSize);
-        io.enumCase(value, "other", hakc::Other);
+        for (auto &it: hakc::HAKCArgumentArgumentUseStringMap()) {
+            io.enumCase(value, it.second, it.first);
+        }
     }
 };
 

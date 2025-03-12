@@ -274,19 +274,43 @@ namespace llvm::hakc {
     HAKCWriter &
     HAKCWriter::operator<<(const HAKCPreTransferAction &PreTransferAction) {
         *this << "Pre Transfer Action " << PreTransferAction.GetLabel() << " " << PreTransferAction.
-                GetHAKCActionFunction().GetName() << "\n";
+                GetHAKCActionFunction().GetName();
         return *this;
     }
 
     HAKCWriter &
     HAKCWriter::operator<<(const HAKCPostTargetAction &PostTargetAction) {
         *this << "Post Transfer Action " << PostTargetAction.GetLabel() << " " << PostTargetAction.
-                GetHAKCActionFunction().GetName() << "\n";
+                GetHAKCActionFunction().GetName();
         return *this;
     }
 
     HAKCWriter &HAKCWriter::operator<<(const HAKCFunctionDefinition &FunctionDefinition) {
-        *this << "HAKC Function " << FunctionDefinition.GetName() << "\n";
+        *this << "HAKC Function " << FunctionDefinition.GetName();
+        return *this;
+    }
+
+    HAKCWriter &HAKCWriter::operator<<(const HAKCFunctionArgumentDefinition &Arg) {
+        *this << "HAKCFunction Arg " << Arg.Idx << " (use: " << Arg.ArgUse << ")";
+        return *this;
+    }
+
+    HAKCWriter &HAKCWriter::operator<<(const enum HAKCFunctionArgumentUse ArgUse) {
+        for (auto &it: HAKCArgumentArgumentUseStringMap()) {
+            if (it.first == ArgUse) {
+                *this << it.second;
+                break;
+            }
+        }
+
+        return *this;
+    }
+
+    HAKCWriter &HAKCWriter::operator<<(const HAKCTransferAction &TransferAction) {
+        *this << "Transfer Action " << TransferAction.GetHAKCActionFunction().GetName();
+        if (!TransferAction.GetLabel().empty()) {
+            *this << "(" << TransferAction.GetLabel() << ")";
+        }
         return *this;
     }
 } // namespace llvm::hakc

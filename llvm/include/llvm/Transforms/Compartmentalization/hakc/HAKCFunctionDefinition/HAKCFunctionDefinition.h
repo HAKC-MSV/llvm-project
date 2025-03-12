@@ -7,6 +7,7 @@
 
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
+#include <map>
 
 using namespace llvm;
 
@@ -23,8 +24,9 @@ namespace llvm::hakc {
         ValidTargetSize
     };
 
-    struct
-HAKCFunctionArgumentDefinition {
+    const std::map<HAKCFunctionArgumentUse, const char *> HAKCArgumentArgumentUseStringMap();
+
+    struct HAKCFunctionArgumentDefinition {
         HAKCFunctionArgumentDefinition(Type *ArgTy, unsigned Idx, HAKCFunctionArgumentUse Use);
 
         Type *ArgTy;
@@ -48,11 +50,11 @@ HAKCFunctionArgumentDefinition {
 
         ConstantInt *GetDivisionIdIdx() const;
 
-        HAKCFunctionArgumentUse GetArgUseByIdx(unsigned Idx);
+        iterator_range<SmallVector<HAKCFunctionArgumentDefinition>::iterator> Args();
 
     protected:
         Function *F;
-        SmallVector<HAKCFunctionArgumentDefinition> Args;
+        SmallVector<HAKCFunctionArgumentDefinition> ArgList;
 
         bool GetArgIdxByUse(HAKCFunctionArgumentUse Use, unsigned *Idx) const;
 
@@ -61,7 +63,6 @@ HAKCFunctionArgumentDefinition {
 
     typedef std::shared_ptr<HAKCFunctionDefinition> function_def_t;
     typedef HAKCFunctionDefinition arg_def_t;
-
 } // hakc
 
 #endif //HAKC_HAKCFUNCTIONDEFINITION_H

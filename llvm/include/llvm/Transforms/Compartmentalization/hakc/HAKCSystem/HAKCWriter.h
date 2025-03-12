@@ -5,9 +5,9 @@
 #ifndef HAKCWRITER_H
 #define HAKCWRITER_H
 
-#include <llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCPreTransferAction.h>
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCPreTransferAction.h"
 
-#include <llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCPostTargetAction.h>
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCPostTargetAction.h"
 
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/ManagedHAKCPointer.h"
 
@@ -94,6 +94,12 @@ namespace llvm::hakc {
         HAKCWriter &operator<<(const HAKCPostTargetAction &PostTargetAction);
 
         HAKCWriter &operator<<(const HAKCFunctionDefinition &FunctionDefinition);
+
+        HAKCWriter &operator<<(const HAKCFunctionArgumentDefinition &Arg);
+
+        HAKCWriter &operator<<(const enum HAKCFunctionArgumentUse ArgUse);
+
+        HAKCWriter &operator<<(const HAKCTransferAction &TransferAction);
     };
 } // hakc
 

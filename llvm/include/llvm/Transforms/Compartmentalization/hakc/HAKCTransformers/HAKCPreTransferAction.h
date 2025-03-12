@@ -5,7 +5,6 @@
 #ifndef HAKC_HAKCPRETRANSFERACTION_H
 #define HAKC_HAKCPRETRANSFERACTION_H
 #include "HAKCTransferAction.h"
-#include "llvm/Transforms/Compartmentalization/hakc/HAKC-defs.h"
 #include <map>
 
 namespace llvm::hakc {

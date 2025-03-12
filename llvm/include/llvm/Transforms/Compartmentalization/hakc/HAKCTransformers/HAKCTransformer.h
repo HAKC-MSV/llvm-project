@@ -190,12 +190,6 @@ namespace llvm::hakc {
 
         virtual Function *PopulateGlobalTransfer(Function *GlobalTransfer, GlobalVariable *GlobalVar, bool Debug);
 
-        Value* CreateActionCall(HAKCTransferAction &TransferAction, Argument *TransferredArg, HAKCTransferState &TransferState);
-
-        void CreatePreTransferActionCalls(iterator_range<HAKCPreTransferActionList::iterator> TransferActions, Argument *TransferredArg, HAKCTransferState &TransferState);
-
-        void CreatePostTargetActionCalls(iterator_range<HAKCPostTargetActionList::iterator> TargetActions, Argument *TransferredArg, HAKCTransferState &TransferState);
-
     protected:
         IRBuilder<> HAKCIRBuilder;
         HAKCCompartmentalizationPolicy &CompartmentalizationPolicy;
@@ -339,12 +333,6 @@ namespace llvm::hakc {
 
         Function *GetTransferFunction(Function *F) const;
 
-        // virtual void
-        // CreateForwardArgumentTransfers(Function *Target, Function *TransferFunction, HAKCTransferState &TransferState);
-
-        // void CreateBackwardArgumentTransfers(Function *Target, Function *TransferFunction,
-        //                                      HAKCTransferState &TransferState);
-
         virtual bool TargetIsKernel(GlobalValue *Target);
 
         virtual void
@@ -366,6 +354,17 @@ namespace llvm::hakc {
         void InitNewFunction(Function *F, StringRef EntryBlockName);
 
         HAKCPointerBaseP CreateNewManagedPointer(Value *BaseDefinition);
+
+        Value *CreateActionCall(HAKCTransferAction &TransferAction, Argument *Original,
+                                HAKCTransferState &TransferState);
+
+        void CreatePreTransferActionCalls(iterator_range<HAKCPreTransferActionList::iterator> TransferActions,
+                                          Argument *Original,
+                                          HAKCTransferState &TransferState);
+
+        void CreatePostTargetActionCalls(iterator_range<HAKCPostTargetActionList::iterator> TargetActions,
+                                         Argument *Original,
+                                         HAKCTransferState &TransferState);
     };
 } // namespace hakc
 

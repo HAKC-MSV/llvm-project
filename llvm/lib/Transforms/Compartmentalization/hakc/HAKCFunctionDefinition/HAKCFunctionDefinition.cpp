@@ -18,7 +18,7 @@ namespace llvm::hakc {
 
     HAKCFunctionDefinition::HAKCFunctionDefinition(Function *F,
                                                    SmallVectorImpl<HAKCFunctionArgumentDefinition> &
-                                                   Args) : F(F), Args(Args.begin(), Args.end()) {
+                                                   Args) : F(F), ArgList(Args.begin(), Args.end()) {
         if (!F) {
             CommonHAKCAnalysis::getWriter(true) << "F is null\n";
             throw std::exception();
@@ -54,7 +54,7 @@ namespace llvm::hakc {
     }
 
     bool HAKCFunctionDefinition::GetArgIdxByUse(HAKCFunctionArgumentUse Use, unsigned *Idx) const {
-        for (auto &Arg: Args) {
+        for (auto &Arg: ArgList) {
             if (Arg.ArgUse == Use) {
                 *Idx = Arg.Idx;
                 return true;
@@ -63,13 +63,21 @@ namespace llvm::hakc {
         return false;
     }
 
-    HAKCFunctionArgumentUse HAKCFunctionDefinition::GetArgUseByIdx(unsigned Idx) {
-      for (auto Arg: Args) {
-        if (Arg.Idx == Idx) {
-          return Arg.ArgUse;
-        }
-      }
-      CommonHAKCAnalysis::getWriter(true) << "Error, failed to find TransferredArgument Use by Idx!\n";
-      std::exception();
+    iterator_range<SmallVector<HAKCFunctionArgumentDefinition>::iterator> HAKCFunctionDefinition::Args() {
+        return make_range(ArgList.begin(), ArgList.end());
+    }
+
+    const std::map<HAKCFunctionArgumentUse, const char *> HAKCArgumentArgumentUseStringMap() {
+        return {
+            {hakc::Size, "size"},
+            {hakc::SignedPtr, "signed-ptr"},
+            {hakc::Comp, "compartment"},
+            {hakc::Div, "division"},
+            {hakc::IsCode, "is-code"},
+            {hakc::AccessToken, "access-token"},
+            {hakc::ValidTargets, "valid-targets"},
+            {hakc::ValidTargetSize, "valid-target-size"},
+            {hakc::Other, "other"}
+        };
     }
 } // namespace llvm::hakc
