@@ -255,16 +255,16 @@ std::shared_ptr<hakc::HAKCTypeInfo> hakc::HAKCTypeIdentifier::HandleType(const D
                 dwarf::DW_TAG_restrict_type,
             };
             if (TagsToConsider.contains(DerivedTy->getTag())) {
-                CommonHAKCAnalysis::getWriter(debug)
-                        << "___ Creating HAKCTypeInfo for\n"
-                        << type << "\n";
-                auto TypeName = GetTypeName(type);
-                TypeP = std::make_shared<HAKCTypeInfo>(AnalysisHelper, TypeName,
-                                                       debug);
-                // TODO: is this right derrick?
-                auto *LLVMTy = GetLLVMType(DerivedTy);
-                TypeP->SetLLVMType(LLVMTy);
-                AddTypeMapping(type, TypeP);
+              CommonHAKCAnalysis::getWriter(debug)
+                  << "Creating HAKCTypeInfo for\n"
+                  << type << "\n";
+              auto TypeName = GetTypeName(type);
+              TypeP = std::make_shared<HAKCTypeInfo>(AnalysisHelper, TypeName,
+                                                     debug);
+              // TODO: is this right derrick?
+              auto *LLVMTy = GetLLVMType(DerivedTy);
+              TypeP->SetLLVMType(LLVMTy);
+              AddTypeMapping(type, TypeP);
             } else {
                 CommonHAKCAnalysis::getWriter(debug) << "Not handling DITYpe " << type << "\n";
             }

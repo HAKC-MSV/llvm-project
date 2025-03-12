@@ -662,18 +662,21 @@ void hakc::HAKCTransformer::CreateTransferFunctionArg_PreCall(Function *F, Funct
     }
 }
 
-void hakc::HAKCTransformer::CreateTransferFunctionArg_PostCall(Function *F, Function *TransformFunction, Argument *Arg,
-                                                               HAKCTransferState &TransferState) {
-    for (auto &Postaction: ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().PostTransferActions()) {
-        SmallVector<Value *> Args;
-        /* For each argument type in Postaction, fetch the relevant data, and place it into Args */
-        /* For each labeled arg in Postaction, get the associated Value* that matches the labeled Preaction,
-         * and replace the Index Value* with the Preaction Value* in Args */
-        /* Create Call to Postaction Function with Args */
-        /* Associate the Call with Postaction in TransferState */
-        Value *Call = nullptr; /* TODO: Actually create the call */
-        TransferState.AddTransferActionValue(*Postaction, Call);
+void hakc::HAKCTransformer::CreateTransferFunctionArg_PreCall(
+    Function *F, Function *TransferFunction, Argument *Arg,
+    HAKCTransferState &TransferState) {
+    // TODO: Implement Me
+    // ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().Get
+    for (auto PreTransferAction: ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().PreTransferActions()) {
+      ModuleAnalysis.GetCommonAnalysis().getWriter(DebugIsActive()) <<
+        "Processing PreTransferAction: " << *PreTransferAction << "\n";
     }
+}
+
+void hakc::HAKCTransformer::CreateTransferFunctionArg_PostCall(
+    Function *F, Function *TransformFunction, Argument *Arg,
+    HAKCTransferState &TransferState) {
+    // TODO: Implement me
 }
 
 // void hakc::HAKCTransformer::CreateBackwardArgumentTransfers(

@@ -260,7 +260,7 @@ struct yaml::MappingTraits<hakc::HAKCYAMLAllocationType> {
     static void mapping(yaml::IO &io, hakc::HAKCYAMLAllocationType &AllocationType) {
         io.mapRequired("name", AllocationType.FunctionName);
         io.mapRequired("type", AllocationType.AllocationType);
-        io.mapRequired("args", AllocationType.Arguments);
+        io.mapRequired("arguments", AllocationType.Arguments);
     }
 };
 
@@ -277,7 +277,7 @@ struct yaml::MappingTraits<hakc::HAKCYAMLActionType> {
     static void mapping(yaml::IO &io, hakc::HAKCYAMLActionType &ActionType) {
         io.mapRequired("name", ActionType.FunctionName);
         io.mapOptional("label", ActionType.Label, "");
-        io.mapOptional("args", ActionType.Arguments);
+        io.mapOptional("arguments", ActionType.Arguments);
     }
 };
 
