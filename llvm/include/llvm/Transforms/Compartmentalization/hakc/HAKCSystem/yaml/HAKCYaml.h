@@ -63,11 +63,10 @@ namespace llvm::hakc {
     // the function argument values (the parameter values set when called)
     struct HAKCYAMLFunctionArgument {
         unsigned Idx;
-        HAKCYAMLStringType Label;
         HAKCYAMLStringType TypeStr;
         HAKCFunctionArgumentUse ArgUse;
 
-        HAKCYAMLFunctionArgument() : Idx(), Label(), TypeStr(), ArgUse(Other) {
+        HAKCYAMLFunctionArgument() : Idx(), TypeStr(), ArgUse(Other) {
         }
 
         Type *GetType(HAKCTypeIdentifier &TypeIdentifier) {
@@ -312,7 +311,6 @@ struct yaml::MappingTraits<hakc::HAKCYAMLFunctionArgument> {
         io.mapRequired("idx", HAKCYAMLFunctionArgument.Idx);
         io.mapRequired("type", HAKCYAMLFunctionArgument.TypeStr);
         io.mapRequired("arg-use", HAKCYAMLFunctionArgument.ArgUse);
-        io.mapOptional("label", HAKCYAMLFunctionArgument.Label, "");
     }
 };
 

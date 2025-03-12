@@ -12,6 +12,12 @@
 
 namespace llvm {
   namespace hakc {
+  struct HAKCActionArgument {
+      HAKCActionArgument(unsigned Idx, std::string Label) : Idx(Idx), Label(Label){};
+
+      unsigned Idx;
+      std::string Label;
+    };
     class HAKCTransferAction {
       // pretransfer: step0 = check_color
       // posttarget: color_address(step0)
@@ -20,9 +26,15 @@ namespace llvm {
       // the action itself consists of an argument number, an argument label, and a
       // function
     public:
+      HAKCTransferAction(HAKCFunctionDefinition &HAKCActionFunction, StringRef Label, SmallVector<HAKCActionArgument> Arguments);
+
       HAKCTransferAction(HAKCFunctionDefinition &HAKCActionFunction, StringRef Label);
 
+      virtual ~HAKCTransferAction() = default;
+
       StringRef GetLabel() const;
+
+      SmallVector<HAKCActionArgument> GetArguments();
 
       HAKCFunctionDefinition &GetHAKCActionFunction() const;
 
@@ -31,7 +43,9 @@ namespace llvm {
     protected:
       std::string Label;
       HAKCFunctionDefinition &HAKCActionFunction;
+      SmallVector<HAKCActionArgument> Arguments;
     };
+    typedef std::shared_ptr<HAKCTransferAction> transfer_action_def_t;
   } // namespace hakc
 } // namespace llvm
 

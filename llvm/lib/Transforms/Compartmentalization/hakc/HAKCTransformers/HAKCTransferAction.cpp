@@ -5,11 +5,20 @@
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCTransferAction.h"
 
 hakc::HAKCTransferAction::HAKCTransferAction(HAKCFunctionDefinition &HAKCActionFunction,
-                                             StringRef Label) : Label(Label), HAKCActionFunction(HAKCActionFunction) {
+                                             StringRef Label,  SmallVector<HAKCActionArgument> Arguments) : Label(Label), HAKCActionFunction(HAKCActionFunction), Arguments(Arguments) {
+}
+
+hakc::HAKCTransferAction::HAKCTransferAction(HAKCFunctionDefinition &HAKCActionFunction,
+                                             StringRef Label) : Label(Label), HAKCActionFunction(HAKCActionFunction), Arguments() {
 }
 
 StringRef hakc::HAKCTransferAction::GetLabel() const {
     return Label;
+}
+
+
+SmallVector<hakc::HAKCActionArgument> GetArguments() {
+    return Arguments;
 }
 
 hakc::HAKCFunctionDefinition &hakc::HAKCTransferAction::GetHAKCActionFunction() const {

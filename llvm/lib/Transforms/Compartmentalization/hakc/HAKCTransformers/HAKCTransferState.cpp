@@ -19,3 +19,7 @@ Value *hakc::HAKCTransferState::GetTransferActionValue(HAKCTransferAction &Actio
     }
     return it->second;
 }
+//
+// hakc::HAKCTransferAction* GetTransferActions() {
+//   return
+// }

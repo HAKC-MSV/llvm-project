@@ -20,16 +20,15 @@ namespace llvm::hakc {
         IsCode,
         AccessToken,
         ValidTargets,
-        ValidTargetSize,
-        Void
+        ValidTargetSize
     };
 
-    struct HAKCFunctionArgumentDefinition {
-        HAKCFunctionArgumentDefinition(Type *ArgTy, unsigned Idx, StringRef Label, HAKCFunctionArgumentUse Use);
+    struct
+HAKCFunctionArgumentDefinition {
+        HAKCFunctionArgumentDefinition(Type *ArgTy, unsigned Idx, HAKCFunctionArgumentUse Use);
 
         Type *ArgTy;
         unsigned Idx;
-        std::string Label;
         HAKCFunctionArgumentUse ArgUse;
     };
 
@@ -49,6 +48,8 @@ namespace llvm::hakc {
 
         ConstantInt *GetDivisionIdIdx() const;
 
+        HAKCFunctionArgumentUse GetArgUseByIdx(unsigned Idx);
+
     protected:
         Function *F;
         SmallVector<HAKCFunctionArgumentDefinition> Args;
@@ -59,6 +60,8 @@ namespace llvm::hakc {
     };
 
     typedef std::shared_ptr<HAKCFunctionDefinition> function_def_t;
+    typedef HAKCFunctionDefinition arg_def_t;
+
 } // hakc
 
 #endif //HAKC_HAKCFUNCTIONDEFINITION_H

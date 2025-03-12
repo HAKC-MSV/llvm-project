@@ -13,7 +13,6 @@
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/yaml/HAKCYaml.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCPostTargetAction.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCPreTransferAction.h"
-#include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCTransferState.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTypeIdentifier/HAKCTypeIdentifier.h"
 
 typedef std::shared_ptr<llvm::hakc::HAKCAllocationSize> HAKCCustomAllocation;
@@ -27,9 +26,10 @@ typedef SmallVector<Function *> FunctionList;
 typedef SmallPtrSet<Type *, 16> HAKCTypeSet;
 typedef SmallVector<std::string, 16> HAKCStringList;
 typedef SmallVector<HAKCCustomAllocation> HAKCCustomAllocationList;
+typedef SmallVector<llvm::hakc::arg_def_t> HAKCArgumentsList;
+typedef SmallVector<llvm::hakc::transfer_action_def_t> HAKCTransferActionList;
 typedef SmallVector<llvm::hakc::pre_transfer_action_def_t> HAKCPreTransferActionList;
-typedef SmallVector<llvm::hakc::post_target_action_def_t> HAKCPostTransferActionList;
-
+typedef SmallVector<llvm::hakc::post_target_action_def_t> HAKCPostTargetActionList;
 
 namespace llvm::hakc {
     class CommonHAKCAnalysis;
@@ -124,7 +124,7 @@ namespace llvm::hakc {
 
         iterator_range<HAKCPreTransferActionList::iterator> PreTransferActions();
 
-        iterator_range<HAKCPostTransferActionList::iterator> PostTransferActions();
+        iterator_range<HAKCPostTargetActionList::iterator> PostTargetActions();
 
     protected:
         CommonHAKCAnalysis &CommonAnalysis;
@@ -155,7 +155,7 @@ namespace llvm::hakc {
         HAKCCustomAllocationList AllocationFunctionList;
         HAKCCustomTransferList CustomTransferList;
         HAKCPreTransferActionList PreTransferActionList;
-        HAKCPostTransferActionList PostTransferActionList;
+        HAKCPostTargetActionList PostTargetActionList;
 
         void GetAllDefinedHAKCFunctions(SmallVectorImpl<hakc::function_def_t> &Results);
 

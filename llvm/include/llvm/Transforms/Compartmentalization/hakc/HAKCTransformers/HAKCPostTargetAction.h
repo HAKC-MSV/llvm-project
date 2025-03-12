@@ -11,7 +11,7 @@
 namespace llvm::hakc {
     class HAKCPostTargetAction : public HAKCTransferAction {
     public:
-        HAKCPostTargetAction(HAKCFunctionDefinition &HAKCActionFunction, StringRef Label);
+        HAKCPostTargetAction(HAKCFunctionDefinition &HAKCActionFunction, StringRef Label, SmallVector<HAKCActionArgument> Arguments);
     };
 
     typedef std::shared_ptr<HAKCPostTargetAction> post_target_action_def_t;
