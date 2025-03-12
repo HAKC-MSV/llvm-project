@@ -630,65 +630,131 @@ bool hakc::HAKCTransformer::NoKernelTransfers(Function *Target) {
     return hakc::CommonHAKCAnalysis::IsUncompartmentalizedSymbol(Target, CompartmentalizationPolicy);
 }
 
-// void
-// hakc::HAKCTransformer::CreateForwardArgumentTransfers(Function *Target, Function *TransferFunction,
-//                                                       HAKCTransferState &TransferState) {
-//     bool NoKernelXfers = NoKernelTransfers(Target);
-//     for (auto *Arg = TransferFunction->arg_begin(); Arg != TransferFunction->arg_end(); Arg++) {
-//         if (!CommonHAKCAnalysis::argShouldTransfer(Arg) || NoKernelXfers) {
-//             TransferState.AddTransferredArgument(Arg);
-//             continue;
-//         }
-//         CommonHAKCAnalysis::getWriter(DebugIsActive())
-//                 << "Forward Argument Transfer with Arg: " << *Arg << "\n";
-//         auto ManagedPointer = CreateNewManagedPointer(Arg);
-//         bool IsData = !Arg->getType()->isFunctionTy();
-//         CreateTransferFunctionArg_PreCall(Target, TransferFunction, Arg, TransferState);
-//         Instruction *Transfer = CreateCompartmentTransfer(*ManagedPointer, &*HAKCIRBuilder.GetInsertPoint(), Target,
-//                                                           IsData);
-//         TransferState.AddTransferredArgument(Transfer);
-//     }
-// }
+Value* hakc::HAKCTransformer::CreateActionCall(HAKCTransferAction &TransferAction, Argument *TransferredArg, HAKCTransferState &TransferState) {
+  // E.g., foo(int *a) -> Transferred arg is *a
+  //  TransferAction = get_address_color(ptr)
+  //  TransferredArg = ptr -> signed-ptr use
+  //  The *a is supposed to map somewhere in the TransferAction, but we need to find it
+  /* For each argument in PreTransferAction, fetch the relevant data, and place it into Args */
+  // TODO: figure out how to dynamically determine the transferred arg use
+  HAKCFunctionArgumentUse TransferredArgUse = HAKCFunctionArgumentUse::SignedPtr;
 
-void hakc::HAKCTransformer::CreateTransferFunctionArg_PreCall(Function *F, Function *TransferFunction, Argument *Arg,
-                                                              HAKCTransferState &TransferState) {
-    for (auto &Preaction: ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().PreTransferActions()) {
-        SmallVector<Value *> Args;
-        /* For each argument type in Preaction, fetch the relevant data, and place it into Args */
-        /* Create Call to Preaction function with Args */
-        /* Associate the Call with the Preaction in TransferState */
-        Value *Call = nullptr; /* TODO: Actually create the call */
-        TransferState.AddTransferActionValue(*Preaction, Call);
+  // check the label
+  auto ActionFunction = TransferAction.GetHAKCActionFunction();
+  // actually, assume that the label is unique for now
+  CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Creating Action Call: " << TransferAction.GetLabel() << "\n";
+  SmallVector<Value *> ActionArgs;
+  auto TransferActionValue = TransferState.GetTransferActionValue(TransferAction);
+
+  for (auto ActionArg = ActionFunction.GetFunction()->arg_begin(); ActionArg != ActionFunction.GetFunction()->arg_end(); ActionArg++ ) {
+    CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Got arg " << *ActionArg <<  " in function "<< ActionFunction << "\n" ;
+    HAKCFunctionArgumentUse ActionArgUse = ActionFunction.GetArgUseByIdx(ActionArg->getArgNo());
+    // go through arg use, then determine what goes in to the function call (except for other) -> throw exception for other
+    if(ActionArgUse == HAKCFunctionArgumentUse::SignedPtr){
+        ActionArgs.push_back(ActionArg);
     }
+    else if(ActionArgUse == HAKCFunctionArgumentUse::Comp){
+    }
+    else if(ActionArgUse == HAKCFunctionArgumentUse::Div){
+    }
+    else if(ActionArgUse == HAKCFunctionArgumentUse::Size){
+    }
+    else if(ActionArgUse == HAKCFunctionArgumentUse::IsCode){
+    }
+    else if(ActionArgUse == HAKCFunctionArgumentUse::AccessToken){
+    }
+    else if(ActionArgUse == HAKCFunctionArgumentUse::ValidTargets){
+    }
+    else if (ActionArgUse == HAKCFunctionArgumentUse::ValidTargetSize) {
+    }
+    else if(ActionArgUse == HAKCFunctionArgumentUse::Other) {
+      CommonHAKCAnalysis::getWriter(true) << "Argument of type Other is invalid\n";
+      std::exception();
+    }
+
+  }
+
+  if (!TransferActionValue) {
+    // let's assume for now that it is a simple return value that needs to be created
+    auto *CallI = CreateCall(ActionFunction.GetFunction(), ActionArgs);
+    CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Created Action Call: " << *CallI << "\n";
+    return CallI;
+  }
+  else {
+    // assume that the label has an actual use, so fill that in now (and overwrite the present function argument)
+    auto *CallI = CreateCall(ActionFunction.GetFunction(), ActionArgs);
+    // CallI->getArgOperand()
+    for (auto Argument: TransferAction.GetArguments()) {
+        auto ArgumentIdx = Argument.Idx;
+        auto ArgumentLabel = Argument.Label;
+        // TODO error checking
+        CallI->setOperand(ArgumentIdx, TransferState.GetTransferActionValue(ArgumentLabel));
+    }
+
+    CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Created Action Call: " << *CallI << "\n";
+    return CallI;
+  }
+  CommonHAKCAnalysis::getWriter(DebugIsActive()) << "\t" << TransferActionValue << "\n";
+
+
+  // if (TransferAction.GetLabel())
+  //
+
+  // if (GetLabel not in enums, then it must be custom lablel)
+
+  // check if label is a return value (true if arguments is empty)
+  // if (TransferAction.GetHAKCActionFunction())
+
+  //
+  // Populate each argument in the action function (and match by use)
+  // f
+  //
+  //   auto transferredArgIndex = ActionFunction.GetArgUseByIdx(TransferredArgUse);
+    // First, check if the Transferred Argument matches a label
+    // First check if the Action Argument matches the name (use) of the Transferred Argument
+    // ActionArg
+    // if (TransferredArgUse == ActionArgUse) {
+    //   ActionArgs.push_back(TransferredArg);
+    // }
+    // // If not a simple substitution, then fill in the parameters
+    // else if () {
+    //
+    // }
+
+    // Finally, create the value
+      // ActionArg->getArgNo()
+    // if (ActionFunction.GetSignedPtrIdx()->equalsInt(ActionArg->getArgNo())) {
+      // if Value* exists for label, then grab the value else create it
+    // }
+
+
+
+
+
 }
 
-void hakc::HAKCTransformer::CreateTransferFunctionArg_PostCall(Function *F, Function *TransformFunction, Argument *Arg,
-                                                               HAKCTransferState &TransferState) {
-    for (auto &Postaction: ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().PostTransferActions()) {
-        SmallVector<Value *> Args;
-        /* For each argument type in Postaction, fetch the relevant data, and place it into Args */
-        /* For each labeled arg in Postaction, get the associated Value* that matches the labeled Preaction,
-         * and replace the Index Value* with the Preaction Value* in Args */
-        /* Create Call to Postaction Function with Args */
-        /* Associate the Call with Postaction in TransferState */
-        Value *Call = nullptr; /* TODO: Actually create the call */
-        TransferState.AddTransferActionValue(*Postaction, Call);
-    }
+void hakc::HAKCTransformer::CreatePreTransferActionCalls(iterator_range<HAKCPreTransferActionList::iterator> TransferActions, Argument *TransferredArg, HAKCTransferState &TransferState){
+  for (auto Action: TransferActions) {
+    /* Create Call to TransferAction function with Args */
+    CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Searching for TransferAction:" << Action->GetHAKCActionFunction().GetName() << "\n";
+    auto ActionCast = std::dynamic_pointer_cast<HAKCTransferAction>(Action);
+    Value *TransferActionCall = CreateActionCall(*ActionCast, TransferredArg, TransferState);
+    /* Associate the Call with the Preaction in TransferState */
+    TransferState.AddTransferActionValue(*Action, TransferActionCall);
+  }
 }
 
-// void hakc::HAKCTransformer::CreateBackwardArgumentTransfers(
-//     Function *Target, Function *TransferFunction,
-//     HAKCTransferState &TransferState) {
-//     bool NoKernelXfers = NoKernelTransfers(Target);
-//     for (auto &Arg: TransferFunction->args()) {
-//         if (!CommonHAKCAnalysis::argShouldTransfer(&Arg) || NoKernelXfers) {
-//             continue;
-//         }
-//         CommonHAKCAnalysis::getWriter(DebugIsActive())
-//                 << "Backward Argument Transfer with Arg: " << Arg << "\n";
-//         CreateTransferFunctionArg_PostCall(Target, TransferFunction, &Arg, TransferState);
-//     }
-// }
+
+  void hakc::HAKCTransformer::CreatePostTargetActionCalls(iterator_range<HAKCPostTargetActionList::iterator> TargetActions, Argument *TransferredArg, HAKCTransferState &TransferState){
+  for (auto Action: TargetActions) {
+    /* Create Call to TransferAction function with Args */
+    CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Searching for TransferAction:" << Action->GetHAKCActionFunction().GetName() << "\n";
+    auto ActionCast = std::dynamic_pointer_cast<HAKCTransferAction>(Action);
+    Value *TransferActionCall = CreateActionCall(*ActionCast, TransferredArg, TransferState);
+    /* Associate the Call with the Preaction in TransferState */
+    TransferState.AddTransferActionValue(*Action, TransferActionCall);
+  }
+}
 
 Function *hakc::HAKCTransformer::CreateTransferFunction(Function *F) {
     if (F->isIntrinsic()) {
@@ -891,7 +957,9 @@ Function *hakc::HAKCTransformer::PopulateTransferFunction(Function *Target, Func
         auto ManagedPointer = CreateNewManagedPointer(&Arg);
         HAKCTransferState TransferState;
         bool IsData = !Arg.getType()->isFunctionTy();
-        CreateTransferFunctionArg_PreCall(Target, TransferFunction, &Arg, TransferState);
+
+
+        CreatePreTransferActionCalls(ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().PreTransferActions(), &Arg, TransferState);
         auto *Transfer = CreateCompartmentTransfer(*ManagedPointer, &*HAKCIRBuilder.GetInsertPoint(), Target,
                                                    IsData);
         TargetFunctionCall->setArgOperand(Arg.getArgNo(), Transfer);
@@ -899,11 +967,9 @@ Function *hakc::HAKCTransformer::PopulateTransferFunction(Function *Target, Func
         if (!Target->doesNotReturn()) {
             HAKCIRBuilder.SetInsertPoint(TargetFunctionCall->getNextNonDebugInstruction());
             CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Backward Argument Transfer with Arg: " << Arg << "\n";
-            CreateTransferFunctionArg_PostCall(Target, TransferFunction, &Arg, TransferState);
+            CreatePostTargetActionCalls(ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().PostTargetActions(), &Arg, TransferState);
         }
     }
-
-    //    CreateTransferFunctionFinalize_Arch(Target, TransferFunction);
 
     CommonHAKCAnalysis::VerifyFunction(TransferFunction);
 

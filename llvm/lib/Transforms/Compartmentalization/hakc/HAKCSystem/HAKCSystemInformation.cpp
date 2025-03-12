@@ -8,6 +8,7 @@
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/yaml/HAKCYaml.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCPostTargetAction.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCPreTransferAction.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCTransferAction.h"
 
 namespace llvm::hakc {
     HAKCDatabaseInformation::HAKCDatabaseInformation()
@@ -57,7 +58,7 @@ namespace llvm::hakc {
           CompartmentalizationSupportFunctionList(), SymbolsToOutputDebugInfo(),
           SeparateNamespacePathList(), HAKCSourcePathList(),
           SafeTransitionFunctionList(), IgnoredTypeSet(), IgnoredGlobalList(),
-          AllocationFunctionList(), CustomTransferList(), PreTransferActionList(), PostTransferActionList() {
+          AllocationFunctionList(), CustomTransferList(), PreTransferActionList(), PostTargetActionList() {
     }
 
     hakc::function_def_t
@@ -99,7 +100,7 @@ namespace llvm::hakc {
                         " in definition for " << YAMLFunctionDef.Name << "\n";
                 throw std::exception();
             }
-            HAKCFunctionArgumentDefinition Arg(ArgTy, YAMLArg.Idx, YAMLArg.Label, YAMLArg.ArgUse);
+            HAKCFunctionArgumentDefinition Arg(ArgTy, YAMLArg.Idx, YAMLArg.ArgUse);
             Args.push_back(Arg);
         }
     }
@@ -253,9 +254,14 @@ namespace llvm::hakc {
         for (auto &PostTargetActionDefinition: YamlConfig.PostTargetActions) {
             for (auto &FuncDef: DefinedFunctions) {
                 if (FuncDef->GetName() == PostTargetActionDefinition.FunctionName) {
-                    auto Action = std::make_shared<HAKCPostTargetAction>(*FuncDef, PostTargetActionDefinition.Label);
-                    PostTransferActionList.push_back(Action);
-                    break;
+                  SmallVector<HAKCActionArgument> Arguments;
+                  for (auto Arg: PostTargetActionDefinition.Arguments) {
+                    HAKCActionArgument Argument(Arg.Idx, Arg.Label);
+                    Arguments.push_back(Argument);
+                  }
+                  auto Action = std::make_shared<HAKCPostTargetAction>(*FuncDef, PostTargetActionDefinition.Label, Arguments);
+                  PostTargetActionList.push_back(Action);
+                  break;
                 }
             }
         }
@@ -378,12 +384,13 @@ namespace llvm::hakc {
     }
 
     iterator_range<HAKCPreTransferActionList::iterator> HAKCSystemInformation::PreTransferActions() {
-        return make_range(PreTransferActionList.begin(), PreTransferActionList.end());
+      return make_range(PreTransferActionList.begin(), PreTransferActionList.end());
     }
 
-    iterator_range<HAKCPostTransferActionList::iterator> HAKCSystemInformation::PostTransferActions() {
-        return make_range(PostTransferActionList.begin(), PostTransferActionList.end());
+    iterator_range<HAKCPostTargetActionList::iterator> HAKCSystemInformation::PostTargetActions() {
+      return make_range(PostTargetActionList.begin(), PostTargetActionList.end());
     }
+
 
     StringRef HAKCSystemInformation::GetArch() const { return Arch; }
 

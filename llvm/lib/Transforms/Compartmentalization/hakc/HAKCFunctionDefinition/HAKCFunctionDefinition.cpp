@@ -7,16 +7,12 @@
 #include <llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/CommonHAKCAnalysis.h>
 
 namespace llvm::hakc {
-    HAKCFunctionArgumentDefinition::HAKCFunctionArgumentDefinition(Type *ArgTy, unsigned Idx, StringRef Label,
+    HAKCFunctionArgumentDefinition::HAKCFunctionArgumentDefinition(Type *ArgTy, unsigned Idx,
                                                                    HAKCFunctionArgumentUse Use) : ArgTy(ArgTy),
-        Idx(Idx), Label(Label), ArgUse(Use) {
+        Idx(Idx), ArgUse(Use) {
         if (!ArgTy) {
             CommonHAKCAnalysis::getWriter(true) << "ArgTy is null\n";
             throw std::exception();
-        }
-        if (Label.empty()) {
-            llvm::raw_string_ostream os(this->Label);
-            os << "arg_" << Idx;
         }
     }
 
@@ -65,5 +61,15 @@ namespace llvm::hakc {
             }
         }
         return false;
+    }
+
+    HAKCFunctionArgumentUse HAKCFunctionDefinition::GetArgUseByIdx(unsigned Idx) {
+      for (auto Arg: Args) {
+        if (Arg.Idx == Idx) {
+          return Arg.ArgUse;
+        }
+      }
+      CommonHAKCAnalysis::getWriter(true) << "Error, failed to find TransferredArgument Use by Idx!\n";
+      std::exception();
     }
 } // namespace llvm::hakc

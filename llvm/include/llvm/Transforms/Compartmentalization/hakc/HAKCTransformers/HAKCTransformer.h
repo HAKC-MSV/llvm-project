@@ -13,11 +13,12 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
-#include "llvm/Transforms/Compartmentalization/hakc/HAKCFunctionDefinition/HAKCFunctionDefinition.h"
-#include "llvm/Transforms/Compartmentalization/hakc/HAKCFunctionDefinition/HAKCCustomTransfer.h"
-#include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartmentalizationPolicy.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/ManagedHAKCPointer.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartmentalizationPolicy.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCFunctionDefinition/HAKCCustomTransfer.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCFunctionDefinition/HAKCFunctionDefinition.h"
 
+#include <llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCSystemInformation.h>
 
 using namespace llvm;
 
@@ -188,6 +189,12 @@ namespace llvm::hakc {
         virtual GlobalVariable *AddCompartmentMetadataEntry(HAKCCompartment &Compartment);
 
         virtual Function *PopulateGlobalTransfer(Function *GlobalTransfer, GlobalVariable *GlobalVar, bool Debug);
+
+        Value* CreateActionCall(HAKCTransferAction &TransferAction, Argument *TransferredArg, HAKCTransferState &TransferState);
+
+        void CreatePreTransferActionCalls(iterator_range<HAKCPreTransferActionList::iterator> TransferActions, Argument *TransferredArg, HAKCTransferState &TransferState);
+
+        void CreatePostTargetActionCalls(iterator_range<HAKCPostTargetActionList::iterator> TargetActions, Argument *TransferredArg, HAKCTransferState &TransferState);
 
     protected:
         IRBuilder<> HAKCIRBuilder;

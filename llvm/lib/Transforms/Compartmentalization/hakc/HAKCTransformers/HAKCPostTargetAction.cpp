@@ -7,5 +7,5 @@
 using namespace llvm;
 
 hakc::HAKCPostTargetAction::HAKCPostTargetAction(HAKCFunctionDefinition &HAKCActionFunction,
-                                                 StringRef Label) : HAKCTransferAction(HAKCActionFunction, Label) {
+                                                 StringRef Label, SmallVector<HAKCActionArgument> Arguments) : HAKCTransferAction(HAKCActionFunction, Label, Arguments) {
 }
