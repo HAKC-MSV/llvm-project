@@ -355,8 +355,7 @@ namespace llvm::hakc {
 
         HAKCPointerBaseP CreateNewManagedPointer(Value *BaseDefinition);
 
-        Value *CreateActionCall(HAKCTransferAction &TransferAction, Argument *Original,
-                                HAKCTransferState &TransferState);
+        Value *CreateActionCall(HAKCTransferAction &TransferAction, HAKCTransferState &TransferState);
     };
 } // namespace hakc
 

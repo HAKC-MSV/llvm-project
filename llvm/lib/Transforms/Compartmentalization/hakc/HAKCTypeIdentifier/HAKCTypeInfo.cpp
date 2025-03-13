@@ -44,8 +44,17 @@ namespace llvm::hakc {
         return LLVMType;
     }
 
+    Value*HAKCTypeInfo::GetObjectSizeInBytes() {
+      return this->ObjectSizeInBits;
+    }
+
+    void HAKCTypeInfo::SetObjectSizeInBytes(const HAKCTypeP &PointeeType) {
+      this->ObjectSizeInBits = dyn_cast<Value>(ConstantInt::get(Type::getInt64Ty(GetCommonHAKCAnalysis().GetModule().getContext()), PointeeType->GetSizeInBits() / BITS_PER_BYTE));
+    }
+
     void HAKCTypeInfo::SetPointeeType(const HAKCTypeP &PointeeType) {
         this->PointeeType = PointeeType;
+        SetObjectSizeInBytes(this->PointeeType);
     }
 
     bool HAKCTypeInfo::IsIntegerType() const {

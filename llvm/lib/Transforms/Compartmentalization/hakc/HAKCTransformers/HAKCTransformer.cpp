@@ -624,18 +624,20 @@ bool hakc::HAKCTransformer::NoKernelTransfers(Function *Target) {
     return hakc::CommonHAKCAnalysis::IsUncompartmentalizedSymbol(Target, CompartmentalizationPolicy);
 }
 
-// TODO: Change function signature to remove Original and only operate on the Managed Pointer in TransferState
 Value *
 hakc::HAKCTransformer::CreateActionCall(HAKCTransferAction &TransferAction,
                                         HAKCTransferState &TransferState) {
-  Argument *Original = TransferState.GetManagedPointer()->GetBaseDefinition();
+  Argument *Original = dyn_cast<Argument>(TransferState.GetManagedPointer()->GetBaseDefinition());
+  if (!Original) {
+    CommonHAKCAnalysis::getWriter(true) << "Casting Value* to Argument* in ManagedPointer failed\n";
+    std::exception();
+  }
   auto ActionFunction = TransferAction.GetHAKCActionFunction();
   CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Creating Action for: " << TransferAction << "\n";
     SmallVector<Value *> ActionArgs;
     for (auto &ActionArg: ActionFunction.Args()) {
         switch (ActionArg.ArgUse) {
             case SignedPtr:
-                // TODO: use ManagedPointer.GetBaseDefinition
                 ActionArgs.push_back(Original);
                 break;
             case Comp:
@@ -645,29 +647,26 @@ hakc::HAKCTransformer::CreateActionCall(HAKCTransferAction &TransferAction,
                 ActionArgs.push_back(TransferState.GetDivision().GetDivisionID());
                 break;
             case Size: {
-                // TODO: Move this logic to the caller of this function and put the size in TransferState
-                auto ObjectSizeInBytes = GetObjectSizeInBytes(*TransferState.GetManagedPointer());
-                if (!ObjectSizeInBytes) {
-                    CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Unable to find Object Size of Managed Pointer: "
-                            << *TransferState.GetManagedPointer() << ", so using default Object Size: " << *
-                            GetDefaultObjectSize() << "\n";
-                    ActionArgs.push_back(GetDefaultObjectSize()); // Look here
-                    break;
-                }
-                ActionArgs.push_back(ObjectSizeInBytes);
+                ActionArgs.push_back(TransferState.GetManagedPointer()->GetType()->GetObjectSizeInBytes());
                 break;
             }
             case IsCode:
-                // TODO: Test if the Managed Pointer is a function pointer and call getTrue or getFalse as needed
+                  if (TransferState.GetManagedPointer()->GetIsCode()) {
+                    ActionArgs.push_back(getTrue());
+                  }
+                  else {
+                    ActionArgs.push_back(getFalse());
+                  }
                 break;
             case AccessToken:
-                // TODO: Get the Target access token and put that into TransferState and use it here
+                ActionArgs.push_back(TransferState.GetAccessToken());
                 break;
             case ValidTargets:
                 // TODO: Get the Target valid targets and put that into TransferState and use it here
+                TransferState.GetDivision().GetHAKCCompartment().GetValidTargets();
                 break;
-            case ValidTargetSize:
-                // TODO: Get the number of valid targets and put that into TransferState and use it here
+        case ValidTargetSize:
+                ActionArgs.push_back(getInt64(TransferState.GetDivision().GetHAKCCompartment().GetValidTargetsSize()));
                 break;
             default:
                 CommonHAKCAnalysis::getWriter(true) << "Unsupported argument use: " << ActionArg.ArgUse << "\n";
@@ -896,9 +895,8 @@ Function *hakc::HAKCTransformer::PopulateTransferFunction(Function *Target, Func
         auto ManagedPointer = CreateNewManagedPointer(&Arg);
         HAKCTransferState TransferState(TargetDivision, ManagedPointer);
         bool IsData = !Arg.getType()->isFunctionTy();
-
         for (auto &Preaction: ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().PreTransferActions()) {
-            CreateActionCall(*Preaction, &Arg, TransferState);
+            CreateActionCall(*Preaction, TransferState);
         }
         auto *Transfer = CreateCompartmentTransfer(*ManagedPointer, &*HAKCIRBuilder.GetInsertPoint(), Target,
                                                    IsData);
@@ -908,7 +906,7 @@ Function *hakc::HAKCTransformer::PopulateTransferFunction(Function *Target, Func
             HAKCIRBuilder.SetInsertPoint(TargetFunctionCall->getNextNonDebugInstruction());
             CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Backward Argument Transfer with Arg: " << Arg << "\n";
             for (auto &Postaction: ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().PostTargetActions()) {
-                CreateActionCall(*Postaction, &Arg, TransferState);
+                CreateActionCall(*Postaction, TransferState);
             }
         }
     }
@@ -951,29 +949,6 @@ Value *hakc::HAKCTransformer::CreateBitCast(hakc::HAKCPointerBase &HAKCPointer, 
         BitCast = HAKCIRBuilder.CreateBitCast(HAKCPointer.GetBaseDefinition(), TargetType);
     }
     return BitCast;
-}
-
-// TODO: Move this logic to HAKCTYpe and remove this function
-ConstantInt *hakc::HAKCTransformer::GetObjectSizeInBytes(hakc::HAKCPointerBase &HAKCPointer) {
-    CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Finding size of " << HAKCPointer << "\n";
-    if (HAKCPointer.GetType() == nullptr) {
-        CommonHAKCAnalysis::getWriter(DebugIsActive()) << "HAKCPointer: " << HAKCPointer << " has GetType of null\n";
-        return nullptr;
-    } else if (!HAKCPointer.GetType()->GetPointeeType()) {
-        CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Pointee Type of " << HAKCPointer << " Type " << *HAKCPointer.
-                GetType() << " is null\n";
-        return nullptr;
-    }
-    CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Finding Size of PointeeType " << *HAKCPointer.GetType()->
-            GetPointeeType() << "\n";
-    return GetObjectSizeInBytes(HAKCPointer.GetType()->GetPointeeType());
-}
-
-// TODO: Move this logic to HAKCType and remove this function
-ConstantInt *hakc::HAKCTransformer::GetObjectSizeInBytes(hakc::HAKCTypeP HAKCType) {
-    CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Getting size of HAKCTypeInfo " << *HAKCType << "\n";
-    auto bit_size = HAKCType->GetSizeInBits();
-    return getInt64(bit_size / BITS_PER_BYTE);
 }
 
 Type *hakc::HAKCTransformer::HAKCAuthenticationRetType(unsigned AddrSpace) {
@@ -1037,5 +1012,7 @@ hakc::HAKCPointerBaseP hakc::HAKCTransformer::CreateNewManagedPointer(Value *Bas
     } else {
         ManagedPtr->SetType(HAKCTy);
     }
+    ManagedPtr->SetIsData(!ModuleAnalysis.GetCommonAnalysis().valueIsReadonlyPtr(ModuleAnalysis.GetCommonAnalysis().getDef(BaseDefinition, false)));
+    ManagedPtr->SetIsCode(!ManagedPtr->GetIsData());
     return ManagedPtr;
 }

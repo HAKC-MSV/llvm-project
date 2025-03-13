@@ -35,6 +35,10 @@ namespace llvm::hakc {
         return make_range(Targets.begin(), Targets.end());
     }
 
+    unsigned HAKCCompartment::GetValidTargetsSize() const {
+      return Targets.size();
+    }
+
     void HAKCCompartment::AddTarget(HAKC_Compartment_ID CompartmentID) {
         Targets.insert(CompartmentID);
     }

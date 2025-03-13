@@ -98,12 +98,23 @@ namespace llvm::hakc {
 
         unsigned ID;
 
+        bool IsData;
+
+        bool IsCode;
     public:
         HAKCPointerBase(Value *BaseDefinition, unsigned ID);
 
         virtual ~HAKCPointerBase() = default;
 
         Value *GetBaseDefinition() const;
+
+        bool GetIsData();
+
+        bool GetIsCode();
+
+        void SetIsData(bool IsData);
+
+        void SetIsCode(bool IsCode);
 
         HAKCTypeP GetType();
 

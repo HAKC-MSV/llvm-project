@@ -54,12 +54,21 @@ namespace llvm::hakc {
 
     HAKCPointerBase::HAKCPointerBase(Value *BaseDefinition, unsigned ID) : BaseDefinition(BaseDefinition),
                                                                            AuthenticatedPointer(nullptr),
-                                                                           HAKCTy(nullptr), ID(ID) {
+                                                                           HAKCTy(nullptr), ID(ID), IsData(), IsCode() {
     }
 
     Value *HAKCPointerBase::GetBaseDefinition() const {
         return BaseDefinition;
     }
+
+
+    bool GetIsData();
+
+    bool GetIsCode();
+
+    void SetIsData(bool IsData);
+
+    void SetIsCode(bool IsCode);
 
     HAKCTypeP HAKCPointerBase::GetType() {
         return HAKCTy;

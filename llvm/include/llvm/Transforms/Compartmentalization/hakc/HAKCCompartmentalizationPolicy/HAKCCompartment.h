@@ -24,7 +24,9 @@ namespace llvm::hakc {
 
         HAKC_Access_Token GetEntryToken() const;
 
-        iterator_range<CompartmentIDSet::const_iterator> GetValidTargets() const;
+        iterator_range<CompartmentIDSet::const_iterator>GetValidTargets() const;
+
+        unsigned GetValidTargetsSize() const;
 
         void AddTarget(HAKC_Compartment_ID CompartmentID);
 

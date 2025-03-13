@@ -12,6 +12,8 @@
 
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTypeIdentifier/HAKCInfo.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/yaml/HAKCYamlType.h"
+#include "llvm/IR/Type.h"
+
 
 namespace llvm::hakc {
     class HAKCTypeInfo;
@@ -55,14 +57,18 @@ namespace llvm::hakc {
 
         bool IsPointerType() const;
 
+        Value *GetObjectSizeInBytes();
+
+        void SetObjectSizeInBytes(const HAKCTypeP &PointeeType);
+
     protected:
         std::map<unsigned, std::set<std::shared_ptr<HAKCTypeInfo> > > Members;
         unsigned SizeInBits;
+        Value* ObjectSizeInBits;
         const DIType *DbgType;
         Type *LLVMType;
         std::string DbgTypeName;
         HAKCTypeP PointeeType;
-
         bool IsPointerToPointer(const DIType *DiType);
 
         const DIType *StripTypeModifiers(const DIType *DiType);

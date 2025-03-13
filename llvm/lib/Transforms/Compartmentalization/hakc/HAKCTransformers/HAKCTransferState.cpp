@@ -7,7 +7,7 @@
 
 hakc::HAKCTransferState::HAKCTransferState(
     const HAKCCompartmentDivision &TargetDivision, HAKCPointerBaseP HAKCPointer)
-    : ActionValues(), TargetDivision(TargetDivision), HAKCPointer(HAKCPointer) {
+    : ActionValues(), TargetDivision(TargetDivision), HAKCPointer(HAKCPointer), AccessToken(TargetDivision.GetAccessToken()) {
 }
 
 Value *hakc::HAKCTransferState::GetLabeledValue(StringRef Label) const {
@@ -38,3 +38,9 @@ const hakc::HAKCCompartmentDivision &hakc::HAKCTransferState::GetDivision() cons
 hakc::HAKCPointerBaseP hakc::HAKCTransferState::GetManagedPointer() {
   return HAKCPointer;
 }
+
+hakc::HAKC_Access_Token hakc::HAKCTransferState::GetAccessToken(){
+  return AccessToken;
+}
+
+

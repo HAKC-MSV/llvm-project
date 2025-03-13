@@ -28,10 +28,13 @@ namespace llvm::hakc {
 
         HAKCPointerBaseP GetManagedPointer();
 
+        HAKC_Access_Token GetAccessToken();
+
     protected:
         std::map<HAKCTransferAction, Value *> ActionValues;
         const HAKCCompartmentDivision TargetDivision;
         HAKCPointerBaseP HAKCPointer;
+        HAKC_Access_Token AccessToken;
     };
 } // namespace llvm::hakc
 
