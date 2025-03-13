@@ -905,8 +905,6 @@ Function *hakc::HAKCTransformer::PopulateTransferFunction(Function *Target, Func
         for (auto &Preaction: ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().PreTransferActions()) {
             CreateActionCall(*Preaction, &Arg, TransferState);
         }
-        // Perform all preactions before the transfers
-        HAKCIRBuilder.SetInsertPoint(TargetFunctionCall);
         auto *Transfer = CreateCompartmentTransfer(*ManagedPointer, &*HAKCIRBuilder.GetInsertPoint(), Target,
                                                    IsData);
         TargetFunctionCall->setArgOperand(Arg.getArgNo(), Transfer);
