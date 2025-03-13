@@ -77,7 +77,8 @@ namespace llvm::hakc {
             {hakc::AccessToken, "access-token"},
             {hakc::ValidTargets, "valid-targets"},
             {hakc::ValidTargetSize, "valid-target-size"},
-            {hakc::Other, "other"}
+            {hakc::Other, "other"},
+          {hakc::Color, "color"}
         };
     }
 } // namespace llvm::hakc

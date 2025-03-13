@@ -642,9 +642,9 @@ Value *hakc::HAKCTransformer::CreateActionCall(HAKCTransferAction &TransferActio
     // check the label
     auto ActionFunction = TransferAction.GetHAKCActionFunction();
     // actually, assume that the label is unique for now
-    CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Creating Action for " << TransferAction << "\n";
+    CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Creating Action for: " << TransferAction << "\n";
     SmallVector<Value *> ActionArgs;
-
+    // TODO: at some point make sure that the function args are actually sorted (or else the order here will be incorrect)
     for (auto &ActionArg: ActionFunction.Args()) {
         // go through arg use, then determine what goes in to the function call (except for other) -> throw exception for other
         switch (ActionArg.ArgUse) {
@@ -657,8 +657,29 @@ Value *hakc::HAKCTransformer::CreateActionCall(HAKCTransferAction &TransferActio
             case Div:
                 ActionArgs.push_back(TransferState.GetDivision().GetDivisionID());
                 break;
-            // TODO: Finish this
-
+            // TODO: Fill these in with at least some default value, or else the label insertion will fail
+            case Size: { // TODO: without braces the compiler gets mad (probably about the declaration of the object size variable)
+              // Size is already computed and store
+              auto ObjectSizeInBytes = GetObjectSizeInBytes(*TransferState.GetManagedPointer());
+              if (!ObjectSizeInBytes) {
+                CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Unable to find Object Size of Managed Pointer: " << *TransferState.GetManagedPointer() << ", so using default Object Size: " << *GetDefaultObjectSize() << "\n";
+                ActionArgs.push_back(GetDefaultObjectSize()); // Look here
+                break;
+              }
+              ActionArgs.push_back(ObjectSizeInBytes);
+              break;
+            }
+            case IsCode:
+                break;
+            case AccessToken:
+                break;
+            case ValidTargets:
+                break;
+            case ValidTargetSize:
+                break;
+            case Color:
+                ActionArgs.push_back(llvm::ConstantInt::get(Type::getInt32Ty(getModule().getContext()), 0)); // Look here -> currently filler / incorrect, maybe use default color
+                break;
             default:
                 CommonHAKCAnalysis::getWriter(true) << "Unsupported argument use: " << ActionArg.ArgUse << "\n";
                 throw std::exception();
@@ -666,21 +687,25 @@ Value *hakc::HAKCTransformer::CreateActionCall(HAKCTransferAction &TransferActio
     }
 
     for (auto &LabeledArg: TransferAction.GetArguments()) {
-        auto ArgLabel = LabeledArg.GetLabel();
-        auto *ArgValue = TransferState.GetLabeledValue(ArgLabel);
-        if (!ArgValue) {
-            CommonHAKCAnalysis::getWriter(true) << "Could not find action value with label " << ArgLabel << "\n";
-            throw std::exception();
-        } else if (LabeledArg.GetIdx() >= ActionArgs.size()) {
-            CommonHAKCAnalysis::getWriter(true) << "Label " << ArgLabel << " has an invalid index " << LabeledArg.
-                    GetIdx() << " for calling " << ActionFunction.GetName() << "\n";
-            throw std::exception();
-        }
-        ActionArgs[LabeledArg.GetIdx()] = ArgValue;
-    }
+      auto ArgLabel = LabeledArg.GetLabel();
+      // Exit if the index is obviously incorrect
 
+      // Now, search for the value associated with the label
+      auto *ArgValue = TransferState.GetLabeledValue(ArgLabel);
+      if (!ArgValue) {
+        CommonHAKCAnalysis::getWriter(true) << "Could not find action value with label " << ArgLabel << "\n";
+        throw std::exception();
+      }
+      else if (LabeledArg.GetIdx() >= ActionArgs.size()) {
+        CommonHAKCAnalysis::getWriter(true) << "Label " << ArgLabel << " has an invalid index " << LabeledArg.
+                GetIdx() << " for calling " << ActionFunction << "\n";
+        throw std::exception();
+      }
+      ActionArgs[LabeledArg.GetIdx()] = ArgValue;
+    }
     auto *CallI = CreateCall(ActionFunction.GetFunction(), ActionArgs);
     TransferState.AddTransferActionValue(TransferAction, CallI);
+    CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Created CallI: " << *CallI << "\n";
     return CallI;
 }
 
@@ -913,7 +938,7 @@ Function *hakc::HAKCTransformer::PopulateTransferFunction(Function *Target, Func
         HAKCIRBuilder.SetInsertPoint(TargetFunctionCall);
         CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Forward Argument Transfer with Arg: " << Arg << "\n";
         auto ManagedPointer = CreateNewManagedPointer(&Arg);
-        HAKCTransferState TransferState(TargetDivision);
+        HAKCTransferState TransferState(TargetDivision, ManagedPointer);
         bool IsData = !Arg.getType()->isFunctionTy();
 
 

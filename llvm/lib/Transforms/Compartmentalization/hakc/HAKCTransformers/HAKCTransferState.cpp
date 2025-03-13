@@ -5,8 +5,8 @@
 
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCSystemInformation.h"
 
-hakc::HAKCTransferState::HAKCTransferState(const HAKCCompartmentDivision &TargetDivision) : ActionValues(),
-    TargetDivision(TargetDivision) {
+hakc::HAKCTransferState::HAKCTransferState(const HAKCCompartmentDivision &TargetDivision, HAKCPointerBaseP HAKCPointer) : ActionValues(),
+    TargetDivision(TargetDivision), HAKCPointer(HAKCPointer) {
 }
 
 Value *hakc::HAKCTransferState::GetLabeledValue(StringRef Label) const {
@@ -32,4 +32,8 @@ Value *hakc::HAKCTransferState::GetTransferActionValue(const HAKCTransferAction 
 
 const hakc::HAKCCompartmentDivision &hakc::HAKCTransferState::GetDivision() const {
     return TargetDivision;
+}
+
+hakc::HAKCPointerBaseP hakc::HAKCTransferState::GetManagedPointer() {
+  return HAKCPointer;
 }

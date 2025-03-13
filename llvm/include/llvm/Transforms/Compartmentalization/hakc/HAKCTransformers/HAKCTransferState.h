@@ -16,7 +16,7 @@ using namespace llvm;
 namespace llvm::hakc {
     class HAKCTransferState {
     public:
-        HAKCTransferState(const HAKCCompartmentDivision &TargetDivision);
+        HAKCTransferState(const HAKCCompartmentDivision &TargetDivision, HAKCPointerBaseP HAKCPointer);
 
         void AddTransferActionValue(const HAKCTransferAction &Action, Value *V);
 
@@ -26,9 +26,12 @@ namespace llvm::hakc {
 
         const HAKCCompartmentDivision &GetDivision() const;
 
+        HAKCPointerBaseP GetManagedPointer();
+
     protected:
         std::map<HAKCTransferAction, Value *> ActionValues;
         const HAKCCompartmentDivision TargetDivision;
+        HAKCPointerBaseP HAKCPointer;
     };
 } // namespace llvm::hakc
 
