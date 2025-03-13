@@ -122,9 +122,7 @@ namespace llvm::hakc {
             }
 
             auto *FType = FunctionType::get(ReturnTy, ArgTys, false);
-            auto *F = dyn_cast<Function>(TypeIdentifier.GetModule()
-                .getOrInsertFunction(Name, FType)
-                .getCallee());
+            auto *F = dyn_cast<Function>(TypeIdentifier.GetModule().getOrInsertFunction(Name, FType).getCallee());
             return F;
         }
     };
