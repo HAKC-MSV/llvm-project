@@ -5,42 +5,44 @@
 #ifndef HAKC_HAKCINFO_H
 #define HAKC_HAKCINFO_H
 
-#include <string>
+#include "llvm/ADT/StringRef.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace llvm;
 
 namespace llvm::hakc {
-    class CommonHAKCAnalysis;
+class CommonHAKCAnalysis;
 
-    class HAKCInfo {
-    public:
-        virtual ~HAKCInfo() = default;
+class HAKCInfo {
+public:
+  virtual ~HAKCInfo() = default;
 
-        virtual std::string GetYaml(unsigned Indents) const = 0;
+  virtual std::string GetYaml(unsigned Indents) const = 0;
 
-        virtual StringRef GetYamlIdentifier() const = 0;
+  virtual StringRef GetYamlIdentifier() const = 0;
 
-        virtual std::string GetYamlHeader(unsigned Indents) const;
+  virtual std::string GetYamlHeader(unsigned Indents) const;
 
-        virtual StringRef GetName() const;
+  virtual StringRef GetName() const;
 
-        raw_ostream &operator>>(raw_ostream &os) const;
+  raw_ostream &operator>>(raw_ostream &os) const;
 
-        friend raw_ostream &operator<<(raw_ostream &os, const HAKCInfo &HAKCInfo);
+  friend raw_ostream &operator<<(raw_ostream &os, const HAKCInfo &HAKCInfo);
 
-        static unsigned int IndentSpaces();
+  static unsigned int IndentSpaces();
 
-        static unsigned int EntrySpaces();
+  static unsigned int EntrySpaces();
 
-        CommonHAKCAnalysis &GetCommonHAKCAnalysis();
+  CommonHAKCAnalysis &GetCommonHAKCAnalysis();
 
-    protected:
-        CommonHAKCAnalysis &Analysis;
-        bool DebugActive;
-        std::string Name;
+protected:
+  CommonHAKCAnalysis &Analysis;
+  bool DebugActive;
+  std::string Name;
 
-        explicit HAKCInfo(CommonHAKCAnalysis &Analysis, StringRef Name, bool DebugActive);
-    };
-} // hakc
+  explicit HAKCInfo(CommonHAKCAnalysis &Analysis, StringRef Name,
+                    bool DebugActive);
+};
+} // namespace llvm::hakc
 
-#endif //HAKC_HAKCINFO_H
+#endif // HAKC_HAKCINFO_H

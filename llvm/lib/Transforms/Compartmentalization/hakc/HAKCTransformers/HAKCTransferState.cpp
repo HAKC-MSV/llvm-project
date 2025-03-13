@@ -6,35 +6,38 @@
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCSystemInformation.h"
 
 hakc::HAKCTransferState::HAKCTransferState(
-    const HAKCCompartmentDivision &TargetDivision, HAKCPointerBaseP HAKCPointer)
+    const HAKCCompartmentDivision &TargetDivision, HAKCPointerBase &HAKCPointer)
     : ActionValues(), TargetDivision(TargetDivision), HAKCPointer(HAKCPointer) {
 }
 
 Value *hakc::HAKCTransferState::GetLabeledValue(StringRef Label) const {
-    for (auto &it: ActionValues) {
-        if (it.first.GetLabel() == Label) {
-            return it.second;
-        }
+  for (auto &it : ActionValues) {
+    if (it.first.GetLabel() == Label) {
+      return it.second;
     }
+  }
+  return nullptr;
+}
+
+void hakc::HAKCTransferState::AddTransferActionValue(
+    const HAKCTransferAction &Action, Value *V) {
+  ActionValues[Action] = V;
+}
+
+Value *hakc::HAKCTransferState::GetTransferActionValue(
+    const HAKCTransferAction &Action) {
+  const auto it = ActionValues.find(Action);
+  if (it == ActionValues.end()) {
     return nullptr;
+  }
+  return it->second;
 }
 
-void hakc::HAKCTransferState::AddTransferActionValue(const HAKCTransferAction &Action, Value *V) {
-    ActionValues[Action] = V;
+const hakc::HAKCCompartmentDivision &
+hakc::HAKCTransferState::GetDivision() const {
+  return TargetDivision;
 }
 
-Value *hakc::HAKCTransferState::GetTransferActionValue(const HAKCTransferAction &Action) {
-    const auto it = ActionValues.find(Action);
-    if (it == ActionValues.end()) {
-        return nullptr;
-    }
-    return it->second;
-}
-
-const hakc::HAKCCompartmentDivision &hakc::HAKCTransferState::GetDivision() const {
-    return TargetDivision;
-}
-
-hakc::HAKCPointerBaseP hakc::HAKCTransferState::GetManagedPointer() {
+hakc::HAKCPointerBase &hakc::HAKCTransferState::GetManagedPointer() {
   return HAKCPointer;
 }

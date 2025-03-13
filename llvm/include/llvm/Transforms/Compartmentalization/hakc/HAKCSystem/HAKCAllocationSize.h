@@ -5,44 +5,45 @@
 #ifndef HAKC_HAKCALLOCATIONSIZE_H
 #define HAKC_HAKCALLOCATIONSIZE_H
 
-#include <memory>
 #include "llvm/IR/Constants.h"
-#include "llvm/IR/IRBuilder.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/yaml/HAKCYaml.h"
+#include <memory>
 
 using namespace llvm;
 
 namespace llvm::hakc {
-    class HAKCAllocationSize {
-    public:
-        virtual ~HAKCAllocationSize() = default;
+class HAKCAllocationSize {
+public:
+  virtual ~HAKCAllocationSize() = default;
 
-        static std::shared_ptr<HAKCAllocationSize> FromYaml(const HAKCYAMLAllocationType &YamlLine, Module &M);
+  static std::shared_ptr<HAKCAllocationSize>
+  FromYaml(const HAKCYAMLAllocationType &YamlLine, Module &M);
 
-        virtual ConstantInt *GetSize(CallInst *val) = 0;
+  virtual ConstantInt *GetSize(CallInst *val) = 0;
 
-        Function *GetAllocationFunction();
+  Function *GetAllocationFunction();
 
-    protected:
-        explicit HAKCAllocationSize(Function *AllocationFunction);
+protected:
+  explicit HAKCAllocationSize(Function *AllocationFunction);
 
-        HAKCAllocationSize() = default;
+  HAKCAllocationSize() = default;
 
-        Function *AllocationFunction;
-    };
+  Function *AllocationFunction;
+};
 
-    class HAKCSingleArgumentSize : public HAKCAllocationSize {
-        friend class HAKCAllocationSize;
+class HAKCSingleArgumentSize : public HAKCAllocationSize {
+  friend class HAKCAllocationSize;
 
-    public:
-        HAKCSingleArgumentSize(Function *AllocationFunction, const std::vector<std::string> &Arguments);
+public:
+  HAKCSingleArgumentSize(Function *AllocationFunction,
+                         const std::vector<std::string> &Arguments);
 
-        ConstantInt *GetSize(CallInst *Val) override;
+  ConstantInt *GetSize(CallInst *Val) override;
 
-    protected:
-        unsigned ArgNo;
-    };
-} // namespace hakc
+protected:
+  unsigned ArgNo;
+};
+} // namespace llvm::hakc
 
-#endif//HAKC_HAKCALLOCATIONSIZE_H
+#endif // HAKC_HAKCALLOCATIONSIZE_H

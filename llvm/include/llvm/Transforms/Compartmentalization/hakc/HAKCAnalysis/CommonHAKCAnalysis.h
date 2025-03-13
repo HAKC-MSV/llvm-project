@@ -12,150 +12,169 @@
 #include <map>
 
 namespace llvm::hakc {
-    class HAKCTransformer;
+class HAKCTransformer;
 
-    typedef std::function<llvm::Value *(llvm::Value *)> hakc_allocation_size_map_t;
+typedef std::function<llvm::Value *(llvm::Value *)> hakc_allocation_size_map_t;
 
-    class CommonHAKCAnalysis {
-    protected:
-        Module &M;
+class CommonHAKCAnalysis {
+protected:
+  Module &M;
 
-        std::map<Value *, SmallVector<Value *> > DefchainCache;
+  std::map<Value *, SmallVector<Value *>> DefchainCache;
 
-        HAKCSystemInformation SystemInfo;
+  HAKCSystemInformation SystemInfo;
 
-        static bool IsFunctionInHAKCTransferFunctionList(Function *F, iterator_range<HAKCTransferList::iterator> Range);
+  static bool IsFunctionInHAKCTransferFunctionList(
+      Function *F, iterator_range<HAKCTransferList::iterator> Range);
 
-        void InitConfig(StringRef ConfigPath);
+  void InitConfig(StringRef ConfigPath);
 
-    public:
-        virtual ~CommonHAKCAnalysis() = default;
+public:
+  virtual ~CommonHAKCAnalysis() = default;
 
-        explicit CommonHAKCAnalysis(Module &M, StringRef ConfigPath);
+  explicit CommonHAKCAnalysis(Module &M, StringRef ConfigPath);
 
-        HAKCSystemInformation &GetSystemInfo();
+  HAKCSystemInformation &GetSystemInfo();
 
-        Module &GetModule() const;
+  Module &GetModule() const;
 
-        Value *getDef(Value *V, bool followLoad);
+  Value *getDef(Value *V, bool followLoad);
 
-        void findDefChain(Value *v, bool followLoad, SmallVectorImpl<Value *> &Results);
+  void findDefChain(Value *v, bool followLoad,
+                    SmallVectorImpl<Value *> &Results);
 
-        static bool argShouldTransfer(Value *V);
+  static bool argShouldTransfer(Value *V);
 
-        static bool IsPerCPUPointer(Value *V);
+  static bool IsPerCPUPointer(Value *V);
 
-        static bool IsKernelUserPointer(Value *V);
+  static bool IsKernelUserPointer(Value *V);
 
-        bool IsNoTransferFunction(Function *F);
+  bool IsNoTransferFunction(Function *F);
 
-        static bool valueIsReadonlyPtr(Value *value);
+  static bool valueIsReadonlyPtr(Value *value);
 
-        static bool FunctionIsStatic(Function *F);
+  static bool FunctionIsStatic(Function *F);
 
-        static bool FunctionHasPointerArg(Function *F);
+  static bool FunctionHasPointerArg(Function *F);
 
-        static bool IsOutsideTransferFunc(Function *F);
+  static bool IsOutsideTransferFunc(Function *F);
 
-        static bool IsCapabilityReassignmentFunc(Function *F);
+  static bool IsCapabilityReassignmentFunc(Function *F);
 
-        static bool IsPointerLikeType(Type *Ty);
+  static bool IsPointerLikeType(Type *Ty);
 
-        std::string GetOutsideTransferName(Function *F);
+  std::string GetOutsideTransferName(Function *F);
 
-        static bool FunctionIsModParamGetCtx(Function *F);
+  static bool FunctionIsModParamGetCtx(Function *F);
 
-        bool ValueShouldBeReplacedWithTransfer(Value *V, HAKCCompartmentalizationPolicy &Policy);
+  bool
+  ValueShouldBeReplacedWithTransfer(Value *V,
+                                    HAKCCompartmentalizationPolicy &Policy);
 
-        bool IsSafeTransitionFunction(Function *F);
+  bool IsSafeTransitionFunction(Function *F);
 
-        static std::string getVariadicTransferName(Function *F);
+  static std::string getVariadicTransferName(Function *F);
 
-        static std::string getOriginalTransformedName(Function *F);
+  static std::string getOriginalTransformedName(Function *F);
 
-        bool IsHAKCTransferFunction(Function *F);
+  bool IsHAKCTransferFunction(Function *F);
 
-        bool IsHAKCCustomTransferFunction(Function *F);
+  bool IsHAKCCustomTransferFunction(Function *F);
 
-        bool IsHAKCCompartmentalizationSupportFunction(Function *F);
+  bool IsHAKCCompartmentalizationSupportFunction(Function *F);
 
-        bool IsHAKCFunction(Function *F);
+  bool IsHAKCFunction(Function *F);
 
-        bool IsAllocationFunction(Function *F);
+  bool IsAllocationFunction(Function *F);
 
-        bool functionIsTransferCandidate(Function *F, HAKCCompartmentalizationPolicy &Policy);
+  bool functionIsTransferCandidate(Function *F,
+                                   HAKCCompartmentalizationPolicy &Policy);
 
-        static hakc::HAKCWriter &getWriter(bool DebugActive);
+  static hakc::HAKCWriter &getWriter(bool DebugActive);
 
-        FunctionType *GetDataAuthenticationFunctionType(Module &M, unsigned AddrSpace = 0);
+  FunctionType *GetDataAuthenticationFunctionType(Module &M,
+                                                  unsigned AddrSpace = 0);
 
-        FunctionType *GetCodeAuthenticationFunctionType(Module &M, unsigned AddrSpace = 0);
+  FunctionType *GetCodeAuthenticationFunctionType(Module &M,
+                                                  unsigned AddrSpace = 0);
 
-        FunctionType *GetTransferFunctionType(Module &M, unsigned AddrSpace = 0);
+  FunctionType *GetTransferFunctionType(Module &M, unsigned AddrSpace = 0);
 
-        static bool FunctionIsComplexVariadic(Function *F);
+  static bool FunctionIsComplexVariadic(Function *F);
 
-        static StringRef GetFunctionName(Function *F);
+  static StringRef GetFunctionName(Function *F);
 
-        static bool isRegisterRead(Value *v);
+  static bool isRegisterRead(Value *v);
 
-        bool IsIgnoredType(Type *Ty);
+  bool IsIgnoredType(Type *Ty);
 
-        bool IsIgnoredGlobal(Value *V);
+  bool IsIgnoredGlobal(Value *V);
 
-        static bool FunctionsAreInSameCompartment(Function *F, Function *G, HAKCCompartmentalizationPolicy &Policy);
+  static bool
+  FunctionsAreInSameCompartment(Function *F, Function *G,
+                                HAKCCompartmentalizationPolicy &Policy);
 
-        bool IsSafeTransitionCall(CallBase *call);
+  bool IsSafeTransitionCall(CallBase *call);
 
-        bool IsAllocation(Value *V);
+  bool IsAllocation(Value *V);
 
-        static bool IsCompartmentalizedFunction(Function *F, HAKCCompartmentalizationPolicy &Policy);
+  static bool
+  IsCompartmentalizedFunction(Function *F,
+                              HAKCCompartmentalizationPolicy &Policy);
 
-        static bool IsStringType(Type *Ty);
+  static bool IsStringType(Type *Ty);
 
-        static Instruction *GetTargetTypeCast(Instruction *I, Type *TargetType);
+  static Instruction *GetTargetTypeCast(Instruction *I, Type *TargetType);
 
-        virtual std::set<Intrinsic::ID> GetBitshiftIntrinsics();
+  virtual std::set<Intrinsic::ID> GetBitshiftIntrinsics();
 
-        virtual std::set<Instruction::BinaryOps> GetPointerManipulatingBinaryOps();
+  virtual std::set<Instruction::BinaryOps> GetPointerManipulatingBinaryOps();
 
-        bool IsCallInIntrinsicSet(CallBase *Call, std::set<Intrinsic::ID> &IntrinsicsSet) const;
+  bool IsCallInIntrinsicSet(CallBase *Call,
+                            std::set<Intrinsic::ID> &IntrinsicsSet) const;
 
-        static std::string GetModuleFullPath(Module &M);
+  static std::string GetModuleFullPath(Module &M);
 
-        static bool IsMultiSSAUser(Value *V);
+  static bool IsMultiSSAUser(Value *V);
 
-        static bool IsConstantUsedInGlobal(Value *V);
+  static bool IsConstantUsedInGlobal(Value *V);
 
-        static void SortGlobalList(std::vector<GlobalVariable *> &GlobalList);
+  static void SortGlobalList(std::vector<GlobalVariable *> &GlobalList);
 
-        static void SortFunctionList(FunctionList &FuncList);
+  static void SortFunctionList(FunctionList &FuncList);
 
-        static bool IsUncompartmentalizedSymbol(GlobalValue *GV, HAKCCompartmentalizationPolicy &Policy);
+  static bool
+  IsUncompartmentalizedSymbol(GlobalValue *GV,
+                              HAKCCompartmentalizationPolicy &Policy);
 
-        static void VerifyFunction(Function *F);
+  static void VerifyFunction(Function *F);
 
-        bool ValueIsUsedAsPointer(Value *V);
+  bool ValueIsUsedAsPointer(Value *V);
 
-        hakc::function_def_t GetHAKCTransferDefinition(Function *F);
+  hakc::function_def_t GetHAKCTransferDefinition(Function *F);
 
-        HAKCCustomAllocation GetAllocationDefinition(Function *F);
+  HAKCCustomAllocation GetAllocationDefinition(Function *F);
 
-        bool FunctionIsAnalysisCandidate(Function *F);
+  bool FunctionIsAnalysisCandidate(Function *F);
 
-        static bool IsFunctionInFunctionList(Function *F, iterator_range<FunctionList::iterator> Range);
+  static bool
+  IsFunctionInFunctionList(Function *F,
+                           iterator_range<FunctionList::iterator> Range);
 
-        static bool IsFunctionInFunctionList(Function *F, iterator_range<HAKCFunctionList::iterator> Range);
+  static bool
+  IsFunctionInFunctionList(Function *F,
+                           iterator_range<HAKCFunctionList::iterator> Range);
 
-        static bool PointerShouldBeConsideredCode(const ManagedHAKCPointerP &ManagedPointer);
+  static bool
+  PointerShouldBeConsideredCode(const ManagedHAKCPointer &ManagedPointer);
 
-        std::string GetTransformedPath(StringRef Path) const;
+  std::string GetTransformedPath(StringRef Path) const;
 
-        static Function *GetOriginalFunctionFromTransferFunction(Function *F);
+  static Function *GetOriginalFunctionFromTransferFunction(Function *F);
 
-    private:
-        static bool valueHasAttribute(Value *v, Attribute::AttrKind Kind);
-    };
-} // namespace hakc
+private:
+  static bool valueHasAttribute(Value *v, Attribute::AttrKind Kind);
+};
+} // namespace llvm::hakc
 
-#endif//HAKC_COMMONHAKCANALYSIS_H
+#endif // HAKC_COMMONHAKCANALYSIS_H

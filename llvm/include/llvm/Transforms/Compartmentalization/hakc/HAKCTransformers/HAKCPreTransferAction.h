@@ -5,16 +5,15 @@
 #ifndef HAKC_HAKCPRETRANSFERACTION_H
 #define HAKC_HAKCPRETRANSFERACTION_H
 #include "HAKCTransferAction.h"
-#include <map>
 
 namespace llvm::hakc {
-    class HAKCPreTransferAction : public HAKCTransferAction {
-    public:
-        HAKCPreTransferAction(HAKCFunctionDefinition &HAKCActionFunction, StringRef Label);
-    };
+class HAKCPreTransferAction : public HAKCTransferAction {
+public:
+  HAKCPreTransferAction(HAKCFunctionDefinition &HAKCActionFunction,
+                        StringRef Label);
+};
 
-    typedef std::shared_ptr<HAKCPreTransferAction> pre_transfer_action_def_t;
-}
+typedef std::shared_ptr<HAKCPreTransferAction> pre_transfer_action_def_t;
+} // namespace llvm::hakc
 
-
-#endif //HAKC_HAKCPRETRANSFERACTION_H
+#endif // HAKC_HAKCPRETRANSFERACTION_H

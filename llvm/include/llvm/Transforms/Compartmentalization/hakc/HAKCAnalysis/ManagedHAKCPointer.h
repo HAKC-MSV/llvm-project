@@ -5,262 +5,262 @@
 #ifndef HAKC_MANAGEDHAKCPOINTER_H
 #define HAKC_MANAGEDHAKCPOINTER_H
 
-#include <set>
 #include "llvm/IR/Value.h"
-#include "llvm/IR/User.h"
-
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTypeIdentifier/HAKCTypeInfo.h"
-#include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartmentalizationPolicy.h"
 
 using namespace llvm;
 
 namespace llvm::hakc {
-    class ManagedHAKCPointerUse;
+class HAKCPointerBase {
+protected:
+  /**
+   * The original source of a pointer
+   */
+  Value *BaseDefinition;
 
-    using ManagedHAKCPointerUseP = std::shared_ptr<ManagedHAKCPointerUse>;
+  /**
+   * A pointer suitable for dereferencing
+   */
+  Value *AuthenticatedPointer;
 
-    class ManagedHAKCPointer;
+  HAKCTypeP HAKCTy;
 
-    using ManagedHAKCPointerP = std::shared_ptr<ManagedHAKCPointer>;
+  unsigned ID;
 
-    class HAKCPointerManager;
+public:
+  HAKCPointerBase(Value *BaseDefinition, unsigned ID);
 
-    class HAKCPointerBase;
+  virtual ~HAKCPointerBase() = default;
 
-    using HAKCPointerBaseP = std::shared_ptr<HAKCPointerBase>;
+  Value *GetBaseDefinition() const;
 
-    /**
-     * Stores Instruction and Operand to change
-     */
-    class ManagedHAKCPointerUse {
-    public:
-        ManagedHAKCPointerUse(ManagedHAKCPointerP P, User *User, unsigned OperandNo, unsigned ID);
+  HAKCTypeP GetType() const;
 
-        User *getUser() const;
+  void SetType(const HAKCTypeP &NewHAKCTy);
 
-        void setUser(User *U);
+  Value *GetAuthenticatedPointer() const;
 
-        unsigned getOperandNo() const;
+  virtual void SetAuthenticatedPointer(Value *NewAuthenticatedPointer);
 
-        Value *get() const;
+  unsigned GetID() const;
 
-        ManagedHAKCPointerP getManagedPtr() const;
+  friend bool operator==(const HAKCPointerBase &Lhs, Value *V) {
+    return Lhs.GetBaseDefinition() == V;
+  }
 
-        unsigned getID() const;
+  friend bool operator!=(const HAKCPointerBase &Lhs, Value *V) {
+    return !(Lhs == V);
+  }
 
-        static void SortUses(SmallVectorImpl<ManagedHAKCPointerUseP> &ManagedUses);
+  friend bool operator==(Value *V, const HAKCPointerBase &Rhs) {
+    return (Rhs == V);
+  }
 
-    protected:
-        ManagedHAKCPointerP ManagedPtr;
-        User *UserP;
-        unsigned OperandNo;
-        unsigned ID;
+  friend bool operator!=(Value *V, const HAKCPointerBase &Rhs) {
+    return !(V == Rhs);
+  }
 
-    public:
-        friend bool operator==(const ManagedHAKCPointerUse &lhs, const Use &rhs) {
-            return lhs.getUser() == rhs.getUser() && lhs.getOperandNo() == rhs.getOperandNo();
-        }
+  friend bool operator==(const HAKCPointerBase &Lhs,
+                         const HAKCPointerBase &Rhs) {
+    return Lhs.GetBaseDefinition() == Rhs.GetBaseDefinition();
+  }
 
-        friend bool operator!=(const ManagedHAKCPointerUse &lhs, const Use &rhs) {
-            return !(lhs == rhs);
-        }
+  friend bool operator!=(const HAKCPointerBase &Lhs,
+                         const HAKCPointerBase &Rhs) {
+    return !(Lhs == Rhs);
+  }
+};
+typedef std::shared_ptr<HAKCPointerBase> HAKCPointerBaseP;
 
-        friend bool operator==(const Use &lhs, const ManagedHAKCPointerUse &rhs) {
-            return (rhs == lhs);
-        }
+class ManagedHAKCPointer;
 
-        friend bool operator!=(const Use &lhs, const ManagedHAKCPointerUse &rhs) {
-            return !(lhs == rhs);
-        }
-
-        friend bool operator==(const ManagedHAKCPointerUse &lhs, const ManagedHAKCPointerUse &rhs) {
-            return (lhs.getUser() == rhs.getUser()) && (lhs.getOperandNo() == rhs.getOperandNo());
-        }
-
-        friend bool operator!=(const ManagedHAKCPointerUse &lhs, const ManagedHAKCPointerUse &rhs) {
-            return !(lhs == rhs);
-        }
-    };
-
-    class HAKCPointerBase {
-    protected:
-        /**
-         * The original source of a pointer
-         */
-        Value *BaseDefinition;
-
-        /**
- * A pointer suitable for dereferencing
+/**
+ * Stores Instruction and Operand to change
  */
-        Value *AuthenticatedPointer;
+class ManagedHAKCPointerUse {
+public:
+  ManagedHAKCPointerUse(ManagedHAKCPointer &P, User *User, unsigned OperandNo,
+                        unsigned ID);
 
-        HAKCTypeP HAKCTy;
+  User *getUser() const;
 
-        unsigned ID;
+  void setUser(User *U);
 
-    public:
-        HAKCPointerBase(Value *BaseDefinition, unsigned ID);
+  unsigned getOperandNo() const;
 
-        virtual ~HAKCPointerBase() = default;
+  Value *get() const;
 
-        Value *GetBaseDefinition() const;
+  ManagedHAKCPointer &getManagedPtr() const;
 
-        HAKCTypeP GetType();
+  unsigned getID() const;
 
-        void SetType(HAKCTypeP NewHAKCTy);
+  static void SortUses(
+      SmallVectorImpl<std::shared_ptr<ManagedHAKCPointerUse>> &ManagedUses);
 
-        Value *GetAuthenticatedPointer() const;
+protected:
+  ManagedHAKCPointer &ManagedPtr;
+  User *UserP;
+  unsigned OperandNo;
+  unsigned ID;
 
-        virtual void SetAuthenticatedPointer(Value *NewAuthenticatedPointer);
+public:
+  friend bool operator==(const ManagedHAKCPointerUse &Lhs, const Use &Rhs) {
+    return Lhs.getUser() == Rhs.getUser() &&
+           Lhs.getOperandNo() == Rhs.getOperandNo();
+  }
 
-        unsigned GetID() const;
+  friend bool operator!=(const ManagedHAKCPointerUse &Lhs, const Use &Rhs) {
+    return !(Lhs == Rhs);
+  }
 
-        friend bool operator==(const HAKCPointerBase &lhs, Value *V) {
-            return lhs.GetBaseDefinition() == V;
-        }
+  friend bool operator==(const Use &Lhs, const ManagedHAKCPointerUse &Rhs) {
+    return (Rhs == Lhs);
+  }
 
-        friend bool operator!=(const HAKCPointerBase &lhs, Value *V) {
-            return !(lhs == V);
-        }
+  friend bool operator!=(const Use &Lhs, const ManagedHAKCPointerUse &Rhs) {
+    return !(Lhs == Rhs);
+  }
 
-        friend bool operator==(Value *V, const HAKCPointerBase &rhs) {
-            return (rhs == V);
-        }
+  friend bool operator==(const ManagedHAKCPointerUse &Lhs,
+                         const ManagedHAKCPointerUse &Rhs) {
+    return (Lhs.getUser() == Rhs.getUser()) &&
+           (Lhs.getOperandNo() == Rhs.getOperandNo());
+  }
 
-        friend bool operator!=(Value *V, const HAKCPointerBase &rhs) {
-            return !(V == rhs);
-        }
+  friend bool operator!=(const ManagedHAKCPointerUse &Lhs,
+                         const ManagedHAKCPointerUse &Rhs) {
+    return !(Lhs == Rhs);
+  }
+};
 
-        friend bool operator==(const HAKCPointerBase &lhs, const HAKCPointerBase &rhs) {
-            return lhs.GetBaseDefinition() == rhs.GetBaseDefinition();
-        }
+typedef std::shared_ptr<ManagedHAKCPointerUse> ManagedHAKCPointerUseP;
+class HAKCPointerManager;
 
-        friend bool operator!=(const HAKCPointerBase &lhs, const HAKCPointerBase &rhs) {
-            return !(lhs == rhs);
-        }
-    };
+/**
+ * A single managed Pointer.  Contains the original definition of the pointer,
+ * an authenticated pointer suitable for dereferencing, and a protected pointer
+ * to be used in function arguments.  The base definition and protected pointer
+ * can be different if BaseDefinition is from an external function call.
+ */
+class ManagedHAKCPointer : public HAKCPointerBase {
+protected:
+  /**
+   * A pointer belonging to the current function compartment
+   */
+  Value *ProtectedPointer;
 
-    /**
-     * A single managed Pointer.  Contains the original definition of the pointer, an authenticated pointer suitable
-     * for dereferencing, and a protected pointer to be used in function arguments.  The base definition and
-     * protected pointer can be different if BaseDefinition is from an external function call.
-     */
-    class ManagedHAKCPointer : public HAKCPointerBase {
-    protected:
-        /**
-         * A pointer belonging to the current function compartment
-         */
-        Value *ProtectedPointer;
+  bool DebugActive;
+  HAKCPointerManager &Manager;
 
-        bool DebugActive;
-        HAKCPointerManager &Manager;
+  bool BaseIsAuthenticated;
 
-        bool BaseIsAuthenticated;
+  bool ManuallyTransferred;
 
-        bool ManuallyTransferred;
+  bool PurposefullyIgnored;
 
-        bool PurposefullyIgnored;
+  bool AuthenticatedIsCopyOfBase;
 
-        bool AuthenticatedIsCopyOfBase;
+  /**
+   * Pointer uses and their replacements
+   */
+  SmallVector<ManagedHAKCPointerUseP> AuthenticatedUses;
+  SmallVector<ManagedHAKCPointerUseP> ProtectedUses;
+  SmallVector<ManagedHAKCPointerUseP> CloneUses;
 
-        /**
-         * Pointer uses and their replacements
-         */
-        std::set<ManagedHAKCPointerUseP> AuthenticatedUses;
-        std::set<ManagedHAKCPointerUseP> ProtectedUses;
-        std::set<ManagedHAKCPointerUseP> CloneUses;
+  /**
+   * Return the Authenticated version of HAKCUse
+   * @param HAKCUse
+   * @return
+   */
+  Value *CreateAuthenticatedValue(ManagedHAKCPointerUse &HAKCUse);
 
-        /**
-         * Return the Authenticated version of HAKCUse
-         * @param HAKCUse
-         * @return
-         */
-        Value *CreateAuthenticatedValue(const ManagedHAKCPointerUseP &HAKCUse);
+  /**
+   * Return the Signed version of HAKCUse
+   * @param HAKCUse
+   * @return
+   */
+  Value *CreateProtectedValue(ManagedHAKCPointerUse &HAKCUse);
 
-        /**
-         * Return the Signed version of HAKCUse
-         * @param HAKCUse
-         * @return
-         */
-        Value *CreateProtectedValue(const ManagedHAKCPointerUseP &HAKCUse);
+  void TransformUseSet(SmallVectorImpl<ManagedHAKCPointerUseP> &UseSet);
 
-        void TransformUseSet(std::set<ManagedHAKCPointerUseP> &UseSet);
+  void TransformClones();
 
-        void TransformClones();
+  void CreatePointerReplacements();
 
-        void CreatePointerReplacements();
+  bool ComputeBasePointerAuthenticated();
 
-        bool ComputeBasePointerAuthenticated();
+  void GetAllUses(SmallVectorImpl<ManagedHAKCPointerUseP> &Result) const;
 
-        void GetAllUses(SmallVectorImpl<ManagedHAKCPointerUseP> &Result) const;
+  void SetProtectedPointer(Value *NewProtectedPointer);
 
-        void SetProtectedPointer(Value *NewProtectedPointer);
+  void SetUseOperand(User *U, Value *Replacement,
+                     const ManagedHAKCPointerUse &PointerUse,
+                     bool IsAuthenticatedUse);
 
-        void
-        SetUseOperand(User *U, Value *Replacement, const ManagedHAKCPointerUseP &PointerUse, bool IsAuthenticatedUse);
+  bool AllIncomingValuesAreAuthenticated();
 
-        bool AllIncomingValuesAreAuthenticated();
+  bool AllIncomingValuesWillBeAuthenticated() const;
 
-        bool AllIncomingValuesWillBeAuthenticated();
+  void GetAllIncomingValues(SmallVectorImpl<Value *> &Result) const;
 
-        void GetAllIncomingValues(SmallVectorImpl<Value *> &Result);
+  bool PointerSetsShouldBeEqual() const;
 
-        bool PointerSetsShouldBeEqual() const;
+  void SetPointerSetsToBeEqual();
 
-        void SetPointerSetsToBeEqual();
+  bool UseIsManagedAndHasUsers(const ManagedHAKCPointerUse &PointerUse,
+                               bool CountAuthenticatedUsers);
 
-        bool UseIsManagedAndHasUsers(const ManagedHAKCPointerUseP &PointerUse, bool CountAuthenticatedUsers);
+  bool ValueIsManagedAndHasUsers(Value *V, bool CountAuthenticatedUsers);
 
-        bool ValueIsManagedAndHasUsers(Value *V, bool CountAuthenticatedUsers);
+public:
+  ManagedHAKCPointer(Value *Pointer, HAKCPointerManager &Manager, unsigned ID);
 
-    public:
-        ManagedHAKCPointer(Value *Pointer, HAKCPointerManager &Manager, unsigned ID);
+  ~ManagedHAKCPointer() = default;
 
-        ~ManagedHAKCPointer() = default;
+  Value *GetProtectedPointer() const;
 
-        Value *GetProtectedPointer() const;
+  void CreateBaseAuthenticatedPointer();
 
-        void CreateBaseAuthenticatedPointer();
+  void CreatePointerUseClones();
 
-        void CreatePointerUseClones();
+  bool BaseDefinitionShouldBeTransferred();
 
-        bool BaseDefinitionShouldBeTransferred();
+  void TransformUses();
 
-        void TransformUses();
+  void MaybeCreateProtectedPointer();
 
-        void MaybeCreateProtectedPointer();
+  void MaybeCreateBaseCopyPointer();
 
-        void MaybeCreateBaseCopyPointer();
+  void RegisterManualHAKCTransfer(CallBase *CallI);
 
-        void RegisterManualHAKCTransfer(CallBase *CallI);
+  unsigned GetAuthenticatedUserCount() const;
 
-        unsigned GetAuthenticatedUserCount() const;
+  unsigned GetProtectedUserCount() const;
 
-        unsigned GetProtectedUserCount() const;
+  bool BaseIsAuthenticatedPointer() const;
 
-        bool BaseIsAuthenticatedPointer() const;
+  bool IsAuthenticatedIsCopyOfBase() const;
 
-        bool IsAuthenticatedIsCopyOfBase() const;
+  bool DetermineIfBasePointerIsAuthenticated();
 
-        bool DetermineIfBasePointerIsAuthenticated();
+  void AddAuthenticatedUse(ManagedHAKCPointerUseP &UPtr);
 
-        void AddAuthenticatedUse(const ManagedHAKCPointerUseP &UPtr);
+  void AddProtectedUse(ManagedHAKCPointerUseP &UPtr);
 
-        void AddProtectedUse(const ManagedHAKCPointerUseP &UPtr);
+  void AddCloneUse(ManagedHAKCPointerUseP &UPtr);
 
-        void AddCloneUse(const ManagedHAKCPointerUseP &UPtr);
+  bool PointerSetsCanBeEqual() const;
 
-        bool PointerSetsCanBeEqual() const;
+  void UpdateUserCounts();
 
-        void UpdateUserCounts();
+  void SetAuthenticatedPointer(Value *NewAuthenticatedPointer) override;
 
-        void SetAuthenticatedPointer(Value *NewAuthenticatedPointer) override;
+private:
+  void InitBaseDefinitionInfo();
 
-    private:
-        void InitBaseDefinitionInfo();
+  void CheckPointerReplacement(Value *Old, Value *New,
+                               StringRef TypeName) const;
+};
+} // namespace llvm::hakc
 
-        void CheckPointerReplacement(Value *Old, Value *New, StringRef TypeName) const;
-    };
-} // hakc
-
-#endif //HAKC_MANAGEDHAKCPOINTER_H
+#endif // HAKC_MANAGEDHAKCPOINTER_H

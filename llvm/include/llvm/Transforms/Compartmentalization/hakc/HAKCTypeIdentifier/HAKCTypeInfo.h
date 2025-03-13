@@ -9,7 +9,6 @@
 #include <set>
 
 #include "llvm/IR/DebugInfoMetadata.h"
-
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/yaml/HAKCYamlType.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTypeIdentifier/HAKCInfo.h"
 
@@ -71,36 +70,23 @@ protected:
   const DIType *StripTypeModifiers(const DIType *DiType);
 
 public:
-  friend bool operator==(const HAKCTypeInfo &lhs, const HAKCTypeInfo &rhs) {
-    if (lhs.DbgType && rhs.DbgType) {
-      return lhs.DbgType == rhs.DbgType;
-    } else if (lhs.LLVMType && rhs.LLVMType) {
-      return lhs.LLVMType == rhs.LLVMType;
+  friend bool operator==(const HAKCTypeInfo &Lhs, const HAKCTypeInfo &Rhs) {
+    if (Lhs.DbgType && Rhs.DbgType) {
+      return Lhs.DbgType == Rhs.DbgType;
     }
 
-    return lhs.GetName() == rhs.GetName();
+    return Lhs.GetDbgTypeName() == Rhs.GetDbgTypeName();
   }
 
-  friend bool operator!=(const HAKCTypeInfo &lhs, const HAKCTypeInfo &rhs) {
-    return !(lhs == rhs);
+  friend bool operator!=(const HAKCTypeInfo &Lhs, const HAKCTypeInfo &Rhs) {
+    return !(Lhs == Rhs);
   }
 
-  friend bool operator==(const std::shared_ptr<HAKCTypeInfo> &lhs,
-                         const std::shared_ptr<HAKCTypeInfo> &rhs) {
-    return *lhs == *rhs;
-  }
-
-  friend bool operator!=(const std::shared_ptr<HAKCTypeInfo> &lhs,
-                         const std::shared_ptr<HAKCTypeInfo> &rhs) {
-    return !(*lhs == *rhs);
-  }
-
-  friend bool operator==(StringRef TypeName,
-                         const std::shared_ptr<HAKCTypeInfo> &TypeInfo) {
+  friend bool operator==(StringRef TypeName, const HAKCTypeInfo &TypeInfo) {
     SmallVector<StringRef> TypeNameTokens;
     SmallVector<StringRef> DbgTypeNameTokens;
     TypeName.split(TypeNameTokens, " ");
-    TypeInfo->GetDbgTypeName().split(DbgTypeNameTokens, " ");
+    TypeInfo.GetDbgTypeName().split(DbgTypeNameTokens, " ");
     std::string TypeNameStr;
     std::string DbgTypeNameStr;
 
@@ -115,24 +101,28 @@ public:
     return TypeNameStr == DbgTypeNameStr;
   }
 
-  friend bool operator==(const HAKCYamlType &YamlType,
-                         const std::shared_ptr<HAKCTypeInfo> &TypeInfo) {
-    return YamlType.DebugType == TypeInfo || YamlType.LLVMType == TypeInfo;
+  friend bool operator!=(StringRef TypeName, const HAKCTypeInfo &TypeInfo) {
+    return !(TypeName == TypeInfo);
   }
 
-  friend bool operator==(const std::shared_ptr<HAKCTypeInfo> &TypeInfo,
+  friend bool operator==(const HAKCYamlType &YamlType,
+                         const HAKCTypeInfo &TypeInfo) {
+    return YamlType.DebugType == TypeInfo;
+  }
+
+  friend bool operator!=(const HAKCYamlType &YamlType,
+                         const HAKCTypeInfo &TypeInfo) {
+    return YamlType.DebugType != TypeInfo;
+  }
+
+  friend bool operator==(const HAKCTypeInfo &TypeInfo,
                          const HAKCYamlType &YamlType) {
     return (YamlType == TypeInfo);
   }
 
-  friend bool operator!=(const std::shared_ptr<HAKCTypeInfo> &TypeInfo,
+  friend bool operator!=(const HAKCTypeInfo &TypeInfo,
                          const HAKCYamlType &YamlType) {
-    return !(YamlType == TypeInfo);
-  }
-
-  friend bool operator!=(const HAKCYamlType &YamlType,
-                         const std::shared_ptr<HAKCTypeInfo> &TypeInfo) {
-    return !(YamlType == TypeInfo);
+    return YamlType != TypeInfo;
   }
 };
 typedef std::shared_ptr<HAKCTypeInfo> HAKCTypeP;

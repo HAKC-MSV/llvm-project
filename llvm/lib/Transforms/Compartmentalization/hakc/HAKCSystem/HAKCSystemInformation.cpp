@@ -244,7 +244,7 @@ void HAKCSystemInformation::operator<<(HAKCYamlConfig &YamlConfig) {
 
   for (auto &CustomTransferDefinition : YamlConfig.CustomTransferFunctions) {
     for (auto &HAKCTy : Types) {
-      if (CustomTransferDefinition.TransferObjectTypeName == HAKCTy) {
+      if (CustomTransferDefinition.TransferObjectTypeName == *HAKCTy) {
         auto CustomTransfer = CreateCustomTransferFunction(
             CustomTransferDefinition, HAKCTy, TypeIdentifier);
         CustomTransferList.push_back(CustomTransfer);

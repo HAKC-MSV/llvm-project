@@ -19,36 +19,13 @@ Type *hakc::HAKCTransformer::GetEntryTokenType(unsigned AddrSpace) const {
   return HAKCCompartment::GetEntryTokenType(HAKCIRBuilder.getContext());
 }
 
-std::string hakc::HAKCTransformer::getUniqueAddressable_Name(Function *F) {
-  std::string unique_addressable_name = "__UNIQUE_ID___addressable_";
-  unique_addressable_name += F->getName();
-  for (auto &G : getModule().globals()) {
-    if (G.getName().starts_with(unique_addressable_name)) {
-      return G.getName().str();
-    }
-  }
-  return unique_addressable_name;
-}
-
-std::string hakc::HAKCTransformer::getKstrtab_entry_name(Function *F) {
-  std::string ksymtab_symbol_name = "__kstrtab_";
-  ksymtab_symbol_name += F->getName();
-  return ksymtab_symbol_name;
-}
-
-std::string hakc::HAKCTransformer::getKstrtabns_entry_name(const Function *F) {
-  std::string ksymtabns_symbol_name = "__kstrtabns_";
-  ksymtabns_symbol_name += F->getName();
-  return ksymtabns_symbol_name;
-}
-
 void hakc::HAKCTransformer::CreateDataAuthArguments(
     hakc::HAKCPointerBase &HAKCPointer, Instruction *I,
     SmallVectorImpl<Value *> &Result) {
   Function *F = I->getFunction();
   Value *HAKCPointerBitCast;
   auto Division = CompartmentalizationPolicy.GetDivision(F);
-  auto AccessToken = Division.GetAccessToken();
+  auto *AccessToken = Division.GetAccessToken();
   unsigned AddrSpace = GetPointerAddrSpace(HAKCPointer);
   auto *DataAuthFuncTy =
       ModuleAnalysis.GetCommonAnalysis().GetDataAuthenticationFunctionType(
@@ -731,11 +708,11 @@ hakc::HAKCTransformer::CreateActionCall(HAKCTransferAction &TransferAction,
       // TODO: Move this logic to the caller of this function and put the size
       // in TransferState
       auto ObjectSizeInBytes =
-          GetObjectSizeInBytes(*TransferState.GetManagedPointer());
+          GetObjectSizeInBytes(TransferState.GetManagedPointer());
       if (!ObjectSizeInBytes) {
         CommonHAKCAnalysis::getWriter(DebugIsActive())
             << "Unable to find Object Size of Managed Pointer: "
-            << *TransferState.GetManagedPointer()
+            << TransferState.GetManagedPointer()
             << ", so using default Object Size: " << *GetDefaultObjectSize()
             << "\n";
         ActionArgs.push_back(GetDefaultObjectSize()); // Look here
@@ -1020,7 +997,7 @@ hakc::HAKCTransformer::PopulateTransferFunction(Function *Target,
     CommonHAKCAnalysis::getWriter(DebugIsActive())
         << "Forward Argument Transfer with Arg: " << Arg << "\n";
     auto ManagedPointer = CreateNewManagedPointer(&Arg);
-    HAKCTransferState TransferState(TargetDivision, ManagedPointer);
+    HAKCTransferState TransferState(TargetDivision, *ManagedPointer);
     bool IsData = !Arg.getType()->isFunctionTy();
 
     for (auto &Preaction : ModuleAnalysis.GetCommonAnalysis()
@@ -1156,9 +1133,8 @@ ConstantInt *hakc::HAKCTransformer::GetDefaultObjectSize() {
 }
 
 bool hakc::HAKCTransformer::TargetIsKernel(GlobalValue *Target) {
-  return CompartmentalizationPolicy.GetDivision(Target)
-      .GetHAKCCompartment()
-      .IsUncompartmentalized();
+  return CommonHAKCAnalysis::IsUncompartmentalizedSymbol(
+      Target, CompartmentalizationPolicy);
 }
 
 unsigned

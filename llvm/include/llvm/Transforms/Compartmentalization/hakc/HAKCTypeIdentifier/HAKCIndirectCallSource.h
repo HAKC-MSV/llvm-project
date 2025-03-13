@@ -8,66 +8,71 @@
 #include "HAKCGlobalInfo.h"
 #include "HAKCTypeInfo.h"
 
-
 using namespace llvm;
 
 namespace llvm::hakc {
-    class HAKCIndirectCallSourceLink : public HAKCInfo {
-    public:
-        HAKCIndirectCallSourceLink(Argument *Arg, const std::shared_ptr<HAKCTypeInfo> &HAKCType, bool Debug);
+class HAKCIndirectCallSourceLink : public HAKCInfo {
+public:
+  HAKCIndirectCallSourceLink(Argument *Arg,
+                             const std::shared_ptr<HAKCTypeInfo> &HAKCType,
+                             bool Debug);
 
-        HAKCIndirectCallSourceLink(const std::shared_ptr<HAKCGlobalInfo> &GlobalInfo, bool Debug);
+  HAKCIndirectCallSourceLink(const std::shared_ptr<HAKCGlobalInfo> &GlobalInfo,
+                             bool Debug);
 
-        HAKCIndirectCallSourceLink(const std::shared_ptr<HAKCSymbolInfo> &HAKCSymbol, bool Debug);
+  HAKCIndirectCallSourceLink(const std::shared_ptr<HAKCSymbolInfo> &HAKCSymbol,
+                             bool Debug);
 
-        HAKCIndirectCallSourceLink(const std::shared_ptr<HAKCGlobalInfo> &GlobalInfo, int OffsetInBits, bool Debug);
+  HAKCIndirectCallSourceLink(const std::shared_ptr<HAKCGlobalInfo> &GlobalInfo,
+                             int OffsetInBits, bool Debug);
 
-        HAKCIndirectCallSourceLink(const std::shared_ptr<HAKCTypeInfo> &HAKCType, int OffsetInBits, bool Debug);
+  HAKCIndirectCallSourceLink(const std::shared_ptr<HAKCTypeInfo> &HAKCType,
+                             int OffsetInBits, bool Debug);
 
-        virtual ~HAKCIndirectCallSourceLink() = default;
+  ~HAKCIndirectCallSourceLink() override = default;
 
-        std::string GetYaml(unsigned Indents) const override;
+  std::string GetYaml(unsigned Indents) const override;
 
-        StringRef GetYamlIdentifier() const override;
+  StringRef GetYamlIdentifier() const override;
 
-    protected:
-        std::vector<std::string> LinkYamlTokens;
+protected:
+  std::vector<std::string> LinkYamlTokens;
 
-        void SplitTypeYaml(const std::shared_ptr<HAKCTypeInfo> &HAKCType);
+  void SplitTypeYaml(const std::shared_ptr<HAKCTypeInfo> &HAKCType);
 
-        void SplitString(StringRef S, unsigned Indents);
+  void SplitString(StringRef S, unsigned Indents);
 
-        void InputHAKCSymbol(const std::shared_ptr<HAKCSymbolInfo> &HAKCSymbol);
+  void InputHAKCSymbol(const std::shared_ptr<HAKCSymbolInfo> &HAKCSymbol);
 
-        void InputLinkType(StringRef LinkType);
+  void InputLinkType(StringRef LinkType);
 
-        void InputType(const std::shared_ptr<HAKCTypeInfo> &HAKCType);
+  void InputType(const std::shared_ptr<HAKCTypeInfo> &HAKCType);
 
-        void InputGlobalObject(GlobalObject *GlobalObj);
+  void InputGlobalObject(GlobalObject *GlobalObj);
 
-        void InputYamlHeader();
+  void InputYamlHeader();
 
-        void InputBitoffset(unsigned BitOffset);
+  void InputBitoffset(unsigned BitOffset);
 
-        void InputArgument(Argument *Arg);
-    };
+  void InputArgument(Argument *Arg);
+};
 
+class HAKCIndirectCallSource : public HAKCInfo {
+public:
+  HAKCIndirectCallSource(
+      std::vector<std::shared_ptr<HAKCIndirectCallSourceLink>> SourcePath,
+      const std::shared_ptr<HAKCTypeInfo> &HAKCType, bool debug);
 
-    class HAKCIndirectCallSource : public HAKCInfo {
-    public:
-        HAKCIndirectCallSource(std::vector<std::shared_ptr<HAKCIndirectCallSourceLink> > SourcePath,
-                               const std::shared_ptr<HAKCTypeInfo> &HAKCType, bool debug);
+  ~HAKCIndirectCallSource() override = default;
 
-        virtual ~HAKCIndirectCallSource() = default;
+  std::string GetYaml(unsigned Indents) const override;
 
-        std::string GetYaml(unsigned Indents) const override;
+  StringRef GetYamlIdentifier() const override;
 
-        StringRef GetYamlIdentifier() const override;
+protected:
+  std::shared_ptr<HAKCTypeInfo> HAKCType;
+  std::vector<std::shared_ptr<HAKCIndirectCallSourceLink>> SourcePath;
+};
+} // namespace llvm::hakc
 
-    protected:
-        std::shared_ptr<HAKCTypeInfo> HAKCType;
-        std::vector<std::shared_ptr<HAKCIndirectCallSourceLink> > SourcePath;
-    };
-} // hakc
-
-#endif //HAKC_HAKCINDIRECTCALLSOURCE_H
+#endif // HAKC_HAKCINDIRECTCALLSOURCE_H

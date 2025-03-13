@@ -5,170 +5,186 @@
 #ifndef HAKC_HAKCPOINTERMANAGER_H
 #define HAKC_HAKCPOINTERMANAGER_H
 
-#include <set>
-#include "llvm/IR/Instructions.h"
 #include "ManagedHAKCPointer.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartmentalizationPolicy.h"
+#include <memory>
 
 namespace llvm::hakc {
-    using namespace llvm;
+using namespace llvm;
 
-    class HAKCFunctionAnalysis;
+class HAKCFunctionAnalysis;
 
-    /**
-     * In a function, there are two versions of each pointer that need to be tracked, a pointer that can be
-     * dereferenced and a pointer that is protected.  Any dereference could be the result of arbitrary number of
-     * Instructions, and we assume that pointer origins (e.g., function arguments or the result of a call) return a
-     * protected pointer.  So Instructions that lead to a dereference will dereference a protected pointer, so those
-     * Instructions need to be cloned and modified to use the authenticated pointer.  This manager tracks those
-     * clones, so exactly one is ever created.
-     */
-    class HAKCPointerManager {
-    public:
-        explicit HAKCPointerManager(HAKCFunctionAnalysis &Analysis, HAKCCompartmentalizationPolicy &Policy,
-                                    bool DebugActive);
+/**
+ * In a function, there are two versions of each pointer that need to be
+ * tracked, a pointer that can be dereferenced and a pointer that is protected.
+ * Any dereference could be the result of arbitrary number of Instructions, and
+ * we assume that pointer origins (e.g., function arguments or the result of a
+ * call) return a protected pointer.  So Instructions that lead to a dereference
+ * will dereference a protected pointer, so those Instructions need to be cloned
+ * and modified to use the authenticated pointer.  This manager tracks those
+ * clones, so exactly one is ever created.
+ */
+typedef std::shared_ptr<ManagedHAKCPointer> ManagedHAKCPointerP;
+typedef std::vector<ManagedHAKCPointerP> ManagedHAKCPointerListType;
+typedef std::vector<ManagedHAKCPointerUseP> ManagedHAKCPointerUseListType;
 
-        bool ManagePointer(Value *V);
+class HAKCPointerManager {
+public:
+  explicit HAKCPointerManager(HAKCFunctionAnalysis &Analysis,
+                              HAKCCompartmentalizationPolicy &Policy,
+                              bool DebugActive);
 
-        std::set<ManagedHAKCPointerP> GetManagedPointers();
+  bool ManagePointer(Value *V);
 
-        void GetSortedPointers(SmallVector<ManagedHAKCPointerP> &SortedPointers);
+  iterator_range<ManagedHAKCPointerListType::iterator> ManagedPointers();
 
-        HAKCFunctionAnalysis &GetFunctionAnalysis();
+  HAKCFunctionAnalysis &GetFunctionAnalysis();
 
-        /**
-         * Returns the ManagedHAKCPointer that corresponds to the definition V
-         * @param V
-         * @return
-         */
-        ManagedHAKCPointerP GetManagedPointer(Value *V);
+  /**
+   * Returns the ManagedHAKCPointer that corresponds to the definition V
+   * @param V
+   * @return
+   */
+  ManagedHAKCPointerP GetManagedPointer(Value *V);
 
-        bool empty() const;
+  bool empty() const;
 
-        Value *GetDef(Value *V);
+  Value *GetDef(Value *V);
 
-        /**
-         * Return the Authenticated version of Pointer
-         * @param Pointer
-         * @param Debug
-         * @return
-         */
-        Value *CreateAuthenticatedValue(const ManagedHAKCPointerUseP &PointerUse);
+  /**
+   * Return the Authenticated version of Pointer
+   * @param Pointer
+   * @param Debug
+   * @return
+   */
+  Value *CreateAuthenticatedValue(ManagedHAKCPointerUse &PointerUse);
 
-        Value *CreateProtectedValue(const ManagedHAKCPointerUseP &PointerUse);
+  Value *CreateProtectedValue(ManagedHAKCPointerUse &PointerUse);
 
-        Value *FindAuthenticatedValue(Value *V);
+  Value *FindAuthenticatedValue(Value *V);
 
-        Value *FindProtectedValue(Value *V);
+  Value *FindProtectedValue(Value *V);
 
-        Value *FindAuthenticatedValue(const ManagedHAKCPointerUseP &PointerUse);
+  Value *FindAuthenticatedValue(ManagedHAKCPointerUse &PointerUse);
 
-        Value *FindProtectedValue(const ManagedHAKCPointerUseP &PointerUse);
+  Value *FindProtectedValue(const ManagedHAKCPointerUse &PointerUse);
 
-        static Value *
-        FindManagedValue(std::map<ManagedHAKCPointerUseP, Value *> &Storage, const ManagedHAKCPointerUseP &PointerUse);
+  static Value *
+  FindManagedValue(const std::map<ManagedHAKCPointerUseP, Value *> &Storage,
+                   const ManagedHAKCPointerUse &PointerUse);
 
-        /**
-         * Create authenticated versions of the ManagedHAKCPointer set
-         * @param Debug
-         */
-        void CreateAuthenticatedPointersAndAllClones();
+  /**
+   * Create authenticated versions of the ManagedHAKCPointer set
+   * @param Debug
+   */
+  void CreateAuthenticatedPointersAndAllClones();
 
-        void CreateAllTransfers();
+  void CreateAllTransfers();
 
-        void TransformPointers();
+  void TransformPointers();
 
-        void AddAuthenticatedPointer(const ManagedHAKCPointerUseP &PointerUse, Value *Replacement);
+  void AddAuthenticatedPointer(ManagedHAKCPointerUseP &PointerUse,
+                               Value *Replacement);
 
-        void AddProtectedPointer(const ManagedHAKCPointerUseP &PointerUse, Value *Replacement);
+  void AddProtectedPointer(ManagedHAKCPointerUseP &PointerUse,
+                           Value *Replacement);
 
-        bool ValueWillBeAuthenticated(Value *V);
+  bool ValueWillBeAuthenticated(Value *V);
 
-        unsigned GetDataAuthenticationsAdded() const;
+  unsigned GetDataAuthenticationsAdded() const;
 
-        unsigned GetCodeAuthenticationsAdded() const;
+  unsigned GetCodeAuthenticationsAdded() const;
 
-        unsigned GetSafePointersAdded() const;
+  unsigned GetSafePointersAdded() const;
 
-        unsigned GetClonesAdded() const;
+  unsigned GetClonesAdded() const;
 
-        unsigned GetTotalAdditions() const;
+  unsigned GetTotalAdditions() const;
 
-        void PrintProtectedValues() const;
+  void PrintProtectedValues() const;
 
-        void PrintAuthenticatedValues() const;
+  void PrintAuthenticatedValues() const;
 
-        bool FunctionIsCompartmentalized() const;
+  bool FunctionIsCompartmentalized() const;
 
-        void SetFunctionIsCompartmentalized(bool FunctionIsCompartmentalized);
+  void SetFunctionIsCompartmentalized(bool FunctionIsCompartmentalized);
 
-        HAKCCompartmentalizationPolicy &GetPolicy() const;
+  HAKCCompartmentalizationPolicy &GetPolicy() const;
 
-        Instruction *CloneInstruction(Instruction *I);
+  Instruction *CloneInstruction(Instruction *I);
 
-        Value *CreateSafePointerAtLocation(Value *Pointer, Instruction *InsertLocation);
+  Value *CreateSafePointerAtLocation(Value *Pointer,
+                                     Instruction *InsertLocation);
 
-        Value *CreateAuthenticationAtLocation(Value *Pointer, Instruction *InsertLocation);
+  Value *CreateAuthenticationAtLocation(Value *Pointer,
+                                        Instruction *InsertLocation);
 
-        bool DebugIsActive() const;
+  bool DebugIsActive() const;
 
-    protected:
-        /**
-         * The set of pointers under management
-         */
-        std::set<ManagedHAKCPointerP> ManagedPointers;
+protected:
+  /**
+   * The set of pointers under management
+   */
+  ManagedHAKCPointerListType ManagedPointersList;
 
-        std::map<ManagedHAKCPointerUseP, Value *> AuthenticatedValues;
-        std::map<ManagedHAKCPointerUseP, Value *> ProtectedValues;
-        std::map<Instruction *, Instruction *> Clones;
+  std::map<ManagedHAKCPointerUseP, Value *> AuthenticatedValues;
+  std::map<ManagedHAKCPointerUseP, Value *> ProtectedValues;
+  std::map<Instruction *, Instruction *> Clones;
 
-        std::set<ManagedHAKCPointerUseP> AnalyzedUses;
+  ManagedHAKCPointerUseListType AnalyzedUses;
 
-        HAKCFunctionAnalysis &HAKCAnalysis;
-        HAKCCompartmentalizationPolicy &Policy;
+  HAKCFunctionAnalysis &HAKCAnalysis;
+  HAKCCompartmentalizationPolicy &Policy;
 
-        unsigned DataAuthenticationsAdded;
-        unsigned CodeAuthenticationsAdded;
-        unsigned SafePointersAdded;
+  unsigned DataAuthenticationsAdded;
+  unsigned CodeAuthenticationsAdded;
+  unsigned SafePointersAdded;
 
-        bool IsCompartmentalized;
-        bool DebugActive;
+  bool IsCompartmentalized;
+  bool DebugActive;
 
-        bool PointerIsEligibleForManagement(Value *Pointer);
+  bool PointerIsEligibleForManagement(Value *Pointer);
 
-        void AddHAKCPointerReplacement(const ManagedHAKCPointerUseP &PtrUse, Value *Replacement,
-                                       bool AddingAuthenticatedReplacements);
+  void AddHAKCPointerReplacement(ManagedHAKCPointerUseP &PtrUse,
+                                 Value *Replacement,
+                                 bool AddingAuthenticatedReplacements);
 
-        Value *FindManagedValue(std::map<ManagedHAKCPointerUseP, Value *> &Storage, Value *Target);
+  Value *FindManagedValue(std::map<ManagedHAKCPointerUseP, Value *> &Storage,
+                          Value *Target);
 
-        void ManageNewPointer(Value *V);
+  void ManageNewPointer(Value *V);
 
-        void ClassifyAllUsesOfDefinition(Value *Definition, const ManagedHAKCPointerP &ManagedPointer);
+  void ClassifyAllUsesOfDefinition(Value *Definition,
+                                   ManagedHAKCPointer &ManagedPointer);
 
-        bool UseIsAnalyzed(const ManagedHAKCPointerUseP &UseP);
+  bool UseIsAnalyzed(ManagedHAKCPointerUse &MangedPtrUse);
 
-        bool UseShouldBeIgnored(Use &U);
+  bool UseShouldBeIgnored(Use &U);
 
-        static bool UseShouldBeCloned(Use &U);
+  static bool UseShouldBeCloned(Use &U);
 
-        bool UseShouldUtilizeAuthenticatedPointer(Use &U);
+  bool UseShouldUtilizeAuthenticatedPointer(Use &U);
 
-        bool UseShouldUtilizeSignedBasePointer(Use &U);
+  bool UseShouldUtilizeSignedBasePointer(Use &U);
 
-        bool IsClonedUseNeedingAdditionalClassification(Use &U);
+  bool IsClonedUseNeedingAdditionalClassification(Use &U);
 
-        static void PrintManagedValues(const std::map<ManagedHAKCPointerUseP, Value *> &Storage);
+  static void
+  PrintManagedValues(const std::map<ManagedHAKCPointerUseP, Value *> &Storage);
 
-        Value *FindManagedPointerReplacement(Value *Target, bool ReturnAuthenticatedPointer);
+  Value *FindManagedPointerReplacement(Value *Target,
+                                       bool ReturnAuthenticatedPointer);
 
-        ManagedHAKCPointerUseP CreateManagedPointerUse(const ManagedHAKCPointerP &ManagedPointer, User *U,
-                                                       unsigned OperandNo);
+  ManagedHAKCPointerUseP
+  CreateManagedPointerUse(ManagedHAKCPointer &ManagedPointer, User *U,
+                          unsigned OperandNo);
 
-        bool IsConstantExprUsedInKernelCall(User *U);
+  bool IsConstantExprUsedInKernelCall(User *U);
 
-    private:
-        unsigned CurrentPointerID;
-        unsigned CurrentPointerUseID;
-    };
-} // hakc
+private:
+  unsigned CurrentPointerID;
+  unsigned CurrentPointerUseID;
+};
+} // namespace llvm::hakc
 
-#endif //HAKC_HAKCPOINTERMANAGER_H
+#endif // HAKC_HAKCPOINTERMANAGER_H
