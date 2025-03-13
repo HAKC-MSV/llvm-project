@@ -1,0 +1,61 @@
+!HAKCCompartmentalization
+directed: true
+division_count: 16
+edges:
+  - key: IsType
+    persisted: true
+    source: &id001 !HAKCFunction
+      DefiningFile: _HAKC_SOURCE_PATH_/hakc_test_kuzu12.c
+      DefiningLine: 15
+      Name: sk_buff_caller
+      is_function: true
+      symbol_hash: 49a95eac6aacaa69
+    target: &id004 !HAKCType
+      DebugType: int (struct sk_buff*)
+      LLVMType: i32 (ptr)
+      type_hash: 4b937fd04d597ae0
+  - key: HasScope
+    persisted: true
+    source: *id001
+    target: &id005 !HAKCScope
+      LocalScopeName: global
+      Scope: global
+      scope_hash: 8001c27439650c5c
+  - key: UsedInCompilationUnit
+    persisted: true
+    source: *id001
+    target: &id002 !HAKCCompilationUnit
+      filename: _HAKC_SOURCE_PATH_/hakc_test_kuzu12.c
+  - key: DefinedIn
+    line: 15
+    persisted: true
+    source: *id001
+    target: *id002
+  - key: InDivision
+    persisted: true
+    source: *id001
+    target: &id003 !HAKCDivision
+      AccessToken: 73728
+      DivisionID: 13
+      division_hash: be7396225c569ba9
+  - key: InCompartment
+    persisted: true
+    source: *id003
+    target: &id006 !HAKCCompartment
+      CompartmentID: 1
+      EntryToken: 73728
+graph: { }
+multigraph: true
+nodes:
+  - id: *id001
+    persisted: true
+  - id: *id004
+    persisted: true
+  - id: *id005
+    persisted: true
+  - id: *id002
+    persisted: true
+  - id: *id003
+    persisted: true
+  - id: *id006
+    persisted: true

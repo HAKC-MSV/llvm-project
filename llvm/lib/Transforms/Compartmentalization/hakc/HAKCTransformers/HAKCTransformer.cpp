@@ -625,10 +625,12 @@ bool hakc::HAKCTransformer::NoKernelTransfers(Function *Target) {
 }
 
 // TODO: Change function signature to remove Original and only operate on the Managed Pointer in TransferState
-Value *hakc::HAKCTransformer::CreateActionCall(HAKCTransferAction &TransferAction, Argument *Original,
-                                               HAKCTransferState &TransferState) {
-    auto ActionFunction = TransferAction.GetHAKCActionFunction();
-    CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Creating Action for: " << TransferAction << "\n";
+Value *
+hakc::HAKCTransformer::CreateActionCall(HAKCTransferAction &TransferAction,
+                                        HAKCTransferState &TransferState) {
+  Argument *Original = TransferState.GetManagedPointer()->GetBaseDefinition();
+  auto ActionFunction = TransferAction.GetHAKCActionFunction();
+  CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Creating Action for: " << TransferAction << "\n";
     SmallVector<Value *> ActionArgs;
     for (auto &ActionArg: ActionFunction.Args()) {
         switch (ActionArg.ArgUse) {
