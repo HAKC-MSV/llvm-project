@@ -504,9 +504,14 @@ bool hakc::HAKCTransformer::HAKCPointerHasCustomTransfer(
 hakc::custom_transfer_def_t
 hakc::HAKCTransformer::GetCustomTransferFunctionForType(
     hakc::HAKCTypeP HAKCTy) {
+  CommonHAKCAnalysis::getWriter(DebugIsActive())
+      << "Attempting to find Custom Transfer Function for Type " << *HAKCTy
+      << "\n";
   for (auto &it : ModuleAnalysis.GetCommonAnalysis()
                       .GetSystemInfo()
                       .HAKCCustomTransfers()) {
+    CommonHAKCAnalysis::getWriter(DebugIsActive())
+        << "Custom Transfer Type " << *it->GetTargetType() << "\n";
     if (HAKCTy == it->GetTargetType()) {
       return it;
     }
@@ -516,14 +521,9 @@ hakc::HAKCTransformer::GetCustomTransferFunctionForType(
 
 hakc::custom_transfer_def_t hakc::HAKCTransformer::GetCustomTransferFunction(
     hakc::HAKCPointerBase &HAKCPointer) {
-  for (auto &it : ModuleAnalysis.GetCommonAnalysis()
-                      .GetSystemInfo()
-                      .HAKCCustomTransfers()) {
-    if (HAKCPointer.GetType() == it->GetTargetType()) {
-      return it;
-    }
-  }
-  return nullptr;
+  CommonHAKCAnalysis::getWriter(DebugIsActive())
+      << "Attempting to find custom transfer for " << HAKCPointer << "\n";
+  return GetCustomTransferFunctionForType(HAKCPointer.GetType());
 }
 
 Instruction *
