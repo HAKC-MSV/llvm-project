@@ -1,14 +1,14 @@
 Arch: X86
 Platform: Test
 Database:
-  server-url: @PWD@/hakc-socket
+  server-url: @BUILD_PATH@/hakc-socket
   get-compartment-by-id-endpoint: "get-compartment-by-id"
   get-division-by-id-endpoint: "get-division-by-id"
   get-division-from-symbol-endpoint: "get-division-from-symbol"
   get-valid-targets-from-compartment-id-endpoint: "get-valid-targets-from-compartment-id"
-SourcePath: @PWD@
-BuildPath: @PWD@/build
-DagAnalysisRootPath: @PWD@/dag_analysis
+SourcePath: /home/al32163/hakc/llvm-project/llvm/test/Transforms/Compartmentalization/hakc_test_kuzu12/hakc_test_kuzu12.c
+BuildPath: @BUILD_PATH@/build
+DagAnalysisRootPath: @BUILD_PATH@/dag_analysis
 OutputDebugInfo: true
 PassMode: @PASS_MODE@
 IncludePaths: [ ]
