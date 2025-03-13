@@ -87,11 +87,11 @@ namespace llvm::hakc {
 
         static hakc::HAKCWriter &getWriter(bool DebugActive);
 
-        static FunctionType *GetDataAuthenticationFunctionType(Module &M, unsigned AddrSpace = 0);
+        FunctionType *GetDataAuthenticationFunctionType(Module &M, unsigned AddrSpace = 0);
 
-        static FunctionType *GetCodeAuthenticationFunctionType(Module &M, unsigned AddrSpace = 0);
+        FunctionType *GetCodeAuthenticationFunctionType(Module &M, unsigned AddrSpace = 0);
 
-        static FunctionType *GetTransferFunctionType(Module &M, unsigned AddrSpace = 0);
+        FunctionType *GetTransferFunctionType(Module &M, unsigned AddrSpace = 0);
 
         static bool FunctionIsComplexVariadic(Function *F);
 

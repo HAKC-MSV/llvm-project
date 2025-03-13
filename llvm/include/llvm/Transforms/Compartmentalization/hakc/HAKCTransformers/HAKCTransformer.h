@@ -243,7 +243,7 @@ namespace llvm::hakc {
          * @param F
          * @return
          */
-        GlobalVariable *GetValidTargetCompartments(Function *F);
+        GlobalVariable *GetValidTargetCompartments(Function *F) const;
 
         /**
          * Return the type that HAKC Compartment Entry Tokens are in the source

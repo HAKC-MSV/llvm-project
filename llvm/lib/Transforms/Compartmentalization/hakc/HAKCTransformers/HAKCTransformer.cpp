@@ -51,7 +51,8 @@ void hakc::HAKCTransformer::CreateDataAuthArguments(hakc::HAKCPointerBase &HAKCP
     auto Division = CompartmentalizationPolicy.GetDivision(F);
     auto AccessToken = Division.GetAccessToken();
     unsigned AddrSpace = GetPointerAddrSpace(HAKCPointer);
-    auto *DataAuthFuncTy = hakc::CommonHAKCAnalysis::GetDataAuthenticationFunctionType(ModuleAnalysis.GetModule(),
+    auto *DataAuthFuncTy = ModuleAnalysis.GetCommonAnalysis().GetDataAuthenticationFunctionType(
+        ModuleAnalysis.GetModule(),
         AddrSpace);
 
     if (HAKCPointer.GetBaseDefinition()->getType()->isIntegerTy()) {
@@ -220,10 +221,9 @@ Value *hakc::HAKCTransformer::CreateDataAuthentication(hakc::HAKCPointerBase &HA
         throw std::exception();
     }
 
-    Value *HAKCPointerBitCast;
     SmallVector<Value *> Args;
     unsigned AddrSpace = GetPointerAddrSpace(HAKCPointer);
-    auto *DataAuthFuncTy = CommonHAKCAnalysis::GetDataAuthenticationFunctionType(getModule(), AddrSpace);
+    auto *DataAuthFuncTy = ModuleAnalysis.GetCommonAnalysis().GetDataAuthenticationFunctionType(getModule(), AddrSpace);
     CreateDataAuthArguments(HAKCPointer, I, Args);
     for (unsigned i = 0; i < DataAuthFuncTy->getNumParams(); i++) {
         if (Args[i]->getType() != DataAuthFuncTy->getParamType(i)) {
@@ -234,7 +234,7 @@ Value *hakc::HAKCTransformer::CreateDataAuthentication(hakc::HAKCPointerBase &HA
     }
 
     auto *DataAuthCall = CreateCall(ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().DataValidation(), Args);
-    HAKCPointerBitCast = CreateReturnCast(HAKCPointer, DataAuthCall);
+    Value *HAKCPointerBitCast = CreateReturnCast(HAKCPointer, DataAuthCall);
     HAKCPointer.SetAuthenticatedPointer(HAKCPointerBitCast);
 
     return HAKCPointerBitCast;
@@ -275,13 +275,12 @@ Value *hakc::HAKCTransformer::CreateCodeAuthentication(hakc::HAKCPointerBase &HA
     return BitCast;
 }
 
-GlobalVariable *hakc::HAKCTransformer::GetValidTargetCompartments(Function *F) {
+GlobalVariable *hakc::HAKCTransformer::GetValidTargetCompartments(Function *F) const {
     auto Division = CompartmentalizationPolicy.GetDivision(F);
 
-    GlobalVariable *EntryTokenArray;
     auto CompartmentID = Division.GetHAKCCompartment().GetCompartmentID();
     std::string name = "entry_tokens_" + std::to_string(CompartmentID->getZExtValue());
-    EntryTokenArray = getModule().getNamedGlobal(name);
+    GlobalVariable *EntryTokenArray = getModule().getNamedGlobal(name);
     if (EntryTokenArray) {
         if (!EntryTokenArray->getValueType()->isArrayTy()) {
             CommonHAKCAnalysis::getWriter(true) << "Invalid type for " << *EntryTokenArray << "\n";
@@ -958,7 +957,7 @@ Value *hakc::HAKCTransformer::CreateBitCast(hakc::HAKCPointerBase &HAKCPointer, 
     return BitCast;
 }
 
-
+// TODO: Move this logic to HAKCTYpe and remove this function
 ConstantInt *hakc::HAKCTransformer::GetObjectSizeInBytes(hakc::HAKCPointerBase &HAKCPointer) {
     CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Finding size of " << HAKCPointer << "\n";
     if (HAKCPointer.GetType() == nullptr) {
@@ -974,6 +973,7 @@ ConstantInt *hakc::HAKCTransformer::GetObjectSizeInBytes(hakc::HAKCPointerBase &
     return GetObjectSizeInBytes(HAKCPointer.GetType()->GetPointeeType());
 }
 
+// TODO: Move this logic to HAKCType and remove this function
 ConstantInt *hakc::HAKCTransformer::GetObjectSizeInBytes(hakc::HAKCTypeP HAKCType) {
     CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Getting size of HAKCTypeInfo " << *HAKCType << "\n";
     auto bit_size = HAKCType->GetSizeInBits();
@@ -981,7 +981,8 @@ ConstantInt *hakc::HAKCTransformer::GetObjectSizeInBytes(hakc::HAKCTypeP HAKCTyp
 }
 
 Type *hakc::HAKCTransformer::HAKCAuthenticationRetType(unsigned AddrSpace) {
-    auto *AuthCallType = CommonHAKCAnalysis::GetDataAuthenticationFunctionType(getModule(), AddrSpace);
+    auto *AuthCallType = ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().DataValidation()->GetFunction()->
+            getFunctionType();
     return AuthCallType->getReturnType();
 }
 

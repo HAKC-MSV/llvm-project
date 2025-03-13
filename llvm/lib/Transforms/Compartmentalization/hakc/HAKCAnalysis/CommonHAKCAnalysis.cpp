@@ -496,40 +496,15 @@ namespace llvm::hakc {
     }
 
     FunctionType *CommonHAKCAnalysis::GetDataAuthenticationFunctionType(Module &M, unsigned AddrSpace) {
-        auto *RetTy = PointerType::get(M.getContext(), AddrSpace);
-        Type *ArgTy[] = {
-            PointerType::get(M.getContext(), AddrSpace), /* pointer */
-            IntegerType::get(M.getContext(), COMPARTMENT_ID_BIT_LENGTH), /* Compartment ID */
-            IntegerType::get(M.getContext(), COMPARTMENT_ID_BIT_LENGTH), /* Division ID */
-        };
-
-        return FunctionType::get(RetTy, ArgTy, false);
+        return GetSystemInfo().DataValidation()->GetFunction()->getFunctionType();
     }
 
     FunctionType *CommonHAKCAnalysis::GetTransferFunctionType(Module &M, unsigned int AddrSpace) {
-        auto *RetTy = PointerType::get(M.getContext(), AddrSpace);
-        Type *ArgTy[] = {
-            PointerType::get(M.getContext(), AddrSpace),
-            IntegerType::get(M.getContext(), COMPARTMENT_ID_BIT_LENGTH), /* DivisionID */
-            IntegerType::get(M.getContext(), COMPARTMENT_ID_BIT_LENGTH), /* Compartment ID */
-            IntegerType::get(M.getContext(), 64), /* Size */
-            IntegerType::get(M.getContext(), 1) /* IsData */
-        };
-
-        return FunctionType::get(RetTy, ArgTy, false);
+        return GetSystemInfo().CompartmentTransfer(false)->GetFunction()->getFunctionType();
     }
 
     FunctionType *CommonHAKCAnalysis::GetCodeAuthenticationFunctionType(Module &M, unsigned AddrSpace) {
-        auto *RetTy = PointerType::get(M.getContext(), AddrSpace);
-        Type *ArgTy[] = {
-            PointerType::get(M.getContext(), AddrSpace), /* Function pointer */
-            IntegerType::get(M.getContext(), COMPARTMENT_ID_BIT_LENGTH), /* Compartment ID */
-            IntegerType::get(M.getContext(), COMPARTMENT_ID_BIT_LENGTH), /* Division ID */
-            PointerType::get(M.getContext(), AddrSpace), /* Access Token array */
-            IntegerType::get(M.getContext(), 64), /* Number of Access Tokens */
-        };
-
-        return FunctionType::get(RetTy, ArgTy, false);
+        return GetSystemInfo().CodeValidation()->GetFunction()->getFunctionType();
     }
 
     bool CommonHAKCAnalysis::IsCompartmentalizedFunction(Function *F, HAKCCompartmentalizationPolicy &Policy) {
