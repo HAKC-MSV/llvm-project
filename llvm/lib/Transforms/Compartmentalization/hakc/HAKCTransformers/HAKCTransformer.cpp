@@ -191,11 +191,6 @@ Value *hakc::HAKCTransformer::CreateSafePointer(HAKCPointerBase &HAKCPointer, In
     Value *orValue = HAKCIRBuilder.CreateOr(ptrToInt, 0xFFFF000000000000);
     Value *orCast = HAKCIRBuilder.CreateIntToPtr(orValue, HAKCPointer.GetBaseDefinition()->getType());
     auto SafePtr = HAKCIRBuilder.CreateSelect(addrCheck, orCast, HAKCPointer.GetBaseDefinition());
-    ////
-
-    // todo: anesathu; fix this, also add better debugging here probably
-    // auto *SafePtr = CreateSafePointer_Arch(HAKCPointer, I);
-    // auto *SafePtr = CreateSafePointer(HAKCPointer, I);
 
     if (SafePtr->getType() != HAKCPointer.GetBaseDefinition()->getType()) {
         CommonHAKCAnalysis::getWriter(true) << "SafePtr and HAKCPointerBase are not the same Type!\n"
@@ -899,7 +894,6 @@ Function *hakc::HAKCTransformer::PopulateTransferFunction(Function *Target, Func
         auto ManagedPointer = CreateNewManagedPointer(&Arg);
         HAKCTransferState TransferState(TargetDivision, ManagedPointer);
         bool IsData = !Arg.getType()->isFunctionTy();
-
 
         for (auto &Preaction: ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().PreTransferActions()) {
             CreateActionCall(*Preaction, &Arg, TransferState);

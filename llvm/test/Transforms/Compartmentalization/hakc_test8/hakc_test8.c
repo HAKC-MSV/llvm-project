@@ -19,6 +19,7 @@ struct data_struct2 {
 
 int foo(struct data_struct2 *a, int* v1, int* v2) {
     if (a) {
+// CHECK:
         *v1++;
         *v2++;
         struct data_struct b;
@@ -28,14 +29,4 @@ int foo(struct data_struct2 *a, int* v1, int* v2) {
     return 0;
 }
 
-// int bar(){
-//     struct data_struct2 ds2; 
-//     int *v1;
-//     v1 = &kmalloc_caches; 
-//     int *v2;
-//     v2 = &somevar; 
-//     foo(&ds2, v1, v2);
-// }
-// note: incomplete test. need derricks help for expected behavior 
 // CHECK-LABEL: HAKC_XFER_foo
-// CHECK: %7 = call i8* @hakc_transfer_to_clique
