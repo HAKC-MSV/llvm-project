@@ -357,14 +357,6 @@ namespace llvm::hakc {
 
         Value *CreateActionCall(HAKCTransferAction &TransferAction, Argument *Original,
                                 HAKCTransferState &TransferState);
-
-        void CreatePreTransferActionCalls(iterator_range<HAKCPreTransferActionList::iterator> TransferActions,
-                                          Argument *Original,
-                                          HAKCTransferState &TransferState);
-
-        void CreatePostTargetActionCalls(iterator_range<HAKCPostTargetActionList::iterator> TargetActions,
-                                         Argument *Original,
-                                         HAKCTransferState &TransferState);
     };
 } // namespace hakc
 

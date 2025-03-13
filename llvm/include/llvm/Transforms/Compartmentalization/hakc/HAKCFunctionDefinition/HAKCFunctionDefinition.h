@@ -21,8 +21,7 @@ namespace llvm::hakc {
         IsCode,
         AccessToken,
         ValidTargets,
-        ValidTargetSize,
-        Color
+        ValidTargetSize
     };
 
     const std::map<HAKCFunctionArgumentUse, const char *> HAKCArgumentArgumentUseStringMap();

@@ -23,6 +23,10 @@ namespace llvm::hakc {
             CommonHAKCAnalysis::getWriter(true) << "F is null\n";
             throw std::exception();
         }
+        llvm::sort(ArgList.begin(), ArgList.end(),
+                   [](const HAKCFunctionArgumentDefinition &LHS, const HAKCFunctionArgumentDefinition &RHS) {
+                       return LHS.Idx < RHS.Idx;
+                   });
     }
 
     StringRef HAKCFunctionDefinition::GetName() const {
@@ -77,8 +81,7 @@ namespace llvm::hakc {
             {hakc::AccessToken, "access-token"},
             {hakc::ValidTargets, "valid-targets"},
             {hakc::ValidTargetSize, "valid-target-size"},
-            {hakc::Other, "other"},
-          {hakc::Color, "color"}
+            {hakc::Other, "other"}
         };
     }
 } // namespace llvm::hakc

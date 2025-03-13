@@ -138,7 +138,6 @@ namespace llvm::hakc {
 
     struct HAKCYAMLActionArgument {
         HAKCYAMLStringType Label;
-        HAKCYAMLStringType Type;  // TODO: implement type parsing if necessary
         unsigned Idx;
     };
 
@@ -263,7 +262,6 @@ struct yaml::MappingTraits<hakc::HAKCYAMLActionArgument> {
     static void mapping(yaml::IO &io, hakc::HAKCYAMLActionArgument &ActionArg) {
         io.mapRequired("label", ActionArg.Label);
         io.mapRequired("idx", ActionArg.Idx);
-        io.mapOptional("type", ActionArg.Type);
     }
 };
 
