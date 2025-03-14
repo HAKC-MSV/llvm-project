@@ -383,9 +383,8 @@ protected:
 
   HAKCPointerBaseP CreateNewManagedPointer(Value *BaseDefinition);
 
-  Value *CreateActionCall(HAKCTransferAction &TransferAction,
-                          Argument *Original, HAKCTransferState &TransferState);
-};
-} // namespace llvm::hakc
+        Value *CreateActionCall(HAKCTransferAction &TransferAction, HAKCTransferState &TransferState);
+    };
+} // namespace hakc
 
 #endif // HAKC_HAKCTRANSFORMER_H

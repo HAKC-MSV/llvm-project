@@ -26,7 +26,9 @@ public:
 
   iterator_range<CompartmentIDSet::const_iterator> GetValidTargets() const;
 
-  void AddTarget(HAKC_Compartment_ID CompartmentID);
+        unsigned GetValidTargetsSize() const;
+
+        void AddTarget(HAKC_Compartment_ID CompartmentID);
 
   hakc_compartment_id_t GetCompartmentIDValue() const;
 

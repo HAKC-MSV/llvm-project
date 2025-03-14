@@ -41,3 +41,7 @@ hakc::HAKCTransferState::GetDivision() const {
 hakc::HAKCPointerBase &hakc::HAKCTransferState::GetManagedPointer() {
   return HAKCPointer;
 }
+
+hakc::HAKC_Access_Token hakc::HAKCTransferState::GetAccessToken(){
+  return TargetDivision.GetAccessToken();
+}
