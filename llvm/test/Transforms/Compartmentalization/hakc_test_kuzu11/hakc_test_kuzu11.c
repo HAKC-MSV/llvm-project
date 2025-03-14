@@ -1,8 +1,12 @@
+// RUN: %HAKC_EMIT_LLVM
 // RUN: %HAKC_PROCESS_YAML_COMP_CONFIG
+// RUN: %HAKC_PROCESS_YAML_COMP_DAG_CONFIG
 // RUN: %HAKC_PROCESS_YAML_POLICY_CONFIG
+// RUN: %HAKC_RUN_DAG_PASS
 // RUN: %HAKC_PYTHON_VENV
+// RUN: %HAKC_RUN_PYTHON_DAG
 // RUN: %HAKC_START_POLICY_SERVER & sleep 1 &&\
-// RUN: %HAKC_RUN_PASS
+// RUN: %HAKC_RUN_COMP_PASS
 // RUN: %HAKC_EVALUATE
 
 // Testing if foo can find valid targets of bar and baz
@@ -19,13 +23,8 @@ int foo(int* _a) {
   return b + c;
 }
 
-// todo: add better checking, maybe of t.ll after dag too?
-
-// CHECK: @foo = alias i32 (ptr), ptr @HAKC_XFER_foo
-
-// CHECK-LABEL: HAKC_ORIG_foo
-// CHECK: call i32 @bar(ptr noundef %5)
-
-// CHECK-LABEL: HAKC_XFER_foo
-// CHECK: call ptr @hakc_transfer_to_clique(ptr %0, i64 4, i64 3, i64 13, i1 false)
-// CHECK: call i32 @HAKC_ORIG_foo(ptr %1)
+// CHECK-LABEL: @HAKC_XFER_foo
+// CHECK: call i32 @get_hakc_address_color(ptr %0)
+// CHECK: call ptr @hakc_transfer_to_clique(ptr %0, i64 32, i64 3, i64 13, i1 false)
+// CHECK: call i32 @HAKC_ORIG_foo(ptr %3)
+// CHECK: call void @hakc_color_address(ptr %0, i32 %2, i64 32)

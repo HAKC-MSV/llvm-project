@@ -1,8 +1,12 @@
+// RUN: %HAKC_EMIT_LLVM
 // RUN: %HAKC_PROCESS_YAML_COMP_CONFIG
+// RUN: %HAKC_PROCESS_YAML_COMP_DAG_CONFIG
 // RUN: %HAKC_PROCESS_YAML_POLICY_CONFIG
+// RUN: %HAKC_RUN_DAG_PASS
 // RUN: %HAKC_PYTHON_VENV
+// RUN: %HAKC_RUN_PYTHON_DAG
 // RUN: %HAKC_START_POLICY_SERVER & sleep 1 &&\
-// RUN: %HAKC_RUN_PASS
+// RUN: %HAKC_RUN_COMP_PASS
 // RUN: %HAKC_EVALUATE
 
 // test of nested compartment calls
@@ -27,17 +31,14 @@ int foo(struct data_struct *a) {
     return 0;
 }
 
-// note: incomplete test. need derricks help for expected behavior
-// CHECK: call ptr @check_hakc_data_access(ptr %8, i64 2, i64 139264)
-// CHECK: getelementptr inbounds %struct.data_struct, ptr %9, i32 0, i32 0
-// CHECK: getelementptr inbounds %struct.data_struct, ptr %8, i32 0, i32 0
+// CHECK-LABEL: i32 @HAKC_XFER_bar(ptr noundef %0)
+// CHECK: call i32 @get_hakc_address_color(ptr %0)
+// CHECK: call ptr @hakc_transfer_to_clique(ptr %0, i64 32, i64 1, i64 13, i1 false)
+// CHECK: call i32 @HAKC_ORIG_bar(ptr %3)
+// CHECK: call void @hakc_color_address(ptr %0, i32 %2, i64 32)
 
-// CHECK: define dso_local i32 @HAKC_XFER_bar(ptr noundef %0)
-// CHECK: HAKCTransferEntry:
-// CHECK: call ptr @hakc_transfer_to_clique(ptr %0, i64 4, i64 1, i64 13, i1 false)
-// CHECK: call i32 @HAKC_ORIG_bar(ptr %1)
-
-// CHECK: define dso_local i32 @HAKC_XFER_foo(ptr noundef %0)
-// CHECK: HAKCTransferEntry:
-// CHECK: call ptr @hakc_transfer_to_clique(ptr %0, i64 4, i64 2, i64 13, i1 false)
-// CHECK: call i32 @HAKC_ORIG_foo(ptr %1)
+// CHECK-LABEL: i32 @HAKC_XFER_foo(ptr noundef %0)
+// CHECK: call i32 @get_hakc_address_color(ptr %0)
+// CHECK: call ptr @hakc_transfer_to_clique(ptr %0, i64 32, i64 2, i64 13, i1 false)
+// CHECK: call i32 @HAKC_ORIG_foo(ptr %3)
+// CHECK: call void @hakc_color_address(ptr %0, i32 %2, i64 32)

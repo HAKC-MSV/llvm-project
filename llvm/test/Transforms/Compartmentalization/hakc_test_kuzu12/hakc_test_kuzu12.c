@@ -2,9 +2,9 @@
 // RUN: %HAKC_PROCESS_YAML_COMP_CONFIG
 // RUN: %HAKC_PROCESS_YAML_COMP_DAG_CONFIG
 // RUN: %HAKC_PROCESS_YAML_POLICY_CONFIG
+// RUN: %HAKC_RUN_DAG_PASS
 // RUN: %HAKC_PYTHON_VENV
 // RUN: %HAKC_RUN_PYTHON_DAG
-// RUN: %HAKC_RUN_DAG_PASS
 // RUN: %HAKC_START_POLICY_SERVER & sleep 1 &&\
 // RUN: %HAKC_RUN_COMP_PASS
 // RUN: %HAKC_EVALUATE
@@ -21,12 +21,9 @@ int sk_buff_caller(struct sk_buff* buff) {
   return 0;
 }
 
-// CHECK: @sk_buff_caller = alias i32 (ptr), ptr @HAKC_XFER_sk_buff_caller
-
-// CHECK-LABEL: HAKC_ORIG_sk_buff_caller
-
-// CHECK-LABEL: HAKC_XFER_sk_buff_caller
-
-// CHECK NOT: @hakc_transfer_to_clique
-
-// CHECK @hakc_transfer_skb
+// CHECK-LABEL: @HAKC_XFER_sk_buff_caller
+// CHECK: call i32 @get_hakc_address_color(ptr %0)
+// CHECK-NOT: @hakc_transfer_to_clique
+// CHECK: call ptr @hakc_transfer_skb(ptr %0, i64 1, i64 13)
+// CHECK: call i32 @HAKC_ORIG_sk_buff_caller(ptr %3)
+// CHECK: call void @hakc_color_address(ptr %0, i32 %2, i64 32)

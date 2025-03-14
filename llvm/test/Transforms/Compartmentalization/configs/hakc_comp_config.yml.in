@@ -1,13 +1,13 @@
 Arch: X86
 Platform: Test
 Database:
-  server-url: @BUILD_PATH@/hakc-socket
+  server-url: @HAKC_SOCKET_PATH@/hakc-socket
   get-compartment-by-id-endpoint: "get-compartment-by-id"
   get-division-by-id-endpoint: "get-division-by-id"
   get-division-from-symbol-endpoint: "get-division-from-symbol"
   get-valid-targets-from-compartment-id-endpoint: "get-valid-targets-from-compartment-id"
 SourcePath: @SOURCE_PATH_ENTRY@
-BuildPath: @BUILD_PATH@/build
+BuildPath: @BUILD_PATH@
 DagAnalysisRootPath: @BUILD_PATH@/dag_analysis
 OutputDebugInfo: true
 PassMode: @PASS_MODE@
