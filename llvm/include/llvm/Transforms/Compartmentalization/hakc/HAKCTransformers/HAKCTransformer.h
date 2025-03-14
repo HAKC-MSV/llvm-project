@@ -265,15 +265,14 @@ protected:
    */
   GlobalVariable *GetValidTargetCompartments(Function *F) const;
 
+  GlobalVariable *
+  GetValidTargetCompartments(const HAKCCompartmentDivision &Division) const;
+
   /**
    * Return the type that HAKC Compartment Entry Tokens are in the source
    * @return
    */
   Type *GetEntryTokenType(unsigned AddrSpace) const;
-
-  virtual ConstantInt *GetObjectSizeInBytes(hakc::HAKCPointerBase &HAKCPointer);
-
-  virtual ConstantInt *GetObjectSizeInBytes(hakc::HAKCTypeP HAKCType);
 
   /**
    * Create the argument set for a HAKC data check
@@ -383,8 +382,9 @@ protected:
 
   HAKCPointerBaseP CreateNewManagedPointer(Value *BaseDefinition);
 
-        Value *CreateActionCall(HAKCTransferAction &TransferAction, HAKCTransferState &TransferState);
-    };
-} // namespace hakc
+  Value *CreateActionCall(HAKCTransferAction &TransferAction,
+                          HAKCTransferState &TransferState);
+};
+} // namespace llvm::hakc
 
 #endif // HAKC_HAKCTRANSFORMER_H

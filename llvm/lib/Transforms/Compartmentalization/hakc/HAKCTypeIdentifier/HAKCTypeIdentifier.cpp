@@ -39,13 +39,6 @@ void hakc::HAKCTypeIdentifier::AddTypeMapping(
   CommonHAKCAnalysis::getWriter(
       AnalysisHelper.GetSystemInfo().OutputDebugInfo())
       << "Adding mapping " << *type << " -> " << HAKCType->GetName() << "\n";
-  std::set<dwarf::Tag> TagsToSize = {
-      dwarf::DW_TAG_structure_type,
-      dwarf::DW_TAG_union_type,
-  };
-  if (isa<DIBasicType>(type) || TagsToSize.contains(type->getTag())) {
-    HAKCType->SetSizeInBits(type->getSizeInBits());
-  }
   HAKCType->SetDbgType(type);
   auto DbgTypeName = GetTypeName(type);
   HAKCType->SetDbgTypeName(DbgTypeName);

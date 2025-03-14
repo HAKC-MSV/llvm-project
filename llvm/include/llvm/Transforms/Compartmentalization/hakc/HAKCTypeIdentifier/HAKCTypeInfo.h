@@ -25,7 +25,7 @@ public:
 
   std::string GetYaml(unsigned Indents) const override;
 
-  void SetSizeInBits(unsigned Size);
+  ConstantInt *GetSizeInBytes() const;
 
   unsigned GetSizeInBits() const;
 
@@ -56,6 +56,8 @@ public:
   bool IsIntegerType() const;
 
   bool IsPointerType() const;
+
+  bool IsFunctionType() const;
 
 protected:
   std::map<unsigned, std::set<std::shared_ptr<HAKCTypeInfo>>> Members;

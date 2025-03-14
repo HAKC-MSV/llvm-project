@@ -16,9 +16,18 @@ HAKCTypeInfo::HAKCTypeInfo(CommonHAKCAnalysis &Analysis, StringRef Name,
       DbgType(nullptr), LLVMType(nullptr), DbgTypeName(), PointeeType(nullptr) {
 }
 
-void HAKCTypeInfo::SetSizeInBits(unsigned int Size) { SizeInBits = Size; }
+unsigned HAKCTypeInfo::GetSizeInBits() const {
+  if (DbgType) {
+    return DbgType->getSizeInBits();
+  }
+  return 0;
+}
 
-unsigned HAKCTypeInfo::GetSizeInBits() const { return SizeInBits; }
+ConstantInt *HAKCTypeInfo::GetSizeInBytes() const {
+  unsigned SizeInBits = GetSizeInBits();
+  LLVMContext &Ctx = Analysis.GetModule().getContext();
+  return ConstantInt::get(IntegerType::get(Ctx, 64), SizeInBits, false);
+}
 
 const DIType *HAKCTypeInfo::GetDbgType() const { return DbgType; }
 
@@ -61,6 +70,15 @@ bool HAKCTypeInfo::IsPointerType() const {
     return DbgType->getTag() == dwarf::DW_TAG_pointer_type;
   } else if (LLVMType) {
     return LLVMType->isPointerTy();
+  }
+  return false;
+}
+
+bool HAKCTypeInfo::IsFunctionType() const {
+  if (DbgType) {
+    return isa<DISubroutineType>(DbgType);
+  } else if (LLVMType) {
+    return isa<FunctionType>(LLVMType);
   }
   return false;
 }

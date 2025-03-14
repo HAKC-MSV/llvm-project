@@ -6,7 +6,7 @@ Database:
   get-division-by-id-endpoint: "get-division-by-id"
   get-division-from-symbol-endpoint: "get-division-from-symbol"
   get-valid-targets-from-compartment-id-endpoint: "get-valid-targets-from-compartment-id"
-SourcePath: /home/al32163/hakc/llvm-project/llvm/test/Transforms/Compartmentalization/hakc_test_kuzu12/hakc_test_kuzu12.c
+SourcePath: @SOURCE_PATH_ENTRY@
 BuildPath: @BUILD_PATH@/build
 DagAnalysisRootPath: @BUILD_PATH@/dag_analysis
 OutputDebugInfo: true

@@ -112,7 +112,16 @@ void hakc::HAKCTransformer::ValidateLocation(Instruction *I) {
 
 void hakc::HAKCTransformer::ValidateHAKCPointer(
     const HAKCPointerBase &HAKCPointer) {
-  // TODO: this should be implemented
+  if (HAKCPointer.GetType() == nullptr) {
+    CommonHAKCAnalysis::getWriter(true)
+        << "HAKCPointer " << HAKCPointer << " has no HAKCType\n";
+    throw std::exception();
+  } else if (HAKCPointer.GetType()->GetPointeeType()) {
+    CommonHAKCAnalysis::getWriter(true)
+        << "HAKCPointer " << HAKCPointer << " Type " << *HAKCPointer.GetType()
+        << " has no PointeeType\n";
+    throw std::exception();
+  }
 }
 
 void hakc::HAKCTransformer::ValidateHAKCPointerAndLocation(
@@ -278,11 +287,9 @@ Value *hakc::HAKCTransformer::CreateCodeAuthentication(
   return BitCast;
 }
 
-GlobalVariable *
-hakc::HAKCTransformer::GetValidTargetCompartments(Function *F) const {
-  auto Division = CompartmentalizationPolicy.GetDivision(F);
-
-  auto CompartmentID = Division.GetHAKCCompartment().GetCompartmentID();
+GlobalVariable *hakc::HAKCTransformer::GetValidTargetCompartments(
+    const HAKCCompartmentDivision &Division) const {
+  const auto CompartmentID = Division.GetHAKCCompartment().GetCompartmentID();
   std::string name =
       "entry_tokens_" + std::to_string(CompartmentID->getZExtValue());
   GlobalVariable *EntryTokenArray = getModule().getNamedGlobal(name);
@@ -295,18 +302,15 @@ hakc::HAKCTransformer::GetValidTargetCompartments(Function *F) const {
     return EntryTokenArray;
   }
 
-  auto Targets = Division.GetHAKCCompartment().GetValidTargets();
-
   SmallVector<Constant *> EntryTokenValues;
   SmallVector<hakc_compartment_id_t> IDs;
   IDs.push_back(CompartmentID->getZExtValue());
-  for (auto &t : Targets) {
+  for (auto &t : Division.GetHAKCCompartment().GetValidTargets()) {
     IDs.push_back(t->getZExtValue());
   }
   llvm::sort(IDs.begin(), IDs.end(),
-             [](hakc_compartment_id_t LHS, hakc_compartment_id_t RHS) {
-               return LHS < RHS;
-             });
+             [](const hakc_compartment_id_t LHS,
+                const hakc_compartment_id_t RHS) { return LHS < RHS; });
 
   for (auto ID : IDs) {
     auto TargetCompartment = CompartmentalizationPolicy.GetCompartment(ID);
@@ -343,6 +347,12 @@ hakc::HAKCTransformer::GetValidTargetCompartments(Function *F) const {
   EntryTokenArray->setInitializer(Initializer);
 
   return EntryTokenArray;
+}
+
+GlobalVariable *
+hakc::HAKCTransformer::GetValidTargetCompartments(Function *F) const {
+  auto Division = CompartmentalizationPolicy.GetDivision(F);
+  return GetValidTargetCompartments(Division);
 }
 
 CallInst *hakc::HAKCTransformer::CreateCall(Function *Callee,
@@ -605,7 +615,7 @@ Instruction *hakc::HAKCTransformer::CreateVoidCastCompartmentTransfer(
     return FinalTransfer;
   }
 
-  auto *size = GetObjectSizeInBytes(TypeToUse->GetPointeeType());
+  auto *size = TypeToUse->GetPointeeType()->GetSizeInBytes();
 
   if (size->equalsInt(0)) {
     errs() << "Zero size for HAKCType " << *TypeToUse->GetPointeeType() << "\n";
@@ -650,7 +660,7 @@ Instruction *hakc::HAKCTransformer::CreateCompartmentTransfer(
     bool IsData) {
   ValidateHAKCPointerAndLocation(HAKCPointer, I);
 
-  auto ObjectSize = GetObjectSizeInBytes(HAKCPointer);
+  auto ObjectSize = HAKCPointer.GetType()->GetPointeeType()->GetSizeInBytes();
 
   return CreateSizedCompartmentTransfer(HAKCPointer, I, Target, IsData,
                                         ObjectSize);
@@ -683,49 +693,57 @@ bool hakc::HAKCTransformer::NoKernelTransfers(Function *Target) {
 
 Value *
 hakc::HAKCTransformer::CreateActionCall(HAKCTransferAction &TransferAction,
-                                        Argument *Original,
                                         HAKCTransferState &TransferState) {
   auto ActionFunction = TransferAction.GetHAKCActionFunction();
-  CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Creating Action for: " << TransferAction << "\n";
-    SmallVector<Value *> ActionArgs;
-    for (auto &ActionArg: ActionFunction.Args()) {
-        switch (ActionArg.ArgUse) {
-            case SignedPtr:
-                ActionArgs.push_back(Original);
-                break;
-            case Comp:
-                ActionArgs.push_back(TransferState.GetDivision().GetHAKCCompartment().GetCompartmentID());
-                break;
-            case Div:
-                ActionArgs.push_back(TransferState.GetDivision().GetDivisionID());
-                break;
-            case Size: {
-                ActionArgs.push_back(TransferState.GetManagedPointer()->GetType()->GetObjectSizeInBytes());
-                break;
-            }
-            case IsCode:
-                  if (TransferState.GetManagedPointer()->GetIsCode()) {
-                    ActionArgs.push_back(getTrue());
-                  }
-                  else {
-                    ActionArgs.push_back(getFalse());
-                  }
-                break;
-            case AccessToken:
-                ActionArgs.push_back(TransferState.GetAccessToken());
-                break;
-            case ValidTargets:
-                // TODO: Get the Target valid targets and put that into TransferState and use it here
-                TransferState.GetDivision().GetHAKCCompartment().GetValidTargets();
-                break;
-        case ValidTargetSize:
-                ActionArgs.push_back(getInt64(TransferState.GetDivision().GetHAKCCompartment().GetValidTargetsSize()));
-                break;
-            default:
-                CommonHAKCAnalysis::getWriter(true) << "Unsupported argument use: " << ActionArg.ArgUse << "\n";
-                throw std::exception();
-        }
+  CommonHAKCAnalysis::getWriter(DebugIsActive())
+      << "Creating Action for: " << TransferAction << "\n";
+  SmallVector<Value *> ActionArgs;
+  for (auto &ActionArg : ActionFunction.Args()) {
+    switch (ActionArg.ArgUse) {
+    case SignedPtr:
+      ActionArgs.push_back(
+          TransferState.GetManagedPointer().GetBaseDefinition());
+      break;
+    case Comp:
+      ActionArgs.push_back(
+          TransferState.GetDivision().GetHAKCCompartment().GetCompartmentID());
+      break;
+    case Div:
+      ActionArgs.push_back(TransferState.GetDivision().GetDivisionID());
+      break;
+    case Size: {
+      ActionArgs.push_back(TransferState.GetManagedPointer()
+                               .GetType()
+                               ->GetPointeeType()
+                               ->GetSizeInBytes());
+      break;
     }
+    case IsCode:
+      ActionArgs.push_back(TransferState.GetManagedPointer()
+                                   .GetType()
+                                   ->GetPointeeType()
+                                   ->IsFunctionType()
+                               ? getTrue()
+                               : getFalse());
+      break;
+    case AccessToken:
+      ActionArgs.push_back(TransferState.GetAccessToken());
+      break;
+    case ValidTargets:
+      ActionArgs.push_back(
+          GetValidTargetCompartments(TransferState.GetDivision()));
+      break;
+    case ValidTargetSize:
+      ActionArgs.push_back(getInt64(TransferState.GetDivision()
+                                        .GetHAKCCompartment()
+                                        .GetValidTargetsSize()));
+      break;
+    default:
+      CommonHAKCAnalysis::getWriter(true)
+          << "Unsupported argument use: " << ActionArg.ArgUse << "\n";
+      throw std::exception();
+    }
+  }
 
   for (auto &LabeledArg : TransferAction.GetArguments()) {
     auto ArgLabel = LabeledArg.GetLabel();
@@ -972,30 +990,37 @@ hakc::HAKCTransformer::PopulateTransferFunction(Function *Target,
     }
   }
 
-    for (auto &Arg: TransferFunction->args()) {
-        if (!CommonHAKCAnalysis::argShouldTransfer(&Arg) || NoKernelXfers) {
-            continue;
-        }
-        HAKCIRBuilder.SetInsertPoint(TargetFunctionCall);
-        CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Forward Argument Transfer with Arg: " << Arg << "\n";
-        auto ManagedPointer = CreateNewManagedPointer(&Arg);
-        HAKCTransferState TransferState(TargetDivision, ManagedPointer);
-        bool IsData = !Arg.getType()->isFunctionTy();
-        for (auto &Preaction: ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().PreTransferActions()) {
-            CreateActionCall(*Preaction, TransferState);
-        }
-        auto *Transfer = CreateCompartmentTransfer(*ManagedPointer, &*HAKCIRBuilder.GetInsertPoint(), Target,
-                                                   IsData);
-        TargetFunctionCall->setArgOperand(Arg.getArgNo(), Transfer);
-
-        if (!Target->doesNotReturn()) {
-            HAKCIRBuilder.SetInsertPoint(TargetFunctionCall->getNextNonDebugInstruction());
-            CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Backward Argument Transfer with Arg: " << Arg << "\n";
-            for (auto &Postaction: ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().PostTargetActions()) {
-                CreateActionCall(*Postaction, TransferState);
-            }
-        }
+  for (auto &Arg : TransferFunction->args()) {
+    if (!CommonHAKCAnalysis::argShouldTransfer(&Arg) || NoKernelXfers) {
+      continue;
     }
+    HAKCIRBuilder.SetInsertPoint(TargetFunctionCall);
+    CommonHAKCAnalysis::getWriter(DebugIsActive())
+        << "Forward Argument Transfer with Arg: " << Arg << "\n";
+    auto ManagedPointer = CreateNewManagedPointer(&Arg);
+    HAKCTransferState TransferState(TargetDivision, *ManagedPointer);
+    bool IsData = !Arg.getType()->isFunctionTy();
+    for (auto &Preaction : ModuleAnalysis.GetCommonAnalysis()
+                               .GetSystemInfo()
+                               .PreTransferActions()) {
+      CreateActionCall(*Preaction, TransferState);
+    }
+    auto *Transfer = CreateCompartmentTransfer(
+        *ManagedPointer, &*HAKCIRBuilder.GetInsertPoint(), Target, IsData);
+    TargetFunctionCall->setArgOperand(Arg.getArgNo(), Transfer);
+
+    if (!Target->doesNotReturn()) {
+      HAKCIRBuilder.SetInsertPoint(
+          TargetFunctionCall->getNextNonDebugInstruction());
+      CommonHAKCAnalysis::getWriter(DebugIsActive())
+          << "Backward Argument Transfer with Arg: " << Arg << "\n";
+      for (auto &Postaction : ModuleAnalysis.GetCommonAnalysis()
+                                  .GetSystemInfo()
+                                  .PostTargetActions()) {
+        CreateActionCall(*Postaction, TransferState);
+      }
+    }
+  }
 
   CommonHAKCAnalysis::VerifyFunction(TransferFunction);
 
