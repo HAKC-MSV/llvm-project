@@ -116,7 +116,7 @@ void hakc::HAKCTransformer::ValidateHAKCPointer(
     CommonHAKCAnalysis::getWriter(true)
         << "HAKCPointer " << HAKCPointer << " has no HAKCType\n";
     throw std::exception();
-  } else if (HAKCPointer.GetType()->GetPointeeType()) {
+  } else if (HAKCPointer.GetType()->GetPointeeType() == nullptr) {
     CommonHAKCAnalysis::getWriter(true)
         << "HAKCPointer " << HAKCPointer << " Type " << *HAKCPointer.GetType()
         << " has no PointeeType\n";
@@ -126,17 +126,8 @@ void hakc::HAKCTransformer::ValidateHAKCPointer(
 
 void hakc::HAKCTransformer::ValidateHAKCPointerAndLocation(
     const HAKCPointerBase &HAKCPointer, Instruction *I) {
-  try {
-    ValidateHAKCPointer(HAKCPointer);
-    ValidateLocation(I);
-  } catch (std::exception &e) {
-    if (I) {
-      CommonHAKCAnalysis::getWriter(true)
-          << "Validation failed for " << HAKCPointer << " for Instruction in "
-          << I->getFunction()->getName() << ": " << *I << "\n";
-      throw;
-    }
-  }
+  ValidateHAKCPointer(HAKCPointer);
+  ValidateLocation(I);
 }
 
 Value *hakc::HAKCTransformer::CreateSafePointer(HAKCPointerBase &HAKCPointer,
@@ -1131,7 +1122,7 @@ bool hakc::HAKCTransformer::DebugIsActive() const {
 }
 
 hakc::HAKCPointerBaseP
-hakc::HAKCTransformer::CreateNewManagedPointer(Value *BaseDefinition) {
+hakc::HAKCTransformer::CreateNewManagedPointer(Value *BaseDefinition) const {
   CommonHAKCAnalysis::getWriter(DebugIsActive())
       << "Creating new managed pointer for " << *BaseDefinition << "\n";
   auto ManagedPtr = std::make_shared<HAKCPointerBase>(BaseDefinition, 0);

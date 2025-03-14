@@ -380,7 +380,7 @@ protected:
 
   void InitNewFunction(Function *F, StringRef EntryBlockName);
 
-  HAKCPointerBaseP CreateNewManagedPointer(Value *BaseDefinition);
+  HAKCPointerBaseP CreateNewManagedPointer(Value *BaseDefinition) const;
 
   Value *CreateActionCall(HAKCTransferAction &TransferAction,
                           HAKCTransferState &TransferState);

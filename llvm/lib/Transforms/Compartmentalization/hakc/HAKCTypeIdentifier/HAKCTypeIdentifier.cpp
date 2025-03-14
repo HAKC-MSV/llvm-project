@@ -16,7 +16,6 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/BinaryFormat/Dwarf.h"
 #include "llvm/IR/DerivedTypes.h"
-#include "llvm/Support/Path.h"
 
 std::shared_ptr<hakc::HAKCTypeInfo>
 hakc::HAKCTypeIdentifier::FindType(const DIType *type) {
@@ -335,8 +334,6 @@ void hakc::HAKCTypeIdentifier::AddGlobalMapping(
       AnalysisHelper.GetSystemInfo().OutputDebugInfo(DIGV->getName()))
       << "Adding mapping " << *DIGV << " -> " << HAKCSymbol->GetName() << "\n";
   globals[DIGV] = HAKCSymbol;
-  //    AddLLVMTypeMapping(HAKCSymbol->GetType(),
-  //    HAKCSymbol->GetGlobalVariable()->getValueType());
 }
 
 std::shared_ptr<hakc::HAKCFunctionInfo>
@@ -408,8 +405,6 @@ void hakc::HAKCTypeIdentifier::AddFunctionMapping(
   functions[SubProg] = HAKCFunction;
   HAKCFunction->GetType()->SetLLVMType(
       HAKCFunction->GetFunction()->getFunctionType());
-  // AddLLVMTypeMapping(HAKCFunction->GetType(),
-  // HAKCFunction->GetFunction()->getFunctionType());
 }
 
 void hakc::HAKCTypeIdentifier::FindAllGlobalsUsed(
@@ -762,15 +757,22 @@ hakc::HAKCTypeIdentifier::FindType(Type *Ty) {
 
 hakc::HAKCTypeP
 hakc::HAKCTypeIdentifier::FindType(HAKCPointerBase &HAKCPointer) {
+  HAKCTypeP ReturnTy = nullptr;
   if (HAKCPointer.GetType()) {
-    return HAKCPointer.GetType();
+    ReturnTy = HAKCPointer.GetType();
+  } else {
+    ReturnTy = FindHAKCType(HAKCPointer.GetBaseDefinition());
   }
-
-  auto BaseType = FindHAKCType(HAKCPointer.GetBaseDefinition());
-  if (BaseType) {
-    HAKCPointer.SetType(BaseType);
+  if (ReturnTy) {
+    if (ReturnTy->IsPointerType() && !ReturnTy->GetPointeeType()) {
+      auto PointeeType = FindPointeeType(*ReturnTy);
+      if (PointeeType) {
+        ReturnTy->SetPointeeType(PointeeType);
+      }
+    }
+    HAKCPointer.SetType(ReturnTy);
   }
-  return BaseType;
+  return ReturnTy;
 }
 
 hakc::HAKCTypeP
@@ -786,7 +788,7 @@ hakc::HAKCTypeIdentifier::FindPointeeType(HAKCPointerBase &HAKCPointer) {
   }
 
   if (BaseType) {
-    PointeeType = FindPointeeType(BaseType);
+    PointeeType = FindPointeeType(*BaseType);
     BaseType->SetPointeeType(PointeeType);
   }
 
@@ -794,27 +796,34 @@ hakc::HAKCTypeIdentifier::FindPointeeType(HAKCPointerBase &HAKCPointer) {
 }
 
 hakc::HAKCTypeP
-hakc::HAKCTypeIdentifier::FindPointeeType(const HAKCTypeP &BaseType) {
-  if (BaseType->GetPointeeType()) {
-    return BaseType->GetPointeeType();
+hakc::HAKCTypeIdentifier::FindPointeeType(const HAKCTypeInfo &BaseType) {
+  if (BaseType.GetPointeeType()) {
+    return BaseType.GetPointeeType();
   }
 
+  auto Debug = AnalysisHelper.GetSystemInfo().OutputDebugInfo();
+  CommonHAKCAnalysis::getWriter(Debug)
+      << "Finding Pointee Type for " << BaseType << "\n";
   DIType *TypeToFind = nullptr;
-  if (BaseType->GetDbgType() &&
-      BaseType->GetDbgType()->getTag() == dwarf::DW_TAG_pointer_type) {
-    TypeToFind = dyn_cast<DIDerivedType>(BaseType->GetDbgType())->getBaseType();
+  if (BaseType.GetDbgType() &&
+      BaseType.GetDbgType()->getTag() == dwarf::DW_TAG_pointer_type) {
+    TypeToFind = dyn_cast<DIDerivedType>(BaseType.GetDbgType())->getBaseType();
   }
   if (!TypeToFind) {
+    CommonHAKCAnalysis::getWriter(Debug) << "Could not find PointeeType\n";
     return nullptr;
   }
 
   for (auto &it : types) {
     auto *DebugTy = it.first;
     if (DebugTy == TypeToFind) {
-      BaseType->SetPointeeType(it.second);
+      CommonHAKCAnalysis::getWriter(Debug)
+          << "Found PointeeType " << *it.second << "\n";
       return it.second;
     }
   }
+  CommonHAKCAnalysis::getWriter(Debug)
+      << "PointeeType " << TypeToFind << " not found\n";
   return nullptr;
 }
 
@@ -940,7 +949,7 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
 
   if (FoundType && FoundType->IsPointerType() &&
       FoundType->GetPointeeType() == nullptr) {
-    auto PointeeType = FindPointeeType(FoundType);
+    auto PointeeType = FindPointeeType(*FoundType);
     if (PointeeType) {
       FoundType->SetPointeeType(PointeeType);
     }
@@ -1176,6 +1185,16 @@ void hakc::HAKCTypeIdentifier::ProcessDebugInfo() {
   FindTypesInFunctions();
   FindUsesInGlobals();
   FindUsesInFunctions();
+
+  for (auto &it : types) {
+    auto HAKCType = it.second;
+    if (HAKCType->IsPointerType()) {
+      auto PointeeType = FindPointeeType((*HAKCType));
+      if (PointeeType) {
+        HAKCType->SetPointeeType(PointeeType);
+      }
+    }
+  }
 }
 
 void hakc::HAKCTypeIdentifier::OutputYAML(raw_ostream &out) const {

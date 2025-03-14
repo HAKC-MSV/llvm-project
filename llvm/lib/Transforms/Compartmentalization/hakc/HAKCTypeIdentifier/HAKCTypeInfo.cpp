@@ -31,9 +31,7 @@ ConstantInt *HAKCTypeInfo::GetSizeInBytes() const {
 
 const DIType *HAKCTypeInfo::GetDbgType() const { return DbgType; }
 
-void HAKCTypeInfo::SetDbgType(const DIType *DiDbgType) {
-  this->DbgType = DiDbgType;
-}
+void HAKCTypeInfo::SetDbgType(const DIType *DiDbgType) { DbgType = DiDbgType; }
 
 void HAKCTypeInfo::AddMember(const std::shared_ptr<HAKCTypeInfo> &TypeUse,
                              unsigned int BitOffset) {
@@ -83,7 +81,7 @@ bool HAKCTypeInfo::IsFunctionType() const {
   return false;
 }
 
-std::shared_ptr<HAKCTypeInfo> HAKCTypeInfo::GetPointeeType() {
+std::shared_ptr<HAKCTypeInfo> HAKCTypeInfo::GetPointeeType() const {
   return PointeeType;
 }
 

@@ -49,7 +49,7 @@ public:
 
   bool IsPointerToPointer();
 
-  HAKCTypeP GetPointeeType();
+  HAKCTypeP GetPointeeType() const;
 
   void SetPointeeType(const HAKCTypeP &PointeeType);
 

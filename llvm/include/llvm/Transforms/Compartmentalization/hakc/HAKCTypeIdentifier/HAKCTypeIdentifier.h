@@ -57,7 +57,7 @@ protected:
 
   HAKCTypeP FindPointeeType(HAKCPointerBase &HAKCPointer);
 
-  HAKCTypeP FindPointeeType(const HAKCTypeP &BaseType);
+  HAKCTypeP FindPointeeType(const HAKCTypeInfo &BaseType);
 
   HAKCTypeP FindPointerType(const HAKCTypeP &BaseType);
 
