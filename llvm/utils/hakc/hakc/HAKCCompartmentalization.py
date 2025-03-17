@@ -6,6 +6,7 @@ import networkx as nx
 import pandas as pd
 import yaml
 from networkx.readwrite import json_graph
+
 from .HAKCBase import HAKCDivisionEnum, HAKCDBNode, HAKCDBRelation
 from .HAKCDatabase import HAKCDatabase
 from .HAKCLogger import HAKCLogger

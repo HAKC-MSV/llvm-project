@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Optional
 
 import yaml
+
 from .HAKCBase import HAKCPrintableObj, HAKCPayload
 from .HAKCDatabase import HAKCDatabase
 from .HAKCLogger import setup_logging, LoggingLevelEnum, HAKCLogger
