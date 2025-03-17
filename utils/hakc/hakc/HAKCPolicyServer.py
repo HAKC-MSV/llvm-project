@@ -7,11 +7,12 @@ from pathlib import Path
 from typing import Optional
 
 import yaml
-
 from .HAKCBase import HAKCPrintableObj, HAKCPayload
 from .HAKCDatabase import HAKCDatabase
-from .HAKCLogger import setup_logging, LoggingLevelEnum
+from .HAKCLogger import setup_logging, LoggingLevelEnum, HAKCLogger
 from .HAKCObjects import HAKCSymbol, HAKCCompartment, HAKCDivision, HAKCDivisionCompartmentPayload
+
+logging.setLoggerClass(HAKCLogger)
 
 logger = logging.getLogger('hakc-policy-server')
 
@@ -157,7 +158,7 @@ class NullHAKCPolicyDataStore(HAKCPolicyDataSource):
         return HAKCDivisionCompartmentPayload(division=self._get_default_division(),
                                               compartment=self._get_default_compartment())
 
-    def _get_valid_targets_from_compartment_id(self, compartment_id: int) -> Optional[HAKCPayload]:
+    def _get_valid_targets_from_compartment_id(self, compartment_id: int) -> list[int]:
         return list()
 
 
@@ -193,8 +194,9 @@ class YAMLHAKCPolicyDataStore(HAKCPolicyDataSource):
     def deserialize_compartmentalization(self, yamlin):
         if yamlin is None:
             raise RuntimeError(f'yamlin is None')
+        from .HAKCCompartmentalization import HAKCCompartmentalization
         with open(yamlin, 'r') as file:
-            self.compartmentalization = yaml.load(file, Loader=self.yaml_loader)
+            self.compartmentalization: HAKCCompartmentalization = yaml.load(file, Loader=self.yaml_loader)
 
         if len(self.compartmentalization) == 0:
             raise RuntimeError(f'{yamlin} does not contain a compartmentalization policy')

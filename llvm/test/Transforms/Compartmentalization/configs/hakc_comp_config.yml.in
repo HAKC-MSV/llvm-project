@@ -9,7 +9,7 @@ Database:
 SourcePath: @HAKC_SOURCE_PATH_ENTRY@
 BuildPath: @HAKC_BUILD_PATH@
 DagAnalysisRootPath: @HAKC_DAG_ANALYSIS_PATH@
-OutputDebugInfo: true
+OutputDebugInfo: false
 PassMode: @HAKC_PASS_MODE@
 IncludePaths: [ ]
 PreTransferActions:

@@ -10,16 +10,16 @@ import pstats
 import shutil
 import time
 
-import tqdm
 import yaml
-
 from hakc.HAKCCompartmentalization import HAKCCompartmentalization
 from hakc.HAKCDatabase import HAKCDatabase
-from hakc.HAKCLogger import LoggingLevelEnum, parse_log_level, setup_logging
+from hakc.HAKCLogger import LoggingLevelEnum, parse_log_level, setup_logging, HAKCLogger
 from hakc.HAKCObjects import HAKCSymbol, HAKCFunction, HAKCGlobalVariable, \
     HAKCCompartment, HAKCDivision, HAKCCompilationUnit, HAKCCompartmentalizationAdjustment
 
-logger = logging.getLogger('hakc-static-analysis')
+logging.setLoggerClass(HAKCLogger)
+
+logger: HAKCLogger = logging.getLogger('hakc-static-analysis')
 
 
 def batched(iterable, n):
@@ -107,29 +107,24 @@ def add_symbols(compartmentalization: HAKCCompartmentalization, compilation_unit
 
 def create_dag_single_thread(files: set[str], conn: HAKCDatabase) -> HAKCCompartmentalization:
     compartmentalization = HAKCCompartmentalization()
-    with tqdm.tqdm(total=len(files)) as pbar:
-        for filename in sorted(files):
-            compilation_unit, functions, global_variables = parse_yaml(filename)
-            logger.debug(
-                f'{compilation_unit} found {len(functions)} functions and {len(global_variables)} globals')
-            add_symbols(compartmentalization, compilation_unit, functions, global_variables)
-            pbar.update(1)
+    for filename in logger.progress_bar(iterable=sorted(files), desc='Parsing YAML'):
+        compilation_unit, functions, global_variables = parse_yaml(filename)
+        logger.debug(
+            f'{compilation_unit} found {len(functions)} functions and {len(global_variables)} globals')
+        add_symbols(compartmentalization, compilation_unit, functions, global_variables)
 
     compartmentalization.persist_to_database(conn, create_schema=True)
     dag_edges = dict()
     dag_edges_added = 0
-    logger.info(f'Computing DAG edges')
     symbols = compartmentalization.get_symbols()
-    with tqdm.tqdm(total=len(symbols)) as pbar:
-        for symbol in symbols:
-            for (head_hash, tail_hash, dag_edge_weight) in compute_dag_edges_for_symbol_with_conn(conn, hash(symbol)):
-                if head_hash not in dag_edges:
-                    dag_edges[head_hash] = dict()
-                dag_edges[head_hash][tail_hash] = dag_edge_weight
-                tail_symbol = compartmentalization.get_symbol_by_hash(tail_hash)
-                compartmentalization.add_dag_edge(symbol, tail_symbol, dag_edge_weight=dag_edge_weight, add_nodes=False)
-                dag_edges_added += 1
-            pbar.update(1)
+    for symbol in logger.progress_bar(iterable=symbols, desc='DAG Edge computation'):
+        for (head_hash, tail_hash, dag_edge_weight) in compute_dag_edges_for_symbol_with_conn(conn, hash(symbol)):
+            if head_hash not in dag_edges:
+                dag_edges[head_hash] = dict()
+            dag_edges[head_hash][tail_hash] = dag_edge_weight
+            tail_symbol = compartmentalization.get_symbol_by_hash(tail_hash)
+            compartmentalization.add_dag_edge(symbol, tail_symbol, dag_edge_weight=dag_edge_weight, add_nodes=False)
+            dag_edges_added += 1
     logger.info(f'Adding {dag_edges_added} DAG edges to compartmentalization')
     conn.persist_dag_edges(dag_edges)
     logger.info(f'Adding compartmentalization')
@@ -149,7 +144,7 @@ def adjust_compartmentalization(db_dir: str, adjustment: HAKCCompartmentalizatio
         kernel_compartment = HAKCCompartment(HAKCCompartmentalization.kernel_compartment_id)
         compartmentalization.add_division(kernel_division, kernel_compartment)
 
-    with tqdm.tqdm(total=len(symbols)) as pbar:
+    with logger.progress_bar(total=len(symbols), desc='Adjusting Compartmentalization') as pbar:
         for symbol in symbols:
             compartmentalization.add_persistent_node(symbol, already_persisted=True)
             adjusted_division = adjustment.get_adjusted_compartment(symbol.defining_file)
@@ -177,11 +172,10 @@ def adjust_compartmentalization(db_dir: str, adjustment: HAKCCompartmentalizatio
 
 def add_default_compartmentalization(conn: HAKCDatabase, compartmentalization: HAKCCompartmentalization,
                                      create_schema: bool = False):
-    logger.info(f'Adding default compartmentalization')
     compartment_id = HAKCCompartmentalization.kernel_compartment_id + 1
     division_id = HAKCCompartmentalization.default_division
     symbols = list(compartmentalization.get_symbols())
-    with tqdm.tqdm(total=len(symbols)) as pbar:
+    with logger.progress_bar(total=len(symbols), desc='Adding default compartmentalization') as pbar:
         for sym in symbols:
             compartment = HAKCCompartment(compartment_id)
             division = HAKCDivision(division_id, compartment_id)
@@ -194,16 +188,12 @@ def add_default_compartmentalization(conn: HAKCDatabase, compartmentalization: H
 def create_dag_multithread(files: set[str], core_count: int, conn: HAKCDatabase) -> HAKCCompartmentalization:
     logger.info(f'Starting multiprocess DAG creation using {core_count} cores')
     with concurrent.futures.ProcessPoolExecutor(max_workers=core_count) as executor:
-        logger.info(f'Submitting {len(files)} parsing yaml tasks')
         futures_to_files = {}
-        with tqdm.tqdm(total=len(files)) as pbar:
-            for file in sorted(files):
-                futures_to_files[executor.submit(parse_yaml, file)] = file
-                pbar.update(1)
+        for file in logger.progress_bar(iterable=sorted(files), desc="YAML parsing scheduling"):
+            futures_to_files[executor.submit(parse_yaml, file)] = file
         compartmentalization = HAKCCompartmentalization()
         compartmentalization.create_schema(conn)
-        logger.info(f'Reading yaml parsing results')
-        with tqdm.tqdm(total=len(files)) as pbar:
+        with logger.progress_bar(total=len(files), desc='YAML parsing results') as pbar:
             for future in concurrent.futures.as_completed(futures_to_files):
                 pbar.update(1)
                 file = futures_to_files[future]
@@ -224,8 +214,8 @@ def create_dag_multithread(files: set[str], core_count: int, conn: HAKCDatabase)
         symbol_hashes = compartmentalization.get_symbol_hashes()
         batch_size = 100
         futures = list()
-        logger.info(f'Submitting DAG edge computation tasks')
-        with tqdm.tqdm(total=int(len(symbol_hashes) / batch_size) + 1) as pbar:
+        with logger.progress_bar(total=int(len(symbol_hashes) / batch_size) + 1,
+                                 desc='DAG Edge computation scheduling') as pbar:
             try:
                 for symbol_hash_batch in batched(symbol_hashes.keys(), batch_size):
                     future = executor.submit(compute_dag_edges_for_symbol, symbol_hash_batch)
@@ -236,8 +226,7 @@ def create_dag_multithread(files: set[str], core_count: int, conn: HAKCDatabase)
                 executor.shutdown(wait=False, cancel_futures=True)
                 raise e
 
-        logger.info(f'Reading DAG edge computation')
-        with tqdm.tqdm(total=len(futures)) as pbar:
+        with logger.progress_bar(total=len(futures), desc='DAG Edge addition') as pbar:
             try:
                 dag_edges = dict()
                 for future in concurrent.futures.as_completed(futures):

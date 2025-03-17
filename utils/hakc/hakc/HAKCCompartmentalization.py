@@ -4,22 +4,23 @@ from typing import Type, Optional
 
 import networkx as nx
 import pandas as pd
-import tqdm
 import yaml
 from networkx.readwrite import json_graph
-
 from .HAKCBase import HAKCDivisionEnum, HAKCDBNode, HAKCDBRelation
 from .HAKCDatabase import HAKCDatabase
+from .HAKCLogger import HAKCLogger
 from .HAKCObjects import HAKCSymbol, HAKCCompilationUnit, HAKCFunction, HAKCType, HAKCCompartment, HAKCDivision, \
     HAKCScope, HAKCGlobalVariable
 
-logger = logging.getLogger('hakc-dag')
+logging.setLoggerClass(HAKCLogger)
+
+logger: HAKCLogger = logging.getLogger('hakc-compartmentalization')
 
 
 class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
     kernel_compartment_id = 0
-    kernel_division = HAKCDivisionEnum.NO_DIVISION.value
-    default_division = HAKCDivisionEnum.TEAL_DIVISION.value
+    kernel_division: int = HAKCDivisionEnum.NO_DIVISION.value
+    default_division: int = HAKCDivisionEnum.TEAL_DIVISION.value
     DefaultDivisionCount = max(1, len(HAKCDivisionEnum) - 1)
     persisted_attr = 'persisted'
     yaml_tag = "!HAKCCompartmentalization"
@@ -230,74 +231,70 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
 
     def _persist_nodes(self, conn: HAKCDatabase):
         unpersisted_nodes = self.get_unpersisted_nodes()
-        with tqdm.tqdm(total=len(unpersisted_nodes)) as pbar:
-            for table_name, nodes in unpersisted_nodes.items():
-                data_to_persist = dict()
+        for table_name, nodes in logger.progress_bar(iterable=unpersisted_nodes.items(), desc="Persisting to database"):
+            data_to_persist = dict()
+            for node in nodes:
+                for column, data in node.get_db_data().items():
+                    if column.column_name not in data_to_persist:
+                        data_to_persist[column.column_name] = list()
+                    data_to_persist[column.column_name].append(data)
+            df = pd.DataFrame(data_to_persist)
+            logger.debug(f'Persisting {len(nodes)} Nodes to {table_name}')
+            try:
+                conn.insert_from_dataframe(table_name, df)
                 for node in nodes:
-                    for column, data in node.get_db_data().items():
-                        if column.column_name not in data_to_persist:
-                            data_to_persist[column.column_name] = list()
-                        data_to_persist[column.column_name].append(data)
-                df = pd.DataFrame(data_to_persist)
-                logger.debug(f'Persisting {len(nodes)} Nodes to {table_name}')
-                try:
-                    conn.insert_from_dataframe(table_name, df)
-                    for node in nodes:
-                        self.nodes[node][HAKCCompartmentalization.persisted_attr] = True
-                    pbar.update(1)
-                except Exception as e:
-                    logger.error(f'Failed to persist to {table_name}: {str(e)}')
-                    raise e
+                    self.nodes[node][HAKCCompartmentalization.persisted_attr] = True
+            except Exception as e:
+                logger.error(f'Failed to persist to {table_name}: {str(e)}')
+                raise e
 
     def _persist_edges(self, conn: HAKCDatabase):
         unpersisted_edges = self.get_unpersisted_edges()
-        with tqdm.tqdm(total=len(unpersisted_edges)) as pbar:
-            for table_name, edge_data in unpersisted_edges.items():
-                head_primary_keys = list()
-                tail_primary_keys = list()
-                attr_list = dict()
-                for head, tail, attrs in edge_data:
-                    head_primary_key = head.get_primary_key_data()
-                    tail_primary_key = tail.get_primary_key_data()
-                    head_primary_keys.append(head_primary_key)
-                    tail_primary_keys.append(tail_primary_key)
-                    if len(attrs) > 0:
-                        for key, val in attrs.items():
-                            if key not in attr_list:
-                                attr_list[key] = list()
-                            attr_list[key].append(val)
-                if len(attr_list) == 0:
-                    df = pd.DataFrame({
-                        'from': head_primary_keys,
-                        'to': tail_primary_keys
-                    })
+        for table_name, edge_data in logger.progress_bar(iterable=unpersisted_edges.items(), desc="Persisting edges"):
+            head_primary_keys = list()
+            tail_primary_keys = list()
+            attr_list = dict()
+            for head, tail, attrs in edge_data:
+                head_primary_key = head.get_primary_key_data()
+                tail_primary_key = tail.get_primary_key_data()
+                head_primary_keys.append(head_primary_key)
+                tail_primary_keys.append(tail_primary_key)
+                if len(attrs) > 0:
+                    for key, val in attrs.items():
+                        if key not in attr_list:
+                            attr_list[key] = list()
+                        attr_list[key].append(val)
+            if len(attr_list) == 0:
+                df = pd.DataFrame({
+                    'from': head_primary_keys,
+                    'to': tail_primary_keys
+                })
+            else:
+                df_data = {
+                    'from': head_primary_keys,
+                    'to': tail_primary_keys
+                }
+                for key, val in attr_list.items():
+                    df_data[key] = val
+                df = pd.DataFrame(df_data)
+            logger.debug(f'Persisting {len(head_primary_keys)} edges to {table_name}')
+            try:
+                conn.insert_from_dataframe(table_name, df)
+                for head, tail, _ in edge_data:
+                    self.edges[head, tail, table_name][HAKCCompartmentalization.persisted_attr] = True
+            except Exception as e:
+                match = re.search('Runtime exception: Unable to find primary key value (-?[0-9]+)', str(e))
+                if match:
+                    missing_hash = int(match.group(1))
+                    for head_primary_key in head_primary_keys:
+                        if head_primary_key == missing_hash:
+                            logger.error(f'{missing_hash} found in head_primary_keys')
+                    for tail_primary_key in tail_primary_keys:
+                        if tail_primary_key == missing_hash:
+                            logger.error(f'{missing_hash} found in tail_primary_keys')
                 else:
-                    df_data = {
-                        'from': head_primary_keys,
-                        'to': tail_primary_keys
-                    }
-                    for key, val in attr_list.items():
-                        df_data[key] = val
-                    df = pd.DataFrame(df_data)
-                logger.debug(f'Persisting {len(head_primary_keys)} edges to {table_name}')
-                try:
-                    conn.insert_from_dataframe(table_name, df)
-                    for head, tail, _ in edge_data:
-                        self.edges[head, tail, table_name][HAKCCompartmentalization.persisted_attr] = True
-                    pbar.update(1)
-                except Exception as e:
-                    match = re.search('Runtime exception: Unable to find primary key value (-?[0-9]+)', str(e))
-                    if match:
-                        missing_hash = int(match.group(1))
-                        for head_primary_key in head_primary_keys:
-                            if head_primary_key == missing_hash:
-                                logger.error(f'{missing_hash} found in head_primary_keys')
-                        for tail_primary_key in tail_primary_keys:
-                            if tail_primary_key == missing_hash:
-                                logger.error(f'{missing_hash} found in tail_primary_keys')
-                    else:
-                        logger.error(f'Failed to persist to {table_name}: {str(e)}')
-                    raise e
+                    logger.error(f'Failed to persist to {table_name}: {str(e)}')
+                raise e
 
     def persist_to_database(self, conn: HAKCDatabase, create_schema: bool = False):
         if create_schema:
@@ -318,19 +315,13 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
 
     def create_schema(self, conn: HAKCDatabase):
         node_tables = HAKCCompartmentalization.get_table_classes()
-        logger.info(f'Creating tables')
-        with tqdm.tqdm(total=len(node_tables)) as pbar:
-            for cls in node_tables:
-                self.create_node_table(conn, node_class=cls)
-                pbar.update(1)
+        for cls in logger.progress_bar(iterable=node_tables, desc='Creating data tables'):
+            self.create_node_table(conn, node_class=cls)
 
-        logger.info(f'Creating relationship tables')
-        with tqdm.tqdm(total=len(node_tables)) as pbar:
-            for cls in node_tables:
-                db_relations = cls.get_db_relations()
-                for db_relation in db_relations:
-                    self.create_rel_table(conn, db_relation)
-                pbar.update(1)
+        for cls in logger.progress_bar(iterable=node_tables, desc='Creating relationship tables'):
+            db_relations = cls.get_db_relations()
+            for db_relation in db_relations:
+                self.create_rel_table(conn, db_relation)
 
     def get_symbol_hashes(self) -> dict[int, HAKCSymbol]:
         symbol_hashes = dict()

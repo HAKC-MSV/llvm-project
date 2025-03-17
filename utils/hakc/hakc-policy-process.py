@@ -4,9 +4,11 @@ import logging
 import signal
 from typing import Optional
 
-from hakc.HAKCLogger import LoggingLevelEnum, parse_log_level, setup_logging
+from hakc.HAKCLogger import LoggingLevelEnum, parse_log_level, setup_logging, HAKCLogger
 from hakc.HAKCPolicyServer import HAKCPolicyServer, NullHAKCPolicyDataStore, HAKCPolicyDataSource, \
     YAMLHAKCPolicyDataStore, KUZUHAKCPolicyDataStore, TimeoutException, HAKCPolicyProcessConfig, SupportedBackingStore
+
+logging.setLoggerClass(HAKCLogger)
 
 logger = logging.getLogger('hakc-policy-process')
 
