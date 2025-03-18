@@ -1,13 +1,6 @@
-// RUN: %HAKC_EMIT_LLVM
-// RUN: %HAKC_RUN_DAG_PASS
-// RUN: %HAKC_PYTHON_VENV
-// RUN: %HAKC_RUN_PYTHON_DAG
 // RUN: %HAKC_START_POLICY_SERVER & sleep 1 &&\
-// RUN: %HAKC_RUN_COMP_PASS
+// RUN: clang -g -S -emit-llvm -mllvm --enable-hakc -mllvm --hakc-config %HAKC_CONFIG -o %t %s
 // RUN: %HAKC_EVALUATE
-// TODO: add the linux include for build 
-// testing function that allocates variable sized memory is tagged correctly 
-// #include <linux/slab.h>         // kmalloc()
 
 void *kmalloc(unsigned long size, unsigned int);
 
