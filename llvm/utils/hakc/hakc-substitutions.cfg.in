@@ -1,0 +1,23 @@
+config.name = "HAKC"
+config.test_source_root = os.path.dirname(__file__)
+sys.path.append(os.path.dirname(__file__))
+config.name = "HAKC"
+
+config.substitutions.append(("%HAKC_ROOT",              "@CMAKE_SOURCE_DIR@"))
+config.substitutions.append(("%LOG_LEVEL",              "ERROR"))
+config.substitutions.append(("%HAKC_BUILD_PATH",        "@CMAKE_BINARY_DIR@"))
+config.substitutions.append(("%HAKC_TEST_PATH"          "@LLVM_MAIN_SRC_DIR@/test/Transforms/Compartmentalization/hakc"
+config.substitutions.append(("%HAKC_TEST_BUILD_PATH"    "@CMAKE_BINARY_DIR@/test/Transforms/Compartmentalization/hakc"
+
+config.substitutions.append(("%HAKC_EVALUATE", "cat %t.out.ll | FileCheck %s || exit 1"))
+
+config.substitutions.append(("%HAKC_START_POLICY_SERVER",
+                             "python3 @CMAKE_BINARY_DIR@/bin/hakc/hakc-policy-server --config %HAKC_YAML_POLICY_CONFIG --log-level %LOG_LEVEL & sleep 1"))
+config.substitutions.append(("%HAKC_RUN_PYTHON_DAG",
+                             "python3 @CMAKE_BINARY_DIR@/bin/hakc/hakc-static-analysis --dump-dag %HAKC_YAML_BACKING --create-dag --dag-files-root %HAKC_BUILD_PATH/dag-analysis --db-dir %HAKC_BUILD_PATH/hakc-db --log-level %LOG_LEVEL"))
+config.substitutions.append(("%HAKC_RUN_COMP_PASS",
+                             "@CMAKE_BINARY_DIR@/bin/clang %HAKC_CLANG_FLAGS -g -S -emit-llvm -mllvm --enable-hakc -mllvm --hakc-config=%HAKC_YAML_COMP_CONFIG -o %t.out.ll %s"))
+config.substitutions.append(("%HAKC_RUN_DAG_PASS",
+                             "@CMAKE_BINARY_DIR@/bin/clang %HAKC_CLANG_FLAGS -g -S -emit-llvm -mllvm --enable-hakc -mllvm --hakc-config=%HAKC_YAML_COMP_DAG_CONFIG -o %t.orig.ll %s"))
+
+config.suffixes = [".c", ".cpp"]

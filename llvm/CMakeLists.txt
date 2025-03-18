@@ -988,9 +988,6 @@ include(HandleLLVMOptions)
 
 option(LLVM_ENABLE_HAKC "Build HAKC" OFF)
 mark_as_advanced(LLVM_ENABLE_HAKC)
-if(LLVM_ENABLE_HAKC)
-    set(HAKC_PASS_LIB "HAKC-Compartmentalizer" CACHE STRING "HAKC Pass Name")
-endif()
 
 ######
 
@@ -1291,6 +1288,10 @@ if (LLVM_INCLUDE_TESTS)
                 ALWAYS_CLEAN)
     endif ()
     add_subdirectory(utils/lit)
+    if (LLVM_ENABLE_HAKC)
+        add_subdirectory(utils/hakc)
+    endif ()
+
     add_subdirectory(test)
     add_subdirectory(unittests)
 

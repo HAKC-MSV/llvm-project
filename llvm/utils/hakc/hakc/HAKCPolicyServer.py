@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import socketserver
 import struct
 from enum import Enum
@@ -318,6 +319,7 @@ class HAKCPolicyServer(socketserver.ThreadingUnixStreamServer):
                  log_file: str = "", log_mode: str = 'w', **kwargs):
         self.data_source = data_source
         setup_logging(logger, log_level=log_level, log_file=log_file, log_mode=log_mode)
+        os.makedirs(os.path.dirname(data_source.socket_path), exist_ok=True)
         logger.debug(f'Starting Socket Server at {data_source.socket_path}')
         socketserver.ThreadingUnixStreamServer.__init__(self, str(data_source.socket_path),
                                                         RequestHandlerClass=HAKCRequestHandler)

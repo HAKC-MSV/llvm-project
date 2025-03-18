@@ -1,0 +1,7 @@
+config.substitutions.append(("%HAKC_START_POLICY_SERVER",
+                             "python3 @HAKC_PYTHON_POLICY_PROCESS@ --config @HAKC_POLICY_CONFIG@ --log-level %LOG_LEVEL & sleep 1"))
+config.substitutions.append(("%HAKC_CONFIG",            "@HAKC_PASS_CONFIG@"))
+config.substitutions.append(("%HAKC_EVALUATE",          "cat %t.out.ll | FileCheck %s || exit 1"))
+config.substitutions.append(("%LOG_LEVEL",              "ERROR"))
+
+config.suffixes = [".c", ".cpp"]
