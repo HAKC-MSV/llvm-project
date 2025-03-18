@@ -1,16 +1,16 @@
 Arch: X86
 Platform: Test
 Database:
-  server-url: @HAKC_SOCKET_PATH@/hakc-socket
+  server-url: @HAKC_SOCKET_PATH@
   get-compartment-by-id-endpoint: "get-compartment-by-id"
   get-division-by-id-endpoint: "get-division-by-id"
   get-division-from-symbol-endpoint: "get-division-from-symbol"
   get-valid-targets-from-compartment-id-endpoint: "get-valid-targets-from-compartment-id"
-SourcePath: @SOURCE_PATH_ENTRY@
-BuildPath: @BUILD_PATH@
-DagAnalysisRootPath: @BUILD_PATH@/dag_analysis
+SourcePath: @HAKC_SOURCE_PATH_ENTRY@
+BuildPath: @HAKC_BUILD_PATH@
+DagAnalysisRootPath: @HAKC_DAG_ANALYSIS_PATH@
 OutputDebugInfo: true
-PassMode: @PASS_MODE@
+PassMode: @HAKC_PASS_MODE@
 IncludePaths: [ ]
 PreTransferActions:
   - { name: "get_hakc_address_color", label: "saved-color" }

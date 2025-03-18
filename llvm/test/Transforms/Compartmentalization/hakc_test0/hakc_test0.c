@@ -1,7 +1,4 @@
 // RUN: %HAKC_EMIT_LLVM
-// RUN: %HAKC_PROCESS_YAML_COMP_CONFIG
-// RUN: %HAKC_PROCESS_YAML_COMP_DAG_CONFIG
-// RUN: %HAKC_PROCESS_YAML_POLICY_CONFIG
 // RUN: %HAKC_RUN_DAG_PASS
 // RUN: %HAKC_PYTHON_VENV
 // RUN: %HAKC_RUN_PYTHON_DAG
@@ -10,17 +7,17 @@
 // RUN: %HAKC_EVALUATE
 
 struct data_struct {
-    int a;
+  int a;
 };
 
 int bar(struct data_struct *);
 
 int foo(struct data_struct *a) {
-    if (a) {
-        (a->a)++;
-        return bar(a);
-    }
-    return 0;
+  if (a) {
+    (a->a)++;
+    return bar(a);
+  }
+  return 0;
 }
 
 // CHECK-LABEL: i32 @HAKC_XFER_foo(ptr noundef %0)
@@ -28,3 +25,4 @@ int foo(struct data_struct *a) {
 // CHECK: call ptr @hakc_transfer_to_clique(ptr %0, i64 32, i64 2, i64 13, i1 false)
 // CHECK: call i32 @HAKC_ORIG_foo(ptr %3)
 // CHECK: call void @hakc_color_address(ptr %0, i32 %2, i64 32)
+

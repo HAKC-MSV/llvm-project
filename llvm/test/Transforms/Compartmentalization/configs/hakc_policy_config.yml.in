@@ -6,8 +6,8 @@
     "default_division": @HAKC_DEFAULT_DIVISION@
   },
   "reuse_path": true,
-  "socket_path": "@HAKC_SOCKET_PATH@/hakc-socket",
-  "server_timeout": @SERVER_TIMEOUT@,
+  "socket_path": "@HAKC_SOCKET_PATH@",
+  "server_timeout": @HAKC_SERVER_TIMEOUT@,
   "get-compartment-by-id-endpoint": "get-compartment-by-id",
   "get-division-by-id-endpoint": "get-division-by-id",
   "get-division-from-symbol-endpoint": "get-division-from-symbol",
