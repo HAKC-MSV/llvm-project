@@ -1,7 +1,6 @@
-// RUN: source %HAKC_PYTHON_VENV/bin/activate
+// RUN: %HAKC_PYTHON_VENV
 // RUN: %HAKC_START_POLICY_SERVER & sleep 1
-// RUN: %hakc_clang -g -S -emit-llvm -mllvm --enable-hakc -mllvm --hakc-config=%HAKC_CONFIG -o %t %s
-// RUN: deactivate
+// RUN: %HAKC_RUN_COMP_PASS
 // RUN: %HAKC_EVALUATE
 
 // testing static branch
