@@ -39,7 +39,5 @@ class HAKCTestSuite(ShTest):
                         test_path = os.path.join(test_config.test_source_root, filename)
                         _, extension = os.path.splitext(test_path)
                         if os.path.isfile(test_path) and extension in test_config.suffixes:
-                            # source_path_in_suite = os.path.join(os.path.dirname(os.path.join(*path_in_suite)),
-                            #                                     filename).split(os.sep)
                             source_path_in_suite = [filename]
                             yield lit.Test.Test(test_suite, source_path_in_suite, test_config)
