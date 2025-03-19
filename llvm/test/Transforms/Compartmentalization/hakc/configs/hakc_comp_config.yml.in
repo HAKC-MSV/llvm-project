@@ -1,7 +1,7 @@
 Arch: X86
 Platform: Test
 Database:
-  server-url: @HAKC_BACKING_STORE@
+  server-url: @HAKC_SOCKET_PATH@
   get-compartment-by-id-endpoint: "get-compartment-by-id"
   get-division-by-id-endpoint: "get-division-by-id"
   get-division-from-symbol-endpoint: "get-division-from-symbol"

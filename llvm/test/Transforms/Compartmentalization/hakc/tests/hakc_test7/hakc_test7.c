@@ -1,5 +1,5 @@
-// RUN: %HAKC_START_POLICY_SERVER & sleep 1 &&\
-// RUN: clang -g -S -emit-llvm -mllvm --enable-hakc -mllvm --hakc-config %HAKC_CONFIG -o %t %s
+// RUN: %HAKC_START_POLICY_SERVER
+// RUN: clang -g -S -emit-llvm -mllvm --enable-hakc -mllvm --hakc-config=%HAKC_CONFIG -o %t %s
 // RUN: %HAKC_EVALUATE
 // testing never used struct types 
 struct list_head{
