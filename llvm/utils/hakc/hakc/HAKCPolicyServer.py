@@ -10,7 +10,6 @@ from typing import Optional
 import yaml
 
 from .HAKCBase import HAKCPrintableObj, HAKCPayload
-from .HAKCDatabase import HAKCDatabase
 from .HAKCLogger import setup_logging, LoggingLevelEnum, HAKCLogger
 from .HAKCObjects import HAKCSymbol, HAKCCompartment, HAKCDivision, HAKCDivisionCompartmentPayload
 
@@ -249,6 +248,7 @@ class KUZUHAKCPolicyDataStore(HAKCPolicyDataSource):
         return HAKCPayload({'ValidTargets': target_id_entry_token})
 
     def connect(self, kuzuin):
+        from .HAKCDatabase import HAKCDatabase
         logger.debug(f"Kuzu opening connection to {kuzuin}")
         # open kuzu database connection in read only mode (multithreading)
         self.database = HAKCDatabase(kuzuin, True)

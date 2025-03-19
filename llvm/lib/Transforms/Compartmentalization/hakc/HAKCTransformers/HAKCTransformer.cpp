@@ -660,6 +660,9 @@ Instruction *hakc::HAKCTransformer::CreateCompartmentTransfer(
 Function *hakc::HAKCTransformer::GetTransferFunction(Function *F) const {
   auto TransferFunctionName =
       ModuleAnalysis.GetCommonAnalysis().GetOutsideTransferName(F);
+  CommonHAKCAnalysis::getWriter(DebugIsActive())
+      << "Getting Transfer Function " << TransferFunctionName
+      << " for Target Function " << *F << "\n";
   auto *TransferFunction = ModuleAnalysis.GetFunctionByName(
       TransferFunctionName, F->getFunctionType());
   if (TransferFunction == nullptr) {
@@ -938,7 +941,8 @@ void hakc::HAKCTransformer::InitNewFunction(Function *F,
 
   auto *EntryBB =
       BasicBlock::Create(getModule().getContext(), EntryBlockName, F);
-  if (EntryBB != &F->getEntryBlock()) {
+  auto *TestEntryBB = &F->getEntryBlock();
+  if (EntryBB != TestEntryBB) {
     CommonHAKCAnalysis::getWriter(true) << "Invalid Entry BasicBlock created\n";
     throw std::exception();
   }
@@ -954,13 +958,19 @@ hakc::HAKCTransformer::PopulateTransferFunction(Function *Target,
   }
 
   InitNewFunction(TransferFunction, "HAKCTransferEntry");
-  HAKCIRBuilder.SetInsertPoint(&TransferFunction->getEntryBlock());
+  auto *Unreachable = HAKCIRBuilder.CreateUnreachable();
+  HAKCIRBuilder.SetInsertPoint(Unreachable);
+  CommonHAKCAnalysis::getWriter(DebugIsActive())
+      << "Populating " << TransferFunction->getName() << "\n";
 
   bool NoKernelXfers = NoKernelTransfers(Target);
   auto TargetDivision = CompartmentalizationPolicy.GetDivision(Target);
   SmallVector<Value *> Args;
-  for (auto &Arg : TransferFunction->args()) {
-    Args.push_back(&Arg);
+  for (unsigned i = 0; i < TransferFunction->arg_size(); i++) {
+    auto *ArgP = TransferFunction->getArg(i);
+    CommonHAKCAnalysis::getWriter(DebugIsActive())
+        << "Adding Argument " << *ArgP << "\n";
+    Args.push_back(ArgP);
   }
   CommonHAKCAnalysis::getWriter(DebugIsActive())
       << "Creating Target call in Transfer function "
@@ -980,6 +990,7 @@ hakc::HAKCTransformer::PopulateTransferFunction(Function *Target,
       HAKCIRBuilder.CreateRet(TargetFunctionCall);
     }
   }
+  Unreachable->removeFromParent();
 
   for (auto &Arg : TransferFunction->args()) {
     if (!CommonHAKCAnalysis::argShouldTransfer(&Arg) || NoKernelXfers) {

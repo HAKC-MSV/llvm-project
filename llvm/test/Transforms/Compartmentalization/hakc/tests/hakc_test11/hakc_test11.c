@@ -1,6 +1,10 @@
-// RUN: %HAKC_START_POLICY_SERVER
-// RUN: clang -g -S -emit-llvm -mllvm --enable-hakc -mllvm --hakc-config=%HAKC_CONFIG -o %t %s
+// RUN: source %HAKC_PYTHON_VENV/bin/activate
+// RUN: %HAKC_START_POLICY_SERVER & sleep 1
+// RUN: %hakc_clang -g -S -emit-llvm -mllvm --enable-hakc -mllvm --hakc-config=%HAKC_CONFIG -o %t %s
+// RUN: deactivate
 // RUN: %HAKC_EVALUATE
+
+
 // Testing if foo can find valid targets of bar and baz
 
 int foo(int* _a);

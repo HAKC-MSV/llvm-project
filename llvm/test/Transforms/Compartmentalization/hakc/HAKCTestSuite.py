@@ -6,11 +6,13 @@ from lit.formats.shtest import ShTest
 
 
 class HAKCTestSuite(ShTest):
-    test_types = ['kuzu', 'yaml']
+    # TODO: Add in kuzu tests
+    test_types = ['yaml']
 
     def __init__(self, build_path: str):
         super(HAKCTestSuite, self).__init__()
         self.build_path = build_path
+        self.execute_external = True
 
     def getTestsInDirectory(self, testSuite, path_in_suite, litConfig, localConfig):
         for test_type in HAKCTestSuite.test_types:

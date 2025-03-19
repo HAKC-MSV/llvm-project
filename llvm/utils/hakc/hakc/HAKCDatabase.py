@@ -2,7 +2,6 @@ import logging
 import multiprocessing as mp
 from typing import Type, Optional, Tuple
 
-import kuzu
 import pandas as pd
 
 from .HAKCBase import HAKCDBNode, HAKCDBRelation
@@ -26,10 +25,12 @@ class HAKCDatabase:
             self.database.close()
 
     def open(self, read_only: bool = False, max_num_threads=int(mp.cpu_count() / 2)):
+        import kuzu
         self.database = kuzu.Database(self.db_dir, read_only=read_only, max_num_threads=max_num_threads)
         self.conn = kuzu.Connection(self.database)  # main connection
 
     def new_conn(self, read_only: bool = False):
+        import kuzu
         self.conn = kuzu.Connection(self.database)  # thread i connection
 
     def get_compartment_entry_token_from_id(self, compartment_id: int) -> Optional[int]:
