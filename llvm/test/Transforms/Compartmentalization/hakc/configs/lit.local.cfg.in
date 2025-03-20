@@ -2,7 +2,7 @@ config.name = "@TestName@-@HAKC_BACKING_TYPE@"
 config.test_source_root = "@HAKC_TEST_DIR@"
 
 config.substitutions.append(("%HAKC_START_POLICY_SERVER",
-                             "python @HAKC_PYTHON_POLICY_PROCESS@ --config @HAKC_POLICY_CONFIG@ --log-level %LOG_LEVEL"))
+                             "python @HAKC_PYTHON_POLICY_PROCESS@ --config @HAKC_POLICY_CONFIG@ --log-level %LOG_LEVEL & sleep 1"))
 config.substitutions.append(("%HAKC_EVALUATE", "cat %t | FileCheck %s || exit 1"))
 config.substitutions.append(("%LOG_LEVEL", "ERROR"))
 config.substitutions.append(("%HAKC_PYTHON_VENV", "source @HAKC_PYTHON_VENV@/bin/activate"))
