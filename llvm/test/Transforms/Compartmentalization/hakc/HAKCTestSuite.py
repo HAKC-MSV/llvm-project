@@ -21,10 +21,6 @@ class HAKCTestSuite(ShTest):
                 if os.path.exists(generated_config):
                     localConfig = copy.deepcopy(localConfig)
                     localConfig = litConfig.load_config(localConfig, generated_config)
-                    for local_config_name2 in litConfig.local_config_names:
-                        local_config_path = os.path.join(localConfig.test_source_root, local_config_name2)
-                        if os.path.exists(local_config_path):
-                            localConfig = litConfig.load_config(localConfig, local_config_path)
 
                     for filename in os.listdir(localConfig.test_source_root):
                         test_path = os.path.join(localConfig.test_source_root, filename)

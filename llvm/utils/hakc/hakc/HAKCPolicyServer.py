@@ -42,6 +42,7 @@ class HAKCPolicyProcessConfig:
         self.socket_path = Path(self.socket_path)
         self.reuse_path = kwargs.get('reuse_path', False)
         self.log_path = kwargs.get('log_path', None)
+        self.test_mode = kwargs.get("test-mode", False)
         self.server_timeout = int(kwargs.get('server_timeout', -1))
         if self.reuse_path and self.socket_path.exists():
             self.socket_path.unlink()
@@ -74,6 +75,7 @@ class HAKCPolicyDataSource:
         self.default_compartment = HAKCCompartment(config.default_compartment_id)
         self.default_division = HAKCDivision(config.default_division_id, config.default_compartment_id)
         self.socket_path = config.socket_path
+        self.test_mode = config.test_mode
 
     def _get_default_division(self) -> HAKCDivision:
         return self.default_division
@@ -303,6 +305,8 @@ class HAKCRequestHandler(socketserver.StreamRequestHandler):
         # the 'raise' will call 'handle_error' in HAKCPolicyServer 
         except ConnectionAbortedError:
             logger.debug(f'Client Aborted Connection')
+            if self.hakc_policy_server.data_source.test_mode:
+                raise TimeoutException
             return
         except ConnectionResetError:
             logger.debug(f'Client Reset Connection')
@@ -325,6 +329,6 @@ class HAKCPolicyServer(socketserver.ThreadingUnixStreamServer):
                                                         RequestHandlerClass=HAKCRequestHandler)
 
     def handle_error(self, _a, _b):
-        logger.error(f"Shutting down server")
+        logger.info(f"Shutting down server")
         # do a server shutdown, rather than a server_close()
         self.shutdown()
