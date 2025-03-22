@@ -233,7 +233,10 @@ if (LLVM_ENABLE_HAKC)
     file(GLOB HAKC_TESTS ${LLVM_MAIN_SRC_DIR}/test/Transforms/Compartmentalization/hakc/tests/* LIST_DIRECTORIES TRUE)
 
     set(HAKC_CONFIG_DIR ${LLVM_MAIN_SRC_DIR}/test/Transforms/Compartmentalization/hakc/configs)
-
+    # make custom target named hakc-setup
+    # gen configs
+    # another custom target that generates the kuzu dbs
+    #
     function(create_hakc_test_configs TestPath db_type backing_store socket_path)
         get_filename_component(TestName ${TestPath} NAME)
         get_filename_component(DirName ${TestPath} DIRECTORY)
@@ -246,19 +249,43 @@ if (LLVM_ENABLE_HAKC)
         set(HAKC_DAG_ANALYSIS_PATH ${HAKC_BUILD_DIR}/dag-analysis)
         set(HAKC_PYTHON_POLICY_PROCESS ${LLVM_MAIN_SRC_DIR}/utils/hakc/hakc-policy-process)
         set(HAKC_SOCKET_PATH ${socket_path}.${db_type})
+        # add option to do db.yaml -> kuzu db at build time
         configure_file(${HAKC_CONFIG_DIR}/hakc_policy_config.yml.in ${HAKC_POLICY_CONFIG})
         configure_file(${HAKC_CONFIG_DIR}/hakc_comp_config.yml.in ${HAKC_PASS_CONFIG})
         configure_file(${HAKC_CONFIG_DIR}/lit.local.cfg.in ${HAKC_BUILD_DIR}/lit.local.cfg)
     endfunction()
 
-    foreach (HAKCTest ${HAKC_TESTS})
-        get_filename_component(TestName ${HAKCTest} NAME)
-        create_hakc_test_configs(${HAKCTest} kuzu ${CMAKE_BINARY_DIR}/hakc-db/${TestName} ${CMAKE_BINARY_DIR}/hakc-sockets/${TestName}.db.sock)
-        create_hakc_test_configs(${HAKCTest} yaml ${LLVM_MAIN_SRC_DIR}/test/Transforms/Compartmentalization/hakc/tests/${TestName}/db.yml ${CMAKE_BINARY_DIR}/hakc-sockets/${TestName}.db.sock)
-    endforeach ()
+#    foreach (HAKCTest ${HAKC_TESTS})
+#        get_filename_component(TestName ${HAKCTest} NAME)
+#        create_hakc_test_configs(${HAKCTest} kuzu ${CMAKE_BINARY_DIR}/hakc-db/${TestName} ${CMAKE_BINARY_DIR}/hakc-sockets/${TestName}.db.sock)
+#        create_hakc_test_configs(${HAKCTest} yaml ${LLVM_MAIN_SRC_DIR}/test/Transforms/Compartmentalization/hakc/tests/${TestName}/db.yml ${CMAKE_BINARY_DIR}/hakc-sockets/${TestName}.db.sock)
+#    endforeach ()
 
-    list(APPEND LLVM_TEST_DEPENDS hakc-static-analysis)
-    list(APPEND LLVM_TEST_DEPENDS hakc-policy-process)
+    add_custom_target(hakc-build
+            DEPENDS ${hakc-build-configs})
+
+    # TODO: add an output here for cmake to rebuild?
+    add_custom_target(hakc-build-configs
+            COMMAND
+            foreach (HAKCTest ${HAKC_TESTS})
+                get_filename_component(TestName ${HAKCTest} NAME)
+                create_hakc_test_configs(${HAKCTest} kuzu ${CMAKE_BINARY_DIR}/hakc-db/${TestName} ${CMAKE_BINARY_DIR}/hakc-sockets/${TestName}.db.sock)
+                create_hakc_test_configs(${HAKCTest} yaml ${LLVM_MAIN_SRC_DIR}/test/Transforms/Compartmentalization/hakc/tests/${TestName}/db.yml ${CMAKE_BINARY_DIR}/hakc-sockets/${TestName}.db.sock)
+            endforeach ()
+            echo "Forcing rebuild of custom target"
+            DEPENDS ${hakc-static-analysis} ${hakc-policy-process} ${hakc-build-yaml-to-kuzu})
+
+    add_custom_target(hakc-build-yaml-to-kuzu
+            OUTPUT ${LLVM_MAIN_SRC_DIR}/test/Transforms/Compartmentalization/hakc/tests/${TestName}/hakc-db
+            COMMAND
+            ${PYTHON_EXECUTABLE} ${LLVM_MAIN_SRC_DIR}/utils/hakc/hakc-yaml-to-kuzu --yaml-dir ${LLVM_MAIN_SRC_DIR}/test/Transforms/Compartmentalization/hakc/tests/${TestName}/db.yml --kuzu-dir ${HAKC_BUILD_DIR}/hakc-db
+            DEPENDS ${hakc-yaml-to-kuzu})
+
+
+#    list(APPEND LLVM_TEST_DEPENDS hakc-setup)
+#    list(APPEND LLVM_TEST_DEPENDS hakc-static-analysis)
+#    list(APPEND LLVM_TEST_DEPENDS hakc-policy-process)
+    list(APPEND LLVM_TEST_DEPENDS hakc-build)
 endif ()
 
 add_custom_target(llvm-test-depends DEPENDS ${LLVM_TEST_DEPENDS})

@@ -1,0 +1,67 @@
+#!/usr/bin/env python3
+
+import argparse
+import cProfile
+import concurrent.futures
+import io
+import itertools
+import logging
+import multiprocessing as mp
+import os
+import pstats
+import shutil
+import time
+
+import yaml
+
+
+from hakc.HAKCCompartmentalization import HAKCCompartmentalization
+from hakc.HAKCDatabase import HAKCDatabase
+from hakc.HAKCLogger import LoggingLevelEnum, parse_log_level, setup_logging, HAKCLogger
+from hakc.HAKCObjects import HAKCSymbol, HAKCFunction, HAKCGlobalVariable, \
+    HAKCCompartment, HAKCDivision, HAKCCompilationUnit, HAKCCompartmentalizationAdjustment
+
+logging.setLoggerClass(HAKCLogger)
+
+logger: HAKCLogger = logging.getLogger('hakc-static-analysis')
+
+
+
+def yaml_to_kuzu(yaml_dir, kuzu_dir):
+    # convert a db.yaml file to a kuzu-db
+    compartmentalization = None
+    with open(yaml_dir, 'rb') as f:
+        compartmentalization = yaml.load(f, Loader=yaml.Loader)
+        print(compartmentalization)
+
+    # always delete the existing db (since it is stale)
+    if os.path.exists(kuzu_dir) and os.path.isdir(kuzu_dir):
+        logger.info(f'Removing existing database at {kuzu_dir}')
+        shutil.rmtree(kuzu_dir)
+
+    conn = HAKCDatabase(kuzu_dir)
+    compartmentalization.persist_to_database(conn, create_schema=True)
+
+    # compartmentalization = create_new_dag(args.dag_files_root, args.core_count, args.db_dir, args.delete_db)
+    # conn.persist_dag_edges(dag_edges)
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Kernel Data Access Analysis')
+    parser.add_argument('--log-level', required=False, dest='log_level', default=LoggingLevelEnum.INFO,
+                        help=f'Log level to display, can be lower case {[level.name for level in LoggingLevelEnum]}',
+                        type=parse_log_level)
+    parser.add_argument('-l', '--log', default=None, dest='log_path')
+    parser.add_argument('--log-mode', default='w', dest='log_mode')
+    parser.add_argument('--kuzu-dir', help='Directory to use for the kuzu database', dest='kuzu_dir',
+                        default=None)
+    parser.add_argument('--yaml-dir', help='dump DAG to json', dest='yaml_dir')
+
+    args = parser.parse_args()
+
+    yaml_to_kuzu(args.yaml_dir, args.kuzu_dir)
+
+if __name__ == "__main__":
+    main()
+
+
