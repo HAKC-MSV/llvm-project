@@ -133,7 +133,7 @@ public:
   bool IsCallInIntrinsicSet(CallBase *Call,
                             std::set<Intrinsic::ID> &IntrinsicsSet) const;
 
-  static std::string GetModuleFullPath(Module &M);
+  static void GetModuleFullPath(Module &M, SmallVectorImpl<char> &Result);
 
   static bool IsMultiSSAUser(Value *V);
 
@@ -167,8 +167,6 @@ public:
 
   static bool
   PointerShouldBeConsideredCode(const ManagedHAKCPointer &ManagedPointer);
-
-  std::string GetTransformedPath(StringRef Path) const;
 
   static Function *GetOriginalFunctionFromTransferFunction(Function *F);
 

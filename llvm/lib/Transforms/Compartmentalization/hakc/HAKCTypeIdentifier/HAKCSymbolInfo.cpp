@@ -9,13 +9,14 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/FileSystem.h"
 
+#include "llvm/Support/Path.h"
 #include <utility>
 
 hakc::HAKCSymbolInfo::HAKCSymbolInfo(CommonHAKCAnalysis &Analysis,
                                      StringRef Name, bool DebugActive)
     : HAKCInfo(Analysis, Name, DebugActive), Type(nullptr), UsedSymbols(),
       GlobalObj(nullptr), DbgType(nullptr), DefiningLocation(nullptr),
-      DefiningLine(0), LocalScope(nullptr) {}
+      DefiningLine(0), LocalScope(nullptr), LocalScopeStr() {}
 
 void hakc::HAKCSymbolInfo::SetType(std::shared_ptr<HAKCTypeInfo> HAKCType) {
   Type = std::move(HAKCType);
@@ -30,33 +31,13 @@ void hakc::HAKCSymbolInfo::AddSymbolUse(
   UsedSymbols.insert(Symbol);
 }
 
-std::string
-hakc::HAKCSymbolInfo::GetTransformedPathName(const DIFile *File) const {
-  SmallString<128> PathName(File->getFilename());
-
-  sys::fs::make_absolute(File->getDirectory(), PathName);
-  auto Path = Analysis.GetTransformedPath(PathName);
-  return Path;
+void hakc::HAKCSymbolInfo::GetTransformedPathName(
+    const DIFile *File, SmallVectorImpl<char> &Result) const {
+  sys::path::append(Result, File->getDirectory(), File->getName());
 }
 
-std::string hakc::HAKCSymbolInfo::GetLocalScopePath() const {
-  if (!LocalScope) {
-    return "";
-  }
-  const DIFile *ScopeFile;
-  if (auto *SubProg = dyn_cast<DISubprogram>(LocalScope)) {
-    ScopeFile = SubProg->getFile();
-  } else if (auto *File = dyn_cast<DIFile>(LocalScope)) {
-    ScopeFile = File;
-  } else if (auto *CompileUnit = dyn_cast<DICompileUnit>(LocalScope)) {
-    ScopeFile = CompileUnit->getFile();
-  } else {
-    CommonHAKCAnalysis::getWriter(true)
-        << "Unexpected LocalScope: " << *LocalScope << "\n";
-    throw std::exception();
-  }
-
-  return GetTransformedPathName(ScopeFile);
+StringRef hakc::HAKCSymbolInfo::GetLocalScopePath() const {
+  return LocalScopeStr;
 }
 
 std::string hakc::HAKCSymbolInfo::GetYamlHeader(unsigned int Indents) const {
@@ -71,7 +52,8 @@ std::string hakc::HAKCSymbolInfo::GetYamlHeader(unsigned int Indents) const {
 
   sstream << "\n";
   if (DefiningLocation) {
-    auto PathName = GetTransformedPathName(DefiningLocation);
+    SmallString<256> PathName;
+    GetTransformedPathName(DefiningLocation, PathName);
 
     sstream.indent(Indents + EntrySpaces())
         << "DefiningFile: \"" << PathName << "\"\n";
@@ -157,6 +139,26 @@ void hakc::HAKCSymbolInfo::SetDefiningLocation(const DIFile *File,
 
 void hakc::HAKCSymbolInfo::SetLocalScope(const DIScope *Scope) {
   LocalScope = Scope;
+
+  if (!LocalScope) {
+    return;
+  }
+
+  const DIFile *ScopeFile;
+  if (auto *SubProg = dyn_cast<DISubprogram>(LocalScope)) {
+    ScopeFile = SubProg->getFile();
+  } else if (auto *File = dyn_cast<DIFile>(LocalScope)) {
+    ScopeFile = File;
+  } else if (auto *CompileUnit = dyn_cast<DICompileUnit>(LocalScope)) {
+    ScopeFile = CompileUnit->getFile();
+  } else {
+    CommonHAKCAnalysis::getWriter(true)
+        << "Unexpected LocalScope: " << *LocalScope << "\n";
+    throw std::exception();
+  }
+
+  LocalScopeStr.clear();
+  GetTransformedPathName(ScopeFile, LocalScopeStr);
 }
 
 bool hakc::HAKCSymbolInfo::Matches(

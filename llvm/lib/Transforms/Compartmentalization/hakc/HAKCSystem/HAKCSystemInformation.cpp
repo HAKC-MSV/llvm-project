@@ -50,11 +50,11 @@ void HAKCDatabaseInformation::operator<<(
 HAKCSystemInformation::HAKCSystemInformation(CommonHAKCAnalysis &CommonAnalysis)
     : CommonAnalysis(CommonAnalysis), TypeIdentifier(CommonAnalysis),
       DatabaseInformation(), DebugOutput(false), PassMode(InvalidPassModeType),
-      Arch(), Platform(), SourcePath(), BuildPath(), DagAnalysisRootPath(),
-      IncludePathsList(), NoTransferFunctionList(),
-      CompartmentTransferFunctionList(), CodeValidationFunction(nullptr),
-      DataValidationFunction(nullptr), SignWithDivisionFunction(nullptr),
-      DefaultCompartmentTransfer(nullptr), PerCPUCompartmentTransfer(nullptr),
+      Arch(), Platform(), DagAnalysisRootPath(), IncludePathsList(),
+      NoTransferFunctionList(), CompartmentTransferFunctionList(),
+      CodeValidationFunction(nullptr), DataValidationFunction(nullptr),
+      SignWithDivisionFunction(nullptr), DefaultCompartmentTransfer(nullptr),
+      PerCPUCompartmentTransfer(nullptr),
       CompartmentalizationSupportFunctionList(), SymbolsToOutputDebugInfo(),
       SeparateNamespacePathList(), HAKCSourcePathList(),
       SafeTransitionFunctionList(), IgnoredTypeSet(), IgnoredGlobalList(),
@@ -123,8 +123,6 @@ void HAKCSystemInformation::GetAllDefinedHAKCFunctions(
 void HAKCSystemInformation::operator<<(HAKCYamlConfig &YamlConfig) {
   Arch = YamlConfig.Arch;
   Platform = YamlConfig.Platform;
-  SourcePath = YamlConfig.SourcePath;
-  BuildPath = YamlConfig.BuildPath;
   DagAnalysisRootPath = YamlConfig.DagAnalysisRootPath;
   PassMode = YamlConfig.PassMode;
   DebugOutput = YamlConfig.OutputAllDebugInfo;
@@ -297,10 +295,6 @@ Module &HAKCSystemInformation::GetModule() const {
 hakc::HAKCPassModeTypeEnum HAKCSystemInformation::GetPassMode() const {
   return PassMode;
 }
-
-StringRef HAKCSystemInformation::GetSourcePath() const { return SourcePath; }
-
-StringRef HAKCSystemInformation::GetBuildPath() const { return BuildPath; }
 
 StringRef HAKCSystemInformation::GetDagAnalysisRootPath() const {
   return DagAnalysisRootPath;
