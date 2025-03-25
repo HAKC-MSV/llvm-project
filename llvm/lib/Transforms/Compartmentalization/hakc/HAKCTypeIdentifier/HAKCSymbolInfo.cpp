@@ -33,7 +33,7 @@ void hakc::HAKCSymbolInfo::AddSymbolUse(
 
 void hakc::HAKCSymbolInfo::GetTransformedPathName(
     const DIFile *File, SmallVectorImpl<char> &Result) const {
-  sys::path::append(Result, File->getDirectory(), File->getName());
+  sys::path::append(Result, File->getDirectory(), File->getFilename());
 }
 
 StringRef hakc::HAKCSymbolInfo::GetLocalScopePath() const {

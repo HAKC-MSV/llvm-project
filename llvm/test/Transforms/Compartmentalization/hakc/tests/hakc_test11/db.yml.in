@@ -67,7 +67,7 @@ edges:
     persisted: true
     source: &id004 !HAKCFunction
       DefiningFile: @HAKC_TEST_DIR@/hakc_test11.c
-      DefiningLine: 17
+      DefiningLine: 16
       Name: foo
       is_function: true
       symbol_hash: ef772dce3b61d134
@@ -122,6 +122,15 @@ edges:
     persisted: true
     source: *id004
     target: *id006
+  - key: DirectCall
+    persisted: true
+    source: *id004
+    target: *id001
+  - key: DagEdge
+    persisted: true
+    source: *id004
+    target: *id001
+    weight: 2
   - key: DagEdge
     persisted: true
     source: *id004
