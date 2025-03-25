@@ -278,7 +278,15 @@ if (LLVM_ENABLE_HAKC)
             DEPENDS ${HAKC_TEST_INPUTS} ${HAKC_TEST_GENERATED_FILES}
     )
 
-    list(APPEND LLVM_TEST_DEPENDS hakc_test_configs_gen)
+    get_llvm_lit_path(LIT_BASE_DIR LIT_FILE_NAME)
+
+    add_custom_target(check-hakc
+            COMMAND "${Python3_EXECUTABLE}" ${LIT_BASE_DIR}/${LIT_FILE_NAME} ${LLVM_MAIN_SRC_DIR}/${HAKC_TEST_ROOT_DIR}
+    )
+
+    add_dependencies(check-hakc hakc_test_configs_gen)
+
+    list(APPEND LLVM_TEST_DEPENDS hakc_test_configs_gen clang)
 endif ()
 
 add_custom_target(llvm-test-depends DEPENDS ${LLVM_TEST_DEPENDS})
