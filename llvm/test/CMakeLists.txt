@@ -240,6 +240,12 @@ if (LLVM_ENABLE_HAKC)
             ${HAKC_CONFIG_DIR}/lit.local.cfg.in
     )
 
+    function(create_hakc_config_file in_path out_path)
+        list(APPEND HAKC_TEST_GENERATED_FILES ${out_path})
+        list(APPEND HAKC_TEST_INPUTS ${in_path})
+        configure_file(${in_path} ${out_path})
+    endfunction()
+
     function(create_hakc_test_configs TestPath db_type backing_store socket_path)
         get_filename_component(TestName ${TestPath} NAME)
         get_filename_component(DirName ${TestPath} DIRECTORY)
@@ -251,14 +257,9 @@ if (LLVM_ENABLE_HAKC)
         set(HAKC_DAG_ANALYSIS_PATH ${HAKC_BUILD_DIR}/dag-analysis)
         set(HAKC_PYTHON_POLICY_PROCESS ${LLVM_MAIN_SRC_DIR}/utils/hakc/hakc-policy-process)
         set(HAKC_SOCKET_PATH ${socket_path}.${db_type})
-        configure_file(${HAKC_CONFIG_DIR}/hakc_policy_config.yml.in ${HAKC_POLICY_CONFIG})
-        configure_file(${HAKC_CONFIG_DIR}/hakc_comp_config.yml.in ${HAKC_PASS_CONFIG})
-        configure_file(${HAKC_CONFIG_DIR}/lit.local.cfg.in ${HAKC_BUILD_DIR}/lit.local.cfg)
-
-        list(APPEND HAKC_TEST_GENERATED_FILES
-                ${HAKC_BUILD_DIR}/lit.local.cfg
-                ${HAKC_PASS_CONFIG}
-                ${HAKC_POLICY_CONFIG})
+        create_hakc_config_file(${HAKC_CONFIG_DIR}/hakc_policy_config.yml.in ${HAKC_POLICY_CONFIG})
+        create_hakc_config_file(${HAKC_CONFIG_DIR}/hakc_comp_config.yml.in ${HAKC_PASS_CONFIG})
+        create_hakc_config_file(${HAKC_CONFIG_DIR}/lit.local.cfg.in ${HAKC_BUILD_DIR}/lit.local.cfg)
     endfunction()
 
     foreach (HAKC_TEST_DIR ${HAKC_TESTS})
@@ -266,16 +267,14 @@ if (LLVM_ENABLE_HAKC)
         set(HAKC_DB_IN ${LLVM_MAIN_SRC_DIR}/${HAKC_TEST_ROOT_DIR}/tests/${TestName}/db.yml.in)
         set(HAKC_DB_OUT ${CMAKE_BINARY_DIR}/llvm-project/llvm/${HAKC_TEST_ROOT_DIR}/tests/${TestName}/db.yml)
         set(HAKC_SOCKET_PATH ${CMAKE_BINARY_DIR}/hakc-sockets/${TestName}.db.sock)
-        configure_file(${HAKC_DB_IN} ${HAKC_DB_OUT})
+        create_hakc_config_file(${HAKC_DB_IN} ${HAKC_DB_OUT})
         create_hakc_test_configs(${HAKC_TEST_DIR} kuzu ${CMAKE_BINARY_DIR}/hakc-db/${TestName} ${HAKC_SOCKET_PATH})
         create_hakc_test_configs(${HAKC_TEST_DIR} yaml ${HAKC_DB_OUT} ${HAKC_SOCKET_PATH})
-
-        list(APPEND HAKC_TEST_INPUTS ${HAKC_DB_IN} ${TestPath})
-        list(APPEND HAKC_TEST_GENERATED_FILES ${HAKC_DB_OUT})
     endforeach ()
 
     add_custom_target(hakc_test_configs_gen
             DEPENDS ${HAKC_TEST_INPUTS} ${HAKC_TEST_GENERATED_FILES}
+            COMMENT "Generating HAKC Test Configuration Files"
     )
 
     get_llvm_lit_path(LIT_BASE_DIR LIT_FILE_NAME)
