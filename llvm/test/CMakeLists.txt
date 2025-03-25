@@ -231,6 +231,11 @@ endif ()
 
 if (LLVM_ENABLE_HAKC)
     option(HAKC_SOCKET_ROOT "Directory to use for test socket paths" ${CMAKE_BINARY_DIR}/hakc-sockets)
+    string(LENGTH "${HAKC_SOCKET_ROOT}/hakc_test0.db.sock" socket_path_length)
+    if (socket_path_length GREATER_EQUAL 107)
+        message(WARNING "HAKC_SOCKET_ROOT ${HAKC_SOCKET_ROOT} is too long")
+    endif ()
+
     set(HAKC_TEST_ROOT_DIR test/Transforms/Compartmentalization/hakc)
     file(GLOB HAKC_TESTS ${LLVM_MAIN_SRC_DIR}/${HAKC_TEST_ROOT_DIR}/tests/* LIST_DIRECTORIES TRUE)
 
