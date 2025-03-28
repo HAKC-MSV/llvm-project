@@ -422,13 +422,6 @@ bool CommonHAKCAnalysis::valueHasAttribute(Value *V, Attribute::AttrKind Kind) {
     }
   }
 
-  CommonHAKCAnalysis::getWriter(true) << *V << " does ";
-  if (!result) {
-    CommonHAKCAnalysis::getWriter(true) << "not ";
-  }
-  CommonHAKCAnalysis::getWriter(true)
-      << "have the Attribute " << attrName << "\n";
-
   return result;
 }
 

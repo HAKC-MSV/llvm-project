@@ -890,6 +890,10 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCTypeForUse(Use &U) {
 
 hakc::HAKCTypeP
 hakc::HAKCTypeIdentifier::FindPointerType(const HAKCTypeP &BaseType) {
+  if (!BaseType) {
+    CommonHAKCAnalysis::getWriter(true) << "BaseType is null\n";
+    throw std::exception();
+  }
   for (auto &It : types) {
     auto *DebugType = It.first;
     if (DebugType->getTag() == dwarf::DW_TAG_pointer_type) {
