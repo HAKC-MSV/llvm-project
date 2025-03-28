@@ -567,6 +567,9 @@ bool HAKCFunctionAnalysis::PointerShouldBeManaged(Use &U) {
           << "Call returns 32-bit integer\n";
       return false;
     }
+  } else if (auto *Alloca = dyn_cast<AllocaInst>(ptr)) {
+    CommonHAKCAnalysis::getWriter(DebugActive) << "Def is AllocaInst\n";
+    return CommonHAKCAnalysis::IsPointerLikeType(Alloca->getAllocatedType());
   } else if (auto *ConstExpr = dyn_cast<ConstantExpr>(ptr)) {
     if (ConstExpr->isCast()) {
       auto *Operand = getDef(ConstExpr->getOperand(0), false);

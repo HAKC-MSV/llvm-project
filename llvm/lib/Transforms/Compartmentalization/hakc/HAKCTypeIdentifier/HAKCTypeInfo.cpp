@@ -26,7 +26,8 @@ unsigned HAKCTypeInfo::GetSizeInBits() const {
 ConstantInt *HAKCTypeInfo::GetSizeInBytes() const {
   unsigned SizeInBits = GetSizeInBits();
   LLVMContext &Ctx = Analysis.GetModule().getContext();
-  return ConstantInt::get(IntegerType::get(Ctx, 64), SizeInBits, false);
+  return ConstantInt::get(IntegerType::get(Ctx, 64), SizeInBits / BITS_PER_BYTE,
+                          false);
 }
 
 const DIType *HAKCTypeInfo::GetDbgType() const { return DbgType; }

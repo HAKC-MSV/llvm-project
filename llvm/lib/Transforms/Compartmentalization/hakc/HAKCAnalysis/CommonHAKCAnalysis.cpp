@@ -443,15 +443,11 @@ bool CommonHAKCAnalysis::IsIgnoredGlobal(Value *V) {
 }
 
 bool CommonHAKCAnalysis::IsPerCPUPointer(Value *V) {
-  //        return valueHasAttribute(V, Attribute::PerCPUPtr);
-  // TODO: Fix this when attributes are added in again
-  return false;
+  return valueHasAttribute(V, Attribute::PerCPUPtr);
 }
 
 bool CommonHAKCAnalysis::IsKernelUserPointer(Value *V) {
-  //        return valueHasAttribute(V, Attribute::KernelUserPtr);
-  // TODO: Fix this when attributes are added in again
-  return false;
+  return valueHasAttribute(V, Attribute::KernelUserPtr);
 }
 
 bool CommonHAKCAnalysis::FunctionIsStatic(Function *F) {

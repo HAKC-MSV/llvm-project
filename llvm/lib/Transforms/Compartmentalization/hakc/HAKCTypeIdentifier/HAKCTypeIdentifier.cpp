@@ -878,6 +878,11 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCTypeForUse(Use &U) {
     if (BaseType) {
       Result = FindPointerType(BaseType);
     }
+  } else if (isa<StoreInst>(U.getUser())) {
+    Result = FindHAKCType(U.getUser());
+    if (U.getOperandNo() == StoreInst::getPointerOperandIndex()) {
+      Result = FindPointerType(Result);
+    }
   }
 
   return Result;

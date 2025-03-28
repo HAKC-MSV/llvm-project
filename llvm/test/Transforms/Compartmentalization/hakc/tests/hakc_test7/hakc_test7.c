@@ -17,4 +17,4 @@ int foo(struct list_head * ListHead) {
 }
 // The type "list_head" is in the ignored types list, and should never be transferred
 // CHECK-NOT: i32 @get_hakc_address_color(ptr %0)
-// CHECK-NOT: ptr @hakc_transfer_to_clique(ptr %0, i64 32, i64 1, i64 13, i1 false)
+// CHECK-NOT: ptr @hakc_transfer_to_clique(ptr %0, i64 4, i64 1, i64 13, i1 false)
