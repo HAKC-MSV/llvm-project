@@ -569,7 +569,8 @@ bool HAKCFunctionAnalysis::PointerShouldBeManaged(Use &U) {
     }
   } else if (auto *Alloca = dyn_cast<AllocaInst>(ptr)) {
     CommonHAKCAnalysis::getWriter(DebugActive) << "Def is AllocaInst\n";
-    return CommonHAKCAnalysis::IsPointerLikeType(Alloca->getAllocatedType());
+    return CommonHAKCAnalysis::IsPointerLikeType(Alloca->getAllocatedType()) &&
+           !CommonHAKCAnalysis::IsKernelUserPointer(Alloca);
   } else if (auto *ConstExpr = dyn_cast<ConstantExpr>(ptr)) {
     if (ConstExpr->isCast()) {
       auto *Operand = getDef(ConstExpr->getOperand(0), false);
@@ -602,16 +603,17 @@ bool HAKCFunctionAnalysis::PointerShouldBeManaged(Use &U) {
     CommonHAKCAnalysis::getWriter(DebugActive)
         << *ptr << " is a Kernel pointer from user space\n";
     return false;
-  } else if (isa<LoadInst>(U.getUser())) {
+  } else if (auto *LoadI = dyn_cast<LoadInst>(ptr)) {
     CommonHAKCAnalysis::getWriter(DebugActive)
         << *ptr << " is used in a LoadInst\n";
-    return true;
-  } else if (isa<StoreInst>(U.getUser())) {
-    if (U.getOperandNo() == StoreInst::getPointerOperandIndex()) {
-      CommonHAKCAnalysis::getWriter(DebugActive)
-          << *ptr << " is used in a StoreInst\n";
-      return true;
-    }
+    return PointerShouldBeManaged(
+        LoadI->getOperandUse(LoadInst::getPointerOperandIndex()));
+  } else if (auto *StoreI = dyn_cast<StoreInst>(U.getUser())) {
+    CommonHAKCAnalysis::getWriter(DebugActive)
+        << *ptr << " is used in a StoreInst\n";
+    return U.getOperandNo() == StoreInst::getPointerOperandIndex() &&
+           PointerShouldBeManaged(
+               StoreI->getOperandUse(StoreInst::getPointerOperandIndex()));
   } else if (isa<UndefValue>(ptr)) {
     CommonHAKCAnalysis::getWriter(DebugActive)
         << *ptr << " is an undef value\n";
@@ -630,9 +632,10 @@ bool HAKCFunctionAnalysis::PointerShouldBeManaged(Use &U) {
   } else if (ptr->getType()->isPointerTy()) {
     CommonHAKCAnalysis::getWriter(DebugActive)
         << *ptr << " Type is a pointer: " << *ptr->getType() << "\n";
-    return true;
+    return !CommonHAKCAnalysis::IsKernelUserPointer(ptr);
   }
-  return ptr->getType()->isPointerTy();
+  return ptr->getType()->isPointerTy() &&
+         !CommonHAKCAnalysis::IsKernelUserPointer(ptr);
 }
 
 /**
@@ -671,10 +674,11 @@ void HAKCFunctionAnalysis::RegisterPointerDereference(Use &use) {
     CommonHAKCAnalysis::getWriter(DebugActive)
         << "Definition " << definition << " from " << *use.getUser()
         << " is registered\n";
+  } else {
+    CommonHAKCAnalysis::getWriter(DebugActive)
+        << "Definition " << definition << " from " << *use.getUser()
+        << " should not be checked\n";
   }
-  CommonHAKCAnalysis::getWriter(DebugActive)
-      << "Definition " << definition << " from " << *use.getUser()
-      << " should not be checked\n";
 }
 
 Instruction *HAKCFunctionAnalysis::GetFinalAllocaDef(AllocaInst *Alloca) {

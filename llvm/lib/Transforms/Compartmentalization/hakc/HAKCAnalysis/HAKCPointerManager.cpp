@@ -368,7 +368,7 @@ bool HAKCPointerManager::ManagePointer(Value *V) {
   return result;
 }
 
-HAKCFunctionAnalysis &HAKCPointerManager::GetFunctionAnalysis() {
+HAKCFunctionAnalysis &HAKCPointerManager::GetFunctionAnalysis() const {
   return HAKCAnalysis;
 }
 

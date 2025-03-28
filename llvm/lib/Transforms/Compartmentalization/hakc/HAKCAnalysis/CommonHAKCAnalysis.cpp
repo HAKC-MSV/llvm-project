@@ -386,6 +386,13 @@ bool CommonHAKCAnalysis::IsMultiSSAUser(Value *V) {
 
 bool CommonHAKCAnalysis::valueHasAttribute(Value *V, Attribute::AttrKind Kind) {
   bool result = false;
+  auto attrName = Attribute::getNameFromAttrKind(Kind);
+  if (attrName.empty()) {
+    CommonHAKCAnalysis::getWriter(true)
+        << "Invalid AttrKind name for value " << std::to_string(Kind) << "\n";
+    throw std::exception();
+  }
+
   if (auto *gv = dyn_cast<GlobalVariable>(V)) {
     result = gv->hasAttribute(Kind);
   } else if (auto *arg = dyn_cast<Argument>(V)) {
@@ -396,15 +403,10 @@ bool CommonHAKCAnalysis::valueHasAttribute(Value *V, Attribute::AttrKind Kind) {
   } else if (auto *I = dyn_cast<Instruction>(V)) {
     auto *metadata = I->getMetadata(LLVMContext::MD_annotation);
     if (metadata) {
-      auto attrName = Attribute::getNameFromAttrKind(Kind);
-      if (attrName.empty()) {
-        errs() << "Invalid AttrKind name for value " << std::to_string(Kind)
-               << "\n";
-        throw std::exception();
-      }
       for (auto &operand : metadata->operands()) {
         if (auto *mdstring = dyn_cast<MDString>(operand.get())) {
-          if (mdstring->getString() == attrName) {
+          auto MDStr = mdstring->getString();
+          if (MDStr == attrName) {
             result = true;
             break;
           }
@@ -419,6 +421,13 @@ bool CommonHAKCAnalysis::valueHasAttribute(Value *V, Attribute::AttrKind Kind) {
       }
     }
   }
+
+  CommonHAKCAnalysis::getWriter(true) << *V << " does ";
+  if (!result) {
+    CommonHAKCAnalysis::getWriter(true) << "not ";
+  }
+  CommonHAKCAnalysis::getWriter(true)
+      << "have the Attribute " << attrName << "\n";
 
   return result;
 }

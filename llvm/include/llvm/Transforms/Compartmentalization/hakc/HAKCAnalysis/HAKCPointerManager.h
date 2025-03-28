@@ -38,7 +38,7 @@ public:
 
   iterator_range<ManagedHAKCPointerListType::iterator> ManagedPointers();
 
-  HAKCFunctionAnalysis &GetFunctionAnalysis();
+  HAKCFunctionAnalysis &GetFunctionAnalysis() const;
 
   /**
    * Returns the ManagedHAKCPointer that corresponds to the definition V
