@@ -22,7 +22,7 @@ public:
 
   virtual ConstantInt *GetSize(CallInst *val) = 0;
 
-  Function *GetAllocationFunction();
+  Function *GetAllocationFunction() const;
 
 protected:
   explicit HAKCAllocationSize(Function *AllocationFunction);
@@ -36,13 +36,23 @@ class HAKCSingleArgumentSize : public HAKCAllocationSize {
   friend class HAKCAllocationSize;
 
 public:
-  HAKCSingleArgumentSize(Function *AllocationFunction,
-                         const std::vector<std::string> &Arguments);
+  HAKCSingleArgumentSize(Function *AllocationFunction, StringRef Argument);
 
   ConstantInt *GetSize(CallInst *Val) override;
 
 protected:
   unsigned ArgNo;
+};
+
+class HAKCMultiplyArgumentSize : public HAKCAllocationSize {
+public:
+  HAKCMultiplyArgumentSize(Function *AllocationFunction, StringRef Argument0,
+                           StringRef Argument1);
+  ConstantInt *GetSize(CallInst *Val) override;
+
+protected:
+  unsigned Arg0;
+  unsigned Arg1;
 };
 } // namespace llvm::hakc
 
