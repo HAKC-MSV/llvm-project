@@ -1198,11 +1198,12 @@ void hakc::HAKCTypeIdentifier::ProcessDebugInfo() {
 }
 
 void hakc::HAKCTypeIdentifier::OutputYAML(raw_ostream &out) const {
-  auto RealPath = CommonHAKCAnalysis::GetModuleFullPath(GetModule());
+  SmallString<256> RealPath;
+  CommonHAKCAnalysis::GetModuleFullPath(GetModule(), RealPath);
 
   out << "---\n";
   out << "CU: ";
-  out << AnalysisHelper.GetTransformedPath(RealPath);
+  out << RealPath;
   out << "\n";
 
   auto GlobalCount = globals.size() + UnmappedGlobals.size();

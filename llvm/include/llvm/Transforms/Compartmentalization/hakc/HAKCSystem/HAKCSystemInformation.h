@@ -28,148 +28,149 @@ typedef SmallVector<std::string, 16> HAKCStringList;
 typedef SmallVector<HAKCCustomAllocation> HAKCCustomAllocationList;
 typedef SmallVector<llvm::hakc::arg_def_t> HAKCArgumentsList;
 typedef SmallVector<llvm::hakc::transfer_action_def_t> HAKCTransferActionList;
-typedef SmallVector<llvm::hakc::pre_transfer_action_def_t> HAKCPreTransferActionList;
-typedef SmallVector<llvm::hakc::post_target_action_def_t> HAKCPostTargetActionList;
+typedef SmallVector<llvm::hakc::pre_transfer_action_def_t>
+    HAKCPreTransferActionList;
+typedef SmallVector<llvm::hakc::post_target_action_def_t>
+    HAKCPostTargetActionList;
 
 namespace llvm::hakc {
-    class CommonHAKCAnalysis;
-    class HAKCSystemInformation;
+class CommonHAKCAnalysis;
+class HAKCSystemInformation;
 
-    class HAKCDatabaseInformation {
-    public:
-        HAKCDatabaseInformation();
+class HAKCDatabaseInformation {
+public:
+  HAKCDatabaseInformation();
 
-        StringRef GetServerURL() const;
+  StringRef GetServerURL() const;
 
-        StringRef GetCompartmentEndpoint() const;
+  StringRef GetCompartmentEndpoint() const;
 
-        StringRef GetDivisionEndpoint() const;
+  StringRef GetDivisionEndpoint() const;
 
-        StringRef GetSymbolDivisionEndpoint() const;
+  StringRef GetSymbolDivisionEndpoint() const;
 
-        StringRef GetValidTargetsEndpoint() const;
+  StringRef GetValidTargetsEndpoint() const;
 
-        std::chrono::milliseconds GetServerTimeout() const;
+  std::chrono::milliseconds GetServerTimeout() const;
 
-        void operator<<(const HAKCYamlDatabaseConfig &DatabaseConfig);
+  void operator<<(const HAKCYamlDatabaseConfig &DatabaseConfig);
 
-    protected:
-        std::string ServerURL;
-        std::string CompartmentEndpoint;
-        std::string DivisionEndpoint;
-        std::string SymbolDivisionEndpoint;
-        std::string ValidTargetsEndpoint;
-        std::chrono::milliseconds Timeout;
-    };
+protected:
+  std::string ServerURL;
+  std::string CompartmentEndpoint;
+  std::string DivisionEndpoint;
+  std::string SymbolDivisionEndpoint;
+  std::string ValidTargetsEndpoint;
+  std::chrono::milliseconds Timeout;
+};
 
-    class HAKCSystemInformation {
-    public:
-        explicit HAKCSystemInformation(CommonHAKCAnalysis &CommonAnalysis);
+class HAKCSystemInformation {
+public:
+  explicit HAKCSystemInformation(CommonHAKCAnalysis &CommonAnalysis);
 
-        bool OutputDebugInfo() const;
+  bool OutputDebugInfo() const;
 
-        bool OutputDebugInfo(GlobalValue *GV) const;
+  bool OutputDebugInfo(GlobalValue *GV) const;
 
-        bool OutputDebugInfo(StringRef SymbolName) const;
+  bool OutputDebugInfo(StringRef SymbolName) const;
 
-        Module &GetModule() const;
+  Module &GetModule() const;
 
-        const HAKCDatabaseInformation &GetDatabaseInformation() const;
+  const HAKCDatabaseInformation &GetDatabaseInformation() const;
 
-        void operator<<(HAKCYamlConfig &YamlConfig);
+  void operator<<(HAKCYamlConfig &YamlConfig);
 
-        iterator_range<FunctionList::iterator> NoTransferFunctions();
+  iterator_range<FunctionList::iterator> NoTransferFunctions();
 
-        iterator_range<HAKCTransferList::iterator> CompartmentTransferFunctions();
+  iterator_range<HAKCTransferList::iterator> CompartmentTransferFunctions();
 
-        iterator_range<HAKCFunctionList::iterator> CompartmentalizationSupportFunctions();
+  iterator_range<HAKCFunctionList::iterator>
+  CompartmentalizationSupportFunctions();
 
-        iterator_range<FunctionList::iterator> SafeTransitionFunctions();
+  iterator_range<FunctionList::iterator> SafeTransitionFunctions();
 
-        iterator_range<HAKCTypeSet::iterator> IgnoredTypes() const;
+  iterator_range<HAKCTypeSet::iterator> IgnoredTypes() const;
 
-        iterator_range<HAKCGlobalVariableList::iterator> IgnoredGlobals();
+  iterator_range<HAKCGlobalVariableList::iterator> IgnoredGlobals();
 
-        iterator_range<HAKCStringList::iterator> SeparateNamespacePaths();
+  iterator_range<HAKCStringList::iterator> SeparateNamespacePaths();
 
-        iterator_range<HAKCStringList::iterator> HAKCSourcePaths();
+  iterator_range<HAKCStringList::iterator> HAKCSourcePaths();
 
-        iterator_range<HAKCCustomTransferList::iterator> HAKCCustomTransfers();
+  iterator_range<HAKCCustomTransferList::iterator> HAKCCustomTransfers();
 
-        iterator_range<HAKCCustomAllocationList::iterator> AllocationFunctions();
+  iterator_range<HAKCCustomAllocationList::iterator> AllocationFunctions();
 
-        iterator_range<HAKCStringList::iterator> IncludePaths();
+  iterator_range<HAKCStringList::iterator> IncludePaths();
 
-        llvm::hakc::function_def_t CodeValidation() const;
+  llvm::hakc::function_def_t CodeValidation() const;
 
-        llvm::hakc::function_def_t DataValidation() const;
+  llvm::hakc::function_def_t DataValidation() const;
 
-        llvm::hakc::function_def_t SignWithDivision() const;
+  llvm::hakc::function_def_t SignWithDivision() const;
 
-        llvm::hakc::function_def_t CompartmentTransfer(bool PerCPU) const;
+  llvm::hakc::function_def_t CompartmentTransfer(bool PerCPU) const;
 
-        HAKCTypeIdentifier &GetTypeIdentifier();
+  HAKCTypeIdentifier &GetTypeIdentifier();
 
-        hakc::HAKCPassModeTypeEnum GetPassMode() const;
+  hakc::HAKCPassModeTypeEnum GetPassMode() const;
 
-        StringRef GetArch() const;
+  StringRef GetArch() const;
 
-        StringRef GetPlatform() const;
+  StringRef GetPlatform() const;
 
-        StringRef GetSourcePath() const;
+  StringRef GetDagAnalysisRootPath() const;
 
-        StringRef GetBuildPath() const;
+  iterator_range<HAKCPreTransferActionList::iterator> PreTransferActions();
 
-        StringRef GetDagAnalysisRootPath() const;
+  iterator_range<HAKCPostTargetActionList::iterator> PostTargetActions();
 
-        iterator_range<HAKCPreTransferActionList::iterator> PreTransferActions();
+protected:
+  CommonHAKCAnalysis &CommonAnalysis;
+  HAKCTypeIdentifier TypeIdentifier;
+  HAKCDatabaseInformation DatabaseInformation;
+  bool DebugOutput;
+  hakc::HAKCPassModeTypeEnum PassMode;
+  std::string Arch;
+  std::string Platform;
+  std::string DagAnalysisRootPath;
+  HAKCStringList IncludePathsList;
+  FunctionList NoTransferFunctionList;
+  HAKCTransferList CompartmentTransferFunctionList;
+  hakc::function_def_t CodeValidationFunction;
+  hakc::function_def_t DataValidationFunction;
+  hakc::function_def_t SignWithDivisionFunction;
+  hakc::function_def_t DefaultCompartmentTransfer;
+  hakc::function_def_t PerCPUCompartmentTransfer;
+  HAKCFunctionList CompartmentalizationSupportFunctionList;
+  HAKCSymbolList SymbolsToOutputDebugInfo;
+  HAKCStringList SeparateNamespacePathList;
+  HAKCStringList HAKCSourcePathList;
+  FunctionList SafeTransitionFunctionList;
+  HAKCTypeSet IgnoredTypeSet;
+  HAKCGlobalVariableList IgnoredGlobalList;
+  HAKCCustomAllocationList AllocationFunctionList;
+  HAKCCustomTransferList CustomTransferList;
+  HAKCPreTransferActionList PreTransferActionList;
+  HAKCPostTargetActionList PostTargetActionList;
 
-        iterator_range<HAKCPostTargetActionList::iterator> PostTargetActions();
+  void
+  GetAllDefinedHAKCFunctions(SmallVectorImpl<hakc::function_def_t> &Results);
 
-    protected:
-        CommonHAKCAnalysis &CommonAnalysis;
-        HAKCTypeIdentifier TypeIdentifier;
-        HAKCDatabaseInformation DatabaseInformation;
-        bool DebugOutput;
-        hakc::HAKCPassModeTypeEnum PassMode;
-        std::string Arch;
-        std::string Platform;
-        std::string SourcePath;
-        std::string BuildPath;
-        std::string DagAnalysisRootPath;
-        HAKCStringList IncludePathsList;
-        FunctionList NoTransferFunctionList;
-        HAKCTransferList CompartmentTransferFunctionList;
-        hakc::function_def_t CodeValidationFunction;
-        hakc::function_def_t DataValidationFunction;
-        hakc::function_def_t SignWithDivisionFunction;
-        hakc::function_def_t DefaultCompartmentTransfer;
-        hakc::function_def_t PerCPUCompartmentTransfer;
-        HAKCFunctionList CompartmentalizationSupportFunctionList;
-        HAKCSymbolList SymbolsToOutputDebugInfo;
-        HAKCStringList SeparateNamespacePathList;
-        HAKCStringList HAKCSourcePathList;
-        FunctionList SafeTransitionFunctionList;
-        HAKCTypeSet IgnoredTypeSet;
-        HAKCGlobalVariableList IgnoredGlobalList;
-        HAKCCustomAllocationList AllocationFunctionList;
-        HAKCCustomTransferList CustomTransferList;
-        HAKCPreTransferActionList PreTransferActionList;
-        HAKCPostTargetActionList PostTargetActionList;
+  hakc::function_def_t
+  CreateHAKCFunction(HAKCYAMLFunctionDefinition &YAMLFunctionDef,
+                     HAKCTypeIdentifier &TypeIdentifier) const;
 
-        void GetAllDefinedHAKCFunctions(SmallVectorImpl<hakc::function_def_t> &Results);
+  static hakc::custom_transfer_def_t
+  CreateCustomTransferFunction(HAKCYAMLCustomTransferType &YAMLCustomTransfer,
+                               HAKCTypeP HAKCTy,
+                               HAKCTypeIdentifier &TypeIdentifier);
 
-        hakc::function_def_t CreateHAKCFunction(HAKCYAMLFunctionDefinition &YAMLFunctionDef,
-                                                HAKCTypeIdentifier &TypeIdentifier) const;
+  static void PopulateHAKCFunctionArgs(
+      SmallVectorImpl<HAKCFunctionArgumentDefinition> &Args,
+      HAKCYAMLFunctionDefinition &YAMLFunctionDef,
+      HAKCTypeIdentifier &TypeIdentifier);
+};
+} // namespace llvm::hakc
 
-        static hakc::custom_transfer_def_t CreateCustomTransferFunction(HAKCYAMLCustomTransferType &YAMLCustomTransfer,
-                                                                        HAKCTypeP HAKCTy,
-                                                                        HAKCTypeIdentifier &TypeIdentifier);
-
-        static void PopulateHAKCFunctionArgs(SmallVectorImpl<HAKCFunctionArgumentDefinition> &Args,
-                                             HAKCYAMLFunctionDefinition &YAMLFunctionDef,
-                                             HAKCTypeIdentifier &TypeIdentifier);
-    };
-} // hakc
-
-#endif //HAKC_HAKCSYSTEMINFORMATION_H
+#endif // HAKC_HAKCSYSTEMINFORMATION_H

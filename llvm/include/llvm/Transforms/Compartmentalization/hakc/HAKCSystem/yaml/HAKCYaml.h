@@ -157,8 +157,6 @@ struct HAKCYamlConfig {
   HAKCTestModeTypeEnum TestMode;
   HAKCYAMLStringType Arch;
   HAKCYAMLStringType Platform;
-  HAKCYAMLStringType SourcePath;
-  HAKCYAMLStringType BuildPath;
   HAKCYAMLStringType DagAnalysisRootPath;
   HAKCYAMLFunctionDefinition CodeValidationFunction;
   HAKCYAMLFunctionDefinition DataValidationFunction;
@@ -333,8 +331,6 @@ template <> struct yaml::MappingTraits<hakc::HAKCYamlConfig> {
     } else if (YamlConfig.TestMode == hakc::TestModeDisabled) {
       io.mapRequired("Arch", YamlConfig.Arch);
       io.mapRequired("Platform", YamlConfig.Platform);
-      io.mapRequired("SourcePath", YamlConfig.SourcePath);
-      io.mapRequired("BuildPath", YamlConfig.BuildPath);
       io.mapRequired("DagAnalysisRootPath", YamlConfig.DagAnalysisRootPath);
       io.mapRequired("PassMode", YamlConfig.PassMode);
       io.mapRequired("IncludePaths", YamlConfig.IncludePathsList);
@@ -374,8 +370,6 @@ template <> struct yaml::MappingTraits<hakc::HAKCYamlConfig> {
     } else if (YamlConfig.TestMode == hakc::TestModeDefault) {
       io.mapRequired("Arch", YamlConfig.Arch);
       io.mapRequired("Platform", YamlConfig.Platform);
-      io.mapRequired("SourcePath", YamlConfig.SourcePath);
-      io.mapRequired("BuildPath", YamlConfig.BuildPath);
       io.mapOptional("DagAnalysisRootPath", YamlConfig.DagAnalysisRootPath);
       io.mapOptional("PassMode", YamlConfig.PassMode);
       io.mapOptional("IncludePaths", YamlConfig.IncludePathsList);

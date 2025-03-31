@@ -58,16 +58,12 @@ bool runCompartmentalization(CommonHAKCAnalysis &HAKCAnalysis) {
 
 bool runDataAccessGraphAnalysis(CommonHAKCAnalysis &HAKCAnalysis) {
   Module &M = HAKCAnalysis.GetModule();
-  auto BasePath = CommonHAKCAnalysis::GetModuleFullPath(M);
-  auto P = HAKCAnalysis.GetTransformedPath(BasePath);
-
-  auto Prefix = HAKCAnalysis.GetSystemInfo().GetDagAnalysisRootPath().str();
-  if (Prefix.back() != llvm::sys::path::get_separator().back()) {
-    Prefix += llvm::sys::path::get_separator();
-  }
-  auto Path = Prefix;
-  Path += P;
-  Path += ".dag.yml";
+  SmallString<256> Path;
+  llvm::sys::path::append(
+      Path, HAKCAnalysis.GetSystemInfo().GetDagAnalysisRootPath());
+  CommonHAKCAnalysis::GetModuleFullPath(M, Path);
+  llvm::sys::path::replace_extension(Path, ".dag.yml");
+  llvm::sys::path::make_preferred(Path);
 
   std::error_code err;
   err = sys::fs::create_directories(sys::path::parent_path(Path));

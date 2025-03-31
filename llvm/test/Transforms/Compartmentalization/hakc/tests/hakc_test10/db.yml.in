@@ -5,8 +5,8 @@ edges:
   - key: IsType
     persisted: true
     source: &id001 !HAKCFunction
-      DefiningFile: _HAKC_SOURCE_PATH_/hakc_test8.c
-      DefiningLine: 32
+      DefiningFile: @HAKC_TEST_DIR@/hakc_test10.c
+      DefiningLine: 22
       Name: bar
       is_function: true
       symbol_hash: e6ddbcd69f68b74c
@@ -25,9 +25,9 @@ edges:
     persisted: true
     source: *id001
     target: &id002 !HAKCCompilationUnit
-      filename: _HAKC_SOURCE_PATH_/hakc_test8.c
+      filename: @HAKC_TEST_DIR@/hakc_test10.c
   - key: DefinedIn
-    line: 32
+    line: 22
     persisted: true
     source: *id001
     target: *id002
@@ -35,8 +35,8 @@ edges:
     persisted: true
     source: *id001
     target: &id003 !HAKCGlobalVariable
-      DefiningFile: _HAKC_SOURCE_PATH_/hakc_test8.c
-      DefiningLine: 10
+      DefiningFile: @HAKC_TEST_DIR@/hakc_test10.c
+      DefiningLine: 11
       Name: kmalloc_caches
       is_function: false
       symbol_hash: dbdced7a45ff2d65
@@ -49,8 +49,8 @@ edges:
     persisted: true
     source: *id001
     target: &id004 !HAKCGlobalVariable
-      DefiningFile: _HAKC_SOURCE_PATH_/hakc_test8.c
-      DefiningLine: 11
+      DefiningFile: @HAKC_TEST_DIR@/hakc_test10.c
+      DefiningLine: 12
       Name: somevar
       is_function: false
       symbol_hash: 5631132bb7aef786
@@ -63,11 +63,11 @@ edges:
     persisted: true
     source: *id001
     target: &id005 !HAKCFunction
-      DefiningFile: _HAKC_SOURCE_PATH_/hakc_test8.c
-      DefiningLine: 21
+      DefiningFile: @HAKC_TEST_DIR@/hakc_test10.c
+      DefiningLine: 14
       Name: foo
       is_function: true
-      symbol_hash: a75946d7048f391e
+      symbol_hash: 50c304c000db5c46
   - key: DirectCall
     persisted: true
     source: *id001
@@ -103,7 +103,7 @@ edges:
     source: *id003
     target: *id002
   - key: DefinedIn
-    line: 10
+    line: 11
     persisted: true
     source: *id003
     target: *id002
@@ -133,7 +133,7 @@ edges:
     source: *id004
     target: *id002
   - key: DefinedIn
-    line: 11
+    line: 12
     persisted: true
     source: *id004
     target: *id002
@@ -148,9 +148,9 @@ edges:
     persisted: true
     source: *id005
     target: &id012 !HAKCType
-      DebugType: int (struct data_struct2*, int*, int*)
-      LLVMType: i32 (ptr, ptr, ptr)
-      type_hash: b9bd5a6310a2295f
+      DebugType: int (int*, int*)
+      LLVMType: i32 (ptr, ptr)
+      type_hash: e03c363f04ee656d
   - key: HasScope
     persisted: true
     source: *id005
@@ -163,7 +163,7 @@ edges:
     source: *id005
     target: *id002
   - key: DefinedIn
-    line: 21
+    line: 14
     persisted: true
     source: *id005
     target: *id002

@@ -13,7 +13,9 @@ struct data {
 };
 
 void init_data(struct data *data) {
+// CHECK: call ptr @check_hakc_data_access(ptr %0, i64 1, i64 73728)
     data->data = 0;
+// CHECK-NOT: call ptr @check_hakc_data_access
     data->list.next = &data->list;
 }
 

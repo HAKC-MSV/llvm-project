@@ -707,17 +707,15 @@ Instruction *CommonHAKCAnalysis::GetTargetTypeCast(Instruction *I,
   return nullptr;
 }
 
-std::string CommonHAKCAnalysis::GetModuleFullPath(Module &M) {
+void CommonHAKCAnalysis::GetModuleFullPath(Module &M,
+                                           SmallVectorImpl<char> &Result) {
   const auto &SourceFileName = M.getSourceFileName();
-  SmallString<256> FilenameVec = StringRef(SourceFileName);
-  SmallString<256> RealPath;
 
-  auto err = sys::fs::real_path(FilenameVec, RealPath, true);
+  auto err = sys::fs::real_path(SourceFileName, Result, true);
   if (err) {
     errs() << "Could not get real path to " << M.getSourceFileName() << "\n";
     throw std::exception();
   }
-  return RealPath.str().str();
 }
 
 bool CommonHAKCAnalysis::ValueIsUsedAsPointer(Value *V) {
@@ -762,45 +760,5 @@ bool CommonHAKCAnalysis::ValueIsUsedAsPointer(Value *V) {
   }
 
   return CallIsUsedAsPointer;
-}
-
-std::string CommonHAKCAnalysis::GetTransformedPath(StringRef Path) const {
-  if (Path.empty()) {
-    return Path.str();
-  }
-
-  auto SourcePath = SystemInfo.GetSourcePath();
-  if (SourcePath.size() == 0) {
-    errs() << "Invalid " << SourcePath << "!\n";
-    throw std::exception();
-  }
-
-  auto BuildPath = SystemInfo.GetBuildPath();
-  if (BuildPath.size() == 0) {
-    errs() << "Invalid " << BuildPath << "!\n";
-    throw std::exception();
-  }
-
-  unsigned length;
-  std::string Replacement;
-  if (Path.starts_with(BuildPath)) {
-    length = BuildPath.size();
-    Replacement = HAKC_BUILD_PATH_REPLACEMENT.str();
-  } else if (Path.starts_with(SourcePath)) {
-    length = SourcePath.size();
-    Replacement = HAKC_SOURCE_PATH_REPLACEMENT.str();
-  } else {
-    errs() << "Path " << Path << " does not start with either " << BuildPath
-           << " or " << SourcePath << "!\n";
-    throw std::exception();
-  }
-
-  if (!sys::path::is_separator(Path[length])) {
-    Replacement += sys::path::get_separator();
-  }
-
-  std::string Result = Path.str();
-  Result.replace(0, length, Replacement);
-  return Result;
 }
 } // namespace llvm::hakc

@@ -6,8 +6,6 @@ Database:
   get-division-by-id-endpoint: "get-division-by-id"
   get-division-from-symbol-endpoint: "get-division-from-symbol"
   get-valid-targets-from-compartment-id-endpoint: "get-valid-targets-from-compartment-id"
-SourcePath: @HAKC_TEST_DIR@
-BuildPath: @HAKC_BUILD_DIR@
 DagAnalysisRootPath: @HAKC_DAG_ANALYSIS_PATH@
 OutputDebugInfo: false
 PassMode: RunCompartmentalization

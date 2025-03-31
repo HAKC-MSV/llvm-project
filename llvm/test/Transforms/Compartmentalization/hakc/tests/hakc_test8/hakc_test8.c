@@ -19,6 +19,7 @@ struct data_struct2 {
 
 int foo(struct data_struct2 *a, int* v1, int* v2) {
     if (a) {
+// CHECK-LABEL: if.then
 // CHECK: call ptr @check_hakc_data_access(ptr %1, i64 4, i64 270336)
         *v1++;
 // CHECK: call ptr @check_hakc_data_access(ptr %4, i64 4, i64 270336)
