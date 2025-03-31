@@ -873,13 +873,18 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCTypeForUse(Use &U) {
     }
   } else if (isa<LoadInst>(U.getUser())) {
     Result = FindHAKCType(U.getUser());
-    if (Result && U.getOperandNo() == LoadInst::getPointerOperandIndex()) {
-      Result = FindPointerType(Result);
-    }
   } else if (auto *GEPI = dyn_cast<GetElementPtrInst>(U.getUser())) {
     auto BaseType = FindType(GEPI->getSourceElementType());
     if (BaseType) {
       Result = FindPointerType(BaseType);
+    }
+  } else if (auto *StoreI = dyn_cast<StoreInst>(U.getUser())) {
+    Result = FindHAKCType(
+        StoreI->getOperand((U.getOperandNo() + 1) % StoreI->getNumOperands()));
+    if (Result) {
+      CommonHAKCAnalysis::getWriter(
+          AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+          << "Found " << *Result << " for " << U.get() << "\n";
     }
   }
 

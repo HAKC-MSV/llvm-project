@@ -1128,8 +1128,7 @@ GlobalVariable *hakc::HAKCTransformer::AddCompartmentMetadataEntry(
 }
 
 bool hakc::HAKCTransformer::DebugIsActive() const {
-  return ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().OutputDebugInfo(
-      HAKCIRBuilder.GetInsertPoint()->getFunction());
+  return ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().OutputDebugInfo();
 }
 
 hakc::HAKCPointerBaseP

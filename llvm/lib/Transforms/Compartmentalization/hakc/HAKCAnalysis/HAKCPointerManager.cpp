@@ -20,12 +20,20 @@ HAKCPointerManager::HAKCPointerManager(HAKCFunctionAnalysis &Analysis,
       CurrentPointerUseID(0) {}
 
 bool HAKCPointerManager::PointerIsEligibleForManagement(Use &U) const {
+  CommonHAKCAnalysis::getWriter(DebugActive)
+      << "Starting Pointer Management checks for " << U.get() << " from "
+      << U.getUser() << "\n";
+
   /* The HAKCPointerManager::GetDef method performs some analysis to find a
    * definition that could be different from the "true" definition. Use the true
    * definition to check if we are managing constant strings.
    */
   auto *Pointer = U.get();
   auto *Definition = GetFunctionAnalysis().getDef(Pointer, false);
+  auto *PointerTy = Pointer->getType();
+  if (auto *AllocaI = dyn_cast<AllocaInst>(Definition)) {
+    PointerTy = AllocaI->getAllocatedType();
+  }
   if (isa<ConstantPointerNull>(Definition)) {
     CommonHAKCAnalysis::getWriter(DebugActive)
         << "Pointer Manager ignores null pointers\n";
@@ -34,11 +42,13 @@ bool HAKCPointerManager::PointerIsEligibleForManagement(Use &U) const {
     CommonHAKCAnalysis::getWriter(DebugActive)
         << "Pointer Manager ignores Constant Ints\n";
     return false;
-  } else if (!CommonHAKCAnalysis::IsPointerLikeType(Pointer->getType())) {
+  } else if (!CommonHAKCAnalysis::IsPointerLikeType(PointerTy)) {
     CommonHAKCAnalysis::getWriter(DebugActive)
         << "Pointer Manager ignores non-pointers\n";
     return false;
   }
+  CommonHAKCAnalysis::getWriter(DebugActive)
+      << *Pointer << " Type " << PointerTy << " is a pointer like type\n";
 
   if (auto *GV = dyn_cast<GlobalVariable>(Definition)) {
     if (CommonHAKCAnalysis::IsStringType(GV->getValueType())) {
@@ -48,10 +58,6 @@ bool HAKCPointerManager::PointerIsEligibleForManagement(Use &U) const {
       return false;
     }
   }
-
-  CommonHAKCAnalysis::getWriter(DebugActive)
-      << "Starting Pointer Management checks for " << U.get() << " from "
-      << U.getUser() << "\n";
 
   if (auto *call = dyn_cast<CallInst>(Pointer)) {
     CommonHAKCAnalysis::getWriter(DebugActive)
@@ -81,10 +87,6 @@ bool HAKCPointerManager::PointerIsEligibleForManagement(Use &U) const {
           << "Call returns 32-bit integer\n";
       return false;
     }
-  } else if (auto *Alloca = dyn_cast<AllocaInst>(Pointer)) {
-    CommonHAKCAnalysis::getWriter(DebugActive) << "Def is AllocaInst\n";
-    return CommonHAKCAnalysis::IsPointerLikeType(Alloca->getAllocatedType()) &&
-           !CommonHAKCAnalysis::IsKernelUserPointer(Alloca);
   } else if (auto *ConstExpr = dyn_cast<ConstantExpr>(Pointer)) {
     if (ConstExpr->isCast()) {
       auto *Operand =

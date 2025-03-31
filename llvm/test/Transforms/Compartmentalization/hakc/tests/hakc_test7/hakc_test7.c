@@ -5,13 +5,14 @@
 
 
 // testing never used struct types 
-struct list_head{
+struct list_head {
     int a;
 };
 
 int foo(struct list_head * ListHead) {
     if(ListHead){
-        return 1;
+// CHECK-NOT: call ptr @check_hakc_data_access(ptr %1, i64 1, i64 73728)
+        return ListHead->a;
     }
     return 0;
 }

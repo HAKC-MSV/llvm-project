@@ -288,8 +288,7 @@ void HAKCModuleAnalysis::AddTransferFunctions() {
   for (auto &F : GetModule().functions()) {
     if (!CommonHAKCAnalysis::IsUncompartmentalizedSymbol(&F, Policy) &&
         CommonAnalysis.functionIsTransferCandidate(&F, Policy) &&
-        !hakc::CommonHAKCAnalysis::IsOutsideTransferFunc(&F) &&
-        functionEscapes(&F)) {
+        !CommonHAKCAnalysis::IsOutsideTransferFunc(&F) && functionEscapes(&F)) {
       FuncsNeedingTransfers.push_back(&F);
     }
   }

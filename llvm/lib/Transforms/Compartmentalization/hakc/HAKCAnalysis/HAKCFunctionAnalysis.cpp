@@ -767,8 +767,6 @@ void HAKCFunctionAnalysis::handleCall(CallInst *call) {
       }
     }
   }
-  CommonHAKCAnalysis::getWriter(DebugActive)
-      << *call << " should not be managed\n";
 
   bool needsAuthenticatedArgs =
       (call->isInlineAsm() ||
