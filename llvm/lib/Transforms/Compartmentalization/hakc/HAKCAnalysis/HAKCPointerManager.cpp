@@ -19,11 +19,12 @@ HAKCPointerManager::HAKCPointerManager(HAKCFunctionAnalysis &Analysis,
       IsCompartmentalized(false), DebugActive(DebugActive), CurrentPointerID(0),
       CurrentPointerUseID(0) {}
 
-bool HAKCPointerManager::PointerIsEligibleForManagement(Value *Pointer) {
+bool HAKCPointerManager::PointerIsEligibleForManagement(Use &U) const {
   /* The HAKCPointerManager::GetDef method performs some analysis to find a
    * definition that could be different from the "true" definition. Use the true
    * definition to check if we are managing constant strings.
    */
+  auto *Pointer = U.get();
   auto *Definition = GetFunctionAnalysis().getDef(Pointer, false);
   if (isa<ConstantPointerNull>(Definition)) {
     CommonHAKCAnalysis::getWriter(DebugActive)
@@ -48,15 +49,140 @@ bool HAKCPointerManager::PointerIsEligibleForManagement(Value *Pointer) {
     }
   }
 
-  return true;
+  CommonHAKCAnalysis::getWriter(DebugActive)
+      << "Starting Pointer Management checks for " << U.get() << " from "
+      << U.getUser() << "\n";
+
+  if (auto *call = dyn_cast<CallInst>(Pointer)) {
+    CommonHAKCAnalysis::getWriter(DebugActive)
+        << "Value " << *Pointer << " is a CallInst\n";
+
+    bool IsInline = call->isInlineAsm();
+    if (IsInline) {
+      CommonHAKCAnalysis::getWriter(DebugActive) << "Call is Inline Assembly\n";
+      /* These are usually the result of reading a register value */
+      return GetFunctionAnalysis()
+          .GetModuleAnalysis()
+          .GetCommonAnalysis()
+          .ValueIsUsedAsPointer(call);
+    } else if (call->getCalledFunction() &&
+               call->getCalledFunction()->isIntrinsic() &&
+               call->getCalledFunction()->getIntrinsicID() ==
+                   Intrinsic::IndependentIntrinsics::read_register) {
+      CommonHAKCAnalysis::getWriter(DebugActive)
+          << "Call is a read register intrinsic\n";
+      return false;
+    } else if (call->getType()->isIntegerTy(32)) {
+      /* Sometimes functions that return i32 are cast to a pointer for a check
+       * against IS_ERR(). No need to check this.
+       * See find_mm_struct in mm/migrate.c.
+       */
+      CommonHAKCAnalysis::getWriter(DebugActive)
+          << "Call returns 32-bit integer\n";
+      return false;
+    }
+  } else if (auto *Alloca = dyn_cast<AllocaInst>(Pointer)) {
+    CommonHAKCAnalysis::getWriter(DebugActive) << "Def is AllocaInst\n";
+    return CommonHAKCAnalysis::IsPointerLikeType(Alloca->getAllocatedType()) &&
+           !CommonHAKCAnalysis::IsKernelUserPointer(Alloca);
+  } else if (auto *ConstExpr = dyn_cast<ConstantExpr>(Pointer)) {
+    if (ConstExpr->isCast()) {
+      auto *Operand =
+          GetFunctionAnalysis().getDef(ConstExpr->getOperand(0), false);
+      CommonHAKCAnalysis::getWriter(DebugActive)
+          << *ConstExpr << " operand def is " << *Operand << "\n";
+      if (isa<ConstantInt>(Operand)) {
+        CommonHAKCAnalysis::getWriter(DebugActive)
+            << "ConstExpr is from ConstantInt\n";
+        return false;
+      }
+    }
+  } else if (isa<Constant>(Pointer) && Pointer->getType()->isIntegerTy()) {
+    CommonHAKCAnalysis::getWriter(DebugActive)
+        << *Pointer << " is a constant int\n";
+    return false;
+  } else if (!CommonHAKCAnalysis::IsPointerLikeType(Pointer->getType()) &&
+             !Pointer->getType()->isArrayTy() && !isa<PtrToIntInst>(Pointer)) {
+    CommonHAKCAnalysis::getWriter(DebugActive)
+        << *Pointer << " is not a pointer, array, or pointer to int cast\n";
+    return false;
+  } else if (isa<ConstantPointerNull>(Pointer)) {
+    CommonHAKCAnalysis::getWriter(DebugActive)
+        << *Pointer << " is a constant null pointer\n";
+    return false;
+  } else if (GetFunctionAnalysis().IsPHIOfGlobalsOnly(Pointer)) {
+    CommonHAKCAnalysis::getWriter(DebugActive)
+        << *Pointer << " is a PHINode of Globals\n";
+    return false;
+  } else if (CommonHAKCAnalysis::IsKernelUserPointer(Pointer)) {
+    CommonHAKCAnalysis::getWriter(DebugActive)
+        << *Pointer << " is a Kernel pointer from user space\n";
+    return false;
+  } else if (auto *LoadI = dyn_cast<LoadInst>(Pointer)) {
+    CommonHAKCAnalysis::getWriter(DebugActive)
+        << *Pointer << " is used in a LoadInst\n";
+    return PointerIsEligibleForManagement(
+        LoadI->getOperandUse(LoadInst::getPointerOperandIndex()));
+  } else if (auto *StoreI = dyn_cast<StoreInst>(U.getUser())) {
+    CommonHAKCAnalysis::getWriter(DebugActive)
+        << *Pointer << " is used in a StoreInst\n";
+    return U.getOperandNo() == StoreInst::getPointerOperandIndex() &&
+           !CommonHAKCAnalysis::IsKernelUserPointer(Pointer);
+  } else if (isa<UndefValue>(Pointer)) {
+    CommonHAKCAnalysis::getWriter(DebugActive)
+        << *Pointer << " is an undef value\n";
+    return false;
+  } else if (auto *CallI = dyn_cast<CallInst>(U.getUser())) {
+    if (CallI->isInlineAsm()) {
+      CommonHAKCAnalysis::getWriter(DebugActive)
+          << *Pointer << " is used in inline assembly\n";
+      return GetFunctionAnalysis()
+          .GetModuleAnalysis()
+          .GetCommonAnalysis()
+          .ValueIsUsedAsPointer(U.get());
+    }
+  } else if (!Pointer->getType()->isPointerTy()) {
+    CommonHAKCAnalysis::getWriter(DebugActive)
+        << *Pointer << " Type is not a pointer: " << *Pointer->getType()
+        << "\n";
+    return false;
+  } else if (Pointer->getType()->isPointerTy()) {
+    CommonHAKCAnalysis::getWriter(DebugActive)
+        << *Pointer << " Type is a pointer: " << *Pointer->getType() << "\n";
+    return !CommonHAKCAnalysis::IsKernelUserPointer(Pointer);
+  }
+  return Pointer->getType()->isPointerTy() &&
+         !CommonHAKCAnalysis::IsKernelUserPointer(Pointer);
 }
 
-void HAKCPointerManager::ManageNewPointer(Value *V) {
-  auto *BaseDefinition = GetDef(V);
+void HAKCPointerManager::ManageNewPointer(Use &U) {
+  auto *BaseDefinition = GetDef(U.get());
   if (!BaseDefinition) {
     CommonHAKCAnalysis::getWriter(true)
-        << "Could not find BaseDefinition for " << V << "\n";
+        << "Could not find BaseDefinition for " << U << "\n";
     throw std::exception();
+  }
+  if (isa<IntToPtrInst>(U.get())) {
+    bool is_percpu_ptr = CommonHAKCAnalysis::IsPerCPUPointer(U);
+
+    if (is_percpu_ptr) {
+      CommonHAKCAnalysis::getWriter(DebugActive)
+          << "Detected per-cpu pointer: " << U << "\n";
+      BaseDefinition = U.get();
+    }
+  }
+
+  if ((isa<StoreInst>(U.getUser()) && isa<IntToPtrInst>(U.get())) ||
+      (BaseDefinition->getType()->isIntegerTy(64))) {
+    bool registerUse = false;
+    if (auto *call = dyn_cast<CallInst>(BaseDefinition)) {
+      registerUse = CommonHAKCAnalysis::isRegisterRead(call);
+    }
+    if (!registerUse) {
+      CommonHAKCAnalysis::getWriter(DebugActive)
+          << "Using " << U << " instead of " << *BaseDefinition << "\n";
+      BaseDefinition = U.get();
+    }
   }
 
   auto NextID = CurrentPointerID++;
@@ -349,23 +475,25 @@ void HAKCPointerManager::ClassifyAllUsesOfDefinition(
   }
 }
 
-bool HAKCPointerManager::ManagePointer(Value *V) {
-  bool result = false;
-  if (!PointerIsEligibleForManagement(V)) {
+/**
+ *
+ * @param U
+ * @return True if a new pointer is being managed
+ */
+bool HAKCPointerManager::ManagePointer(Use &U) {
+  bool Result = PointerIsEligibleForManagement(U);
+  if (!Result) {
     CommonHAKCAnalysis::getWriter(DebugActive)
-        << "Value " << *V << " is not eligible for management\n";
-    return result;
-  }
-  auto ManagedPointer = GetManagedPointer(V);
-  if (!ManagedPointer) {
-    ManageNewPointer(V);
-    result = true;
+        << "Use " << U << " is not eligible for management\n";
   } else {
-    CommonHAKCAnalysis::getWriter(DebugActive)
-        << "Pointer " << *V << " is already managed: " << *ManagedPointer
-        << "\n";
+    auto ManagedPointer = GetManagedPointer(U.get());
+    if (!ManagedPointer) {
+      ManageNewPointer(U);
+    } else {
+      Result = false;
+    }
   }
-  return result;
+  return Result;
 }
 
 HAKCFunctionAnalysis &HAKCPointerManager::GetFunctionAnalysis() const {

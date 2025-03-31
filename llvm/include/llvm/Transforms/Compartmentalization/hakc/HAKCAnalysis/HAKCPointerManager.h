@@ -34,7 +34,9 @@ public:
                               HAKCCompartmentalizationPolicy &Policy,
                               bool DebugActive);
 
-  bool ManagePointer(Value *V);
+  bool ManagePointer(Use &U);
+
+  bool PointerIsEligibleForManagement(Use &U) const;
 
   iterator_range<ManagedHAKCPointerListType::iterator> ManagedPointers();
 
@@ -143,8 +145,6 @@ protected:
   bool IsCompartmentalized;
   bool DebugActive;
 
-  bool PointerIsEligibleForManagement(Value *Pointer);
-
   void AddHAKCPointerReplacement(ManagedHAKCPointerUseP &PtrUse,
                                  Value *Replacement,
                                  bool AddingAuthenticatedReplacements);
@@ -152,7 +152,7 @@ protected:
   Value *FindManagedValue(std::map<ManagedHAKCPointerUseP, Value *> &Storage,
                           Value *Target);
 
-  void ManageNewPointer(Value *V);
+  void ManageNewPointer(Use &U);
 
   void ClassifyAllUsesOfDefinition(Value *Definition,
                                    ManagedHAKCPointer &ManagedPointer);

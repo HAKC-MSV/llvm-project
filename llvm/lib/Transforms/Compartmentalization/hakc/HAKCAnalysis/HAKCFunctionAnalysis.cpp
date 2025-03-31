@@ -278,16 +278,16 @@ Value *HAKCFunctionAnalysis::AddCodeAuthCheckAtLocation(Value *SignedPtr,
   return SafePointer;
 }
 
-void HAKCFunctionAnalysis::AddManagedPointer(Value *HAKCPointer) {
-  if (!CommonHAKCAnalysis::IsPointerLikeType(HAKCPointer->getType())) {
+bool HAKCFunctionAnalysis::AddManagedPointer(Use &PointerUse) {
+  if (!CommonHAKCAnalysis::IsPointerLikeType(PointerUse->getType())) {
     CommonHAKCAnalysis::getWriter(true)
-        << "Trying to add an invalid ManagedHAKCPointer: " << HAKCPointer
-        << "\n"
+        << "Trying to add an invalid ManagedHAKCPointer: " << PointerUse << "\n"
         << getFunction() << "\n";
     throw std::exception();
   }
-  if (PointerManager.ManagePointer(HAKCPointer)) {
-    auto ManagedPointer = PointerManager.GetManagedPointer(HAKCPointer);
+  auto Result = PointerManager.ManagePointer(PointerUse);
+  if (Result) {
+    auto ManagedPointer = PointerManager.GetManagedPointer(PointerUse.get());
     if (auto *PHII = dyn_cast<PHINode>(ManagedPointer->GetBaseDefinition())) {
       CommonHAKCAnalysis::getWriter(DebugActive)
           << "Definition is a PHI Node. Adding all non-null incoming "
@@ -295,10 +295,11 @@ void HAKCFunctionAnalysis::AddManagedPointer(Value *HAKCPointer) {
       for (auto &Incoming : PHII->incoming_values()) {
         CommonHAKCAnalysis::getWriter(DebugActive)
             << "Adding Incoming member " << Incoming << "\n";
-        RegisterPointerDereference(Incoming);
+        AddManagedPointer(Incoming);
       }
     }
   }
+  return Result;
 }
 
 /**
@@ -373,7 +374,8 @@ bool HAKCFunctionAnalysis::argNeedsAuthentication(Use &arg) {
               IsIntrinsicNeedingAuthentication(call));
     }
   }
-  return (!isa<Function>(arg) && PointerShouldBeManaged(arg));
+  return (!isa<Function>(arg) &&
+          PointerManager.PointerIsEligibleForManagement(arg));
 }
 
 bool HAKCFunctionAnalysis::IsCallInIntrinsicSet(CallBase *Call,
@@ -528,159 +530,6 @@ bool HAKCFunctionAnalysis::isPHIofGlobalsOnly(Value *ptr,
   return false;
 }
 
-/**
- * @brief Returns true if a pointer should be authenticated
- * @param ptr
- * @return
- */
-bool HAKCFunctionAnalysis::PointerShouldBeManaged(Use &U) {
-  CommonHAKCAnalysis::getWriter(DebugActive)
-      << "Starting Pointer Management checks for " << U.get() << " from "
-      << U.getUser() << "\n";
-
-  auto *ptr = getDef(U.get(), false);
-  CommonHAKCAnalysis::getWriter(DebugActive)
-      << __FUNCTION__ << " found def " << ptr << " for " << U.get() << "\n";
-
-  if (auto *call = dyn_cast<CallInst>(ptr)) {
-    CommonHAKCAnalysis::getWriter(DebugActive)
-        << "Value " << *ptr << " is a CallInst\n";
-
-    bool IsInline = call->isInlineAsm();
-    if (IsInline) {
-      CommonHAKCAnalysis::getWriter(DebugActive) << "Call is Inline Assembly\n";
-      /* These are usually the result of reading a register value */
-      return GetModuleAnalysis().GetCommonAnalysis().ValueIsUsedAsPointer(call);
-    } else if (call->getCalledFunction() &&
-               call->getCalledFunction()->isIntrinsic() &&
-               call->getCalledFunction()->getIntrinsicID() ==
-                   Intrinsic::IndependentIntrinsics::read_register) {
-      CommonHAKCAnalysis::getWriter(DebugActive)
-          << "Call is a read register intrinsic\n";
-      return false;
-    } else if (call->getType()->isIntegerTy(32)) {
-      /* Sometimes functions that return i32 are cast to a pointer for a check
-       * against IS_ERR(). No need to check this.
-       * See find_mm_struct in mm/migrate.c.
-       */
-      CommonHAKCAnalysis::getWriter(DebugActive)
-          << "Call returns 32-bit integer\n";
-      return false;
-    }
-  } else if (auto *Alloca = dyn_cast<AllocaInst>(ptr)) {
-    CommonHAKCAnalysis::getWriter(DebugActive) << "Def is AllocaInst\n";
-    return CommonHAKCAnalysis::IsPointerLikeType(Alloca->getAllocatedType()) &&
-           !CommonHAKCAnalysis::IsKernelUserPointer(Alloca);
-  } else if (auto *ConstExpr = dyn_cast<ConstantExpr>(ptr)) {
-    if (ConstExpr->isCast()) {
-      auto *Operand = getDef(ConstExpr->getOperand(0), false);
-      CommonHAKCAnalysis::getWriter(DebugActive)
-          << *ConstExpr << " operand def is " << *Operand << "\n";
-      if (isa<ConstantInt>(Operand)) {
-        CommonHAKCAnalysis::getWriter(DebugActive)
-            << "ConstExpr is from ConstantInt\n";
-        return false;
-      }
-    }
-  } else if (isa<Constant>(ptr) && ptr->getType()->isIntegerTy()) {
-    CommonHAKCAnalysis::getWriter(DebugActive)
-        << *ptr << " is a constant int\n";
-    return false;
-  } else if (!CommonHAKCAnalysis::IsPointerLikeType(ptr->getType()) &&
-             !ptr->getType()->isArrayTy() && !isa<PtrToIntInst>(ptr)) {
-    CommonHAKCAnalysis::getWriter(DebugActive)
-        << *ptr << " is not a pointer, array, or pointer to int cast\n";
-    return false;
-  } else if (isa<ConstantPointerNull>(ptr)) {
-    CommonHAKCAnalysis::getWriter(DebugActive)
-        << *ptr << " is a constant null pointer\n";
-    return false;
-  } else if (IsPHIOfGlobalsOnly(ptr)) {
-    CommonHAKCAnalysis::getWriter(DebugActive)
-        << *ptr << " is a PHINode of Globals\n";
-    return false;
-  } else if (CommonHAKCAnalysis::IsKernelUserPointer(ptr)) {
-    CommonHAKCAnalysis::getWriter(DebugActive)
-        << *ptr << " is a Kernel pointer from user space\n";
-    return false;
-  } else if (auto *LoadI = dyn_cast<LoadInst>(ptr)) {
-    CommonHAKCAnalysis::getWriter(DebugActive)
-        << *ptr << " is used in a LoadInst\n";
-    return PointerShouldBeManaged(
-        LoadI->getOperandUse(LoadInst::getPointerOperandIndex()));
-  } else if (auto *StoreI = dyn_cast<StoreInst>(U.getUser())) {
-    CommonHAKCAnalysis::getWriter(DebugActive)
-        << *ptr << " is used in a StoreInst\n";
-    return U.getOperandNo() == StoreInst::getPointerOperandIndex() &&
-           PointerShouldBeManaged(
-               StoreI->getOperandUse(StoreInst::getPointerOperandIndex()));
-  } else if (isa<UndefValue>(ptr)) {
-    CommonHAKCAnalysis::getWriter(DebugActive)
-        << *ptr << " is an undef value\n";
-    return false;
-  } else if (auto *CallI = dyn_cast<CallInst>(U.getUser())) {
-    if (CallI->isInlineAsm()) {
-      CommonHAKCAnalysis::getWriter(DebugActive)
-          << *ptr << " is used in inline assembly\n";
-      return GetModuleAnalysis().GetCommonAnalysis().ValueIsUsedAsPointer(
-          U.get());
-    }
-  } else if (!ptr->getType()->isPointerTy()) {
-    CommonHAKCAnalysis::getWriter(DebugActive)
-        << *ptr << " Type is not a pointer: " << *ptr->getType() << "\n";
-    return false;
-  } else if (ptr->getType()->isPointerTy()) {
-    CommonHAKCAnalysis::getWriter(DebugActive)
-        << *ptr << " Type is a pointer: " << *ptr->getType() << "\n";
-    return !CommonHAKCAnalysis::IsKernelUserPointer(ptr);
-  }
-  return ptr->getType()->isPointerTy() &&
-         !CommonHAKCAnalysis::IsKernelUserPointer(ptr);
-}
-
-/**
- * @brief Adds a signed pointer dereference to the list if the source pointer
- * should be authenticated
- * @param use
- */
-void HAKCFunctionAnalysis::RegisterPointerDereference(Use &use) {
-  Value *definition = getDef(use.get(), false);
-  if ((isa<StoreInst>(use.getUser()) && isa<IntToPtrInst>(use.get())) ||
-      (definition->getType()->isIntegerTy(64))) {
-    bool registerUse = false;
-    if (auto *call = dyn_cast<CallInst>(definition)) {
-      registerUse = CommonHAKCAnalysis::isRegisterRead(call);
-    }
-    if (!registerUse) {
-      CommonHAKCAnalysis::getWriter(DebugActive)
-          << "Using " << *use << " instead of " << *definition << "\n";
-      definition = use.get();
-    }
-  }
-  CommonHAKCAnalysis::getWriter(DebugActive)
-      << "Checking if " << *use << " should be registered\n";
-
-  if (PointerShouldBeManaged(use)) {
-    if (isa<IntToPtrInst>(use.get())) {
-      bool is_percpu_ptr = CommonHAKCAnalysis::IsPerCPUPointer(use);
-
-      if (is_percpu_ptr) {
-        CommonHAKCAnalysis::getWriter(DebugActive)
-            << "Detected per-cpu pointer: " << *use << "\n";
-        definition = use.get();
-      }
-    }
-    AddManagedPointer(definition);
-    CommonHAKCAnalysis::getWriter(DebugActive)
-        << "Definition " << definition << " from " << *use.getUser()
-        << " is registered\n";
-  } else {
-    CommonHAKCAnalysis::getWriter(DebugActive)
-        << "Definition " << definition << " from " << *use.getUser()
-        << " should not be checked\n";
-  }
-}
-
 Instruction *HAKCFunctionAnalysis::GetFinalAllocaDef(AllocaInst *Alloca) {
   return Alloca;
 }
@@ -703,8 +552,7 @@ void HAKCFunctionAnalysis::handleLoad(LoadInst *load) {
   CommonHAKCAnalysis::getWriter(DebugActive)
       << "Handling " << *load->getOperandUse(LoadInst::getPointerOperandIndex())
       << " from Load " << *load << "\n";
-  RegisterPointerDereference(
-      load->getOperandUse(LoadInst::getPointerOperandIndex()));
+  AddManagedPointer(load->getOperandUse(LoadInst::getPointerOperandIndex()));
 }
 
 /**
@@ -712,8 +560,7 @@ void HAKCFunctionAnalysis::handleLoad(LoadInst *load) {
  * @param store
  */
 void HAKCFunctionAnalysis::handleStore(StoreInst *store) {
-  RegisterPointerDereference(
-      store->getOperandUse(StoreInst::getPointerOperandIndex()));
+  AddManagedPointer(store->getOperandUse(StoreInst::getPointerOperandIndex()));
 
   if (auto *globalValue = dyn_cast<GlobalValue>(store->getValueOperand())) {
     if (globalShouldBeTransferred(store->getOperandUse(0))) {
@@ -808,13 +655,13 @@ void HAKCFunctionAnalysis::handleComparison(CmpInst *compare) {
     if (arg0NeedsAuth && arg1NeedsAuth) {
       CommonHAKCAnalysis::getWriter(DebugActive)
           << "Both operands should be checked\n";
-      RegisterPointerDereference(compare->getOperandUse(0));
-      RegisterPointerDereference(compare->getOperandUse(1));
+      AddManagedPointer(compare->getOperandUse(0));
+      AddManagedPointer(compare->getOperandUse(1));
     } else {
       if (arg0NeedsAuth) {
         CommonHAKCAnalysis::getWriter(DebugActive)
             << "Registering argument 0\n";
-        RegisterPointerDereference(compare->getOperandUse(0));
+        AddManagedPointer(compare->getOperandUse(0));
       } else {
         CommonHAKCAnalysis::getWriter(DebugActive)
             << "Argument 1 (" << compare->getOperand(1)
@@ -823,15 +670,15 @@ void HAKCFunctionAnalysis::handleComparison(CmpInst *compare) {
       if (arg1NeedsAuth) {
         CommonHAKCAnalysis::getWriter(DebugActive)
             << "Registering argument 1\n";
-        RegisterPointerDereference(compare->getOperandUse(1));
+        AddManagedPointer(compare->getOperandUse(1));
       }
     }
   } else {
     if (argNeedsAuthentication(compare->getOperandUse(0))) {
-      RegisterPointerDereference(compare->getOperandUse(0));
+      AddManagedPointer(compare->getOperandUse(0));
     }
     if (argNeedsAuthentication(compare->getOperandUse(1))) {
-      RegisterPointerDereference(compare->getOperandUse(1));
+      AddManagedPointer(compare->getOperandUse(1));
     }
   }
 }
@@ -849,8 +696,8 @@ void HAKCFunctionAnalysis::handleBinaryOperator(BinaryOperator *binOp) {
   if (argNeedsAuthentication(binOp->getOperandUse(0)) &&
       argNeedsAuthentication(binOp->getOperandUse(1))) {
     CommonHAKCAnalysis::getWriter(DebugActive) << "Registering both operands\n";
-    RegisterPointerDereference(binOp->getOperandUse(0));
-    RegisterPointerDereference(binOp->getOperandUse(1));
+    AddManagedPointer(binOp->getOperandUse(0));
+    AddManagedPointer(binOp->getOperandUse(1));
   }
 }
 
@@ -914,7 +761,11 @@ void HAKCFunctionAnalysis::handleCall(CallInst *call) {
       << "Handling call " << *call << "\n";
 
   if (GetModuleAnalysis().GetCommonAnalysis().ValueIsUsedAsPointer(call)) {
-    AddManagedPointer(call);
+    for (auto &U : call->uses()) {
+      if (AddManagedPointer(U)) {
+        break;
+      }
+    }
   }
   CommonHAKCAnalysis::getWriter(DebugActive)
       << *call << " should not be managed\n";
@@ -942,7 +793,7 @@ void HAKCFunctionAnalysis::handleCall(CallInst *call) {
   if (call->isIndirectCall()) {
     CommonHAKCAnalysis::getWriter(DebugActive)
         << "Indirect call: " << *call << "\n";
-    RegisterPointerDereference(call->getCalledOperandUse());
+    AddManagedPointer(call->getCalledOperandUse());
     /* Using checked pointers for indirect calls because the indirect call
      * can be an assembly function, which currently requires valid pointers.
      * This is safe for other functions, since the target will be a transfer
@@ -951,7 +802,7 @@ void HAKCFunctionAnalysis::handleCall(CallInst *call) {
      * uncompartmentalized code */
     for (auto &arg : call->args()) {
       if (argNeedsAuthentication(arg)) {
-        RegisterPointerDereference(arg);
+        AddManagedPointer(arg);
       }
       CommonHAKCAnalysis::getWriter(DebugActive)
           << "Argument " << *arg << " for " << *call
@@ -960,7 +811,7 @@ void HAKCFunctionAnalysis::handleCall(CallInst *call) {
   } else if (needsAuthenticatedArgs) {
     for (auto &arg : call->args()) {
       if (argNeedsAuthentication(arg)) {
-        RegisterPointerDereference(arg);
+        AddManagedPointer(arg);
       }
       CommonHAKCAnalysis::getWriter(DebugActive)
           << "Argument " << *arg << " for " << *call
@@ -981,7 +832,7 @@ void HAKCFunctionAnalysis::handleCall(CallInst *call) {
           CommonHAKCAnalysis::getWriter(DebugActive)
               << "Global " << glob->getName() << " used by " << *call << "\n";
           GlobalArgumentUses[glob].insert(call);
-          RegisterPointerDereference(arg);
+          AddManagedPointer(arg);
         }
         CommonHAKCAnalysis::getWriter(DebugActive)
             << "Global " << glob->getName() << " should not be transferred to "

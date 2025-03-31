@@ -871,17 +871,15 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCTypeForUse(Use &U) {
             dyn_cast<DISubroutineType>(CallTy->GetDbgType()), U.getOperandNo());
       }
     }
-  } else if (isa<AllocaInst>(U.get()) && isa<LoadInst>(U.getUser())) {
+  } else if (isa<LoadInst>(U.getUser())) {
     Result = FindHAKCType(U.getUser());
+    if (Result && U.getOperandNo() == LoadInst::getPointerOperandIndex()) {
+      Result = FindPointerType(Result);
+    }
   } else if (auto *GEPI = dyn_cast<GetElementPtrInst>(U.getUser())) {
     auto BaseType = FindType(GEPI->getSourceElementType());
     if (BaseType) {
       Result = FindPointerType(BaseType);
-    }
-  } else if (isa<StoreInst>(U.getUser())) {
-    Result = FindHAKCType(U.getUser());
-    if (U.getOperandNo() == StoreInst::getPointerOperandIndex()) {
-      Result = FindPointerType(Result);
     }
   }
 
