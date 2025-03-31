@@ -51,7 +51,7 @@ public:
 
   bool empty() const;
 
-  Value *GetDef(Value *V);
+  Value *GetDef(Value *V) const;
 
   /**
    * Return the Authenticated version of Pointer
@@ -152,7 +152,7 @@ protected:
   Value *FindManagedValue(std::map<ManagedHAKCPointerUseP, Value *> &Storage,
                           Value *Target);
 
-  void ManageNewPointer(Use &U);
+  bool ManageNewPointer(Use &U);
 
   void ClassifyAllUsesOfDefinition(Value *Definition,
                                    ManagedHAKCPointer &ManagedPointer);
@@ -179,7 +179,7 @@ protected:
   CreateManagedPointerUse(ManagedHAKCPointer &ManagedPointer, User *U,
                           unsigned OperandNo);
 
-  bool IsConstantExprUsedInKernelCall(User *U);
+  bool IsConstantExprUsedInKernelCall(User *U) const;
 
 private:
   unsigned CurrentPointerID;

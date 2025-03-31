@@ -882,10 +882,6 @@ bool hakc::HAKCTransformer::TransferShouldBeCreated(Value *V,
     CreateTransfer = !I->equalsInt(0) && !I->isMinusOne();
   }
 
-  if (ModuleAnalysis.GetCommonAnalysis().IsIgnoredType(V->getType())) {
-    CreateTransfer = false;
-  }
-
   return CreateTransfer;
 }
 
@@ -993,14 +989,18 @@ hakc::HAKCTransformer::PopulateTransferFunction(Function *Target,
   Unreachable->removeFromParent();
 
   for (auto &Arg : TransferFunction->args()) {
+    auto ManagedPointer = CreateNewManagedPointer(&Arg);
     if (!CommonHAKCAnalysis::argShouldTransfer(&Arg) || NoKernelXfers) {
       continue;
     }
+    HAKCTransferState TransferState(TargetDivision, *ManagedPointer);
+    if (!TransferState) {
+      continue;
+    }
+
     HAKCIRBuilder.SetInsertPoint(TargetFunctionCall);
     CommonHAKCAnalysis::getWriter(DebugIsActive())
         << "Forward Argument Transfer with Arg: " << Arg << "\n";
-    auto ManagedPointer = CreateNewManagedPointer(&Arg);
-    HAKCTransferState TransferState(TargetDivision, *ManagedPointer);
     bool IsData = !Arg.getType()->isFunctionTy();
     for (auto &Preaction : ModuleAnalysis.GetCommonAnalysis()
                                .GetSystemInfo()

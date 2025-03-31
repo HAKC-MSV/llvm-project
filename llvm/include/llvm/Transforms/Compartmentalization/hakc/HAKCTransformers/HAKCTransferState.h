@@ -28,7 +28,9 @@ public:
 
   HAKCPointerBase &GetManagedPointer();
 
-  HAKC_Access_Token GetAccessToken();
+  HAKC_Access_Token GetAccessToken() const;
+
+  operator bool() const;
 
 protected:
   std::map<HAKCTransferAction, Value *> ActionValues;

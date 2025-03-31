@@ -59,6 +59,10 @@ public:
 
   bool IsFunctionType() const;
 
+  bool IsIgnoredType() const;
+
+  void SetIsIgnoredType(bool isIgnored);
+
 protected:
   std::map<unsigned, std::set<std::shared_ptr<HAKCTypeInfo>>> Members;
   unsigned SizeInBits;
@@ -66,6 +70,7 @@ protected:
   Type *LLVMType;
   std::string DbgTypeName;
   HAKCTypeP PointeeType;
+  bool IsIgnored;
 
   bool IsPointerToPointer(const DIType *DiType);
 

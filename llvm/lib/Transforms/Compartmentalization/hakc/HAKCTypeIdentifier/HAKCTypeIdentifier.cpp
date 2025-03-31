@@ -161,7 +161,7 @@ std::string hakc::HAKCTypeIdentifier::GetTypeName(const DIType *type) {
   return Name;
 }
 
-Type *hakc::HAKCTypeIdentifier::GetLLVMType(const DIType *Ty) {
+Type *hakc::HAKCTypeIdentifier::GetLLVMType(const DIType *Ty) const {
   auto &Ctx = GetModule().getContext();
   if (!Ty) {
     return Type::getVoidTy(Ctx);
@@ -1280,4 +1280,13 @@ Type *hakc::HAKCTypeIdentifier::GetTypeFromString(StringRef TypeStr) const {
   SMDiagnostic Err;
   auto *ParsedType = parseType(TypeStr, Err, GetModule());
   return ParsedType;
+}
+void hakc::HAKCTypeIdentifier::AddIgnoredType(StringRef TypeName) {
+  for (auto &it : types) {
+    auto TyName = GetTypeName(it.first);
+    if (TyName == TypeName) {
+      it.second->SetIsIgnoredType(true);
+      break;
+    }
+  }
 }

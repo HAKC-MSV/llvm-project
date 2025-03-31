@@ -13,8 +13,8 @@ namespace llvm::hakc {
 HAKCTypeInfo::HAKCTypeInfo(CommonHAKCAnalysis &Analysis, StringRef Name,
                            bool DebugActive)
     : HAKCInfo(Analysis, Name, DebugActive), Members(), SizeInBits(0),
-      DbgType(nullptr), LLVMType(nullptr), DbgTypeName(), PointeeType(nullptr) {
-}
+      DbgType(nullptr), LLVMType(nullptr), DbgTypeName(), PointeeType(nullptr),
+      IsIgnored(false) {}
 
 unsigned HAKCTypeInfo::GetSizeInBits() const {
   if (DbgType) {
@@ -22,6 +22,15 @@ unsigned HAKCTypeInfo::GetSizeInBits() const {
   }
   return 0;
 }
+
+bool HAKCTypeInfo::IsIgnoredType() const {
+  bool Result = IsIgnored;
+  if (!Result && PointeeType) {
+    Result = PointeeType->IsIgnoredType();
+  }
+  return Result;
+}
+void HAKCTypeInfo::SetIsIgnoredType(bool isIgnored) { IsIgnored = isIgnored; }
 
 ConstantInt *HAKCTypeInfo::GetSizeInBytes() const {
   unsigned SizeInBits = GetSizeInBits();

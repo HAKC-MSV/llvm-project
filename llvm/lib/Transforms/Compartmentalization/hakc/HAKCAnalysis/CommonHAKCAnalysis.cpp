@@ -425,15 +425,6 @@ bool CommonHAKCAnalysis::valueHasAttribute(Value *V, Attribute::AttrKind Kind) {
   return result;
 }
 
-bool CommonHAKCAnalysis::IsIgnoredType(Type *Ty) {
-  if (!Ty) {
-    return false;
-  }
-
-  auto Search = [Ty](Type *T) { return Ty == T; };
-  return llvm::any_of(SystemInfo.IgnoredTypes(), Search);
-}
-
 bool CommonHAKCAnalysis::IsIgnoredGlobal(Value *V) {
   bool Result = false;
   if (auto *GV = dyn_cast<GlobalVariable>(V)) {

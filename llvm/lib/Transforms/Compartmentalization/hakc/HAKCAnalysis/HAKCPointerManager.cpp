@@ -157,7 +157,7 @@ bool HAKCPointerManager::PointerIsEligibleForManagement(Use &U) const {
          !CommonHAKCAnalysis::IsKernelUserPointer(Pointer);
 }
 
-void HAKCPointerManager::ManageNewPointer(Use &U) {
+bool HAKCPointerManager::ManageNewPointer(Use &U) {
   auto *BaseDefinition = GetDef(U.get());
   if (!BaseDefinition) {
     CommonHAKCAnalysis::getWriter(true)
@@ -187,15 +187,22 @@ void HAKCPointerManager::ManageNewPointer(Use &U) {
     }
   }
 
-  auto NextID = CurrentPointerID++;
-  CommonHAKCAnalysis::getWriter(DebugActive)
-      << "Starting the management of pointer " << std::to_string(NextID)
-      << " with BaseDefinition " << BaseDefinition << "\n";
+  auto NextID = CurrentPointerID + 1;
 
   auto ManagedPointer =
       std::make_shared<ManagedHAKCPointer>(BaseDefinition, *this, NextID);
   HAKCAnalysis.GetModuleAnalysis().GetTypeIdentifier().FindType(
       *ManagedPointer);
+  if (ManagedPointer->GetType() && ManagedPointer->GetType()->IsIgnoredType()) {
+    CommonHAKCAnalysis::getWriter(DebugActive)
+        << "Ignoring pointer " << ManagedPointer
+        << " because its HAKCType is ignored\n";
+    return false;
+  }
+  CurrentPointerID++;
+  CommonHAKCAnalysis::getWriter(DebugActive)
+      << "Starting the management of pointer " << std::to_string(NextID)
+      << " with BaseDefinition " << BaseDefinition << "\n";
   ManagedPointersList.push_back(ManagedPointer);
   AnalyzedUses.clear();
   ClassifyAllUsesOfDefinition(ManagedPointer->GetBaseDefinition(),
@@ -206,6 +213,7 @@ void HAKCPointerManager::ManageNewPointer(Use &U) {
         << " with HAKCType " << *ManagedPointer->GetType();
   }
   CommonHAKCAnalysis::getWriter(DebugActive) << "\n";
+  return true;
 }
 
 bool HAKCPointerManager::UseIsAnalyzed(ManagedHAKCPointerUse &MangedPtrUse) {
@@ -216,7 +224,7 @@ bool HAKCPointerManager::UseIsAnalyzed(ManagedHAKCPointerUse &MangedPtrUse) {
   return llvm::any_of(AnalyzedUses, Search);
 }
 
-bool HAKCPointerManager::IsConstantExprUsedInKernelCall(User *U) {
+bool HAKCPointerManager::IsConstantExprUsedInKernelCall(User *U) const {
   bool Result = false;
   if (isa<ConstantExpr>(U)) {
     for (auto *ConstUser : U->users()) {
@@ -490,7 +498,7 @@ bool HAKCPointerManager::ManagePointer(Use &U) {
   } else {
     auto ManagedPointer = GetManagedPointer(U.get());
     if (!ManagedPointer) {
-      ManageNewPointer(U);
+      Result = ManageNewPointer(U);
     } else {
       Result = false;
     }
@@ -525,7 +533,7 @@ ManagedHAKCPointerP HAKCPointerManager::GetManagedPointer(Value *V) {
 
 bool HAKCPointerManager::empty() const { return ManagedPointersList.empty(); }
 
-Value *HAKCPointerManager::GetDef(Value *V) {
+Value *HAKCPointerManager::GetDef(Value *V) const {
   auto *BaseDefinition = GetFunctionAnalysis().getDef(V, false);
 
   if (isa<GlobalVariable>(BaseDefinition) &&
