@@ -16,7 +16,7 @@ def main():
     hakc_test_path = os.path.join("@LLVM_MAIN_SRC_DIR@", "test", "Transforms", "Compartmentalization", "hakc", "tests",
                                   args.test_name, f'{args.test_name}.c')
     hakc_config_path = os.path.join("@CMAKE_BINARY_DIR@", 'hakc-test', 'test-config.yml')
-    dag_root = os.path.join(os.path.dirname(hakc_config_path), 'hakc-dag-root')
+    dag_root = os.path.join(os.path.dirname(hakc_config_path), f'{args.test_name}', 'hakc-dag-root')
     socket_path = os.path.join(os.path.dirname(hakc_config_path), 'db-socket')
     db_dir = os.path.join(os.path.dirname(hakc_config_path), 'hakc-db')
     config = f"""

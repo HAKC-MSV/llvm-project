@@ -6,7 +6,7 @@ edges:
     persisted: true
     source: &id001 !HAKCFunction
       DefiningFile: @HAKC_TEST_DIR@/hakc_test5.c
-      DefiningLine: 14
+      DefiningLine: 9
       Name: foo
       is_function: true
       symbol_hash: c6d239b8155b41ac
@@ -27,7 +27,7 @@ edges:
     target: &id002 !HAKCCompilationUnit
       filename: @HAKC_TEST_DIR@/hakc_test5.c
   - key: DefinedIn
-    line: 14
+    line: 9
     persisted: true
     source: *id001
     target: *id002
@@ -37,9 +37,9 @@ edges:
     target: &id003 !HAKCFunction
       DefiningFile: null
       DefiningLine: null
-      Name: kmalloc
+      Name: kvmalloc_array
       is_function: true
-      symbol_hash: 4f422de1b7a07299
+      symbol_hash: 80a905cf9983f258
   - key: DirectCall
     persisted: true
     source: *id001

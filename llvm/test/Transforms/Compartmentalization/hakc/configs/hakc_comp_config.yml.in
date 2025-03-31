@@ -129,3 +129,5 @@ CompartmentalizationSupportFunctions:
       - { idx: 2, type: i64, arg-use: size }
 IgnoredTypes: [ "struct list_head", "struct proto", "struct atomic64_s", "struct atomic_s" ]
 NoTransferFunctions: [ "ftrace_stub" ]
+AllocationFunctions:
+  - { name: kvmalloc_array, type: MultiplyTwoArguments, arguments: [ 0,1 ] }

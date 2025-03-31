@@ -4,12 +4,12 @@
 // RUN: %HAKC_EVALUATE
 
 
-void *kmalloc(unsigned long size, unsigned int);
+void *kvmalloc_array(unsigned long size, unsigned int n);
 
 int foo() {
     int * mem; 
-    mem = (int *) kmalloc(2<<8, 0);
-    for(int i = 0; i < 2<<8; ++i){
+    mem = (int *) kvmalloc_array(sizeof(int), 4);
+    for(int i = 0; i < 4; ++i){
         *(mem + i) = (int) i;
     }
     return 0;
