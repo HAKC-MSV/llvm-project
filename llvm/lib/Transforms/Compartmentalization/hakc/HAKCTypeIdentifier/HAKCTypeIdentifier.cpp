@@ -1185,6 +1185,8 @@ void hakc::HAKCTypeIdentifier::ProcessDebugInfo() {
   FindTypesInFunctions();
   FindUsesInGlobals();
   FindUsesInFunctions();
+  // TODO: tictac
+  // FindStructManipulations();
 
   for (auto &it : types) {
     auto HAKCType = it.second;

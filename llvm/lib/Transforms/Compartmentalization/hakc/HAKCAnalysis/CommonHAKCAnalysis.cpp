@@ -454,6 +454,20 @@ bool CommonHAKCAnalysis::IsKernelUserPointer(Value *V) {
   return false;
 }
 
+// TODO: fix tictac
+// bool CommonHAKCAnalysis::functionIsEpochTransferCandidate(Function *f) {
+//   auto NoTransferFuncs = GetNoTransferFunctions();
+//   return NoTransferFuncs.find(f->getName()) == NoTransferFuncs.end() &&
+//       !f->isDeclaration() &&
+//       !isCapabilityReassignmentFunc(f) &&
+//       !FunctionIsComplexVariadic(f) &&
+//       !functionIsModParamGetCtx(f) &&
+//       (FunctionHasPointerArg(f) || f->getReturnType()->isPointerTy()) &&
+//       (!isOutsideTransferFunc(f) ||
+//       !f->hasFnAttribute(Attribute::InlineHint));
+// }
+
+
 bool CommonHAKCAnalysis::FunctionIsStatic(Function *F) {
   return Function::isLocalLinkage(F->getLinkage()) || F->isDeclaration();
 }

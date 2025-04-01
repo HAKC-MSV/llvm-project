@@ -184,6 +184,14 @@ public:
   bool IsIntrinsicNeedingCloning(CallBase *Call);
 
   bool IsIntrinsicToSkip(CallBase *Call);
+  // TicTac code
+  void AssignFunctionEpochs();
+
+  tictac_epoch_id_t GetEpoch(Value *V);
+  std::map<Type*, std::shared_ptr<TICTACEpoch>> function_epochs;
+  Value *AddEpochDataAuthCheckAtLocation(Value *signed_ptr, Instruction *location);
+  Value *AddEpochCodeAuthCheckAtLocation(Value *SignedPtr, Instruction *Location);
+
 };
 } // namespace llvm::hakc
 

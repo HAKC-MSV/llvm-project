@@ -61,6 +61,7 @@ protected:
   unsigned DefiningLine;
   const DIScope *LocalScope;
   SmallString<128> LocalScopeStr;
+  tictac_epoch_id_t current_epoch;
 
   void SetGlobalObj(GlobalObject *GlobalObj);
 

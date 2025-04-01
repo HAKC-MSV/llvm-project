@@ -160,6 +160,7 @@ public:
   static bool
   IsFunctionInFunctionList(Function *F,
                            iterator_range<FunctionList::iterator> Range);
+  static bool functionIsEpochTransferCandidate(Function *F);
 
   static bool
   IsFunctionInFunctionList(Function *F,

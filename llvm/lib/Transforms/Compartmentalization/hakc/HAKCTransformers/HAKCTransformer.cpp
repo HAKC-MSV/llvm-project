@@ -950,6 +950,7 @@ void hakc::HAKCTransformer::InitNewFunction(Function *F,
   HAKCIRBuilder.SetInsertPoint(EntryBB);
 }
 
+// TODO: fix tictac, need to add pre/post/epoch transfer functions here
 Function *
 hakc::HAKCTransformer::PopulateTransferFunction(Function *Target,
                                                 Function *TransferFunction) {
@@ -1028,6 +1029,266 @@ hakc::HAKCTransformer::PopulateTransferFunction(Function *Target,
 
   return TransferFunction;
 }
+//
+// TODO: tictac
+// void hakc::HAKCTransformerLinux::CreateEpochTransferFunctionArg_PostCall(Function *Target, Function *TransferFunction, Value *Arg) {
+//   auto applicableEpoch = GetApplicableEpoch(Target, Arg);
+//   if (!applicableEpoch) {
+//     return;
+//   }
+//   // Get the epoch that needs to be transferred...
+//   auto *Size = GetObjectSizeInBytes(Arg);
+//   if (!Size) {
+//     Size = GetDefaultObjectSize();
+//   }
+//   auto AddrSpace = GetPointerAddrSpace(Arg);
+//
+//   Value *Args[] = {
+//     HAKCIRBuilder.CreateBitCast(Arg, HAKCIRBuilder.getInt8PtrTy(AddrSpace)),
+//     applicableEpoch->GetNextEpochIDAsValue(getModule().getContext()),
+//     Size
+// };
+//   CreateCall(TICTACTagAddressName(), HAKCIRBuilder.getVoidTy(), Args);
+// }
+//
+//
+// std::vector<Value *> hakc::HAKCTransformerLinux::CreateEpochDataAuthArguments(Value *HAKCPointer, Instruction *I) {
+//   Function *F = I->getFunction();
+//   Value *HAKCPointerBitCast;
+//   auto Symbol = SystemInformation.findSymbol(F);
+//   auto pointerType = CommonHAKCAnalysis::GetStrippedTypeFromValue(HAKCPointer);
+//   tictac_epoch_id_t epoch_id;
+//   APInt offset(64, 0);
+//
+//   if (!Symbol) {
+//     CommonHAKCAnalysis::getWriter() << "Could not find symbol for function " << F->getName() << "\n";
+//     throw std::exception();
+//   }
+//   unsigned AddrSpace = GetPointerAddrSpace(HAKCPointer);
+//   if (auto epoch = SystemInformation.GetTypeEpoch(Symbol, pointerType)) {
+//     epoch_id = epoch->GetEpochID();
+//   } else {
+//     CommonHAKCAnalysis::getWriter() << "Couldn't find an epoch under that type for the target function.\n";
+//     CommonHAKCAnalysis::getWriter() << "\tType: ";
+//     pointerType->print(CommonHAKCAnalysis::getWriter());
+//     CommonHAKCAnalysis::getWriter() << "\n";
+//     epoch_id = KERNEL_EPOCH;
+//   }
+//
+//   auto *DataAuthFuncTy = GetHAKCDataAuthenticationFunctionType(AddrSpace);
+//   if (HAKCPointer->getType()->isIntegerTy()) {
+//     HAKCPointerBitCast = HAKCIRBuilder.CreateIntToPtr(HAKCPointer, DataAuthFuncTy->getParamType(0));
+//   } else {
+//     HAKCPointerBitCast = HAKCIRBuilder.CreateBitCast(HAKCPointer, DataAuthFuncTy->getParamType(0));
+//   }
+//
+//   HAKCPointer->stripAndAccumulateInBoundsConstantOffsets(getModule().getDataLayout(), offset);
+//   llvm::Value* constValue = llvm::ConstantInt::get(getModule().getContext(), offset);
+//
+//   return {HAKCPointerBitCast,
+//       GetHAKCCompartmentValue(getFunctionCompartmentID(F)),
+//       constValue
+//   };
+// }
+//
+// // The same as the normal one, since no color is involved in the function invocation.
+// std::vector<Value *> hakc::HAKCTransformerLinux::CreateEpochCodeAuthArguments(Value *HAKCPointer, Instruction *I) {
+//   Function *F = I->getFunction();
+//   auto *ExitTokens = GetValidTargetCompartments(F);
+//   auto Symbol = SystemInformation.findSymbol(F);
+//   if (!Symbol) {
+//     CommonHAKCAnalysis::getWriter() << "Could not find symbol for function " << F->getName() << "\n";
+//     throw std::exception();
+//   }
+//
+//   auto AccessToken = Symbol->getCompartment()->getAccessToken();
+//
+//   if (!ExitTokens->getValueType()->isArrayTy()) {
+//     CommonHAKCAnalysis::getWriter() << "Invalid ExitToken Type (";
+//     ExitTokens->getValueType()->print(CommonHAKCAnalysis::getWriter());
+//     CommonHAKCAnalysis::getWriter() << ") for ";
+//     ExitTokens->print(CommonHAKCAnalysis::getWriter());
+//     CommonHAKCAnalysis::getWriter() << "\n";
+//     throw std::exception();
+//   }
+//   Value *FirstExitToken = HAKCIRBuilder.CreateGEP(ExitTokens->getValueType(),
+//                                                   ExitTokens, {
+//                                                           HAKCIRBuilder.getInt64(0), HAKCIRBuilder.getInt64(0)
+//                                                   });
+//   unsigned AddrSpace = GetPointerAddrSpace(FirstExitToken);
+//   Value *IndirectCallTarget = HAKCIRBuilder.CreateBitCast(HAKCPointer, HAKCIRBuilder.getInt8PtrTy(AddrSpace));
+//   return {
+//     IndirectCallTarget,
+//     GetHAKCCompartmentValue(getFunctionCompartmentID(F)),
+//     HAKCIRBuilder.getInt64(AccessToken),
+//     FirstExitToken,
+//     HAKCIRBuilder.getInt64(ExitTokens->getType()->getPointerElementType()->getArrayNumElements())
+// };
+// }
+//
+// // For now we're assuming that we're only calling this for hte "start" functions
+// std::vector<Value *>
+// hakc::HAKCTransformerLinux::CreateEpochTransitionArguments(Value *HAKCPointer, GlobalValue *Target, bool IsData, ConstantInt *Size) {
+//   std::vector<Value *> FullArgSet;
+//   Value *OperandCast;
+//   auto AddrSpace = GetPointerAddrSpace(HAKCPointer);
+//   bool isPerCPU = CommonHAKCAnalysis::isPerCPUPointer(HAKCPointer);
+//   auto Symbol = SystemInformation.findSymbol(Target);
+//   auto pointerType = CommonHAKCAnalysis::GetStrippedTypeFromValue(HAKCPointer);
+//   hakc_compartment_id_t CompartmentID;
+//   tictac_epoch_id_t epoch_id;
+//   if (Symbol) {
+//     if (auto epoch = SystemInformation.GetTypeEpoch(Symbol, pointerType)) {
+//       epoch_id = epoch->GetEpochID();
+//     } else {
+//       CommonHAKCAnalysis::getWriter() << "Couldn't find an epoch under that type for the target function.\n";
+//       CommonHAKCAnalysis::getWriter() << "\tType: ";
+//       pointerType->print(CommonHAKCAnalysis::getWriter());
+//       CommonHAKCAnalysis::getWriter() << "\n";
+//       CommonHAKCAnalysis::getWriter() << "\tTarget function: ";
+//       CommonHAKCAnalysis::PrettyPrintValue(Target, CommonHAKCAnalysis::getWriter());
+//       CommonHAKCAnalysis::getWriter() << "\n";
+//       CommonHAKCAnalysis::getWriter() << "Setting the default epoch.\n";
+//       epoch_id = KERNEL_EPOCH;
+//     }
+//     CompartmentID = Symbol->getCompartmentID();
+//   } else {
+//     epoch_id = KERNEL_EPOCH;
+//     CompartmentID = KERNEL_COMPARTMENT;
+//   }
+//
+//   OperandCast = HAKCIRBuilder.CreateBitOrPointerCast(HAKCPointer, HAKCIRBuilder.getInt8PtrTy(AddrSpace));
+//   FullArgSet.push_back(OperandCast);
+//   FullArgSet.push_back(Size);
+//   FullArgSet.push_back(GetHAKCCompartmentValue(CompartmentID));
+//   //FullArgSet.push_back(epoch_id);
+//   if (!isPerCPU) {
+//     FullArgSet.push_back(IsData ? getFalse() : getTrue());
+//   }
+//   return FullArgSet;
+// }
+
+// Value *hakc::HAKCTransformer::CreateEpochDataAuthentication(Value *HAKCPointer, Instruction *I) {
+//   ValidateHAKCPointerAndLocation(HAKCPointer, I);
+//
+//   if (isa<PHINode>(I)) {
+//     CommonHAKCAnalysis::getWriter() << "Trying to insert epoch data auth check at ";
+//     I->print(CommonHAKCAnalysis::getWriter());
+//     CommonHAKCAnalysis::getWriter() << " for ";
+//     HAKCPointer->print(CommonHAKCAnalysis::getWriter());
+//     CommonHAKCAnalysis::getWriter() << "\n";
+//     I->getFunction()->print(CommonHAKCAnalysis::getWriter());
+//     throw std::exception();
+//   }
+//
+//   Value *HAKCPointerBitCast;
+//   unsigned AddrSpace = GetPointerAddrSpace(HAKCPointer);
+//   auto *DataAuthFuncTy = GetHAKCDataAuthenticationFunctionType(AddrSpace);
+//   auto Args = CreateEpochDataAuthArguments(HAKCPointer, I);
+//   for (unsigned i = 0; i < DataAuthFuncTy->getNumParams(); i++) {
+//     if (Args[i]->getType() != DataAuthFuncTy->getParamType(i)) {
+//       CommonHAKCAnalysis::getWriter() << "Types do not match at index " << std::to_string(i) << "\n";
+//       DataAuthFuncTy->print(CommonHAKCAnalysis::getWriter());
+//       CommonHAKCAnalysis::getWriter() << "\n";
+//       Args[i]->print(CommonHAKCAnalysis::getWriter());
+//       CommonHAKCAnalysis::getWriter() << "\n";
+//       throw std::exception();
+//     }
+//   }
+//
+//   auto *DataAuthCall = CreateCall(HAKCAnalysis->TICTACDataAuthenticationName(), DataAuthFuncTy->getReturnType(), Args);
+//
+//   if (HAKCPointer->getType()->isIntegerTy()) {
+//     HAKCPointerBitCast = HAKCIRBuilder.CreatePtrToInt(DataAuthCall, HAKCPointer->getType());
+//   } else {
+//     HAKCPointerBitCast = HAKCIRBuilder.CreateBitCast(DataAuthCall, HAKCPointer->getType());
+//   }
+//
+//   return HAKCPointerBitCast;
+// }
+//
+//
+// Value *hakc::HAKCTransformer::CreateEpochCodeAuthentication(Value *HAKCPointer, Instruction *I) {
+//   ValidateHAKCPointerAndLocation(HAKCPointer, I);
+//   auto AddrSpace = GetPointerAddrSpace(HAKCPointer);
+//
+//   auto Args = CreateCodeAuthArguments(HAKCPointer, I);
+//   auto *AuthResult = CreateCall(HAKCAnalysis->TICTACCodeAuthenticationName(), HAKCAuthenticationRetType(AddrSpace),
+//                                 Args);
+//   return HAKCIRBuilder.CreateBitCast(AuthResult, HAKCPointer->getType());
+// }
+//
+// // This should be used only for epoch transitions.
+// Instruction *
+// hakc::HAKCTransformer::CreateSizedEpochTransition(Value *HAKCPointer, Instruction *I, GlobalValue *Target,
+//                                                       bool IsData,
+//                                                       ConstantInt *Size) {
+//   ValidateHAKCPointerAndLocation(HAKCPointer, I);
+//   Instruction *Transfer;
+//   if (TargetIsKernel(Target)) {
+//     auto *V = CreateSafePointer(HAKCPointer, &*HAKCIRBuilder.GetInsertPoint());
+//     auto *SafePtr = dyn_cast<Instruction>(V);
+//     if (!SafePtr) {
+//       CommonHAKCAnalysis::getWriter() << "Unexpected Safe Pointer Type: ";
+//       V->print(CommonHAKCAnalysis::getWriter());
+//       CommonHAKCAnalysis::getWriter() << "\n";
+//       throw std::exception();
+//     }
+//     return SafePtr;
+//   }
+//
+//   Transfer = CreateDefaultEpochTransition(HAKCPointer, I, Target, IsData, Size);
+//
+//   return Transfer;
+// }
+//
+//
+// Instruction *
+// hakc::HAKCTransformer::CreateSignWithEpoch(Value *HAKCPointer, Instruction *I, GlobalValue *Target, bool IsData) {
+//   ValidateHAKCPointerAndLocation(HAKCPointer, I);
+//   auto AddrSpace = GetPointerAddrSpace(HAKCPointer);
+//
+//   hakc_compartment_id_t CompartmentID;
+//   if (auto *GV = dyn_cast<GlobalValue>(HAKCPointer)) {
+//     CompartmentID = getSymbolCompartmentID(GV);
+//   } else {
+//     CompartmentID = getSymbolCompartmentID(Target);
+//   }
+//
+//   auto *CompartmentIDValue = GetHAKCCompartmentValue(CompartmentID);
+//   auto *IsCodeValue = HAKCIRBuilder.getInt1(!IsData);
+//   auto *OperandCast = HAKCIRBuilder.CreateBitCast(HAKCPointer, HAKCIRBuilder.getInt8PtrTy(AddrSpace));
+//   SmallVector<Value *> Args = {
+//     OperandCast, CompartmentIDValue, IsCodeValue
+// };
+//   return CreateCallWithResultCast(HAKCAnalysis->TICTACSignWithEpochName(), HAKCAuthenticationRetType(AddrSpace),
+//                                   Args, HAKCPointer);
+// }
+//
+// Instruction* hakc::HAKCTransformer::CreateDefaultEpochTransition(Value *HAKCPointer, Instruction *I, GlobalValue *Target,
+//                                                       bool IsData,
+//                                                       ConstantInt *Size) {
+//   auto FullArgSet = CreateEpochTransitionArguments(HAKCPointer, Target, IsData, Size);
+//   auto AddrSpace = GetPointerAddrSpace(HAKCPointer);
+//   bool IsPerCPU = CommonHAKCAnalysis::isPerCPUPointer(HAKCPointer);
+//
+//   StringRef FunctionToCall;
+//   if (IsPerCPU) {
+//     FunctionToCall = HAKCAnalysis->TICTACEpochChangePerCPUName();
+//   } else {
+//     FunctionToCall = HAKCAnalysis->TICTACEpochChangeName();
+//   }
+//
+//   return CreateCallWithResultCast(FunctionToCall, HAKCAuthenticationRetType(AddrSpace), FullArgSet, HAKCPointer);
+// }
+// bool hakc::HAKCTransformer::ArgShouldBeRetagged(Function *F, Value *val) {
+//   if (DebugIsActive()) {
+//     CommonHAKCAnalysis::getWriter() << "Argument should be retagged for function ";
+//     CommonHAKCAnalysis::getWriter() << F->getName().str() << "\n";
+//   }
+//   return (GetApplicableEpoch(F, val) == nullptr) ? false : true;
+// }
+
 
 Function *
 hakc::HAKCTransformer::CreateNonVariadicTransferFunction(Function *F) {
@@ -1046,6 +1307,29 @@ hakc::HAKCTransformer::CreateNonVariadicTransferFunction(Function *F) {
 
   return PopulateTransferFunction(F, TransferFunction);
 }
+// if (doEpochTransfer) {
+//   if (!TransferFunction->empty() || !HAKCAnalysis->EpochAliasShouldBeCreated(F)) {
+//     CommonHAKCAnalysis::getWriter() << "Epoch transfer short circuiting for " << F->getName().str() << "\n";
+//     return TransferFunction;
+//   }
+// } else {
+//   if (!TransferFunction->empty() || !HAKCAnalysis->TransferFunctionShouldBeCreated(F)) {
+//     CommonHAKCAnalysis::getWriter() << "Non epoch transfer short circuiting for " << F->getName().str() << "\n";;
+//     return TransferFunction;
+//   }
+
+// std::shared_ptr<hakc::TICTACEpoch> hakc::HAKCTransformer::GetApplicableEpoch(Function *F, Value *Val) {
+//   auto symbol = getSystemInformation().findSymbol(F);
+//   auto epochs = getSystemInformation().getApplicableEpochs(symbol);
+//   for (auto epoch : epochs) {
+//     auto *valTy = CommonHAKCAnalysis::StripType(Val->getType());
+//     if (epoch->getType() == valTy) {
+//       return epoch;
+//     }
+//   }
+//   return nullptr;
+// }
+//
 
 Value *hakc::HAKCTransformer::CreateBitCast(hakc::HAKCPointerBase &HAKCPointer,
                                             Type *TargetType, Instruction *I) {

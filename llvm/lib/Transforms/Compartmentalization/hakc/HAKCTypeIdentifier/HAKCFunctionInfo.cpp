@@ -69,4 +69,34 @@ namespace llvm::hakc {
         }
         return Yaml;
     }
+// if (!ReadStructs.empty()) {
+//   sstream << "\n";
+//   sstream.indent(Indents + EntrySpaces()) << "ReadsStructs:\n";
+//   for (auto pair : ReadStructs) {
+//     sstream.indent(Indents + HAKCInfo::IndentSpaces()) << "- \n";
+//     sstream.indent(Indents + (HAKCInfo::IndentSpaces() + 2)) << "Offset: " << pair.second << "\n";
+//     sstream.indent(Indents + (HAKCInfo::IndentSpaces() + 2)) << "Type:\n";
+//     sstream.indent(Indents + (HAKCInfo::IndentSpaces() + 4))<< pair.first->GetYamlHeader(Indents + HAKCInfo::IndentSpaces() + 2);
+//     sstream << "\n";
+//   }
+// }
+// if (!WrittenStructs.empty()) {
+//   sstream << "\n";
+//   sstream.indent(Indents + EntrySpaces()) << "WritesStructs:\n";
+//   for (auto pair : WrittenStructs) {
+//     sstream.indent(Indents + HAKCInfo::IndentSpaces()) << "- \n";
+//     sstream.indent(Indents + (HAKCInfo::IndentSpaces() + 2)) << "Offset: " << pair.second << "\n";
+//     sstream.indent(Indents + (HAKCInfo::IndentSpaces() + 2)) << "Type:\n";
+//     sstream.indent(Indents + (HAKCInfo::IndentSpaces() + 4)) << pair.first->GetYamlHeader(Indents + HAKCInfo::IndentSpaces() + 2);
+//     sstream << "\n";
+//   }
+// }
+//
+// void HAKCFunctionInfo::setReadStructs(std::set<std::pair<std::shared_ptr<hakc::HAKCTypeInfo>, int64_t>> read) {
+//       ReadStructs = read;
+//     }
+//
+// void HAKCFunctionInfo::setWrittenStructs(std::set<std::pair<std::shared_ptr<hakc::HAKCTypeInfo>, int64_t>> write) {
+//       WrittenStructs = write;
+//     }
 } // hakc

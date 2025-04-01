@@ -50,10 +50,15 @@ namespace llvm::hakc {
 
         ConstantInt *GetDivisionIdIdx() const;
 
+        int GetEpochIdx() const;
+
+        bool HasEpochIdx() const;
+
         iterator_range<SmallVector<HAKCFunctionArgumentDefinition>::iterator> Args();
 
     protected:
         Function *F;
+        int EpochIdx;
         SmallVector<HAKCFunctionArgumentDefinition> ArgList;
 
         bool GetArgIdxByUse(HAKCFunctionArgumentUse Use, unsigned *Idx) const;

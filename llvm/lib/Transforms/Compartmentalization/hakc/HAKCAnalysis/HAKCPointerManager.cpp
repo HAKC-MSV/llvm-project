@@ -831,7 +831,7 @@ Value *HAKCPointerManager::CreateAuthenticationAtLocation(
       << "Adding Authenticated Pointer for " << *ManagedPointer
       << " with HAKCType " << *ManagedPointer->GetType() << "\n"
       << " at " << *InsertLocation << "\n";
-
+  // TODO: insert tictac check here (maybe)
   if (CommonHAKCAnalysis::PointerShouldBeConsideredCode(*ManagedPointer)) {
     CodeAuthenticationsAdded++;
     return GetFunctionAnalysis().AddCodeAuthCheckAtLocation(Pointer,

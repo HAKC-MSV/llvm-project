@@ -32,6 +32,8 @@ typedef SmallVector<llvm::hakc::pre_transfer_action_def_t>
     HAKCPreTransferActionList;
 typedef SmallVector<llvm::hakc::post_target_action_def_t>
     HAKCPostTargetActionList;
+typedef std::vector<std::shared_ptr<TICTACEpoch>> epoch_vec_t;
+typedef std::map<std::shared_ptr<HAKCSymbol>, epoch_vec_t> symbol_epoch_map_t;
 
 namespace llvm::hakc {
 class CommonHAKCAnalysis;
@@ -124,6 +126,10 @@ public:
   iterator_range<HAKCPreTransferActionList::iterator> PreTransferActions();
 
   iterator_range<HAKCPostTargetActionList::iterator> PostTargetActions();
+
+  epoch_vec_t getApplicableEpochs(std::shared_ptr<HAKCSymbol> sym);
+
+  symbol_epoch_map_t getEpochs();
 
 protected:
   CommonHAKCAnalysis &CommonAnalysis;
