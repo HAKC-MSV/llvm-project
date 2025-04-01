@@ -15,12 +15,12 @@ struct data {
 void init_data(struct data *data) {
 // CHECK: call ptr @check_hakc_data_access(ptr %0, i64 1, i64 73728)
     data->data = 0;
-// CHECK-NOT: call ptr @check_hakc_data_access
+// CHECK: store ptr %list, ptr %7
     data->list.next = &data->list;
 }
 
 // CHECK-LABEL: void @HAKC_XFER_init_data(ptr noundef %0)
 // CHECK: call i32 @get_hakc_address_color(ptr %0)
-// CHECK: call ptr @hakc_transfer_to_clique(ptr %0, i64 128, i64 1, i64 13, i1 false)
+// CHECK: call ptr @hakc_transfer_to_clique(ptr %0, i64 16, i64 1, i64 13, i1 false)
 // CHECK: call void @HAKC_ORIG_init_data(ptr %2)
-// CHECK: call void @hakc_color_address(ptr %0, i32 %1, i64 128)
+// CHECK: call void @hakc_color_address(ptr %0, i32 %1, i64 16)

@@ -161,7 +161,7 @@ std::string hakc::HAKCTypeIdentifier::GetTypeName(const DIType *type) {
   return Name;
 }
 
-Type *hakc::HAKCTypeIdentifier::GetLLVMType(const DIType *Ty) {
+Type *hakc::HAKCTypeIdentifier::GetLLVMType(const DIType *Ty) const {
   auto &Ctx = GetModule().getContext();
   if (!Ty) {
     return Type::getVoidTy(Ctx);
@@ -871,12 +871,20 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCTypeForUse(Use &U) {
             dyn_cast<DISubroutineType>(CallTy->GetDbgType()), U.getOperandNo());
       }
     }
-  } else if (isa<AllocaInst>(U.get()) && isa<LoadInst>(U.getUser())) {
+  } else if (isa<LoadInst>(U.getUser())) {
     Result = FindHAKCType(U.getUser());
   } else if (auto *GEPI = dyn_cast<GetElementPtrInst>(U.getUser())) {
     auto BaseType = FindType(GEPI->getSourceElementType());
     if (BaseType) {
       Result = FindPointerType(BaseType);
+    }
+  } else if (auto *StoreI = dyn_cast<StoreInst>(U.getUser())) {
+    Result = FindHAKCType(
+        StoreI->getOperand((U.getOperandNo() + 1) % StoreI->getNumOperands()));
+    if (Result) {
+      CommonHAKCAnalysis::getWriter(
+          AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+          << "Found " << *Result << " for " << U.get() << "\n";
     }
   }
 
@@ -885,6 +893,10 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCTypeForUse(Use &U) {
 
 hakc::HAKCTypeP
 hakc::HAKCTypeIdentifier::FindPointerType(const HAKCTypeP &BaseType) {
+  if (!BaseType) {
+    CommonHAKCAnalysis::getWriter(true) << "BaseType is null\n";
+    throw std::exception();
+  }
   for (auto &It : types) {
     auto *DebugType = It.first;
     if (DebugType->getTag() == dwarf::DW_TAG_pointer_type) {
@@ -1270,4 +1282,13 @@ Type *hakc::HAKCTypeIdentifier::GetTypeFromString(StringRef TypeStr) const {
   SMDiagnostic Err;
   auto *ParsedType = parseType(TypeStr, Err, GetModule());
   return ParsedType;
+}
+void hakc::HAKCTypeIdentifier::AddIgnoredType(StringRef TypeName) {
+  for (auto &it : types) {
+    auto TyName = GetTypeName(it.first);
+    if (TyName == TypeName) {
+      it.second->SetIsIgnoredType(true);
+      break;
+    }
+  }
 }

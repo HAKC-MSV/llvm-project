@@ -57,7 +57,7 @@ HAKCSystemInformation::HAKCSystemInformation(CommonHAKCAnalysis &CommonAnalysis)
       PerCPUCompartmentTransfer(nullptr),
       CompartmentalizationSupportFunctionList(), SymbolsToOutputDebugInfo(),
       SeparateNamespacePathList(), HAKCSourcePathList(),
-      SafeTransitionFunctionList(), IgnoredTypeSet(), IgnoredGlobalList(),
+      SafeTransitionFunctionList(), IgnoredGlobalList(),
       AllocationFunctionList(), CustomTransferList(), PreTransferActionList(),
       PostTargetActionList() {}
 
@@ -234,10 +234,7 @@ void HAKCSystemInformation::operator<<(HAKCYamlConfig &YamlConfig) {
   SignWithDivisionFunction =
       CreateHAKCFunction(YamlConfig.SignWithDivision, TypeIdentifier);
   for (auto &StructName : YamlConfig.IgnoredTypes) {
-    auto *Ty = StructType::getTypeByName(GetModule().getContext(), StructName);
-    if (Ty) {
-      IgnoredTypeSet.insert(Ty);
-    }
+    TypeIdentifier.AddIgnoredType(StructName);
   }
 
   for (auto &CustomTransferDefinition : YamlConfig.CustomTransferFunctions) {
@@ -355,11 +352,6 @@ iterator_range<FunctionList::iterator>
 HAKCSystemInformation::SafeTransitionFunctions() {
   return make_range(SafeTransitionFunctionList.begin(),
                     SafeTransitionFunctionList.end());
-}
-
-iterator_range<HAKCTypeSet::iterator>
-HAKCSystemInformation::IgnoredTypes() const {
-  return make_range(IgnoredTypeSet.begin(), IgnoredTypeSet.end());
 }
 
 iterator_range<HAKCGlobalVariableList::iterator>

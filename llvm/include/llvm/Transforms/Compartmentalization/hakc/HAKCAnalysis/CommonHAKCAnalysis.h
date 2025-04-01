@@ -106,8 +106,6 @@ public:
 
   static bool isRegisterRead(Value *v);
 
-  bool IsIgnoredType(Type *Ty);
-
   bool IsIgnoredGlobal(Value *V);
 
   static bool

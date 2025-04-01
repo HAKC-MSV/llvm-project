@@ -52,6 +52,8 @@ public:
 
   Type *GetTypeFromString(StringRef TypeStr) const;
 
+  void AddIgnoredType(StringRef TypeName);
+
 protected:
   HAKCTypeP FindType(Type *Ty);
 
@@ -124,7 +126,7 @@ protected:
 
   FunctionType *GetLLVMFunctionTy(const DISubroutineType *FunctionTy);
 
-  Type *GetLLVMType(const DIType *);
+  Type *GetLLVMType(const DIType *) const;
 
   CommonHAKCAnalysis &AnalysisHelper;
   DebugInfoFinder DbgInfoFinder;

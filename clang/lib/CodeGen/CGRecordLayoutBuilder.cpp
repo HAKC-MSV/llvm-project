@@ -84,12 +84,12 @@ struct CGRecordLowering {
     };
     MemberInfo(CharUnits Offset, InfoKind Kind, llvm::Type *Data,
                const FieldDecl *FD = nullptr)
-      : Offset(Offset), Kind(Kind), Data(Data), FD(FD) {}
+        : Offset(Offset), Kind(Kind), Data(Data), FD(FD) {}
     MemberInfo(CharUnits Offset, InfoKind Kind, llvm::Type *Data,
                const CXXRecordDecl *RD)
-      : Offset(Offset), Kind(Kind), Data(Data), RD(RD) {}
+        : Offset(Offset), Kind(Kind), Data(Data), RD(RD) {}
     // MemberInfos are sorted so we define a < operator.
-    bool operator <(const MemberInfo& a) const { return Offset < a.Offset; }
+    bool operator<(const MemberInfo &a) const { return Offset < a.Offset; }
   };
   // The constructor.
   CGRecordLowering(CodeGenTypes &Types, const RecordDecl *D, bool Packed);
@@ -139,17 +139,20 @@ struct CGRecordLowering {
   llvm::Type *getByteArrayType(CharUnits NumChars) const {
     assert(!NumChars.isZero() && "Empty byte arrays aren't allowed.");
     llvm::Type *Type = getCharType();
-    return NumChars == CharUnits::One() ? Type :
-        (llvm::Type *)llvm::ArrayType::get(Type, NumChars.getQuantity());
+    return NumChars == CharUnits::One() ? Type
+                                        : (llvm::Type *)llvm::ArrayType::get(
+                                              Type, NumChars.getQuantity());
   }
   /// Gets the storage type for a field decl and handles storage
   /// for itanium bitfields that are smaller than their declared type.
   llvm::Type *getStorageType(const FieldDecl *FD) const {
     llvm::Type *Type = Types.ConvertTypeForMem(FD->getType());
-    if (!FD->isBitField()) return Type;
-    if (isDiscreteBitFieldABI()) return Type;
+    if (!FD->isBitField())
+      return Type;
+    if (isDiscreteBitFieldABI())
+      return Type;
     return getIntNType(std::min(FD->getBitWidthValue(Context),
-                             (unsigned)Context.toBits(getSize(Type))));
+                                (unsigned)Context.toBits(getSize(Type))));
   }
   /// Gets the llvm Basesubobject type from a CXXRecordDecl.
   llvm::Type *getStorageType(const CXXRecordDecl *RD) const {
@@ -223,11 +226,12 @@ struct CGRecordLowering {
   bool IsZeroInitializable : 1;
   bool IsZeroInitializableAsBase : 1;
   bool Packed : 1;
+
 private:
   CGRecordLowering(const CGRecordLowering &) = delete;
-  void operator =(const CGRecordLowering &) = delete;
+  void operator=(const CGRecordLowering &) = delete;
 };
-} // namespace {
+} // namespace
 
 CGRecordLowering::CGRecordLowering(CodeGenTypes &Types, const RecordDecl *D,
                                    bool Packed)
@@ -237,8 +241,9 @@ CGRecordLowering::CGRecordLowering(CodeGenTypes &Types, const RecordDecl *D,
       DataLayout(Types.getDataLayout()), IsZeroInitializable(true),
       IsZeroInitializableAsBase(true), Packed(Packed) {}
 
-void CGRecordLowering::setBitFieldInfo(
-    const FieldDecl *FD, CharUnits StartOffset, llvm::Type *StorageType) {
+void CGRecordLowering::setBitFieldInfo(const FieldDecl *FD,
+                                       CharUnits StartOffset,
+                                       llvm::Type *StorageType) {
   CGBitFieldInfo &Info = BitFields[FD->getCanonicalDecl()];
   Info.IsSigned = FD->getType()->isSignedIntegerOrEnumerationType();
   Info.Offset = (unsigned)(getFieldBitOffset(FD) - Context.toBits(StartOffset));
@@ -352,10 +357,9 @@ void CGRecordLowering::lowerUnion(bool isNoUniqueAddress) {
     if (!IsZeroInitializable)
       continue;
     // Conditionally update our storage type if we've got a new "better" one.
-    if (!StorageType ||
-        getAlignment(FieldType) >  getAlignment(StorageType) ||
+    if (!StorageType || getAlignment(FieldType) > getAlignment(StorageType) ||
         (getAlignment(FieldType) == getAlignment(StorageType) &&
-        getSize(FieldType) > getSize(StorageType)))
+         getSize(FieldType) > getSize(StorageType)))
       StorageType = FieldType;
   }
   // If we have no storage type just pad to the appropriate size and return.
@@ -735,7 +739,8 @@ void CGRecordLowering::accumulateBases() {
     if (!isEmptyRecordForLayout(Context, Base.getType()) &&
         !Context.getASTRecordLayout(BaseDecl).getNonVirtualSize().isZero())
       Members.push_back(MemberInfo(Layout.getBaseClassOffset(BaseDecl),
-          MemberInfo::Base, getStorageType(BaseDecl), BaseDecl));
+                                   MemberInfo::Base, getStorageType(BaseDecl),
+                                   BaseDecl));
   }
 }
 
@@ -886,8 +891,8 @@ CGRecordLowering::calculateTailClippingOffset(bool isNonVirtualBaseType) const {
       // get its own storage location but instead lives inside of that base.
       if (Context.isNearlyEmpty(BaseDecl) && !hasOwnStorage(RD, BaseDecl))
         continue;
-      ScissorOffset = std::min(ScissorOffset,
-                               Layout.getVBaseClassOffset(BaseDecl));
+      ScissorOffset =
+          std::min(ScissorOffset, Layout.getVBaseClassOffset(BaseDecl));
     }
 
   return ScissorOffset;
@@ -901,17 +906,16 @@ void CGRecordLowering::accumulateVBases() {
     CharUnits Offset = Layout.getVBaseClassOffset(BaseDecl);
     // If the vbase is a primary virtual base of some base, then it doesn't
     // get its own storage location but instead lives inside of that base.
-    if (isOverlappingVBaseABI() &&
-        Context.isNearlyEmpty(BaseDecl) &&
+    if (isOverlappingVBaseABI() && Context.isNearlyEmpty(BaseDecl) &&
         !hasOwnStorage(RD, BaseDecl)) {
-      Members.push_back(MemberInfo(Offset, MemberInfo::VBase, nullptr,
-                                   BaseDecl));
+      Members.push_back(
+          MemberInfo(Offset, MemberInfo::VBase, nullptr, BaseDecl));
       continue;
     }
     // If we've got a vtordisp, add it as a storage type.
     if (Layout.getVBaseOffsetsMap().find(BaseDecl)->second.hasVtorDisp())
-      Members.push_back(StorageInfo(Offset - CharUnits::fromQuantity(4),
-                                    getIntNType(32)));
+      Members.push_back(
+          StorageInfo(Offset - CharUnits::fromQuantity(4), getIntNType(32)));
     Members.push_back(MemberInfo(Offset, MemberInfo::VBase,
                                  getStorageType(BaseDecl), BaseDecl));
   }
@@ -1000,7 +1004,7 @@ void CGRecordLowering::determinePacked(bool NVBaseType) {
 }
 
 void CGRecordLowering::insertPadding() {
-  std::vector<std::pair<CharUnits, CharUnits> > Padding;
+  std::vector<std::pair<CharUnits, CharUnits>> Padding;
   CharUnits Size = CharUnits::Zero();
   for (std::vector<MemberInfo>::const_iterator Member = Members.begin(),
                                                MemberEnd = Members.end();
@@ -1018,9 +1022,10 @@ void CGRecordLowering::insertPadding() {
   if (Padding.empty())
     return;
   // Add the padding to the Members list and sort it.
-  for (std::vector<std::pair<CharUnits, CharUnits> >::const_iterator
-        Pad = Padding.begin(), PadEnd = Padding.end();
-        Pad != PadEnd; ++Pad)
+  for (std::vector<std::pair<CharUnits, CharUnits>>::const_iterator
+           Pad = Padding.begin(),
+           PadEnd = Padding.end();
+       Pad != PadEnd; ++Pad)
     Members.push_back(StorageInfo(Pad->first, getByteArrayType(Pad->second)));
   llvm::stable_sort(Members);
 }
@@ -1045,16 +1050,15 @@ void CGRecordLowering::fillOutputFields() {
 }
 
 CGBitFieldInfo CGBitFieldInfo::MakeInfo(CodeGenTypes &Types,
-                                        const FieldDecl *FD,
-                                        uint64_t Offset, uint64_t Size,
-                                        uint64_t StorageSize,
+                                        const FieldDecl *FD, uint64_t Offset,
+                                        uint64_t Size, uint64_t StorageSize,
                                         CharUnits StorageOffset) {
   // This function is vestigial from CGRecordLayoutBuilder days but is still
   // used in GCObjCRuntime.cpp.  That usage has a "fixme" attached to it that
   // when addressed will allow for the removal of this function.
   llvm::Type *Ty = Types.ConvertTypeForMem(FD->getType());
   CharUnits TypeSizeInBytes =
-    CharUnits::fromQuantity(Types.getDataLayout().getTypeAllocSize(Ty));
+      CharUnits::fromQuantity(Types.getDataLayout().getTypeAllocSize(Ty));
   uint64_t TypeSizeInBits = Types.getContext().toBits(TypeSizeInBytes);
 
   bool IsSigned = FD->getType()->isSignedIntegerOrEnumerationType();
@@ -1110,6 +1114,16 @@ CodeGenTypes::ComputeRecordLayout(const RecordDecl *D, llvm::StructType *Ty) {
   // signifies that the type is no longer opaque and record layout is complete,
   // but we may need to recursively layout D while laying D out as a base type.
   Ty->setBody(Builder.FieldTypes, Builder.Packed);
+  unsigned Idx = 0;
+  // DM: This was in a patch but I don't know what it is for
+  // for (auto *field : D->fields()) {
+  //   if (field->hasAttrs()) {
+  //     Attr *attr = *field->attr_begin();
+  //     auto lAttr = llvm::Attribute::getAttrKindFromName(attr->getSpelling());
+  //     Ty->setIndexAttr(Idx, lAttr);
+  //   }
+  //   Idx++;
+  // }
 
   auto RL = std::make_unique<CGRecordLayout>(
       Ty, BaseTy, (bool)Builder.IsZeroInitializable,
@@ -1142,13 +1156,13 @@ CodeGenTypes::ComputeRecordLayout(const RecordDecl *D, llvm::StructType *Ty) {
          "Type size mismatch!");
 
   if (BaseTy) {
-    CharUnits NonVirtualSize  = Layout.getNonVirtualSize();
+    CharUnits NonVirtualSize = Layout.getNonVirtualSize();
 
     uint64_t AlignedNonVirtualTypeSizeInBits =
-      getContext().toBits(NonVirtualSize);
+        getContext().toBits(NonVirtualSize);
 
     assert(AlignedNonVirtualTypeSizeInBits ==
-           getDataLayout().getTypeAllocSizeInBits(BaseTy) &&
+               getDataLayout().getTypeAllocSizeInBits(BaseTy) &&
            "Type size mismatch!");
   }
 
@@ -1191,7 +1205,7 @@ CodeGenTypes::ComputeRecordLayout(const RecordDecl *D, llvm::StructType *Ty) {
       // "starts" at the back.
       if (getDataLayout().isBigEndian())
         assert(static_cast<unsigned>(Info.Offset + Info.Size) ==
-               Info.StorageSize &&
+                   Info.StorageSize &&
                "Big endian union bitfield does not end at the back");
       else
         assert(Info.Offset == 0 &&
@@ -1223,14 +1237,15 @@ void CGRecordLayout::print(raw_ostream &OS) const {
   OS << "  BitFields:[\n";
 
   // Print bit-field infos in declaration order.
-  std::vector<std::pair<unsigned, const CGBitFieldInfo*> > BFIs;
-  for (llvm::DenseMap<const FieldDecl*, CGBitFieldInfo>::const_iterator
-         it = BitFields.begin(), ie = BitFields.end();
+  std::vector<std::pair<unsigned, const CGBitFieldInfo *>> BFIs;
+  for (llvm::DenseMap<const FieldDecl *, CGBitFieldInfo>::const_iterator
+           it = BitFields.begin(),
+           ie = BitFields.end();
        it != ie; ++it) {
     const RecordDecl *RD = it->first->getParent();
     unsigned Index = 0;
-    for (RecordDecl::field_iterator
-           it2 = RD->field_begin(); *it2 != it->first; ++it2)
+    for (RecordDecl::field_iterator it2 = RD->field_begin(); *it2 != it->first;
+         ++it2)
       ++Index;
     BFIs.push_back(std::make_pair(Index, &it->second));
   }
@@ -1244,9 +1259,7 @@ void CGRecordLayout::print(raw_ostream &OS) const {
   OS << "]>\n";
 }
 
-LLVM_DUMP_METHOD void CGRecordLayout::dump() const {
-  print(llvm::errs());
-}
+LLVM_DUMP_METHOD void CGRecordLayout::dump() const { print(llvm::errs()); }
 
 void CGBitFieldInfo::print(raw_ostream &OS) const {
   OS << "<CGBitFieldInfo"
@@ -1258,6 +1271,4 @@ void CGBitFieldInfo::print(raw_ostream &OS) const {
      << " VolatileStorageOffset:" << VolatileStorageOffset.getQuantity() << ">";
 }
 
-LLVM_DUMP_METHOD void CGBitFieldInfo::dump() const {
-  print(llvm::errs());
-}
+LLVM_DUMP_METHOD void CGBitFieldInfo::dump() const { print(llvm::errs()); }

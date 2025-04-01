@@ -23,7 +23,6 @@ typedef SmallVector<llvm::hakc::custom_transfer_def_t> HAKCCustomTransferList;
 typedef SmallVector<GlobalVariable *> HAKCGlobalVariableList;
 typedef SmallVector<GlobalValue *> HAKCSymbolList;
 typedef SmallVector<Function *> FunctionList;
-typedef SmallPtrSet<Type *, 16> HAKCTypeSet;
 typedef SmallVector<std::string, 16> HAKCStringList;
 typedef SmallVector<HAKCCustomAllocation> HAKCCustomAllocationList;
 typedef SmallVector<llvm::hakc::arg_def_t> HAKCArgumentsList;
@@ -91,8 +90,6 @@ public:
 
   iterator_range<FunctionList::iterator> SafeTransitionFunctions();
 
-  iterator_range<HAKCTypeSet::iterator> IgnoredTypes() const;
-
   iterator_range<HAKCGlobalVariableList::iterator> IgnoredGlobals();
 
   iterator_range<HAKCStringList::iterator> SeparateNamespacePaths();
@@ -153,7 +150,6 @@ protected:
   HAKCStringList SeparateNamespacePathList;
   HAKCStringList HAKCSourcePathList;
   FunctionList SafeTransitionFunctionList;
-  HAKCTypeSet IgnoredTypeSet;
   HAKCGlobalVariableList IgnoredGlobalList;
   HAKCCustomAllocationList AllocationFunctionList;
   HAKCCustomTransferList CustomTransferList;

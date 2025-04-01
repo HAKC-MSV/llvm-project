@@ -95,8 +95,6 @@ protected:
 
   bool isPHIofGlobalsOnly(Value *ptr, std::set<PHINode *> &nodes);
 
-  void RegisterPointerDereference(Use &use);
-
   void handleLoad(LoadInst *load);
 
   void handleComparison(CmpInst *compare);
@@ -117,7 +115,7 @@ protected:
 
   HAKCTransformer &getTransformer();
 
-  void AddManagedPointer(Value *HAKCPointer);
+  bool AddManagedPointer(Use &PointerUse);
 
   void ReplaceInstructionOperand(Instruction *I, unsigned ArgNo,
                                  Value *OldValue, Value *NewValue);
@@ -172,8 +170,6 @@ public:
   virtual Instruction *SignGlobalPointerWithColor(GlobalValue *GlobalVar);
 
   Instruction *GetFinalAllocaDef(AllocaInst *Alloca);
-
-  bool PointerShouldBeManaged(Use &use);
 
   bool IsPHIOfGlobalsOnly(Value *V);
 

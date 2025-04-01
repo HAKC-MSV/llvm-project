@@ -59,9 +59,11 @@ bool runCompartmentalization(CommonHAKCAnalysis &HAKCAnalysis) {
 bool runDataAccessGraphAnalysis(CommonHAKCAnalysis &HAKCAnalysis) {
   Module &M = HAKCAnalysis.GetModule();
   SmallString<256> Path;
+  SmallString<256> ModulePath;
+  CommonHAKCAnalysis::GetModuleFullPath(M, ModulePath);
   llvm::sys::path::append(
       Path, HAKCAnalysis.GetSystemInfo().GetDagAnalysisRootPath());
-  CommonHAKCAnalysis::GetModuleFullPath(M, Path);
+  llvm::sys::path::append(Path, ModulePath);
   llvm::sys::path::replace_extension(Path, ".dag.yml");
   llvm::sys::path::make_preferred(Path);
 

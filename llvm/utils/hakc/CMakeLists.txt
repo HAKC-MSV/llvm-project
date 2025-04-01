@@ -3,6 +3,8 @@
             "hakc-policy-process"
     )
 
+    configure_file(gen-test-db.py.in ${CMAKE_BINARY_DIR}/bin/hakc/gen-test-db)
+
     file(GLOB HAKC_MODS hakc/*.py)
 
     foreach (BinFile ${BinFiles})

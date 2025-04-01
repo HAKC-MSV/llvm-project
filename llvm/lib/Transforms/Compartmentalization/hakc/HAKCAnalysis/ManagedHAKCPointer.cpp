@@ -553,10 +553,7 @@ void ManagedHAKCPointer::CreateBaseAuthenticatedPointer() {
   auto *AuthenticationInsertPoint =
       Manager.GetFunctionAnalysis().FindUseInsertionPoint(BaseDefinition,
                                                           UserI);
-  if (Manager.GetFunctionAnalysis()
-          .GetModuleAnalysis()
-          .GetCommonAnalysis()
-          .IsIgnoredType(BaseDefinition->getType())) {
+  if (HAKCTy && HAKCTy->IsIgnoredType()) {
     auto *I = Manager.CreateSafePointerAtLocation(BaseDefinition,
                                                   AuthenticationInsertPoint);
     if (I) {

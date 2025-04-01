@@ -1,0 +1,94 @@
+#!/usr/bin/python3.12
+
+import argparse
+import os
+import shutil
+import subprocess
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Generate HAKC Test Database')
+    parser.add_argument("--test-name", dest='test_name', required=True, help='Name of HAKC Test')
+
+    args = parser.parse_args()
+
+    hakc_static_analysis_path = os.path.join("@CMAKE_CURRENT_SOURCE_DIR@", 'hakc-static-analysis')
+    hakc_test_path = os.path.join("@LLVM_MAIN_SRC_DIR@", "test", "Transforms", "Compartmentalization", "hakc", "tests",
+                                  args.test_name, f'{args.test_name}.c')
+    hakc_config_path = os.path.join("@CMAKE_BINARY_DIR@", 'hakc-test', 'test-config.yml')
+    dag_root = os.path.join(os.path.dirname(hakc_config_path), f'{args.test_name}', 'hakc-dag-root')
+    socket_path = os.path.join(os.path.dirname(hakc_config_path), 'db-socket')
+    db_dir = os.path.join(os.path.dirname(hakc_config_path), 'hakc-db')
+    config = f"""
+    Arch: X86
+    Platform: Linux
+    DagAnalysisRootPath: {dag_root}
+    PassMode: RunDataAccessGraphAnalysis
+    IncludePaths: []
+    Database:
+      server-url: {socket_path}
+      server-timeout: 1000
+      get-compartment-by-id-endpoint: "get-compartment-id"
+      get-division-by-id-endpoint: "get-division-id"
+      get-division-from-symbol-endpoint: "get-division-from-symbol"
+      get-valid-targets-from-compartment-id-endpoint: "get-valid-targets-from-compartment-id"
+    PreTransferActions:
+        - {{ name: "get_hakc_address_color", label: "saved-color" }}
+    PostTargetActions:
+        - {{ name: "hakc_color_address", arguments: [ {{ idx: 2, label: "saved-color" }} ] }}
+    CodeValidationFunction:
+      return-type: ptr
+      name: check_hakc_code_access
+      arguments:
+        - {{ idx: 0, type: ptr, arg-use: signed-ptr }}
+        - {{ idx: 1, type: i64, arg-use: compartment }}
+        - {{ idx: 2, type: i64, arg-use: access-token }}
+        - {{ idx: 3, type: ptr, arg-use: valid-targets }}
+        - {{ idx: 4, type: i64, arg-use: valid-target-size }}
+    DataValidationFunction:
+      return-type: ptr
+      name: check_hakc_data_access
+      arguments:
+        - {{ idx: 0, type: ptr, arg-use: signed-ptr }}
+        - {{ idx: 1, type: i64, arg-use: compartment }}
+        - {{ idx: 2, type: i64, arg-use: access-token }}
+    DefaultCompartmentTransferFunction:
+      return-type: ptr
+      name: hakc_transfer_to_clique
+      arguments:
+        - {{ idx: 0, type: ptr, arg-use: signed-ptr }}
+        - {{ idx: 1, type: i64, arg-use: size }}
+        - {{ idx: 2, type: i64, arg-use: compartment }}
+        - {{ idx: 3, type: i64, arg-use: division }}
+        - {{ idx: 4, type: i1, arg-use: is-code }}
+    SignWithDivisionFunction:
+      return-type: ptr
+      name: hakc_sign_pointer_with_color
+      arguments:
+        - {{ idx: 0, type: ptr, arg-use: signed-ptr }}
+        - {{ idx: 1, type: i64, arg-use: compartment }}
+        - {{ idx: 2, type: i1, arg-use: is-code }}
+    """
+    os.makedirs(os.path.dirname(hakc_config_path), exist_ok=True)
+    os.makedirs(os.path.dirname(dag_root), exist_ok=True)
+    with open(hakc_config_path, 'w') as f:
+        f.write(config)
+
+    gen_dag_file_cmd = [os.path.join('@CMAKE_INSTALL_PREFIX@', 'bin', 'clang'), '-g', '-S', '-emit-llvm', '-mllvm',
+                        '--enable-hakc', '-mllvm', f'--hakc-config={hakc_config_path}', '-o',
+                        os.path.join(os.path.dirname(hakc_config_path), f'{args.test_name}.ll'), hakc_test_path]
+    print(f'Executing {" ".join(gen_dag_file_cmd)}')
+    subprocess.check_output(gen_dag_file_cmd)
+
+    if os.path.exists(db_dir):
+        shutil.rmtree(db_dir)
+
+    gen_compartmentalization_cmd = ['python3', hakc_static_analysis_path, '--dag-files-root', f'{dag_root}',
+                                    '--create-dag', '--db-dir', f'{db_dir}', '--core-count', '1',
+                                    '--dump-dag', os.path.join(os.path.dirname(hakc_test_path), 'db.yml.in')]
+    print(f'Executing {" ".join(gen_compartmentalization_cmd)}')
+    subprocess.check_output(gen_compartmentalization_cmd)
+
+
+if __name__ == "__main__":
+    main()
