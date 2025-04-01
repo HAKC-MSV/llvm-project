@@ -9,11 +9,11 @@ edges:
       DefiningLine: null
       Name: bar
       is_function: true
-      symbol_hash: 2a290548282949a6
+      symbol_hash: 7079b35c8ae47498
     target: &id010 !HAKCType
-      DebugType: int (int)
-      LLVMType: i32 (i32)
-      type_hash: fa480f63681eaa58
+      DebugType: int (int*)
+      LLVMType: i32 (ptr)
+      type_hash: 7c0853e4072ab7c5
   - key: HasScope
     persisted: true
     source: *id001
@@ -40,11 +40,11 @@ edges:
       DefiningLine: null
       Name: baz
       is_function: true
-      symbol_hash: 14e1e1cf4fc6503e
+      symbol_hash: f53fb7c99c727e42
     target: !HAKCType
-      DebugType: int (int)
-      LLVMType: i32 (i32)
-      type_hash: fa480f63681eaa58
+      DebugType: int (int*)
+      LLVMType: i32 (ptr)
+      type_hash: 7c0853e4072ab7c5
   - key: HasScope
     persisted: true
     source: *id002
@@ -67,14 +67,14 @@ edges:
     persisted: true
     source: &id004 !HAKCFunction
       DefiningFile: @HAKC_TEST_DIR@/hakc_test11.c
-      DefiningLine: 16
+      DefiningLine: 15
       Name: foo
       is_function: true
-      symbol_hash: ef772dce3b61d134
+      symbol_hash: 584ebf3d5cc60003
     target: !HAKCType
-      DebugType: int (int)
-      LLVMType: i32 (i32)
-      type_hash: fa480f63681eaa58
+      DebugType: int (int*)
+      LLVMType: i32 (ptr)
+      type_hash: 7c0853e4072ab7c5
   - key: HasScope
     persisted: true
     source: *id004
@@ -87,7 +87,7 @@ edges:
     source: *id004
     target: *id003
   - key: DefinedIn
-    line: 17
+    line: 15
     persisted: true
     source: *id004
     target: *id003
@@ -99,7 +99,7 @@ edges:
       DefiningLine: null
       Name: bar
       is_function: true
-      symbol_hash: 2a290548282949a6
+      symbol_hash: 7079b35c8ae47498
   - key: DirectCall
     persisted: true
     source: *id004
@@ -117,20 +117,11 @@ edges:
       DefiningLine: null
       Name: baz
       is_function: true
-      symbol_hash: 14e1e1cf4fc6503e
+      symbol_hash: f53fb7c99c727e42
   - key: DirectCall
     persisted: true
     source: *id004
     target: *id006
-  - key: DirectCall
-    persisted: true
-    source: *id004
-    target: *id001
-  - key: DagEdge
-    persisted: true
-    source: *id004
-    target: *id001
-    weight: 2
   - key: DagEdge
     persisted: true
     source: *id004

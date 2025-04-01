@@ -345,7 +345,36 @@ void HAKCModuleAnalysis::AddTransferFunctions() {
             << "Replacing uses of " << F.getName() << " with "
             << transferFunc->getName() << "\n";
         in_debug = debug_output;
-        F.replaceUsesWithIf(transferFunc, useEscapes);
+        std::vector<std::pair<User *, unsigned>> UsesToReplace;
+        auto TargetDivision = Policy.GetDivision(&F);
+
+        for (auto &FUse : F.uses()) {
+          if (auto *I = dyn_cast<Instruction>(FUse.getUser())) {
+            if (CommonHAKCAnalysis::IsOutsideTransferFunc(I->getFunction())) {
+              continue;
+            }
+          }
+          if (auto *CallI = dyn_cast<CallInst>(FUse.getUser())) {
+            if (CallI->getCalledFunction() == &F) {
+              auto HeadDivision =
+                  Policy.GetDivision(CallI->getParent()->getParent());
+              if (HeadDivision.GetHAKCCompartment().GetCompartmentID() !=
+                  TargetDivision.GetHAKCCompartment().GetCompartmentID()) {
+                UsesToReplace.push_back(
+                    std::make_pair(CallI, FUse.getOperandNo()));
+                continue;
+              }
+            }
+          }
+          if (useEscapes(FUse)) {
+            UsesToReplace.push_back(
+                std::make_pair(FUse.getUser(), FUse.getOperandNo()));
+          }
+        }
+        for (auto &U : UsesToReplace) {
+          U.first->setOperand(U.second, transferFunc);
+        }
+
         CommonHAKCAnalysis::getWriter(debug_output) << "Done\n"
                                                     << GetModule() << "\n";
       }
