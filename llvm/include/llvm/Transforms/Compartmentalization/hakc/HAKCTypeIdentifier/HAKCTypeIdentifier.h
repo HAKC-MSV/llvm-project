@@ -61,7 +61,7 @@ protected:
 
   HAKCTypeP FindPointeeType(const HAKCTypeInfo &BaseType);
 
-  HAKCTypeP FindPointerType(const HAKCTypeP &BaseType);
+  HAKCTypeP FindPointerType(const HAKCTypeInfo &BaseType);
 
   HAKCTypeP HandleType(const DIType *type);
 
@@ -128,6 +128,8 @@ protected:
 
   Type *GetLLVMType(const DIType *) const;
 
+  HAKCTypeP AddAllocaType(HAKCTypeP BaseType);
+
   CommonHAKCAnalysis &AnalysisHelper;
   DebugInfoFinder DbgInfoFinder;
   std::map<const DIType *, HAKCTypeP> types;
@@ -136,6 +138,7 @@ protected:
   std::map<const DIType *, unsigned> AnonymousNumberMapping;
   std::set<HAKCGlobalP> UnmappedGlobals;
   std::set<HAKCFunctionP> UnmappedFunctions;
+  std::set<HAKCTypeP> AllocaTypes;
   std::map<CallInst *, HAKCTypeP> IndirectCallsTypes;
   unsigned CurrentAnonID;
 };

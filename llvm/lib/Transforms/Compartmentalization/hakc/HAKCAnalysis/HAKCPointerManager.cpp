@@ -123,13 +123,34 @@ bool HAKCPointerManager::PointerIsEligibleForManagement(Use &U) const {
   } else if (auto *LoadI = dyn_cast<LoadInst>(Pointer)) {
     CommonHAKCAnalysis::getWriter(DebugActive)
         << *Pointer << " is used in a LoadInst\n";
-    return PointerIsEligibleForManagement(
-        LoadI->getOperandUse(LoadInst::getPointerOperandIndex()));
+    return !HAKCAnalysis.GetModuleAnalysis()
+                .GetCommonAnalysis()
+                .IsIgnoredGlobal(LoadI->getPointerOperand()) &&
+           PointerIsEligibleForManagement(
+               LoadI->getOperandUse(LoadInst::getPointerOperandIndex()));
   } else if (auto *StoreI = dyn_cast<StoreInst>(U.getUser())) {
     CommonHAKCAnalysis::getWriter(DebugActive)
         << *Pointer << " is used in a StoreInst\n";
+    for (auto &Op : StoreI->operands()) {
+      if (HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().IsIgnoredGlobal(
+              Op.get())) {
+        return false;
+      }
+    }
     return U.getOperandNo() == StoreInst::getPointerOperandIndex() &&
            !CommonHAKCAnalysis::IsKernelUserPointer(Pointer);
+  } else if (auto *AllocaI = dyn_cast<AllocaInst>(Pointer)) {
+    for (auto &Use : AllocaI->uses()) {
+      if (isa<StoreInst>(Use.getUser())) {
+        for (auto &Op : Use.getUser()->operands()) {
+          if (HAKCAnalysis.GetModuleAnalysis()
+                  .GetCommonAnalysis()
+                  .IsIgnoredGlobal(Op.get())) {
+            return false;
+          }
+        }
+      }
+    }
   } else if (isa<UndefValue>(Pointer)) {
     CommonHAKCAnalysis::getWriter(DebugActive)
         << *Pointer << " is an undef value\n";

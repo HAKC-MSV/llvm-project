@@ -1005,7 +1005,7 @@ void HAKCFunctionAnalysis::
 
       for (auto *Target :
            CurrentDivision.GetHAKCCompartment().GetValidTargets()) {
-        CommonHAKCAnalysis::getWriter(true)
+        CommonHAKCAnalysis::getWriter(DebugActive)
             << "Testing Target Compartment "
             << (unsigned int)Target->getSExtValue() << " == "
             << (unsigned int)TargetCompartment.GetCompartmentID()
