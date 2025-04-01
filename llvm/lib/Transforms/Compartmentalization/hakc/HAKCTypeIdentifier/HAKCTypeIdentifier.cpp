@@ -865,7 +865,7 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCTypeForUse(Use &U) {
       if (U.getOperandNo() == CallI->getCalledOperandUse().getOperandNo()) {
         auto FuncTy =
             FindType(dyn_cast<DISubroutineType>(CallTy->GetDbgType()));
-        Result = FindPointerType(FuncTy);
+        Result = FindPointerType(*FuncTy);
       } else {
         Result = GetArgumentHAKCType(
             dyn_cast<DISubroutineType>(CallTy->GetDbgType()), U.getOperandNo());
@@ -873,15 +873,41 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCTypeForUse(Use &U) {
     }
   } else if (isa<LoadInst>(U.getUser())) {
     Result = FindHAKCType(U.getUser());
+    if (Result) {
+      auto PointerTy = FindPointerType(*Result);
+      if (!PointerTy && isa<AllocaInst>(U.get())) {
+        Result = AddAllocaType(Result);
+      } else {
+        Result = PointerTy;
+      }
+    }
   } else if (auto *GEPI = dyn_cast<GetElementPtrInst>(U.getUser())) {
-    auto BaseType = FindType(GEPI->getSourceElementType());
-    if (BaseType) {
-      Result = FindPointerType(BaseType);
+    if (U.getOperandNo() == GetElementPtrInst::getPointerOperandIndex()) {
+      auto BaseType = FindType(GEPI->getSourceElementType());
+      if (BaseType) {
+        CommonHAKCAnalysis::getWriter(
+            AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+            << "Found BaseType " << *BaseType << " for "
+            << *GEPI->getSourceElementType() << "\n";
+        Result = FindPointerType(*BaseType);
+      }
+    } else {
+      Result = FindType(U->getType());
     }
   } else if (auto *StoreI = dyn_cast<StoreInst>(U.getUser())) {
     Result = FindHAKCType(
         StoreI->getOperand((U.getOperandNo() + 1) % StoreI->getNumOperands()));
     if (Result) {
+      if (U.getOperandNo() == StoreInst::getPointerOperandIndex()) {
+        auto PointerType = FindPointerType(*Result);
+        if (!PointerType && isa<AllocaInst>(U.get())) {
+          Result = AddAllocaType(Result);
+        } else {
+          Result = PointerType;
+        }
+      } else {
+        Result = FindPointeeType(*Result);
+      }
       CommonHAKCAnalysis::getWriter(
           AnalysisHelper.GetSystemInfo().OutputDebugInfo())
           << "Found " << *Result << " for " << U.get() << "\n";
@@ -891,19 +917,38 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCTypeForUse(Use &U) {
   return Result;
 }
 
+hakc::HAKCTypeP hakc::HAKCTypeIdentifier::AddAllocaType(HAKCTypeP BaseType) {
+  std::string AllocaName = BaseType->GetDbgTypeName().str();
+  AllocaName += "*";
+  auto HAKCType = std::make_shared<HAKCTypeInfo>(
+      AnalysisHelper, AllocaName,
+      AnalysisHelper.GetSystemInfo().OutputDebugInfo());
+  HAKCType->SetPointeeType(BaseType);
+  HAKCType->SetLLVMType(
+      PointerType::get(GetModule().getContext(),
+                       HAKCType->GetLLVMType()
+                           ? HAKCType->GetLLVMType()->getPointerAddressSpace()
+                           : 0));
+  AllocaTypes.insert(HAKCType);
+
+  return HAKCType;
+}
+
 hakc::HAKCTypeP
-hakc::HAKCTypeIdentifier::FindPointerType(const HAKCTypeP &BaseType) {
-  if (!BaseType) {
-    CommonHAKCAnalysis::getWriter(true) << "BaseType is null\n";
-    throw std::exception();
-  }
+hakc::HAKCTypeIdentifier::FindPointerType(const HAKCTypeInfo &BaseType) {
   for (auto &It : types) {
     auto *DebugType = It.first;
     if (DebugType->getTag() == dwarf::DW_TAG_pointer_type) {
       if (dyn_cast<DIDerivedType>(DebugType)->getBaseType() ==
-          BaseType->GetDbgType()) {
+          BaseType.GetDbgType()) {
         return It.second;
       }
+    }
+  }
+
+  for (auto &AllocaType : AllocaTypes) {
+    if (AllocaType->GetPointeeType()->GetDbgType() == BaseType.GetDbgType()) {
+      return AllocaType;
     }
   }
 
@@ -1160,7 +1205,7 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::HandleIndirectCall(CallInst *CallI) {
 
 hakc::HAKCTypeIdentifier::HAKCTypeIdentifier(CommonHAKCAnalysis &AnalysisHelper)
     : AnalysisHelper(AnalysisHelper), DbgInfoFinder(), types(), globals(),
-      functions(), IndirectCallsTypes(), CurrentAnonID(0) {}
+      functions(), AllocaTypes(), IndirectCallsTypes(), CurrentAnonID(0) {}
 
 Module &hakc::HAKCTypeIdentifier::GetModule() const {
   return AnalysisHelper.GetModule();
