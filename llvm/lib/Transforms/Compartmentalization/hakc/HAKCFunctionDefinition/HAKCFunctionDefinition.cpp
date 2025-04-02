@@ -81,6 +81,7 @@ HAKCArgumentArgumentUseStringMap() {
           {hakc::AccessToken, "access-token"},
           {hakc::ValidTargets, "valid-targets"},
           {hakc::ValidTargetSize, "valid-target-size"},
+          {hakc::Epoch, "epoch"},
           {hakc::Other, "other"}};
 }
 } // namespace llvm::hakc

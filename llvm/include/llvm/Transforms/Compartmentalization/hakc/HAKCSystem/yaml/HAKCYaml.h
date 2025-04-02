@@ -155,19 +155,19 @@ struct HAKCYamlDatabaseConfig {
 };
 
 // TODO: need to figure out how we will specify symbols in the config
-struct YamlEpochPerms {
-  epoch_perms_options_t perm;
-  uint64_t offset;
-};
+// struct YamlEpochPerms {
+//   epoch_perms_options_t perm;
+//   uint64_t offset;
+// };
 
-struct YamlEpoch {
-  uint64_t id;
-  uint64_t next_id;
-  std::string type;
-  std::vector<YamlEpochPerms> perms;
-  YamlSymbol entry_symbol;
-  YamlSymbol exit_symbol;
-};
+// struct YamlEpoch {
+//   uint64_t id;
+//   uint64_t next_id;
+//   std::string type;
+//   std::vector<YamlEpochPerms> perms;
+//   YamlSymbol entry_symbol;
+//   YamlSymbol exit_symbol;
+// };
 
 struct HAKCYamlConfig {
   HAKCTestModeTypeEnum TestMode;
