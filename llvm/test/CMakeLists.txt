@@ -296,7 +296,7 @@ if (LLVM_ENABLE_HAKC)
     get_llvm_lit_path(LIT_BASE_DIR LIT_FILE_NAME)
 
     add_custom_target(check-hakc
-            COMMAND "${Python3_EXECUTABLE}" ${LIT_BASE_DIR}/${LIT_FILE_NAME} ${LLVM_MAIN_SRC_DIR}/${HAKC_TEST_ROOT_DIR}
+            COMMAND "${Python3_EXECUTABLE}" ${LIT_BASE_DIR}/${LIT_FILE_NAME} -a ${LLVM_MAIN_SRC_DIR}/${HAKC_TEST_ROOT_DIR}
     )
 
     add_dependencies(check-hakc hakc_test_configs_gen)
