@@ -52,4 +52,5 @@ def setup_logging(logger: HAKCLogger, log_file: str = "", log_level: LoggingLeve
                   log_mode: str = 'w') -> None:
     logger.setLevel(log_level.value)
     if log_file and len(log_file) > 0:
+        os.makedirs(os.path.dirname(log_file), exist_ok=True)
         logger.add_file_handler(log_file, log_mode)
