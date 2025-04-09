@@ -161,17 +161,17 @@ protected:
 
   hakc::function_def_t
   CreateHAKCFunction(HAKCYAMLFunctionDefinition &YAMLFunctionDef,
-                     HAKCTypeIdentifier &TypeIdentifier) const;
+                     const HAKCTypeIdentifier &TypeIdentifier) const;
 
   static hakc::custom_transfer_def_t
   CreateCustomTransferFunction(HAKCYAMLCustomTransferType &YAMLCustomTransfer,
                                HAKCTypeP HAKCTy,
-                               HAKCTypeIdentifier &TypeIdentifier);
+                               const HAKCTypeIdentifier &TypeIdentifier);
 
   static void PopulateHAKCFunctionArgs(
       SmallVectorImpl<HAKCFunctionArgumentDefinition> &Args,
       HAKCYAMLFunctionDefinition &YAMLFunctionDef,
-      HAKCTypeIdentifier &TypeIdentifier);
+      const HAKCTypeIdentifier &TypeIdentifier);
 };
 } // namespace llvm::hakc
 
