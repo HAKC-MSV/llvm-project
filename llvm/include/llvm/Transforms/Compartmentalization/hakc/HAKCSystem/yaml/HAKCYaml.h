@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "llvm/AsmParser/Parser.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCFunctionDefinition/HAKCFunctionDefinition.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTypeIdentifier/HAKCTypeIdentifier.h"
@@ -62,6 +63,16 @@ struct HAKCYAMLFileType {
   HAKCYAMLStringSequenceType Files;
 
   HAKCYAMLFileType() : PathRoot(), Files() {}
+
+  void AddAllFiles(SmallVectorImpl<std::string> &Results) {
+    for (auto &FilePath : Files) {
+      SmallString<256> Filename;
+      llvm::sys::path::append(Filename, PathRoot);
+      llvm::sys::path::append(Filename, FilePath);
+
+      Results.push_back(Filename.str().str());
+    }
+  }
 };
 
 // the function argument values (the parameter values set when called)
@@ -182,13 +193,10 @@ struct HAKCYamlConfig {
   HAKCYAMLFunctionDefinition CodeValidationFunction;
   HAKCYAMLFunctionDefinition DataValidationFunction;
   HAKCPassModeTypeEnum PassMode;
-  HAKCYAMLStringSequenceType SafeTransitionFunctions;
-  HAKCYAMLStringSequenceType IgnoredGlobals;
+  HAKCYAMLSequence<HAKCYAMLFunctionDeclaration> SafeTransitionFunctions;
+  HAKCYAMLSequence<HAKCYAMLFunctionDeclaration> IgnoredGlobals;
   HAKCYAMLStringSequenceType TransferFunctions;
   HAKCYAMLStringSequenceType PassDebugSymbols;
-  HAKCYAMLStringSequenceType SeparateNamespacePathsList;
-  HAKCYAMLStringSequenceType HAKCSourcePathsList;
-  HAKCYAMLStringSequenceType IncludePathsList;
   bool OutputAllDebugInfo;
   HAKCYamlDatabaseConfig DatabaseConfig;
 
@@ -367,7 +375,6 @@ template <> struct yaml::MappingTraits<hakc::HAKCYamlConfig> {
       io.mapRequired("Platform", YamlConfig.Platform);
       io.mapRequired("DagAnalysisRootPath", YamlConfig.DagAnalysisRootPath);
       io.mapRequired("PassMode", YamlConfig.PassMode);
-      io.mapRequired("IncludePaths", YamlConfig.IncludePathsList);
       io.mapRequired("CodeValidationFunction",
                      YamlConfig.CodeValidationFunction);
       io.mapRequired("DataValidationFunction",
@@ -379,9 +386,9 @@ template <> struct yaml::MappingTraits<hakc::HAKCYamlConfig> {
       io.mapOptional("CompartmentalizationSupportFunctions",
                      YamlConfig.CompartmentalizationSupportFunctions);
       io.mapOptional("NoTransferFunctions", YamlConfig.NoTransferFunctions);
-      io.mapOptional("SeparateNamespacePathList",
+      io.mapOptional("SeparateNamespacePaths",
                      YamlConfig.SeparateNamespacePaths);
-      io.mapOptional("HAKCSourcePathList", YamlConfig.HAKCSourcePaths);
+      io.mapOptional("HAKCSourcePaths", YamlConfig.HAKCSourcePaths);
       io.mapOptional("SafeTransitionFunctions",
                      YamlConfig.SafeTransitionFunctions);
       io.mapOptional("IgnoredTypes", YamlConfig.IgnoredTypes);
@@ -406,7 +413,6 @@ template <> struct yaml::MappingTraits<hakc::HAKCYamlConfig> {
       io.mapRequired("Platform", YamlConfig.Platform);
       io.mapOptional("DagAnalysisRootPath", YamlConfig.DagAnalysisRootPath);
       io.mapOptional("PassMode", YamlConfig.PassMode);
-      io.mapOptional("IncludePaths", YamlConfig.IncludePathsList);
       io.mapOptional("CodeValidationFunction",
                      YamlConfig.CodeValidationFunction);
       io.mapOptional("DataValidationFunction",

@@ -165,32 +165,16 @@ void HAKCSystemInformation::operator<<(HAKCYamlConfig &YamlConfig) {
     throw std::exception();
   }
 
-  IncludePathsList.append(YamlConfig.IncludePathsList.begin(),
-                          YamlConfig.IncludePathsList.end());
-
   for (auto &FileType : YamlConfig.SeparateNamespacePaths) {
-    auto PathRoot = FileType.PathRoot;
-    for (auto &FileName : FileType.Files) {
-      auto File = PathRoot + FileName;
-      YamlConfig.SeparateNamespacePathsList.push_back(File);
-    }
+    FileType.AddAllFiles(SeparateNamespacePathList);
   }
-  SeparateNamespacePathList.append(
-      YamlConfig.SeparateNamespacePathsList.begin(),
-      YamlConfig.SeparateNamespacePathsList.end());
 
   for (auto &FileType : YamlConfig.HAKCSourcePaths) {
-    auto PathRoot = FileType.PathRoot;
-    for (auto &FileName : FileType.Files) {
-      auto File = PathRoot + FileName;
-      YamlConfig.HAKCSourcePathsList.push_back(File);
-    }
+    FileType.AddAllFiles(HAKCSourcePathList);
   }
-  HAKCSourcePathList.append(YamlConfig.HAKCSourcePathsList.begin(),
-                            YamlConfig.HAKCSourcePathsList.end());
 
-  for (auto &FunctionName : YamlConfig.SafeTransitionFunctions) {
-    if (auto *F = GetModule().getFunction(FunctionName)) {
+  for (auto &SafeFunction : YamlConfig.SafeTransitionFunctions) {
+    if (auto *F = GetModule().getFunction(SafeFunction.FunctionName)) {
       SafeTransitionFunctionList.push_back(F);
     }
   }
@@ -204,8 +188,8 @@ void HAKCSystemInformation::operator<<(HAKCYamlConfig &YamlConfig) {
     PerCPUCompartmentTransfer = DefaultCompartmentTransfer;
   }
 
-  for (auto &GlobalName : YamlConfig.IgnoredGlobals) {
-    if (auto *GV = GetModule().getGlobalVariable(GlobalName, true)) {
+  for (auto &Global : YamlConfig.IgnoredGlobals) {
+    if (auto *GV = GetModule().getGlobalVariable(Global.FunctionName, true)) {
       IgnoredGlobalList.push_back(GV);
     }
   }
