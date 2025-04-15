@@ -155,19 +155,19 @@ struct HAKCYamlDatabaseConfig {
 };
 
 // TODO: need to figure out how we will specify symbols in the config
-// struct YamlEpochPerms {
-//   epoch_perms_options_t perm;
-//   uint64_t offset;
-// };
+struct HAKCYAMLEpochPerms {
+  epoch_perms_options_t perm;
+  uint64_t offset;
+};
 
-// struct YamlEpoch {
-//   uint64_t id;
-//   uint64_t next_id;
-//   std::string type;
-//   std::vector<YamlEpochPerms> perms;
-//   YamlSymbol entry_symbol;
-//   YamlSymbol exit_symbol;
-// };
+struct HAKCYAMLEpoch {
+  uint64_t epoch_id;
+  uint64_t next_epoch_id;
+  HAKCYAMLStringType entry_symbol;
+  HAKCYAMLStringType exit_symbol;
+  HAKCYAMLStringType type;
+  HAKCYAMLSequence<HAKCYAMLEpochPerms> perms;
+};
 
 struct HAKCYamlConfig {
   HAKCTestModeTypeEnum TestMode;
@@ -185,6 +185,7 @@ struct HAKCYamlConfig {
   HAKCYAMLStringSequenceType SeparateNamespacePathsList;
   HAKCYAMLStringSequenceType HAKCSourcePathsList;
   HAKCYAMLStringSequenceType IncludePathsList;
+  HAKCYAMLStringSequenceType TransferFunctionCandidates;
   bool OutputAllDebugInfo;
   HAKCYamlDatabaseConfig DatabaseConfig;
 
@@ -195,8 +196,9 @@ struct HAKCYamlConfig {
   HAKCYAMLSequence<HAKCYAMLAllocationType> AllocationFunctions;
   HAKCYAMLSequence<HAKCYAMLFileType> SeparateNamespacePaths;
   HAKCYAMLSequence<HAKCYAMLFileType> HAKCSourcePaths;
-  HAKCYAMLSequence<HAKCYAMLActionType> PreTransferActions;
+  HAKCYAMLSequence<HAKCYAMLActionType> PreTargetActions;
   HAKCYAMLSequence<HAKCYAMLActionType> PostTargetActions;
+  HAKCYAMLSequence<HAKCYAMLEpoch> Epochs;
   HAKCYAMLStringSequenceType IgnoredTypes;
   // TODO: revert to transfer type?
   HAKCYAMLFunctionDefinition DefaultCompartmentTransfer;
@@ -375,9 +377,10 @@ template <> struct yaml::MappingTraits<hakc::HAKCYamlConfig> {
                      YamlConfig.PerCPUCompartmentTransfer);
       io.mapOptional("CustomTransferFunctions",
                      YamlConfig.CustomTransferFunctions);
-      io.mapOptional("PreTransferActions", YamlConfig.PreTransferActions);
+      io.mapOptional("PreTargetActions", YamlConfig.PreTargetActions);
       io.mapOptional("PostTargetActions", YamlConfig.PostTargetActions);
-
+      io.mapOptional("TransferFunctionCandidates", YamlConfig.TransferFunctionCandidates);
+      io.mapOptional("Epochs", YamlConfig.Epochs);
       if (YamlConfig.PassMode == hakc::RunCompartmentalization) {
         io.mapRequired("Database", YamlConfig.DatabaseConfig);
       } else if (YamlConfig.PassMode == hakc::RunDataAccessGraphAnalysis) {
@@ -415,8 +418,10 @@ template <> struct yaml::MappingTraits<hakc::HAKCYamlConfig> {
       io.mapOptional("CustomTransferFunctions",
                      YamlConfig.CustomTransferFunctions);
       io.mapOptional("Database", YamlConfig.DatabaseConfig);
-      io.mapOptional("PreTransferActions", YamlConfig.PreTransferActions);
+      io.mapOptional("PreTargetActions", YamlConfig.PreTargetActions);
       io.mapOptional("PostTargetActions", YamlConfig.PostTargetActions);
+      io.mapOptional("TransferFunctionCandidates", YamlConfig.TransferFunctionCandidates);
+      io.mapOptional("Epochs", YamlConfig.Epochs);
     } else if (YamlConfig.TestMode == hakc::TestModeSuppliedDAG) {
       // TODO
     }

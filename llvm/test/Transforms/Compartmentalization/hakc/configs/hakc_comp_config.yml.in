@@ -10,10 +10,19 @@ DagAnalysisRootPath: @HAKC_DAG_ANALYSIS_PATH@
 OutputDebugInfo: false
 PassMode: RunCompartmentalization
 IncludePaths: [ ]
-PreTransferActions:
+TransferFunctionCandidates: [ ]
+PreTargetActions:
   - { name: "get_hakc_address_color", label: "saved-color" }
 PostTargetActions:
   - { name: "hakc_color_address", arguments: [ { idx: 1, label: "saved-color" } ] }
+Epochs:
+  - { epoch_id: 0,
+      next_epoch_id: 1
+      entry_symbol: foo
+      exit_symbol: bar
+      type: '%struct.nftables_data_t'
+      permissions: - { permission: RW, offset: 0 },
+      }
 CustomTransferFunctions:
   - transfer-obj-type: "char *"
     name: hakc_transfer_string
