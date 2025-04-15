@@ -63,11 +63,11 @@ HAKCSystemInformation::HAKCSystemInformation(CommonHAKCAnalysis &CommonAnalysis)
 
 hakc::function_def_t HAKCSystemInformation::CreateHAKCFunction(
     HAKCYAMLFunctionDefinition &YAMLFunctionDef,
-    HAKCTypeIdentifier &TypeIdentifier) const {
+    const HAKCTypeIdentifier &TypeIdentifier) const {
   auto *TransferFunc = YAMLFunctionDef.GetFunction(TypeIdentifier);
   if (!TransferFunc) {
     CommonHAKCAnalysis::getWriter(true)
-        << "Could not find function " << YAMLFunctionDef.Name << "\n";
+        << "Could not find function " << YAMLFunctionDef.FunctionName << "\n";
     throw std::exception();
   } else {
     CommonHAKCAnalysis::getWriter(OutputDebugInfo())
@@ -81,11 +81,12 @@ hakc::function_def_t HAKCSystemInformation::CreateHAKCFunction(
 
 hakc::custom_transfer_def_t HAKCSystemInformation::CreateCustomTransferFunction(
     HAKCYAMLCustomTransferType &YAMLCustomTransfer, HAKCTypeP HAKCTy,
-    HAKCTypeIdentifier &TypeIdentifier) {
+    const HAKCTypeIdentifier &TypeIdentifier) {
   auto *TransferFunc = YAMLCustomTransfer.GetFunction(TypeIdentifier);
   if (!TransferFunc) {
     CommonHAKCAnalysis::getWriter(true)
-        << "Could not find function " << YAMLCustomTransfer.Name << "\n";
+        << "Could not find function " << YAMLCustomTransfer.FunctionName
+        << "\n";
     throw std::exception();
   }
   SmallVector<HAKCFunctionArgumentDefinition> Args;
@@ -96,13 +97,13 @@ hakc::custom_transfer_def_t HAKCSystemInformation::CreateCustomTransferFunction(
 void HAKCSystemInformation::PopulateHAKCFunctionArgs(
     SmallVectorImpl<HAKCFunctionArgumentDefinition> &Args,
     HAKCYAMLFunctionDefinition &YAMLFunctionDef,
-    HAKCTypeIdentifier &TypeIdentifier) {
+    const HAKCTypeIdentifier &TypeIdentifier) {
   for (auto &YAMLArg : YAMLFunctionDef.Arguments) {
     auto *ArgTy = YAMLArg.GetType(TypeIdentifier);
     if (!ArgTy) {
       CommonHAKCAnalysis::getWriter(true)
           << "Could not determine type for argument " << YAMLArg.Idx
-          << " in definition for " << YAMLFunctionDef.Name << "\n";
+          << " in definition for " << YAMLFunctionDef.FunctionName << "\n";
       throw std::exception();
     }
     HAKCFunctionArgumentDefinition Arg(ArgTy, YAMLArg.Idx, YAMLArg.ArgUse);
@@ -131,20 +132,17 @@ void HAKCSystemInformation::operator<<(HAKCYamlConfig &YamlConfig) {
   // ProcessDebugInfo must happen before creating custom transfers
   TypeIdentifier.ProcessDebugInfo();
 
-  for (auto &FunctionName : YamlConfig.NoTransferFunctions) {
-    auto *F = GetModule().getFunction(FunctionName);
-    if (F) {
+  for (auto &NoTransferFunction : YamlConfig.NoTransferFunctions) {
+    if (auto *F = GetModule().getFunction(NoTransferFunction.FunctionName)) {
       NoTransferFunctionList.push_back(F);
     }
   }
 
   for (auto &SymbolName : YamlConfig.PassDebugSymbols) {
-    auto *F = GetModule().getFunction(SymbolName);
-    if (F) {
+    if (auto *F = GetModule().getFunction(SymbolName)) {
       SymbolsToOutputDebugInfo.push_back(F);
     } else {
-      auto *Global = GetModule().getGlobalVariable(SymbolName);
-      if (Global) {
+      if (auto *Global = GetModule().getGlobalVariable(SymbolName)) {
         SymbolsToOutputDebugInfo.push_back(Global);
       }
     }
@@ -155,7 +153,7 @@ void HAKCSystemInformation::operator<<(HAKCYamlConfig &YamlConfig) {
   if (!CodeValidationFunction) {
     CommonHAKCAnalysis::getWriter(true)
         << "Could not get CodeValidationFunction "
-        << YamlConfig.CodeValidationFunction.Name << "\n";
+        << YamlConfig.CodeValidationFunction.FunctionName << "\n";
     throw std::exception();
   }
   DataValidationFunction =
@@ -163,37 +161,20 @@ void HAKCSystemInformation::operator<<(HAKCYamlConfig &YamlConfig) {
   if (!DataValidationFunction) {
     CommonHAKCAnalysis::getWriter(true)
         << "Could not get DataValidationFunction "
-        << YamlConfig.DataValidationFunction.Name << "\n";
+        << YamlConfig.DataValidationFunction.FunctionName << "\n";
     throw std::exception();
   }
 
-  IncludePathsList.append(YamlConfig.IncludePathsList.begin(),
-                          YamlConfig.IncludePathsList.end());
-
   for (auto &FileType : YamlConfig.SeparateNamespacePaths) {
-    auto PathRoot = FileType.PathRoot;
-    for (auto &FileName : FileType.Files) {
-      auto File = PathRoot + FileName;
-      YamlConfig.SeparateNamespacePathsList.push_back(File);
-    }
+    FileType.AddAllFiles(SeparateNamespacePathList);
   }
-  SeparateNamespacePathList.append(
-      YamlConfig.SeparateNamespacePathsList.begin(),
-      YamlConfig.SeparateNamespacePathsList.end());
 
   for (auto &FileType : YamlConfig.HAKCSourcePaths) {
-    auto PathRoot = FileType.PathRoot;
-    for (auto &FileName : FileType.Files) {
-      auto File = PathRoot + FileName;
-      YamlConfig.HAKCSourcePathsList.push_back(File);
-    }
+    FileType.AddAllFiles(HAKCSourcePathList);
   }
-  HAKCSourcePathList.append(YamlConfig.HAKCSourcePathsList.begin(),
-                            YamlConfig.HAKCSourcePathsList.end());
 
-  for (auto &FunctionName : YamlConfig.SafeTransitionFunctions) {
-    auto *F = GetModule().getFunction(FunctionName);
-    if (F) {
+  for (auto &SafeFunction : YamlConfig.SafeTransitionFunctions) {
+    if (auto *F = GetModule().getFunction(SafeFunction.FunctionName)) {
       SafeTransitionFunctionList.push_back(F);
     }
   }
@@ -207,9 +188,8 @@ void HAKCSystemInformation::operator<<(HAKCYamlConfig &YamlConfig) {
     PerCPUCompartmentTransfer = DefaultCompartmentTransfer;
   }
 
-  for (auto &GlobalName : YamlConfig.IgnoredGlobals) {
-    auto *GV = GetModule().getGlobalVariable(GlobalName, true);
-    if (GV) {
+  for (auto &Global : YamlConfig.IgnoredGlobals) {
+    if (auto *GV = GetModule().getGlobalVariable(Global.FunctionName, true)) {
       IgnoredGlobalList.push_back(GV);
     }
   }
@@ -280,7 +260,7 @@ void HAKCSystemInformation::operator<<(HAKCYamlConfig &YamlConfig) {
 bool HAKCSystemInformation::OutputDebugInfo() const { return DebugOutput; }
 
 bool HAKCSystemInformation::OutputDebugInfo(GlobalValue *GV) const {
-  auto Search = [GV](GlobalValue *Symbol) { return Symbol == GV; };
+  auto Search = [GV](const GlobalValue *Symbol) { return Symbol == GV; };
 
   return OutputDebugInfo() || llvm::any_of(SymbolsToOutputDebugInfo, Search);
 }
@@ -323,7 +303,7 @@ HAKCSystemInformation::CompartmentTransfer(bool PerCPU) const {
 }
 
 bool HAKCSystemInformation::OutputDebugInfo(StringRef SymbolName) const {
-  auto Search = [SymbolName](GlobalValue *Symbol) {
+  auto Search = [SymbolName](const GlobalValue *Symbol) {
     return Symbol->getName() == SymbolName;
   };
 

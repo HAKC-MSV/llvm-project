@@ -169,6 +169,9 @@ Type *hakc::HAKCTypeIdentifier::GetLLVMType(const DIType *Ty) const {
     return PointerType::get(Ctx, 0);
   } else if (auto *BasicTy = dyn_cast<DIBasicType>(Ty)) {
     return IntegerType::get(Ctx, BasicTy->getSizeInBits());
+  } else if (auto *DerivedTy = dyn_cast<DIDerivedType>(Ty)) {
+    if (DerivedTy->getBaseType())
+      return GetLLVMType(DerivedTy->getBaseType());
   }
   return nullptr;
 }

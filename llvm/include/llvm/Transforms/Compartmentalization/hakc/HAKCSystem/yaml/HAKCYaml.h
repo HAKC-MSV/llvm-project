@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "llvm/AsmParser/Parser.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCFunctionDefinition/HAKCFunctionDefinition.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTypeIdentifier/HAKCTypeIdentifier.h"
@@ -42,13 +43,19 @@ enum HAKCTestModeTypeEnum {
   TestModeSuppliedDAG
 };
 
-struct HAKCYAMLAllocationType {
+struct HAKCYAMLFunctionDeclaration {
   HAKCYAMLStringType FunctionName;
+
+  HAKCYAMLFunctionDeclaration() : FunctionName() {}
+};
+
+struct HAKCYAMLAllocationType : public HAKCYAMLFunctionDeclaration {
   HAKCAllocationTypeEnum AllocationType;
   HAKCYAMLStringSequenceType Arguments;
 
   HAKCYAMLAllocationType()
-      : FunctionName(), AllocationType(InvalidAllocationType), Arguments() {}
+      : HAKCYAMLFunctionDeclaration(), AllocationType(InvalidAllocationType),
+        Arguments() {}
 };
 
 struct HAKCYAMLFileType {
@@ -56,6 +63,16 @@ struct HAKCYAMLFileType {
   HAKCYAMLStringSequenceType Files;
 
   HAKCYAMLFileType() : PathRoot(), Files() {}
+
+  void AddAllFiles(SmallVectorImpl<std::string> &Results) {
+    for (auto &FilePath : Files) {
+      SmallString<256> Filename;
+      llvm::sys::path::append(Filename, PathRoot);
+      llvm::sys::path::append(Filename, FilePath);
+
+      Results.push_back(Filename.str().str());
+    }
+  }
 };
 
 // the function argument values (the parameter values set when called)
@@ -66,20 +83,20 @@ struct HAKCYAMLFunctionArgument {
 
   HAKCYAMLFunctionArgument() : Idx(), TypeStr(), ArgUse(Other) {}
 
-  Type *GetType(const HAKCTypeIdentifier &TypeIdentifier) {
+  Type *GetType(const HAKCTypeIdentifier &TypeIdentifier) const {
     return TypeIdentifier.GetTypeFromString(TypeStr);
   }
 };
 
-struct HAKCYAMLFunctionDefinition {
+struct HAKCYAMLFunctionDefinition : public HAKCYAMLFunctionDeclaration {
   HAKCYAMLStringType ReturnType;
-  HAKCYAMLStringType Name;
   HAKCYAMLSequence<HAKCYAMLFunctionArgument> Arguments;
 
-  HAKCYAMLFunctionDefinition() : ReturnType(), Name(), Arguments() {}
+  HAKCYAMLFunctionDefinition()
+      : HAKCYAMLFunctionDeclaration(), ReturnType(), Arguments() {}
 
   bool IsValid() {
-    bool Result = !ReturnType.empty() || !Name.empty();
+    bool Result = !ReturnType.empty() || !FunctionName.empty();
     if (Result) {
       auto ByIndex = [&](const HAKCYAMLFunctionArgument &Arg0,
                          const HAKCYAMLFunctionArgument &Arg1) {
@@ -99,7 +116,7 @@ struct HAKCYAMLFunctionDefinition {
     return Result;
   }
 
-  Function *GetFunction(HAKCTypeIdentifier &TypeIdentifier) {
+  Function *GetFunction(const HAKCTypeIdentifier &TypeIdentifier) {
     if (!IsValid()) {
       return nullptr;
     }
@@ -119,7 +136,7 @@ struct HAKCYAMLFunctionDefinition {
 
     auto *FType = FunctionType::get(ReturnTy, ArgTys, false);
     auto *F = dyn_cast<Function>(TypeIdentifier.GetModule()
-                                     .getOrInsertFunction(Name, FType)
+                                     .getOrInsertFunction(FunctionName, FType)
                                      .getCallee());
     return F;
   }
@@ -137,12 +154,11 @@ struct HAKCYAMLActionArgument {
   unsigned Idx;
 };
 
-struct HAKCYAMLActionType {
-  HAKCYAMLStringType FunctionName;
+struct HAKCYAMLActionType : public HAKCYAMLFunctionDeclaration {
   HAKCYAMLStringType Label;
   HAKCYAMLSequence<HAKCYAMLActionArgument> Arguments;
 
-  HAKCYAMLActionType() : FunctionName(), Label(), Arguments() {}
+  HAKCYAMLActionType() : HAKCYAMLFunctionDeclaration(), Label(), Arguments() {}
 };
 
 struct HAKCYamlDatabaseConfig {
@@ -177,9 +193,8 @@ struct HAKCYamlConfig {
   HAKCYAMLFunctionDefinition CodeValidationFunction;
   HAKCYAMLFunctionDefinition DataValidationFunction;
   HAKCPassModeTypeEnum PassMode;
-  HAKCYAMLStringSequenceType NoTransferFunctions;
-  HAKCYAMLStringSequenceType SafeTransitionFunctions;
-  HAKCYAMLStringSequenceType IgnoredGlobals;
+  HAKCYAMLSequence<HAKCYAMLFunctionDeclaration> SafeTransitionFunctions;
+  HAKCYAMLSequence<HAKCYAMLFunctionDeclaration> IgnoredGlobals;
   HAKCYAMLStringSequenceType TransferFunctions;
   HAKCYAMLStringSequenceType PassDebugSymbols;
   HAKCYAMLStringSequenceType SeparateNamespacePathsList;
@@ -189,7 +204,7 @@ struct HAKCYamlConfig {
   bool OutputAllDebugInfo;
   HAKCYamlDatabaseConfig DatabaseConfig;
 
-  // HAKCYAMLSequence <HAKCYAMLFunctionDefinitionType> NoTransferFunctions;
+  HAKCYAMLSequence<HAKCYAMLFunctionDeclaration> NoTransferFunctions;
   HAKCYAMLSequence<HAKCYAMLCustomTransferType> CustomTransferFunctions;
   HAKCYAMLSequence<HAKCYAMLFunctionDefinition>
       CompartmentalizationSupportFunctions;
@@ -220,6 +235,20 @@ LLVM_YAML_IS_SEQUENCE_VECTOR(hakc::HAKCYAMLFunctionArgument)
 LLVM_YAML_IS_SEQUENCE_VECTOR(hakc::HAKCYAMLActionType)
 
 LLVM_YAML_IS_SEQUENCE_VECTOR(hakc::HAKCYAMLActionArgument)
+
+LLVM_YAML_IS_SEQUENCE_VECTOR(hakc::HAKCYAMLFunctionDeclaration)
+
+static void YAMLFunctionDeclarationMapping(
+    yaml::IO &io, hakc::HAKCYAMLFunctionDeclaration &FunctionDeclaration) {
+  io.mapRequired("name", FunctionDeclaration.FunctionName);
+}
+
+template <> struct yaml::MappingTraits<hakc::HAKCYAMLFunctionDeclaration> {
+  static void mapping(yaml::IO &io,
+                      hakc::HAKCYAMLFunctionDeclaration &FunctionDefinition) {
+    YAMLFunctionDeclarationMapping(io, FunctionDefinition);
+  }
+};
 
 template <> struct yaml::ScalarEnumerationTraits<hakc::HAKCAllocationTypeEnum> {
   static void enumeration(IO &io, hakc::HAKCAllocationTypeEnum &value) {
@@ -261,7 +290,7 @@ template <> struct yaml::ScalarEnumerationTraits<hakc::HAKCTestModeTypeEnum> {
 template <> struct yaml::MappingTraits<hakc::HAKCYAMLAllocationType> {
   static void mapping(yaml::IO &io,
                       hakc::HAKCYAMLAllocationType &AllocationType) {
-    io.mapRequired("name", AllocationType.FunctionName);
+    YAMLFunctionDeclarationMapping(io, AllocationType);
     io.mapRequired("type", AllocationType.AllocationType);
     io.mapRequired("arguments", AllocationType.Arguments);
   }
@@ -276,7 +305,7 @@ template <> struct yaml::MappingTraits<hakc::HAKCYAMLActionArgument> {
 
 template <> struct yaml::MappingTraits<hakc::HAKCYAMLActionType> {
   static void mapping(yaml::IO &io, hakc::HAKCYAMLActionType &ActionType) {
-    io.mapRequired("name", ActionType.FunctionName);
+    YAMLFunctionDeclarationMapping(io, ActionType);
     io.mapOptional("label", ActionType.Label, "");
     io.mapOptional("arguments", ActionType.Arguments);
   }
@@ -285,7 +314,7 @@ template <> struct yaml::MappingTraits<hakc::HAKCYAMLActionType> {
 static void
 YAMLFunctionMapping(yaml::IO &io,
                     hakc::HAKCYAMLFunctionDefinition &FunctionDefinition) {
-  io.mapRequired("name", FunctionDefinition.Name);
+  YAMLFunctionDeclarationMapping(io, FunctionDefinition);
   io.mapRequired("return-type", FunctionDefinition.ReturnType);
   io.mapOptional("arguments", FunctionDefinition.Arguments);
 }
@@ -351,7 +380,6 @@ template <> struct yaml::MappingTraits<hakc::HAKCYamlConfig> {
       io.mapRequired("Platform", YamlConfig.Platform);
       io.mapRequired("DagAnalysisRootPath", YamlConfig.DagAnalysisRootPath);
       io.mapRequired("PassMode", YamlConfig.PassMode);
-      io.mapRequired("IncludePaths", YamlConfig.IncludePathsList);
       io.mapRequired("CodeValidationFunction",
                      YamlConfig.CodeValidationFunction);
       io.mapRequired("DataValidationFunction",
@@ -363,9 +391,9 @@ template <> struct yaml::MappingTraits<hakc::HAKCYamlConfig> {
       io.mapOptional("CompartmentalizationSupportFunctions",
                      YamlConfig.CompartmentalizationSupportFunctions);
       io.mapOptional("NoTransferFunctions", YamlConfig.NoTransferFunctions);
-      io.mapOptional("SeparateNamespacePathList",
+      io.mapOptional("SeparateNamespacePaths",
                      YamlConfig.SeparateNamespacePaths);
-      io.mapOptional("HAKCSourcePathList", YamlConfig.HAKCSourcePaths);
+      io.mapOptional("HAKCSourcePaths", YamlConfig.HAKCSourcePaths);
       io.mapOptional("SafeTransitionFunctions",
                      YamlConfig.SafeTransitionFunctions);
       io.mapOptional("IgnoredTypes", YamlConfig.IgnoredTypes);
@@ -391,7 +419,6 @@ template <> struct yaml::MappingTraits<hakc::HAKCYamlConfig> {
       io.mapRequired("Platform", YamlConfig.Platform);
       io.mapOptional("DagAnalysisRootPath", YamlConfig.DagAnalysisRootPath);
       io.mapOptional("PassMode", YamlConfig.PassMode);
-      io.mapOptional("IncludePaths", YamlConfig.IncludePathsList);
       io.mapOptional("CodeValidationFunction",
                      YamlConfig.CodeValidationFunction);
       io.mapOptional("DataValidationFunction",
