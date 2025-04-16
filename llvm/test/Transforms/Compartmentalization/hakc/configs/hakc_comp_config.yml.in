@@ -21,7 +21,8 @@ Epochs:
       entry_symbol: foo
       exit_symbol: bar
       type: '%struct.nftables_data_t'
-      permissions: - { permission: RW, offset: 0 }
+      permissions:
+        - { permission: RW, offset: 0 },
       }
 CustomTransferFunctions:
   - transfer-obj-type: "char *"
