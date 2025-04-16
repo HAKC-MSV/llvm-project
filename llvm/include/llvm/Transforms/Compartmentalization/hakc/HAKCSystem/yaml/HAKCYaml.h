@@ -450,7 +450,6 @@ template <> struct yaml::MappingTraits<hakc::HAKCYamlConfig> {
       io.mapOptional("PostTargetActions", YamlConfig.PostTargetActions);
       io.mapOptional("TransferFunctionCandidates",
                      YamlConfig.TransferFunctionCandidates);
-      io.mapOptional("Epochs", YamlConfig.Epochs);
     } else if (YamlConfig.TestMode == hakc::TestModeSuppliedDAG) {
       // TODO
     }

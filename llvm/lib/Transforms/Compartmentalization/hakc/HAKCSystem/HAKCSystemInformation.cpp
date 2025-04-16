@@ -230,7 +230,7 @@ void HAKCSystemInformation::operator<<(HAKCYamlConfig &YamlConfig) {
 
   SmallVector<hakc::function_def_t> DefinedFunctions;
   GetAllDefinedHAKCFunctions(DefinedFunctions);
-  for (auto &PreTransferActionDefinition : YamlConfig.PreTransferActions) {
+  for (auto &PreTransferActionDefinition : YamlConfig.PreTargetActions) {
     for (auto &FuncDef : DefinedFunctions) {
       if (FuncDef->GetName() == PreTransferActionDefinition.FunctionName) {
         auto Action = std::make_shared<HAKCPreTransferAction>(
