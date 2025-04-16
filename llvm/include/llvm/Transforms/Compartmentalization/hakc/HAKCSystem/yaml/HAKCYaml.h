@@ -407,8 +407,9 @@ template <> struct yaml::MappingTraits<hakc::HAKCYamlConfig> {
                      YamlConfig.CustomTransferFunctions);
       io.mapOptional("PreTargetActions", YamlConfig.PreTargetActions);
       io.mapOptional("PostTargetActions", YamlConfig.PostTargetActions);
-      io.mapOptional("TransferFunctionCandidates", YamlConfig.TransferFunctionCandidates);
-      io.mapOptional("Epochs", YamlConfig.Epochs);
+      io.mapOptional("TransferFunctionCandidates",
+                     YamlConfig.TransferFunctionCandidates);
+      // io.mapOptional("Epochs", YamlConfig.Epochs);
       if (YamlConfig.PassMode == hakc::RunCompartmentalization) {
         io.mapRequired("Database", YamlConfig.DatabaseConfig);
       } else if (YamlConfig.PassMode == hakc::RunDataAccessGraphAnalysis) {
@@ -447,7 +448,8 @@ template <> struct yaml::MappingTraits<hakc::HAKCYamlConfig> {
       io.mapOptional("Database", YamlConfig.DatabaseConfig);
       io.mapOptional("PreTargetActions", YamlConfig.PreTargetActions);
       io.mapOptional("PostTargetActions", YamlConfig.PostTargetActions);
-      io.mapOptional("TransferFunctionCandidates", YamlConfig.TransferFunctionCandidates);
+      io.mapOptional("TransferFunctionCandidates",
+                     YamlConfig.TransferFunctionCandidates);
       io.mapOptional("Epochs", YamlConfig.Epochs);
     } else if (YamlConfig.TestMode == hakc::TestModeSuppliedDAG) {
       // TODO
