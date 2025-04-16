@@ -1438,7 +1438,7 @@ Type *hakc::HAKCTypeIdentifier::GetTypeFromString(StringRef TypeStr) const {
   return ParsedType;
 }
 
-void hakc::HAKCTypeIdentifier::AddIgnoredType(StringRef TypeName) {
+void hakc::HAKCTypeIdentifier::AddIgnoredType(StringRef TypeName) const {
   for (auto &it : types) {
     auto TyName = GetTypeName(it.first);
     if (TyName == TypeName) {

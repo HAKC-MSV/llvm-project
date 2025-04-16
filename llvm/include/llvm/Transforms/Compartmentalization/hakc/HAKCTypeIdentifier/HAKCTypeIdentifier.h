@@ -52,7 +52,7 @@ public:
 
   Type *GetTypeFromString(StringRef TypeStr) const;
 
-  void AddIgnoredType(StringRef TypeName);
+  void AddIgnoredType(StringRef TypeName) const;
 
 protected:
   HAKCTypeP FindType(Type *Ty);
