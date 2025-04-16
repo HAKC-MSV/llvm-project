@@ -57,7 +57,7 @@ unsigned hakc::HAKCTypeIdentifier::GetAnonymousID(const DIType *type) {
   return ID;
 }
 
-std::string hakc::HAKCTypeIdentifier::GetTypeName(const DIType *type) {
+std::string hakc::HAKCTypeIdentifier::GetTypeName(const DIType *type) const {
   std::string Name;
   llvm::raw_string_ostream out(Name);
 
@@ -129,14 +129,14 @@ std::string hakc::HAKCTypeIdentifier::GetTypeName(const DIType *type) {
     } else if (CompositeTy->getTag() == dwarf::DW_TAG_structure_type) {
       out << "struct ";
       if (CompositeTy->getName().empty()) {
-        out << "anon." << GetAnonymousID(CompositeTy);
+        out << "anon." << CompositeTy->getLine();
       } else {
         out << CompositeTy->getName();
       }
     } else if (CompositeTy->getTag() == dwarf::DW_TAG_union_type) {
       out << "union ";
       if (CompositeTy->getName().empty()) {
-        out << "anon." << GetAnonymousID(CompositeTy);
+        out << "anon." << CompositeTy->getLine();
       } else {
         out << CompositeTy->getName();
       }
@@ -161,44 +161,135 @@ std::string hakc::HAKCTypeIdentifier::GetTypeName(const DIType *type) {
   return Name;
 }
 
+Type *hakc::HAKCTypeIdentifier::FindNamedType(StringRef TypeName) const {
+  auto UnionName = "union." + TypeName;
+  auto StructName = "struct." + TypeName;
+  for (auto *StructTy : GetModule().getIdentifiedStructTypes()) {
+    auto LLVMName = StructTy->getName();
+    if (LLVMName.ends_with(UnionName.str()) ||
+        LLVMName.ends_with(StructName.str())) {
+      return StructTy;
+    }
+  }
+  return nullptr;
+}
+
+Type *hakc::HAKCTypeIdentifier::FindAnonymousType(
+    const DICompositeType *CompositeTy) const {
+  auto debug = AnalysisHelper.GetSystemInfo().OutputDebugInfo();
+  SmallVector<StructType *> FoundTypes;
+  for (auto *StructTy : GetModule().getIdentifiedStructTypes()) {
+    if (StructTy->getName().contains(".anon")) {
+      bool TypesMatch = true;
+      unsigned i;
+      for (i = 0; i < CompositeTy->getElements().size(); i++) {
+        auto *ElementTy = dyn_cast<DIType>(CompositeTy->getElements()[i]);
+        if (!ElementTy || !StructTy->indexValid(i)) {
+          TypesMatch = false;
+          break;
+        }
+        auto *ElementLLVMTy = GetLLVMType(ElementTy);
+        if (!ElementLLVMTy || ElementLLVMTy != StructTy->getTypeAtIndex(i)) {
+          TypesMatch = false;
+          break;
+        }
+      }
+      if (TypesMatch && !StructTy->indexValid(i + 1)) {
+        FoundTypes.push_back(StructTy);
+      }
+    }
+  }
+
+  CommonHAKCAnalysis::getWriter(debug)
+      << "Found " << FoundTypes.size() << " Types for " << CompositeTy << ":\n";
+  for (auto *Ty : FoundTypes) {
+    CommonHAKCAnalysis::getWriter(debug) << Ty << "\n";
+  }
+  if (!FoundTypes.empty()) {
+    return FoundTypes.front();
+  }
+
+  return nullptr;
+}
+
 Type *hakc::HAKCTypeIdentifier::GetLLVMType(const DIType *Ty) const {
+  CommonHAKCAnalysis::getWriter(
+      AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+      << "Finding LLVM Type for " << Ty << "\n";
   auto &Ctx = GetModule().getContext();
   if (!Ty) {
     return Type::getVoidTy(Ctx);
   } else if (Ty->getTag() == dwarf::DW_TAG_pointer_type) {
     return PointerType::get(Ctx, 0);
   } else if (auto *BasicTy = dyn_cast<DIBasicType>(Ty)) {
+    if (BasicTy->getEncoding() == dwarf::DW_ATE_boolean) {
+      return IntegerType::get(Ctx, 1);
+    }
     return IntegerType::get(Ctx, BasicTy->getSizeInBits());
   } else if (auto *DerivedTy = dyn_cast<DIDerivedType>(Ty)) {
+    if (Ty->getTag() == dwarf::DW_TAG_typedef && !Ty->getName().empty()) {
+      auto *LLVMTy = FindNamedType(Ty->getName());
+      if (LLVMTy) {
+        return LLVMTy;
+      }
+    }
     if (DerivedTy->getBaseType())
       return GetLLVMType(DerivedTy->getBaseType());
+  } else if (Ty->getTag() == dwarf::DW_TAG_structure_type) {
+    if (!Ty->getName().empty()) {
+      return FindNamedType(Ty->getName());
+    } else {
+      return FindAnonymousType(dyn_cast<DICompositeType>(Ty));
+    }
+  } else if (Ty->getTag() == dwarf::DW_TAG_enumeration_type) {
+    return GetLLVMType(dyn_cast<DICompositeType>(Ty)->getBaseType());
   }
   return nullptr;
 }
 
 FunctionType *hakc::HAKCTypeIdentifier::GetLLVMFunctionTy(
-    const DISubroutineType *FunctionTy) {
+    const DISubroutineType *FunctionTy) const {
   auto &Ctx = GetModule().getContext();
   auto *ReturnTy = Type::getVoidTy(Ctx);
   auto TyArray = FunctionTy->getTypeArray();
+  auto debug = AnalysisHelper.GetSystemInfo().OutputDebugInfo();
   if (TyArray[0]) {
     ReturnTy = GetLLVMType(TyArray[0]);
+    if (!ReturnTy) {
+      CommonHAKCAnalysis::getWriter(debug)
+          << "Could not find Return Type " << TyArray[0] << "\n";
+      return nullptr;
+    }
+  }
+  if (!FunctionType::isValidReturnType(ReturnTy)) {
+    CommonHAKCAnalysis::getWriter(debug)
+        << "Type " << ReturnTy << " is not a valid argument type\n";
+    return nullptr;
   }
   SmallVector<Type *> ArgTys;
 
+  bool IsVarArg = false;
   for (unsigned i = 1; i < TyArray.size(); i++) {
+    if (TyArray[i] == nullptr) {
+      IsVarArg = true;
+      break;
+    }
     auto *Ty = GetLLVMType(TyArray[i]);
     if (!Ty) {
-      CommonHAKCAnalysis::getWriter(true)
+      CommonHAKCAnalysis::getWriter(debug)
           << "Could not find LLVM Type for " << TyArray[i] << "\n";
-      throw std::exception();
+      return nullptr;
+    }
+    if (!FunctionType::isValidArgumentType(Ty)) {
+      CommonHAKCAnalysis::getWriter(true)
+          << "Type " << Ty << " is not a valid argument type\n";
+      return nullptr;
     }
     ArgTys.push_back(Ty);
   }
 
-  auto *LLVMTy = FunctionType::get(ReturnTy, ArgTys, false);
-  CommonHAKCAnalysis::getWriter(
-      AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+  auto *LLVMTy = FunctionType::get(ReturnTy, ArgTys, IsVarArg);
+  CommonHAKCAnalysis::getWriter(debug)
       << "Found LLVM Type " << LLVMTy << " for " << FunctionTy << "\n";
 
   return LLVMTy;
@@ -266,9 +357,18 @@ hakc::HAKCTypeIdentifier::HandleType(const DIType *type) {
                                              << type << "\n";
         auto TypeName = GetTypeName(type);
         TypeP = std::make_shared<HAKCTypeInfo>(AnalysisHelper, TypeName, debug);
-        // TODO: is this right derrick?
         auto *LLVMTy = GetLLVMType(DerivedTy);
-        TypeP->SetLLVMType(LLVMTy);
+        if (LLVMTy) {
+          CommonHAKCAnalysis::getWriter(debug)
+              << "Found LLVM Type " << *LLVMTy << "\n";
+          TypeP->SetLLVMType(LLVMTy);
+        } else {
+          CommonHAKCAnalysis::getWriter(debug)
+              << "Could not find LLVM Type for " << type << "\n";
+          for (auto *STy : GetModule().getIdentifiedStructTypes()) {
+            CommonHAKCAnalysis::getWriter(debug) << STy << "\n";
+          }
+        }
         AddTypeMapping(type, TypeP);
       } else {
         CommonHAKCAnalysis::getWriter(debug)
@@ -284,8 +384,10 @@ hakc::HAKCTypeIdentifier::FindGlobal(const DIGlobalVariable *DIGV) const {
   auto *Scope = DIGV->getScope();
   std::string Name;
   llvm::raw_string_ostream sstream(Name);
-  if (auto *SubProg = dyn_cast<DISubprogram>(Scope)) {
-    sstream << SubProg->getName() << ".";
+  if (Scope) {
+    if (auto *SubProg = dyn_cast<DISubprogram>(Scope)) {
+      sstream << SubProg->getName() << ".";
+    }
   }
   sstream << DIGV->getName();
 
@@ -406,8 +508,8 @@ void hakc::HAKCTypeIdentifier::AddFunctionMapping(
       AnalysisHelper.GetSystemInfo().OutputDebugInfo(SubProg->getName()))
       << "Adding mapping " << *SubProg << " -> " << *HAKCFunction << "\n";
   functions[SubProg] = HAKCFunction;
-  HAKCFunction->GetType()->SetLLVMType(
-      HAKCFunction->GetFunction()->getFunctionType());
+  // HAKCFunction->GetType()->SetLLVMType(
+  //     HAKCFunction->GetFunction()->getFunctionType());
 }
 
 void hakc::HAKCTypeIdentifier::FindAllGlobalsUsed(
@@ -1321,6 +1423,10 @@ void hakc::HAKCTypeIdentifier::GetHAKCTypes(
 }
 
 Type *hakc::HAKCTypeIdentifier::GetTypeFromString(StringRef TypeStr) const {
+  if (TypeStr.empty()) {
+    return nullptr;
+  }
+
   if (TypeStr == "void") {
     /* parseType only allows parsing void types for functions so explicitly
      * check for that */
@@ -1331,6 +1437,7 @@ Type *hakc::HAKCTypeIdentifier::GetTypeFromString(StringRef TypeStr) const {
   auto *ParsedType = parseType(TypeStr, Err, GetModule());
   return ParsedType;
 }
+
 void hakc::HAKCTypeIdentifier::AddIgnoredType(StringRef TypeName) {
   for (auto &it : types) {
     auto TyName = GetTypeName(it.first);

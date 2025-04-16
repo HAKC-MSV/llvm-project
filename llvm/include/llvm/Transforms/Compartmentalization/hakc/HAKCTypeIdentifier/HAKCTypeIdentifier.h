@@ -69,7 +69,7 @@ protected:
 
   void AddTypeMapping(const DIType *type, const HAKCTypeP &HAKCType);
 
-  std::string GetTypeName(const DIType *type);
+  std::string GetTypeName(const DIType *type) const;
 
   HAKCGlobalP HandleGlobal(const DIGlobalVariable *DIGV);
 
@@ -124,11 +124,15 @@ protected:
   HAKCTypeP GetArgumentHAKCType(const DISubroutineType *FunctionTy,
                                 unsigned ArgNo);
 
-  FunctionType *GetLLVMFunctionTy(const DISubroutineType *FunctionTy);
+  FunctionType *GetLLVMFunctionTy(const DISubroutineType *FunctionTy) const;
 
   Type *GetLLVMType(const DIType *) const;
 
   HAKCTypeP AddAllocaType(HAKCTypeP BaseType);
+
+  Type *FindNamedType(StringRef TypeName) const;
+
+  Type *FindAnonymousType(const DICompositeType *CompositeTy) const;
 
   CommonHAKCAnalysis &AnalysisHelper;
   DebugInfoFinder DbgInfoFinder;
