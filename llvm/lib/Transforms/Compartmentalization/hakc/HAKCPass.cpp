@@ -98,6 +98,8 @@ bool RunHAKCAnalysis(Module &M) {
     return runDataAccessGraphAnalysis(HAKCAnalysis);
   case RunCompartmentalization:
     return runCompartmentalization(HAKCAnalysis);
+  case RunConfigAndExit:
+    return false;
   default:
     CommonHAKCAnalysis::getWriter(true) << "Invalid HAKC pass mode\n";
     throw std::exception();

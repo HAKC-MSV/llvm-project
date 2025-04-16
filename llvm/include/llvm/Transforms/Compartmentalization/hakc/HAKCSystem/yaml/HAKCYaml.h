@@ -33,7 +33,8 @@ enum HAKCAllocationTypeEnum {
 enum HAKCPassModeTypeEnum {
   InvalidPassModeType,
   RunDataAccessGraphAnalysis,
-  RunCompartmentalization
+  RunCompartmentalization,
+  RunConfigAndExit
 };
 
 enum HAKCTestModeTypeEnum {
