@@ -27,7 +27,7 @@ using namespace llvm::hakc;
 
 namespace llvm {
 namespace hakc {
-bool runCompartmentalization(CommonHAKCAnalysis &HAKCAnalysis) {
+static bool runCompartmentalization(CommonHAKCAnalysis &HAKCAnalysis) {
   bool PerformTransformations = true;
   Module &M = HAKCAnalysis.GetModule();
   StringRef CurrentSourceName(M.getSourceFileName());
@@ -56,7 +56,7 @@ bool runCompartmentalization(CommonHAKCAnalysis &HAKCAnalysis) {
   return true;
 }
 
-bool runDataAccessGraphAnalysis(CommonHAKCAnalysis &HAKCAnalysis) {
+static bool runDataAccessGraphAnalysis(CommonHAKCAnalysis &HAKCAnalysis) {
   Module &M = HAKCAnalysis.GetModule();
   SmallString<256> Path;
   SmallString<256> ModulePath;
@@ -86,7 +86,7 @@ bool runDataAccessGraphAnalysis(CommonHAKCAnalysis &HAKCAnalysis) {
   return false;
 }
 
-bool RunHAKCAnalysis(Module &M) {
+static bool RunHAKCAnalysis(Module &M) {
   if (HAKC_CONFIG_PATH.empty()) {
     CommonHAKCAnalysis::getWriter(true) << "no hakc-config pass specified\n";
     throw std::exception();
