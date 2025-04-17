@@ -8,7 +8,7 @@ Database:
   get-valid-targets-from-compartment-id-endpoint: "get-valid-targets-from-compartment-id"
 DagAnalysisRootPath: @HAKC_DAG_ANALYSIS_PATH@
 OutputDebugInfo: false
-PassMode: RunCompartmentalization
+PassMode: RunConfigAndExit
 IncludePaths: [ ]
 TransferFunctionCandidates: [ ]
 PreTargetActions:

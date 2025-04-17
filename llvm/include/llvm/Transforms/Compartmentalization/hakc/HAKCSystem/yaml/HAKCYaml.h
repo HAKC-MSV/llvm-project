@@ -276,6 +276,8 @@ template <> struct yaml::ScalarEnumerationTraits<hakc::HAKCPassModeTypeEnum> {
                 hakc::RunDataAccessGraphAnalysis);
     io.enumCase(value, "RunCompartmentalization",
                 hakc::RunCompartmentalization);
+    io.enumCase(value, "RunConfigAndExit",
+                hakc::RunConfigAndExit);
   }
 };
 

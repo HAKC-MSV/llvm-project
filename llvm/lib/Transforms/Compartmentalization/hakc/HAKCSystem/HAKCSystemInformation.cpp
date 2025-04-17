@@ -126,6 +126,9 @@ void HAKCSystemInformation::operator<<(HAKCYamlConfig &YamlConfig) {
   Platform = YamlConfig.Platform;
   DagAnalysisRootPath = YamlConfig.DagAnalysisRootPath;
   PassMode = YamlConfig.PassMode;
+  if (PassMode == RunConfigAndExit) {
+    return;
+  }
   DebugOutput = YamlConfig.OutputAllDebugInfo;
   DatabaseInformation << YamlConfig.DatabaseConfig;
 
