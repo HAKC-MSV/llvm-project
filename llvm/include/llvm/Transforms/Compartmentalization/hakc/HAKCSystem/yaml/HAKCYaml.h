@@ -411,10 +411,9 @@ template <> struct yaml::MappingTraits<hakc::HAKCYamlConfig> {
       io.mapOptional("PostTargetActions", YamlConfig.PostTargetActions);
       io.mapOptional("TransferFunctionCandidates",
                      YamlConfig.TransferFunctionCandidates);
-      // io.mapOptional("Epochs", YamlConfig.Epochs);
       if (YamlConfig.PassMode == hakc::RunCompartmentalization) {
         io.mapRequired("Database", YamlConfig.DatabaseConfig);
-      } else if (YamlConfig.PassMode == hakc::RunDataAccessGraphAnalysis) {
+      } else {
         io.mapOptional("Database", YamlConfig.DatabaseConfig);
       }
     } else if (YamlConfig.TestMode == hakc::TestModeDefault) {
