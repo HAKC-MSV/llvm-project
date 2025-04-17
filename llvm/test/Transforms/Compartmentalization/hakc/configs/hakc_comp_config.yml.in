@@ -128,14 +128,6 @@ CompartmentalizationSupportFunctions:
       - { idx: 0, type: ptr, arg-use: signed-ptr }
       - { idx: 1, type: i32, arg-use: division }
       - { idx: 2, type: i64, arg-use: size }
-#  - return-type: void *
-#    name: tag_and_sign
-#    arguments:
-#      - { idx: 0, type: ptr, arg-use: signed-ptr }
-#      - { idx: 1, type: i64, arg-use: size }
-#      - { idx: 2, type: i64, arg-use: compartment }
-#      - { idx: 3, type: i64, arg-use: epoch }
-#      - { idx: 4, type: i1, arg-use: is-code }
 IgnoredTypes: [ "struct list_head", "struct proto", "struct atomic64_s", "struct atomic_s" ]
 NoTransferFunctions: [ "ftrace_stub" ]
 IgnoredGlobals: [ "kmalloc_caches" ]
