@@ -9,7 +9,6 @@ Database:
 DagAnalysisRootPath: @HAKC_DAG_ANALYSIS_PATH@
 OutputDebugInfo: false
 PassMode: RunCompartmentalization
-IncludePaths: [ ]
 TransferFunctionCandidates: [ ]
 PreTargetActions:
   - { name: "get_hakc_address_color", label: "saved-color" }
@@ -129,7 +128,9 @@ CompartmentalizationSupportFunctions:
       - { idx: 1, type: i32, arg-use: division }
       - { idx: 2, type: i64, arg-use: size }
 IgnoredTypes: [ "struct list_head", "struct proto", "struct atomic64_s", "struct atomic_s" ]
-NoTransferFunctions: [ "ftrace_stub" ]
-IgnoredGlobals: [ "kmalloc_caches" ]
+NoTransferFunctions:
+  - { name: ftrace_stub }
+IgnoredGlobals:
+  - { name: kmalloc_caches }
 AllocationFunctions:
   - { name: kvmalloc_array, type: MultiplyTwoArguments, arguments: [ 0,1 ] }

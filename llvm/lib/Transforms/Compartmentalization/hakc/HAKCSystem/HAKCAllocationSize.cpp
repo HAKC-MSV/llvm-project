@@ -66,7 +66,7 @@ HAKCAllocationSize::HAKCAllocationSize(Function *AllocationFunction)
 std::shared_ptr<HAKCAllocationSize>
 HAKCAllocationSize::FromYaml(const hakc::HAKCYAMLAllocationType &YamlAllocation,
                              Module &M) {
-  auto *F = M.getFunction(YamlAllocation.FunctionName);
+  auto *F = M.getFunction(YamlAllocation.SymbolName);
   if (!F) {
     return nullptr;
   }

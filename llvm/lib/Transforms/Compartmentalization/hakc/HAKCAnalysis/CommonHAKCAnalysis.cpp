@@ -7,7 +7,6 @@
 
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Verifier.h"
-#include "llvm/Support/Path.h"
 
 namespace llvm::hakc {
 HAKCWriter HAKC_Writer;
@@ -455,7 +454,6 @@ bool CommonHAKCAnalysis::IsKernelUserPointer(Value *V) {
 //       (!isOutsideTransferFunc(f) ||
 //       !f->hasFnAttribute(Attribute::InlineHint));
 // }
-
 
 bool CommonHAKCAnalysis::FunctionIsStatic(Function *F) {
   return Function::isLocalLinkage(F->getLinkage()) || F->isDeclaration();

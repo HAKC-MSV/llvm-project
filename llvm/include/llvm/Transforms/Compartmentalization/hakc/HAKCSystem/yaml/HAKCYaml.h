@@ -44,26 +44,24 @@ enum HAKCTestModeTypeEnum {
   TestModeSuppliedDAG
 };
 
-struct HAKCYAMLFunctionDeclaration {
-  HAKCYAMLStringType FunctionName;
+struct HAKCYAMLSymbolDeclaration {
+  HAKCYAMLStringType SymbolName;
 
-  HAKCYAMLFunctionDeclaration() : FunctionName() {}
+  HAKCYAMLSymbolDeclaration() {}
 };
 
-struct HAKCYAMLAllocationType : public HAKCYAMLFunctionDeclaration {
+struct HAKCYAMLAllocationType : public HAKCYAMLSymbolDeclaration {
   HAKCAllocationTypeEnum AllocationType;
   HAKCYAMLStringSequenceType Arguments;
 
-  HAKCYAMLAllocationType()
-      : HAKCYAMLFunctionDeclaration(), AllocationType(InvalidAllocationType),
-        Arguments() {}
+  HAKCYAMLAllocationType() : AllocationType(InvalidAllocationType) {}
 };
 
 struct HAKCYAMLFileType {
   HAKCYAMLStringType PathRoot;
   HAKCYAMLStringSequenceType Files;
 
-  HAKCYAMLFileType() : PathRoot(), Files() {}
+  HAKCYAMLFileType() {}
 
   void AddAllFiles(SmallVectorImpl<std::string> &Results) {
     for (auto &FilePath : Files) {
@@ -89,15 +87,15 @@ struct HAKCYAMLFunctionArgument {
   }
 };
 
-struct HAKCYAMLFunctionDefinition : public HAKCYAMLFunctionDeclaration {
+struct HAKCYAMLFunctionDefinition : public HAKCYAMLSymbolDeclaration {
   HAKCYAMLStringType ReturnType;
   HAKCYAMLSequence<HAKCYAMLFunctionArgument> Arguments;
 
   HAKCYAMLFunctionDefinition()
-      : HAKCYAMLFunctionDeclaration(), ReturnType(), Arguments() {}
+      : HAKCYAMLSymbolDeclaration(), ReturnType(), Arguments() {}
 
   bool IsValid() {
-    bool Result = !ReturnType.empty() || !FunctionName.empty();
+    bool Result = !ReturnType.empty() || !SymbolName.empty();
     if (Result) {
       auto ByIndex = [&](const HAKCYAMLFunctionArgument &Arg0,
                          const HAKCYAMLFunctionArgument &Arg1) {
@@ -137,7 +135,7 @@ struct HAKCYAMLFunctionDefinition : public HAKCYAMLFunctionDeclaration {
 
     auto *FType = FunctionType::get(ReturnTy, ArgTys, false);
     auto *F = dyn_cast<Function>(TypeIdentifier.GetModule()
-                                     .getOrInsertFunction(FunctionName, FType)
+                                     .getOrInsertFunction(SymbolName, FType)
                                      .getCallee());
     return F;
   }
@@ -155,11 +153,11 @@ struct HAKCYAMLActionArgument {
   unsigned Idx;
 };
 
-struct HAKCYAMLActionType : public HAKCYAMLFunctionDeclaration {
+struct HAKCYAMLActionType : public HAKCYAMLSymbolDeclaration {
   HAKCYAMLStringType Label;
   HAKCYAMLSequence<HAKCYAMLActionArgument> Arguments;
 
-  HAKCYAMLActionType() : HAKCYAMLFunctionDeclaration(), Label(), Arguments() {}
+  HAKCYAMLActionType() : HAKCYAMLSymbolDeclaration(), Label(), Arguments() {}
 };
 
 struct HAKCYamlDatabaseConfig {
@@ -169,6 +167,7 @@ struct HAKCYamlDatabaseConfig {
   HAKCYAMLStringType GetSymbolDivisionEndpoint;
   HAKCYAMLStringType GetValidTargetsEndpoint;
   unsigned ServerTimeout;
+  unsigned MaxConnectionRetries;
 };
 
 // TODO: need to figure out how we will specify symbols in the config
@@ -194,18 +193,17 @@ struct HAKCYamlConfig {
   HAKCYAMLFunctionDefinition CodeValidationFunction;
   HAKCYAMLFunctionDefinition DataValidationFunction;
   HAKCPassModeTypeEnum PassMode;
-  HAKCYAMLSequence<HAKCYAMLFunctionDeclaration> SafeTransitionFunctions;
-  HAKCYAMLSequence<HAKCYAMLFunctionDeclaration> IgnoredGlobals;
+  HAKCYAMLSequence<HAKCYAMLSymbolDeclaration> SafeTransitionFunctions;
+  HAKCYAMLSequence<HAKCYAMLSymbolDeclaration> IgnoredGlobals;
   HAKCYAMLStringSequenceType TransferFunctions;
   HAKCYAMLStringSequenceType PassDebugSymbols;
   HAKCYAMLStringSequenceType SeparateNamespacePathsList;
   HAKCYAMLStringSequenceType HAKCSourcePathsList;
-  HAKCYAMLStringSequenceType IncludePathsList;
   HAKCYAMLStringSequenceType TransferFunctionCandidates;
   bool OutputAllDebugInfo;
   HAKCYamlDatabaseConfig DatabaseConfig;
 
-  HAKCYAMLSequence<HAKCYAMLFunctionDeclaration> NoTransferFunctions;
+  HAKCYAMLSequence<HAKCYAMLSymbolDeclaration> NoTransferFunctions;
   HAKCYAMLSequence<HAKCYAMLCustomTransferType> CustomTransferFunctions;
   HAKCYAMLSequence<HAKCYAMLFunctionDefinition>
       CompartmentalizationSupportFunctions;
@@ -237,16 +235,16 @@ LLVM_YAML_IS_SEQUENCE_VECTOR(hakc::HAKCYAMLActionType)
 
 LLVM_YAML_IS_SEQUENCE_VECTOR(hakc::HAKCYAMLActionArgument)
 
-LLVM_YAML_IS_SEQUENCE_VECTOR(hakc::HAKCYAMLFunctionDeclaration)
+LLVM_YAML_IS_SEQUENCE_VECTOR(hakc::HAKCYAMLSymbolDeclaration)
 
 static void YAMLFunctionDeclarationMapping(
-    yaml::IO &io, hakc::HAKCYAMLFunctionDeclaration &FunctionDeclaration) {
-  io.mapRequired("name", FunctionDeclaration.FunctionName);
+    yaml::IO &io, hakc::HAKCYAMLSymbolDeclaration &FunctionDeclaration) {
+  io.mapRequired("name", FunctionDeclaration.SymbolName);
 }
 
-template <> struct yaml::MappingTraits<hakc::HAKCYAMLFunctionDeclaration> {
+template <> struct yaml::MappingTraits<hakc::HAKCYAMLSymbolDeclaration> {
   static void mapping(yaml::IO &io,
-                      hakc::HAKCYAMLFunctionDeclaration &FunctionDefinition) {
+                      hakc::HAKCYAMLSymbolDeclaration &FunctionDefinition) {
     YAMLFunctionDeclarationMapping(io, FunctionDefinition);
   }
 };
@@ -367,6 +365,8 @@ template <> struct yaml::MappingTraits<hakc::HAKCYamlDatabaseConfig> {
     Io.mapOptional("get-valid-targets-from-compartment-id-endpoint",
                    YamlConfig.GetValidTargetsEndpoint,
                    "get-valid-targets-from-compartment-id");
+    Io.mapOptional("max-connection-retries", YamlConfig.MaxConnectionRetries,
+                   5);
   }
 };
 

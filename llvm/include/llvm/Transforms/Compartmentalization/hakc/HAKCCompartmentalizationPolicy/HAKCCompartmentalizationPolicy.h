@@ -11,6 +11,8 @@
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartment.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartmentDivision.h"
 
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCSystemInformation.h"
+
 namespace llvm::hakc {
 class HAKCModuleAnalysis;
 class HAKCSystemInformation;
@@ -46,7 +48,8 @@ protected:
 
 class HAKCDatabaseConnection {
 public:
-  HAKCDatabaseConnection(std::chrono::milliseconds Timeout);
+  HAKCDatabaseConnection(const HAKCDatabaseInformation &DatabaseInformation,
+                         bool Debug);
 
   HAKCDatabaseResponse HandleRequest(const HAKCDatabaseRequest &Request) const;
 
@@ -54,11 +57,12 @@ public:
 
   void close();
 
-  void connect(StringRef ServerURL);
+  void connect();
 
 protected:
   std::unique_ptr<raw_socket_stream> Socket;
-  std::chrono::milliseconds Timeout;
+  const HAKCDatabaseInformation &DatabaseInformation;
+  bool Debug;
 
   bool CheckConnection() const;
 };
@@ -76,7 +80,7 @@ public:
 
   HAKCDivisionP GetDivisionFromSymbol(hakc::HAKCYamlSymbol symbol);
 
-  void GetValidTargets(HAKCCompartment &Compartment);
+  void GetValidTargets(HAKCCompartment &Compartment) const;
 
   hakc::HAKCCompartmentDivision &GetDefaultDivision();
 

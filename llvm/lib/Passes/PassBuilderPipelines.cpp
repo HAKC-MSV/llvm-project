@@ -1612,12 +1612,12 @@ PassBuilder::buildPerModuleDefaultPipeline(OptimizationLevel Level,
   // Emit annotation remarks.
   addAnnotationRemarksPass(MPM);
 
+  if (EnableHAKC)
+    MPM.addPass(HAKCPass());
+
   if (LTOPreLink)
     addRequiredLTOPreLinkPasses(MPM);
 
-  if (EnableHAKC) {
-    MPM.addPass(HAKCPass());
-  }
   return MPM;
 }
 
@@ -2178,6 +2178,9 @@ ModulePassManager PassBuilder::buildO0DefaultPipeline(OptimizationLevel Level,
     addRequiredLTOPreLinkPasses(MPM);
 
   MPM.addPass(createModuleToFunctionPassAdaptor(AnnotationRemarksPass()));
+
+  if (EnableHAKC)
+    MPM.addPass(HAKCPass());
 
   return MPM;
 }

@@ -53,12 +53,12 @@ void HAKCDatabaseResponse::operator<<(raw_socket_stream &OS) {
 }
 
 HAKCDatabaseConnection::HAKCDatabaseConnection(
-    std::chrono::milliseconds Timeout)
-    : Socket(nullptr), Timeout(Timeout) {}
+    const HAKCDatabaseInformation &DatabaseInformation, bool Debug)
+    : Socket(nullptr), DatabaseInformation(DatabaseInformation), Debug(Debug) {}
 
 HAKCDatabaseResponse HAKCDatabaseConnection::HandleRequest(
     const HAKCDatabaseRequest &Request) const {
-  HAKCDatabaseResponse Response(Timeout);
+  HAKCDatabaseResponse Response(DatabaseInformation.GetServerTimeout());
   Request >> *Socket;
   Response << *Socket;
   return Response;
@@ -77,36 +77,50 @@ bool HAKCDatabaseConnection::CheckConnection() const {
   return Socket != nullptr;
 }
 
-void HAKCDatabaseConnection::connect(StringRef ServerURL) {
+void HAKCDatabaseConnection::connect() {
   close();
-  constexpr int max_tries = 5;
-  int current_try = 1;
-  auto TimeoutInSeconds = Timeout.count() / 1000;
+  unsigned current_try = 0;
+  auto TimeoutInSeconds = DatabaseInformation.GetServerTimeout().count() / 1000;
   if (TimeoutInSeconds == 0) {
     TimeoutInSeconds = 1;
   }
-  do {
-    auto NewConnection = raw_socket_stream::createConnectedUnix(ServerURL);
-    if (auto E = NewConnection.takeError()) {
-      // connection failed, try again with a timeout
-      if (current_try >= max_tries) {
-        CommonHAKCAnalysis::getWriter(true)
-            << "Could not connect to " << ServerURL << "\n";
+  while (true) {
+    try {
+      auto NewConnection = raw_socket_stream::createConnectedUnix(
+          DatabaseInformation.GetServerURL());
+      if (!NewConnection) {
+        /* NB: calling consuming all the errors is required in order for the
+         * Expected object to be properly destructed. llvm::toString does this.
+         */
+        CommonHAKCAnalysis::getWriter(Debug)
+            << "Error connecting to " << DatabaseInformation.GetServerURL()
+            << ": " << llvm::toString(NewConnection.takeError()) << "\n";
         throw std::exception();
       }
-      current_try++;
-      sleep(TimeoutInSeconds);
-    } else {
       Socket = std::move(*NewConnection);
       break;
+    } catch (...) {
+      current_try++;
+      if (current_try >= DatabaseInformation.GetMaxRetries()) {
+        break;
+      }
+      sleep(TimeoutInSeconds);
     }
-  } while (current_try <= max_tries);
+  }
+
+  if (!CheckConnection()) {
+    CommonHAKCAnalysis::getWriter(true)
+        << "Could not connect to " << DatabaseInformation.GetServerURL()
+        << "\n";
+    throw std::exception();
+  }
 }
 
 HAKCCompartmentalizationPolicy::HAKCCompartmentalizationPolicy(
     HAKCSystemInformation &SystemInformation)
     : SystemInformation(SystemInformation), Compartments(), Divisions(),
-      Client(SystemInformation.GetDatabaseInformation().GetServerTimeout()) {
+      Client(SystemInformation.GetDatabaseInformation(),
+             SystemInformation.OutputDebugInfo()) {
   ConnectToDatabase();
 }
 
@@ -122,7 +136,7 @@ void HAKCCompartmentalizationPolicy::ConnectToDatabase() {
   CommonHAKCAnalysis::getWriter(SystemInformation.OutputDebugInfo())
       << "Connecting to "
       << SystemInformation.GetDatabaseInformation().GetServerURL() << "\n";
-  Client.connect(SystemInformation.GetDatabaseInformation().GetServerURL());
+  Client.connect();
 }
 
 void HAKCCompartmentalizationPolicy::CheckConnection() const {
@@ -190,8 +204,9 @@ HAKCCompartmentalizationPolicy::GetDivision(GlobalValue *GV) {
   auto Compartment =
       CreateCompartment(CompartmentID.value(), *EntryToken, false);
   auto Division = std::make_shared<hakc::HAKCCompartmentDivision>(
-      *Compartment, (hakc_compartment_division_t)DivisionID.value(),
-      (hakc_access_token_t)*DivisionAccessToken,
+      *Compartment,
+      static_cast<hakc_compartment_division_t>(DivisionID.value()),
+      static_cast<hakc_access_token_t>(*DivisionAccessToken),
       SystemInformation.GetModule().getContext());
   Divisions.push_back(Division);
   return *Division;
@@ -227,8 +242,8 @@ HAKCDivisionP HAKCCompartmentalizationPolicy::GetDivision(
 
   auto Compartment = GetCompartment(CompartmentID);
   Division = std::make_shared<hakc::HAKCCompartmentDivision>(
-      *Compartment, (hakc_compartment_division_t)DivisionID,
-      (hakc_access_token_t)*DivisionAccessToken,
+      *Compartment, DivisionID,
+      static_cast<hakc_access_token_t>(*DivisionAccessToken),
       SystemInformation.GetModule().getContext());
   Divisions.push_back(Division);
 
@@ -260,7 +275,7 @@ HAKCCompartmentP HAKCCompartmentalizationPolicy::GetCompartment(
 }
 
 void HAKCCompartmentalizationPolicy::GetValidTargets(
-    HAKCCompartment &Compartment) {
+    HAKCCompartment &Compartment) const {
   hakc_compartment_id_t CompartmentID = Compartment.GetCompartmentIDValue();
   json::Object Parameters({
       {"compartment-id", std::to_string(CompartmentID)},
@@ -279,9 +294,10 @@ void HAKCCompartmentalizationPolicy::GetValidTargets(
        ++target) {
     CommonHAKCAnalysis::getWriter(SystemInformation.OutputDebugInfo())
         << "Adding target: "
-        << (hakc_compartment_id_t)target->getAsInteger().value() << "\n";
+        << static_cast<hakc_compartment_id_t>(target->getAsInteger().value())
+        << "\n";
     auto *TargetCompartment = HAKCCompartment::CreateID(
-        (hakc_compartment_id_t)target->getAsInteger().value(),
+        static_cast<hakc_compartment_id_t>(target->getAsInteger().value()),
         SystemInformation.GetModule());
     Compartment.AddTarget(TargetCompartment);
   }
@@ -291,8 +307,7 @@ HAKCCompartmentP HAKCCompartmentalizationPolicy::CreateCompartment(
     hakc_compartment_id_t CompartmentID, hakc_access_token_t AccessToken,
     bool CheckForExisting) {
   if (CheckForExisting) {
-    auto Compartment = FindCachedCompartment(CompartmentID);
-    if (Compartment) {
+    if (auto Compartment = FindCachedCompartment(CompartmentID)) {
       return Compartment;
     }
   }
