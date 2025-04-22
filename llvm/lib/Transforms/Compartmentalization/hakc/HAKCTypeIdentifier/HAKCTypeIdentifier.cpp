@@ -577,9 +577,6 @@ hakc::HAKCTypeIdentifier::AddUnmappedFunction(Function *F) {
 std::shared_ptr<hakc::HAKCSymbolInfo>
 hakc::HAKCTypeIdentifier::AddUnmappedGlobal(GlobalObject *GlobalObj) {
   auto debug = AnalysisHelper.GetSystemInfo().OutputDebugInfo(GlobalObj);
-  if (CommonHAKCAnalysis::IsStringType(GlobalObj->getValueType())) {
-    return nullptr;
-  }
   if (auto *F = dyn_cast<Function>(GlobalObj)) {
     return AddUnmappedFunction(F);
   } else if (auto *GV = dyn_cast<GlobalVariable>(GlobalObj)) {
