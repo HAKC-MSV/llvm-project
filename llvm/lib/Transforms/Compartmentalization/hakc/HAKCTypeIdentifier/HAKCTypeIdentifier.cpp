@@ -1019,7 +1019,8 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCTypeForUse(Use &U) {
   return Result;
 }
 
-hakc::HAKCTypeP hakc::HAKCTypeIdentifier::AddAllocaType(HAKCTypeP BaseType) {
+hakc::HAKCTypeP
+hakc::HAKCTypeIdentifier::AddAllocaType(const HAKCTypeP &BaseType) {
   std::string AllocaName = BaseType->GetDbgTypeName().str();
   AllocaName += "*";
   auto HAKCType = std::make_shared<HAKCTypeInfo>(

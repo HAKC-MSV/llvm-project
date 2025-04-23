@@ -128,7 +128,7 @@ protected:
 
   Type *GetLLVMType(const DIType *) const;
 
-  HAKCTypeP AddAllocaType(HAKCTypeP BaseType);
+  HAKCTypeP AddAllocaType(const HAKCTypeP &BaseType);
 
   Type *FindNamedType(StringRef TypeName) const;
 
