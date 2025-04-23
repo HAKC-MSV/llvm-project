@@ -145,6 +145,7 @@ protected:
   std::set<HAKCTypeP> AllocaTypes;
   std::map<CallInst *, HAKCTypeP> IndirectCallsTypes;
   unsigned CurrentAnonID;
+  const DIScope *CompilationUnitScope;
 };
 } // namespace llvm::hakc
 

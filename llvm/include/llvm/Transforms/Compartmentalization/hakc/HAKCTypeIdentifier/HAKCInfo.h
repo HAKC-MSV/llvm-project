@@ -33,7 +33,7 @@ public:
 
   static unsigned int EntrySpaces();
 
-  CommonHAKCAnalysis &GetCommonHAKCAnalysis();
+  CommonHAKCAnalysis &GetCommonHAKCAnalysis() const;
 
 protected:
   CommonHAKCAnalysis &Analysis;

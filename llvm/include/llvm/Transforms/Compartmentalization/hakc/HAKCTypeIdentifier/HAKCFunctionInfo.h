@@ -17,7 +17,7 @@ namespace llvm::hakc {
 
         void SetFunction(Function *F);
 
-        Function *GetFunction();
+        Function *GetFunction() const;
 
         void AddDirectCall(const std::shared_ptr<HAKCFunctionInfo> &DirectCall);
 

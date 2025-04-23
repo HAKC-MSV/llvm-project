@@ -15,7 +15,7 @@ HAKCInfo::HAKCInfo(CommonHAKCAnalysis &Analysis, StringRef Name,
   }
 }
 
-CommonHAKCAnalysis &HAKCInfo::GetCommonHAKCAnalysis() { return Analysis; }
+CommonHAKCAnalysis &HAKCInfo::GetCommonHAKCAnalysis() const { return Analysis; }
 
 StringRef HAKCInfo::GetName() const { return Name; }
 

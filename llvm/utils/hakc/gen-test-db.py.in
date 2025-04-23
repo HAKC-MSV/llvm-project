@@ -24,7 +24,6 @@ def main():
     Platform: Linux
     DagAnalysisRootPath: {dag_root}
     PassMode: RunDataAccessGraphAnalysis
-    IncludePaths: []
     Database:
       server-url: {socket_path}
       server-timeout: 1000
@@ -32,7 +31,7 @@ def main():
       get-division-by-id-endpoint: "get-division-id"
       get-division-from-symbol-endpoint: "get-division-from-symbol"
       get-valid-targets-from-compartment-id-endpoint: "get-valid-targets-from-compartment-id"
-    PreTransferActions:
+    PreTargetActions:
         - {{ name: "get_hakc_address_color", label: "saved-color" }}
     PostTargetActions:
         - {{ name: "hakc_color_address", arguments: [ {{ idx: 2, label: "saved-color" }} ] }}
@@ -74,8 +73,8 @@ def main():
     with open(hakc_config_path, 'w') as f:
         f.write(config)
 
-    gen_dag_file_cmd = [os.path.join('@CMAKE_INSTALL_PREFIX@', 'bin', 'clang'), '-g', '-S', '-emit-llvm', '-mllvm',
-                        '--enable-hakc', '-mllvm', f'--hakc-config={hakc_config_path}', '-o',
+    gen_dag_file_cmd = [os.path.join('@CMAKE_BINARY_DIR@', 'llvm-project', 'llvm', 'bin', 'clang'), '-g', '-S',
+                        '-emit-llvm', '-mllvm', '--enable-hakc', '-mllvm', f'--hakc-config={hakc_config_path}', '-o',
                         os.path.join(os.path.dirname(hakc_config_path), f'{args.test_name}.ll'), hakc_test_path]
     print(f'Executing {" ".join(gen_dag_file_cmd)}')
     subprocess.check_output(gen_dag_file_cmd)

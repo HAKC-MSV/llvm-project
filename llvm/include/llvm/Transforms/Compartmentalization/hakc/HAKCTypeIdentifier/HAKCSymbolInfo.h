@@ -30,7 +30,7 @@ public:
 
   void SetLocalScope(const DIScope *Scope);
 
-  StringRef GetLocalScopePath() const;
+  void GetLocalScopePath(SmallVectorImpl<char> &Result) const;
 
   friend bool operator==(const HAKCYamlSymbol &YamlSymbol,
                          const HAKCSymbolInfo &SymbolInfo) {
@@ -60,13 +60,11 @@ protected:
   const DIFile *DefiningLocation;
   unsigned DefiningLine;
   const DIScope *LocalScope;
-  SmallString<128> LocalScopeStr;
-  tictac_epoch_id_t current_epoch;
 
   void SetGlobalObj(GlobalObject *GlobalObj);
 
-  void GetTransformedPathName(const DIFile *File,
-                              SmallVectorImpl<char> &Result) const;
+  static void GetTransformedPathName(const DIFile *File,
+                                     SmallVectorImpl<char> &Result);
 
   bool Matches(const HAKCYamlSymbol &YamlSymbol) const;
 };

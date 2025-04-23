@@ -3,6 +3,7 @@
             "hakc-policy-process"
     )
 
+    set(HAKC_CC $<TARGET_FILE:clang>)
     configure_file(gen-test-db.py.in ${CMAKE_BINARY_DIR}/bin/hakc/gen-test-db)
 
     file(GLOB HAKC_MODS hakc/*.py)

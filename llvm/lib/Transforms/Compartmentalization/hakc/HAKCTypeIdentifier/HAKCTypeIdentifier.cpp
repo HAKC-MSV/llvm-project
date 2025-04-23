@@ -508,8 +508,6 @@ void hakc::HAKCTypeIdentifier::AddFunctionMapping(
       AnalysisHelper.GetSystemInfo().OutputDebugInfo(SubProg->getName()))
       << "Adding mapping " << *SubProg << " -> " << *HAKCFunction << "\n";
   functions[SubProg] = HAKCFunction;
-  // HAKCFunction->GetType()->SetLLVMType(
-  //     HAKCFunction->GetFunction()->getFunctionType());
 }
 
 void hakc::HAKCTypeIdentifier::FindAllGlobalsUsed(
@@ -558,6 +556,7 @@ hakc::HAKCTypeIdentifier::AddUnmappedFunction(Function *F) {
   auto FuncInfo =
       std::make_shared<HAKCFunctionInfo>(AnalysisHelper, F->getName(), debug);
   FuncInfo->SetFunction(F);
+  FuncInfo->SetLocalScope(CompilationUnitScope);
   auto HAKCType = FindCalledFunctionType(F->getFunctionType());
   if (!HAKCType) {
     HAKCType = CreateNoDebugType(F->getFunctionType());
@@ -601,6 +600,7 @@ hakc::HAKCTypeIdentifier::AddUnmappedGlobal(GlobalObject *GlobalObj) {
     }
     GlobalInfo->SetGlobalVariable(GV);
     GlobalInfo->SetType(HAKCType);
+    GlobalInfo->SetLocalScope(CompilationUnitScope);
     UnmappedGlobals.insert(GlobalInfo);
     return GlobalInfo;
   } else {
@@ -867,8 +867,7 @@ hakc::HAKCTypeIdentifier::FindType(HAKCPointerBase &HAKCPointer) {
   }
   if (ReturnTy) {
     if (ReturnTy->IsPointerType() && !ReturnTy->GetPointeeType()) {
-      auto PointeeType = FindPointeeType(*ReturnTy);
-      if (PointeeType) {
+      if (auto PointeeType = FindPointeeType(*ReturnTy)) {
         ReturnTy->SetPointeeType(PointeeType);
       }
     }
@@ -1095,8 +1094,7 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
         CommonHAKCAnalysis::getWriter(
             AnalysisHelper.GetSystemInfo().OutputDebugInfo())
             << "Finding Type of " << U << "\n";
-        auto BaseHAKCType = FindHAKCTypeForUse(U);
-        if (BaseHAKCType) {
+        if (auto BaseHAKCType = FindHAKCTypeForUse(U)) {
           CommonHAKCAnalysis::getWriter(
               AnalysisHelper.GetSystemInfo().OutputDebugInfo())
               << "Found " << *BaseHAKCType << " for " << U << "\n";
@@ -1109,8 +1107,7 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
 
   if (FoundType && FoundType->IsPointerType() &&
       FoundType->GetPointeeType() == nullptr) {
-    auto PointeeType = FindPointeeType(*FoundType);
-    if (PointeeType) {
+    if (auto PointeeType = FindPointeeType(*FoundType)) {
       FoundType->SetPointeeType(PointeeType);
     }
   }
@@ -1188,7 +1185,7 @@ hakc::HAKCTypeIdentifier::FindSymbol(Value *V, bool SearchUnmapped) {
   if (auto *GV = dyn_cast<GlobalVariable>(V)) {
     return FindGlobal(GV, SearchUnmapped);
   }
-  if (auto *F = dyn_cast<Function>(V)) {
+  if (const auto *F = dyn_cast<Function>(V)) {
     return FindFunction(F, SearchUnmapped);
   }
   return nullptr;
@@ -1239,7 +1236,7 @@ void hakc::HAKCTypeIdentifier::FindTypesInFunctions() {
         CommonHAKCAnalysis::getWriter(debug)
             << "Found " << *V << " to " << *DebugV
             << " mapping from Instruction " << *I << "\n";
-        auto HAKCType = FindType(DebugV->getType());
+        const auto HAKCType = FindType(DebugV->getType());
         if (!HAKCType) {
           CommonHAKCAnalysis::getWriter(true)
               << "Could not find HAKCType for DIType " << *DebugV->getType()
@@ -1308,7 +1305,8 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::HandleIndirectCall(CallInst *CallI) {
 
 hakc::HAKCTypeIdentifier::HAKCTypeIdentifier(CommonHAKCAnalysis &AnalysisHelper)
     : AnalysisHelper(AnalysisHelper), DbgInfoFinder(), types(), globals(),
-      functions(), AllocaTypes(), IndirectCallsTypes(), CurrentAnonID(0) {}
+      functions(), AllocaTypes(), IndirectCallsTypes(), CurrentAnonID(0),
+      CompilationUnitScope(nullptr) {}
 
 Module &hakc::HAKCTypeIdentifier::GetModule() const {
   return AnalysisHelper.GetModule();
@@ -1319,6 +1317,23 @@ void hakc::HAKCTypeIdentifier::ProcessDebugInfo() {
   auto Debug = AnalysisHelper.GetSystemInfo().OutputDebugInfo();
 
   CommonHAKCAnalysis::getWriter(Debug) << GetModule() << "\n";
+
+  for (auto *Scope : DbgInfoFinder.scopes()) {
+    if (auto *File = dyn_cast<DIFile>(Scope)) {
+      if (File->getFilename() == GetModule().getSourceFileName()) {
+        CompilationUnitScope = Scope;
+        break;
+      }
+    }
+  }
+
+  if (!CompilationUnitScope) {
+    CommonHAKCAnalysis::getWriter(Debug)
+        << "Could not find Compilation Unit Scope\n";
+  } else {
+    CommonHAKCAnalysis::getWriter(Debug)
+        << "Found Compilation Unit Scope " << CompilationUnitScope << "\n";
+  }
 
   CommonHAKCAnalysis::getWriter(Debug) << "!!!! Starting Type Handling !!!!\n";
   for (auto *DITy : DbgInfoFinder.types()) {
@@ -1345,14 +1360,11 @@ void hakc::HAKCTypeIdentifier::ProcessDebugInfo() {
   FindTypesInFunctions();
   FindUsesInGlobals();
   FindUsesInFunctions();
-  // TODO: tictac
-  // FindStructManipulations();
 
   for (auto &it : types) {
     auto HAKCType = it.second;
     if (HAKCType->IsPointerType()) {
-      auto PointeeType = FindPointeeType((*HAKCType));
-      if (PointeeType) {
+      if (auto PointeeType = FindPointeeType((*HAKCType))) {
         HAKCType->SetPointeeType(PointeeType);
       }
     }

@@ -16,7 +16,7 @@ namespace llvm::hakc {
 
         void SetGlobalVariable(GlobalVariable *GV);
 
-        GlobalVariable *GetGlobalVariable();
+        GlobalVariable *GetGlobalVariable() const;
 
         StringRef GetYamlIdentifier() const override;
     };
