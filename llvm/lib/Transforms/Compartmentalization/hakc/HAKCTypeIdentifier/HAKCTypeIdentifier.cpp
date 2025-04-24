@@ -312,17 +312,34 @@ hakc::HAKCTypeIdentifier::HandleType(const DIType *type) {
                                      BasicType->getSizeInBits());
       TypeP->SetLLVMType(IntTy);
     } else if (auto *CompositeTy = dyn_cast<DICompositeType>(type)) {
-      std::string SearchName = ".";
-      SearchName += CompositeTy->getName();
-      StructType *LLVMTy = nullptr;
-      for (auto *StructTy : GetModule().getIdentifiedStructTypes()) {
-        if (StructTy->getName().ends_with(SearchName)) {
-          LLVMTy = StructTy;
-          break;
+      Type *LLVMTy = nullptr;
+      if (CompositeTy->getTag() == dwarf::DW_TAG_structure_type ||
+          CompositeTy->getTag() == dwarf::DW_TAG_union_type) {
+        std::string SearchName = ".";
+        SearchName += CompositeTy->getName();
+        for (auto *StructTy : GetModule().getIdentifiedStructTypes()) {
+          if (StructTy->getName().ends_with(SearchName)) {
+            LLVMTy = StructTy;
+            break;
+          }
+        }
+      } else if (CompositeTy->getTag() == dwarf::DW_TAG_array_type) {
+        if (CompositeTy->getBaseType()) {
+          auto ArrayMemberTy = HandleType(CompositeTy->getBaseType());
+          if (ArrayMemberTy && ArrayMemberTy->GetLLVMType()) {
+            auto SizeInBits = ArrayMemberTy->GetSizeInBits();
+            if (SizeInBits > 0 && CompositeTy->getSizeInBits()) {
+              auto ArraySize = CompositeTy->getSizeInBits() / SizeInBits;
+              LLVMTy = ArrayType::get(ArrayMemberTy->GetLLVMType(), ArraySize);
+              TypeP->SetPointeeType(ArrayMemberTy);
+            }
+          }
         }
       }
 
       if (LLVMTy) {
+        CommonHAKCAnalysis::getWriter(debug)
+            << "Setting " << *TypeP << " LLVM Type to be " << *LLVMTy << "\n";
         TypeP->SetLLVMType(LLVMTy);
       }
     } else if (auto *SubRoutineTy = dyn_cast<DISubroutineType>(type)) {
@@ -840,11 +857,15 @@ hakc::HAKCTypeIdentifier::FindType(Type *Ty) {
   if (isa<PointerType>(Ty)) {
     return nullptr;
   }
-  CommonHAKCAnalysis::getWriter(
-      AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+  auto debug = AnalysisHelper.GetSystemInfo().OutputDebugInfo();
+  CommonHAKCAnalysis::getWriter(debug)
       << "Trying to find HAKCTypeInfo for " << *Ty << "\n";
 
   for (auto &it : types) {
+    if (debug && it.second->GetLLVMType()) {
+      CommonHAKCAnalysis::getWriter(debug)
+          << "Comparing " << it.second->GetLLVMType() << " with " << Ty << "\n";
+    }
     if (it.second->GetLLVMType() && it.second->GetLLVMType() == Ty) {
       return it.second;
     }
@@ -903,8 +924,15 @@ hakc::HAKCTypeIdentifier::FindPointeeType(const HAKCTypeInfo &BaseType) {
       << "Finding Pointee Type for " << BaseType << "\n";
   DIType *TypeToFind = nullptr;
   if (BaseType.GetDbgType() &&
-      BaseType.GetDbgType()->getTag() == dwarf::DW_TAG_pointer_type) {
-    TypeToFind = dyn_cast<DIDerivedType>(BaseType.GetDbgType())->getBaseType();
+      (BaseType.GetDbgType()->getTag() == dwarf::DW_TAG_pointer_type ||
+       BaseType.GetDbgType()->getTag() == dwarf::DW_TAG_array_type)) {
+    if (BaseType.GetDbgType()->getTag() == dwarf::DW_TAG_pointer_type) {
+      TypeToFind =
+          dyn_cast<DIDerivedType>(BaseType.GetDbgType())->getBaseType();
+    } else {
+      TypeToFind =
+          dyn_cast<DICompositeType>(BaseType.GetDbgType())->getBaseType();
+    }
   }
   if (!TypeToFind) {
     CommonHAKCAnalysis::getWriter(Debug) << "Could not find PointeeType\n";

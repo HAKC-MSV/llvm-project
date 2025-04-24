@@ -7,8 +7,6 @@
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/HAKCFunctionAnalysis.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/HAKCModuleAnalysis.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCSystemInformation.h"
-// #include "TICTACFunctionDefinition/TICTACTransferFunction.h"
-// #include "TICTACFunctionDefinition/TICTACFunctionDefinition.h"
 
 namespace llvm::hakc {
 HAKCModuleAnalysis::HAKCModuleAnalysis(CommonHAKCAnalysis &CommonAnalysis,
@@ -146,14 +144,14 @@ bool HAKCModuleAnalysis::AliasShouldBeCreated(Function *F) {
 // TODO: fix tictac
 // bool HAKCModuleAnalysis::EpochAliasShouldBeCreated(Function *F) {
 //   auto symbol = getTransformer().getSystemInformation().findSymbol(F);
-//   auto epochs = getTransformer().getSystemInformation().getApplicableEpochs(symbol);
-//   auto strippedRetType = CommonHAKCAnalysis::StripType(F->getReturnType());
-//   bool returnsEpochType = false;
-//   bool usesEpochTypePointerArg = false;
-//   if (debug_output) {
-//     CommonHAKCAnalysis::getWriter() << "Checking if " << F->getName() << " should have an epoch alias.";
-//     CommonHAKCAnalysis::getWriter() << "Type: ";
-//     strippedRetType->print(CommonHAKCAnalysis::getWriter());
+//   auto epochs =
+//   getTransformer().getSystemInformation().getApplicableEpochs(symbol); auto
+//   strippedRetType = CommonHAKCAnalysis::StripType(F->getReturnType()); bool
+//   returnsEpochType = false; bool usesEpochTypePointerArg = false; if
+//   (debug_output) {
+//     CommonHAKCAnalysis::getWriter() << "Checking if " << F->getName() << "
+//     should have an epoch alias."; CommonHAKCAnalysis::getWriter() << "Type:
+//     "; strippedRetType->print(CommonHAKCAnalysis::getWriter());
 //     CommonHAKCAnalysis::getWriter() << "\n";
 //   }
 //   for (auto epoch : epochs) {
@@ -515,7 +513,7 @@ void HAKCModuleAnalysis::CreateInitGlobalMemberTransfers() {
   }
 }
 
-StringRef HAKCModuleAnalysis::GlobalInitTransferPrefix() const {
+StringRef HAKCModuleAnalysis::GlobalInitTransferPrefix() {
   return "hakc_glob_init_xfer_";
 }
 
@@ -525,17 +523,19 @@ Function *HAKCModuleAnalysis::CreateInitTransfer(GlobalVariable *GlobalVar) {
     throw std::exception();
   }
 
-  SmallString<128> FunctionName = GlobalInitTransferPrefix();
+  SmallString<128> FunctionName;
+  FunctionName.append(GlobalInitTransferPrefix());
 
   for (auto letter : GlobalVar->getName()) {
     if (letter != '@') {
-      FunctionName += letter;
+      FunctionName.push_back(letter);
     }
   }
 
   auto *GlobalTransferTy =
-      FunctionType::get(Type::getVoidTy(GetModule().getContext()), {});
-  auto *GlobalInitFunc = GetFunctionByName(FunctionName, GlobalTransferTy);
+      FunctionType::get(Type::getVoidTy(GetModule().getContext()), {}, false);
+  auto *GlobalInitFunc =
+      GetFunctionByName(FunctionName.str(), GlobalTransferTy);
   if (!GlobalInitFunc) {
     CommonHAKCAnalysis::getWriter(true)
         << "Could not get Global Transfer function " << FunctionName << "\n";
@@ -597,7 +597,7 @@ void HAKCModuleAnalysis::PopulateGlobalInitTransferFunc(
   auto GlobalTrackerName = GlobTransfer->getName() + "_loc";
   auto *TransferPointer =
       dyn_cast<GlobalVariable>(GetModule().getOrInsertGlobal(
-          GlobalTrackerName.getSingleStringRef(), GlobTransfer->getType()));
+          GlobalTrackerName.str(), GlobTransfer->getType()));
   TransferPointer->setConstant(true);
   TransferPointer->setInitializer(GlobTransfer);
   TransferPointer->setSection(GlobalInitTransferPointerSectionName());

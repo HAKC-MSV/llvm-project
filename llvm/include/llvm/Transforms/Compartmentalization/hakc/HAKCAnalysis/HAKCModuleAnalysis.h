@@ -38,7 +38,7 @@ protected:
 
   Function *CreateInitTransfer(GlobalVariable *GlobalVar);
 
-  StringRef GlobalInitTransferPrefix() const;
+  static StringRef GlobalInitTransferPrefix();
 
   StringRef GlobalInitTransferSectionName() const;
 

@@ -75,9 +75,10 @@ bool HAKCTypeInfo::IsIntegerType() const {
 
 bool HAKCTypeInfo::IsPointerType() const {
   if (DbgType) {
-    return DbgType->getTag() == dwarf::DW_TAG_pointer_type;
+    return DbgType->getTag() == dwarf::DW_TAG_pointer_type ||
+           DbgType->getTag() == dwarf::DW_TAG_array_type;
   } else if (LLVMType) {
-    return LLVMType->isPointerTy();
+    return LLVMType->isPointerTy() || LLVMType->isArrayTy();
   }
   return false;
 }
