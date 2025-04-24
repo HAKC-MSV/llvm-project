@@ -123,6 +123,8 @@ class HAKCPolicyDataSource:
         if symbol is None:
             raise Exception("ERROR: get_symbol_division did not receive a symbol object")
         symbol = yaml.load(symbol, Loader=self.yaml_loader)
+        ret = None
+
         ret = self._get_symbol_division_from_backing_store(symbol)
         if ret is None:
             ret = HAKCDivisionCompartmentPayload(division=self._get_default_division(),
