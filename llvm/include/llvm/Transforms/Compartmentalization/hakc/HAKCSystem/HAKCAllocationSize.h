@@ -44,10 +44,50 @@ protected:
   unsigned ArgNo;
 };
 
+class HAKCSimpleStaticSize : public HAKCAllocationSize {
+  friend class HAKCAllocationSize;
+
+public:
+  HAKCSimpleStaticSize(Function *AllocationFunction, StringRef SizeString);
+
+  ConstantInt *GetSize(CallInst *Val) override;
+
+protected:
+  unsigned StaticSize;
+};
+
+class HAKCStaticPlusArgument : public HAKCAllocationSize {
+  friend class HAKCAllocationSize;
+
+public:
+  HAKCStaticPlusArgument(Function *AllocationFunction, StringRef SizeString, StringRef Argument);
+
+  ConstantInt *GetSize(CallInst *Val) override;
+
+protected:
+  unsigned StaticSize;
+  unsigned ArgNo;
+};
+
+
 class HAKCMultiplyArgumentSize : public HAKCAllocationSize {
 public:
   HAKCMultiplyArgumentSize(Function *AllocationFunction, StringRef Argument0,
                            StringRef Argument1);
+  ConstantInt *GetSize(CallInst *Val) override;
+
+protected:
+  unsigned Arg0;
+  unsigned Arg1;
+};
+
+
+class HAKCArgumentGEP : public HAKCAllocationSize {
+  friend class HAKCAllocationSize;
+
+public:
+  HAKCArgumentGEP(Function *AllocationFunction, StringRef Argument0, StringRef Argument1);
+
   ConstantInt *GetSize(CallInst *Val) override;
 
 protected:
