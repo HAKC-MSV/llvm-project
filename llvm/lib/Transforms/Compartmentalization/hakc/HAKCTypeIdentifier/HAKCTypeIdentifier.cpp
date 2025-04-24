@@ -44,19 +44,6 @@ void hakc::HAKCTypeIdentifier::AddTypeMapping(
   types[type] = HAKCType;
 }
 
-unsigned hakc::HAKCTypeIdentifier::GetAnonymousID(const DIType *type) {
-  unsigned ID;
-  if (AnonymousNumberMapping.contains(type)) {
-    AnonymousNumberMapping[type] = CurrentAnonID;
-    ID = CurrentAnonID;
-    CurrentAnonID++;
-  } else {
-    ID = AnonymousNumberMapping[type];
-  }
-
-  return ID;
-}
-
 std::string hakc::HAKCTypeIdentifier::GetTypeName(const DIType *type) const {
   std::string Name;
   llvm::raw_string_ostream out(Name);
@@ -175,8 +162,14 @@ Type *hakc::HAKCTypeIdentifier::FindNamedType(StringRef TypeName) const {
 }
 
 Type *hakc::HAKCTypeIdentifier::FindAnonymousType(
-    const DICompositeType *CompositeTy) const {
+    const DICompositeType *CompositeTy) {
   auto debug = AnalysisHelper.GetSystemInfo().OutputDebugInfo();
+
+  auto Cached = AnonymousTypes.find(CompositeTy);
+  if (Cached != AnonymousTypes.end()) {
+    return Cached->second;
+  }
+
   SmallVector<StructType *> FoundTypes;
   for (auto *StructTy : GetModule().getIdentifiedStructTypes()) {
     if (StructTy->getName().contains(".anon")) {
@@ -205,14 +198,16 @@ Type *hakc::HAKCTypeIdentifier::FindAnonymousType(
   for (auto *Ty : FoundTypes) {
     CommonHAKCAnalysis::getWriter(debug) << Ty << "\n";
   }
+  Type *FoundType = nullptr;
   if (!FoundTypes.empty()) {
-    return FoundTypes.front();
+    FoundType = FoundTypes.front();
   }
 
-  return nullptr;
+  AnonymousTypes[CompositeTy] = FoundType;
+  return FoundType;
 }
 
-Type *hakc::HAKCTypeIdentifier::GetLLVMType(const DIType *Ty) const {
+Type *hakc::HAKCTypeIdentifier::GetLLVMType(const DIType *Ty) {
   CommonHAKCAnalysis::getWriter(
       AnalysisHelper.GetSystemInfo().OutputDebugInfo())
       << "Finding LLVM Type for " << Ty << "\n";
@@ -248,7 +243,7 @@ Type *hakc::HAKCTypeIdentifier::GetLLVMType(const DIType *Ty) const {
 }
 
 FunctionType *hakc::HAKCTypeIdentifier::GetLLVMFunctionTy(
-    const DISubroutineType *FunctionTy) const {
+    const DISubroutineType *FunctionTy) {
   auto &Ctx = GetModule().getContext();
   auto *ReturnTy = Type::getVoidTy(Ctx);
   auto TyArray = FunctionTy->getTypeArray();
@@ -263,7 +258,7 @@ FunctionType *hakc::HAKCTypeIdentifier::GetLLVMFunctionTy(
   }
   if (!FunctionType::isValidReturnType(ReturnTy)) {
     CommonHAKCAnalysis::getWriter(debug)
-        << "Type " << ReturnTy << " is not a valid argument type\n";
+        << "Type " << ReturnTy << " is not a valid return type\n";
     return nullptr;
   }
   SmallVector<Type *> ArgTys;
@@ -282,7 +277,8 @@ FunctionType *hakc::HAKCTypeIdentifier::GetLLVMFunctionTy(
     }
     if (!FunctionType::isValidArgumentType(Ty)) {
       CommonHAKCAnalysis::getWriter(true)
-          << "Type " << Ty << " is not a valid argument type\n";
+          << "Type " << Ty << " for DIType " << TyArray[i]
+          << " is not a valid argument type\n";
       return nullptr;
     }
     ArgTys.push_back(Ty);
@@ -1305,7 +1301,7 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::HandleIndirectCall(CallInst *CallI) {
 
 hakc::HAKCTypeIdentifier::HAKCTypeIdentifier(CommonHAKCAnalysis &AnalysisHelper)
     : AnalysisHelper(AnalysisHelper), DbgInfoFinder(), types(), globals(),
-      functions(), AllocaTypes(), IndirectCallsTypes(), CurrentAnonID(0),
+      functions(), AllocaTypes(), IndirectCallsTypes(), AnonymousTypes(),
       CompilationUnitScope(nullptr) {}
 
 Module &hakc::HAKCTypeIdentifier::GetModule() const {
@@ -1318,9 +1314,11 @@ void hakc::HAKCTypeIdentifier::ProcessDebugInfo() {
 
   CommonHAKCAnalysis::getWriter(Debug) << GetModule() << "\n";
 
+  StringRef ModulePath = GetModule().getSourceFileName();
   for (auto *Scope : DbgInfoFinder.scopes()) {
     if (auto *File = dyn_cast<DIFile>(Scope)) {
-      if (File->getFilename() == GetModule().getSourceFileName()) {
+      auto Filename = File->getFilename();
+      if (ModulePath.contains(Filename)) {
         CompilationUnitScope = Scope;
         break;
       }
@@ -1336,7 +1334,11 @@ void hakc::HAKCTypeIdentifier::ProcessDebugInfo() {
   }
 
   CommonHAKCAnalysis::getWriter(Debug) << "!!!! Starting Type Handling !!!!\n";
+  unsigned TypesProcessed = 0;
   for (auto *DITy : DbgInfoFinder.types()) {
+    CommonHAKCAnalysis::getWriter(Debug)
+        << "Processing Type " << ++TypesProcessed << " of "
+        << DbgInfoFinder.type_count() << "\n";
     auto TypeP = HandleType(DITy);
   }
   CommonHAKCAnalysis::getWriter(Debug) << "!!!! Finished Type Handling !!!!\n";

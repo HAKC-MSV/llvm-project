@@ -332,7 +332,8 @@ HAKCCompartmentalizationPolicy::Execute(StringRef Endpoint,
   }
   auto ParsedJson = Response.GetJSON();
   if (auto E = ParsedJson.takeError()) {
-    CommonHAKCAnalysis::getWriter(true) << "Error Parsing JSON\n";
+    CommonHAKCAnalysis::getWriter(true)
+        << "Error Parsing JSON: " << llvm::toString(std::move(E)) << "\n";
     throw std::exception();
   }
   auto Obj = ParsedJson->getAsObject();

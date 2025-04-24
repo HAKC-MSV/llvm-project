@@ -91,8 +91,6 @@ protected:
 
   void FindTypesInFunctions();
 
-  unsigned GetAnonymousID(const DIType *type);
-
   HAKCSymbolP AddUnmappedGlobal(GlobalObject *GlobalObj);
 
   HAKCFunctionP AddUnmappedFunction(Function *F);
@@ -124,27 +122,26 @@ protected:
   HAKCTypeP GetArgumentHAKCType(const DISubroutineType *FunctionTy,
                                 unsigned ArgNo);
 
-  FunctionType *GetLLVMFunctionTy(const DISubroutineType *FunctionTy) const;
+  FunctionType *GetLLVMFunctionTy(const DISubroutineType *FunctionTy);
 
-  Type *GetLLVMType(const DIType *) const;
+  Type *GetLLVMType(const DIType *);
 
   HAKCTypeP AddAllocaType(const HAKCTypeP &BaseType);
 
   Type *FindNamedType(StringRef TypeName) const;
 
-  Type *FindAnonymousType(const DICompositeType *CompositeTy) const;
+  Type *FindAnonymousType(const DICompositeType *CompositeTy);
 
   CommonHAKCAnalysis &AnalysisHelper;
   DebugInfoFinder DbgInfoFinder;
   std::map<const DIType *, HAKCTypeP> types;
   std::map<const DIGlobalVariable *, HAKCGlobalP> globals;
   std::map<const DISubprogram *, HAKCFunctionP> functions;
-  std::map<const DIType *, unsigned> AnonymousNumberMapping;
   std::set<HAKCGlobalP> UnmappedGlobals;
   std::set<HAKCFunctionP> UnmappedFunctions;
   std::set<HAKCTypeP> AllocaTypes;
   std::map<CallInst *, HAKCTypeP> IndirectCallsTypes;
-  unsigned CurrentAnonID;
+  std::map<const DICompositeType *, Type *> AnonymousTypes;
   const DIScope *CompilationUnitScope;
 };
 } // namespace llvm::hakc
