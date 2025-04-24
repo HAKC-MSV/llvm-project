@@ -22,6 +22,13 @@ CustomTransferFunctions:
       - { idx: 0, type: ptr, arg-use: signed-ptr }
       - { idx: 1, type: i64, arg-use: compartment }
       - { idx: 2, type: i64, arg-use: division }
+  - transfer-obj-type: "char []"
+    name: hakc_transfer_string
+    return-type: ptr
+    arguments:
+      - { idx: 0, type: ptr, arg-use: signed-ptr }
+      - { idx: 1, type: i64, arg-use: compartment }
+      - { idx: 2, type: i64, arg-use: division }
   - transfer-obj-type: "struct sk_buff *"
     name: hakc_transfer_skb
     return-type: ptr

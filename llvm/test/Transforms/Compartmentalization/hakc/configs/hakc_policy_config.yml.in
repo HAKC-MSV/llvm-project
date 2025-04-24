@@ -8,7 +8,7 @@
   "socket_path": "@HAKC_SOCKET_PATH@",
   "reuse_path": true,
   "test-mode": true,
-  "server_timeout": 100,
+  "server_timeout": 10,
   "get-compartment-by-id-endpoint": "get-compartment-by-id",
   "get-division-by-id-endpoint": "get-division-by-id",
   "get-division-from-symbol-endpoint": "get-division-from-symbol",

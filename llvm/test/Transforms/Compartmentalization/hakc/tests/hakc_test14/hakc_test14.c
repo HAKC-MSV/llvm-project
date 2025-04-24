@@ -6,9 +6,14 @@
 
 char *GlobalString = "hello world";
 
+// CHECK-LABEL: HAKC_ORIG_printstr
 int printstr(char *str) {
   printf("%s %s\n", str, GlobalString);
   return 0;
 }
 
-// CHECK_LABEL: HAKC_ORIG_printstr
+// CHECK-LABEL: hakc_glob_init_xfer_GlobalString
+// CHECK: call ptr @hakc_transfer_string(ptr @.str, i64 3, i64 13)
+
+// CHECK-LABEL: HAKC_XFER_printstr
+// CHECK: call ptr @hakc_transfer_string(ptr %0, i64 2, i64 13)
