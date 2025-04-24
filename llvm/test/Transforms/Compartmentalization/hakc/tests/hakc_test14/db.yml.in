@@ -25,7 +25,7 @@ edges:
     persisted: true
     source: *id001
     target: &id003 !HAKCCompilationUnit
-      filename: /home/de29664/code/HAKC/llvm-project/llvm/test/Transforms/Compartmentalization/hakc/tests/hakc_test14/hakc_test14.c
+      filename: @HAKC_TEST_DIR@/hakc_test14.c
   - key: InDivision
     persisted: true
     source: *id001
@@ -36,7 +36,7 @@ edges:
   - key: IsType
     persisted: true
     source: &id002 !HAKCFunction
-      DefiningFile: /home/de29664/code/HAKC/llvm-project/llvm/test/Transforms/Compartmentalization/hakc/tests/hakc_test14/hakc_test14.c
+      DefiningFile: @HAKC_TEST_DIR@/hakc_test14.c
       DefiningLine: 9
       Name: printstr
       is_function: true
@@ -65,7 +65,7 @@ edges:
     persisted: true
     source: *id002
     target: &id004 !HAKCGlobalVariable
-      DefiningFile: /home/de29664/code/HAKC/llvm-project/llvm/test/Transforms/Compartmentalization/hakc/tests/hakc_test14/hakc_test14.c
+      DefiningFile: @HAKC_TEST_DIR@/hakc_test14.c
       DefiningLine: 7
       Name: GlobalString
       is_function: false
