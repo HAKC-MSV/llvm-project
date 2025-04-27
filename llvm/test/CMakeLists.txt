@@ -230,6 +230,7 @@ if (LLVM_INCLUDE_SPIRV_TOOLS_TESTS)
 endif ()
 
 if (LLVM_ENABLE_HAKC)
+    file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/hakc-sockets") # create the hakc-sockets directory
     set(HAKC_SOCKET_ROOT "${CMAKE_BINARY_DIR}/hakc-sockets" CACHE STRING "Directory to use for test socket paths")
     string(LENGTH "${HAKC_SOCKET_ROOT}/hakc_test0.db.sock" socket_path_length)
     if (socket_path_length GREATER_EQUAL 107)

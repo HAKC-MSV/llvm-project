@@ -32,11 +32,11 @@ protected:
   Function *AllocationFunction;
 };
 
-class HAKCSingleArgumentSize : public HAKCAllocationSize {
+class HAKCSimpleArgumentSize : public HAKCAllocationSize {
   friend class HAKCAllocationSize;
 
 public:
-  HAKCSingleArgumentSize(Function *AllocationFunction, StringRef Argument);
+  HAKCSimpleArgumentSize(Function *AllocationFunction, StringRef Argument);
 
   ConstantInt *GetSize(CallInst *Val) override;
 

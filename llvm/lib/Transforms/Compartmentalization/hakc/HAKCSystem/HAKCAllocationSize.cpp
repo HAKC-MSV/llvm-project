@@ -8,19 +8,18 @@
 
 namespace llvm::hakc {
 
-// TODO: rename HAKCSingleArgumentSize to HAKCSimpleArgumentSize (to match enum names)
-HAKCSingleArgumentSize::HAKCSingleArgumentSize(Function *AllocationFunction,
+HAKCSimpleArgumentSize::HAKCSimpleArgumentSize(Function *AllocationFunction,
                                                StringRef Argument)
     : HAKCAllocationSize(AllocationFunction), ArgNo(0) {
   if (Argument.empty()) {
     CommonHAKCAnalysis::getWriter(true)
-        << "Invalid HAKCSingleArgumentSize Argument\n";
+        << "Invalid HAKCSimpleArgumentSize Argument\n";
     throw std::exception();
   }
 
   Argument.getAsInteger(10, ArgNo);
 }
-ConstantInt *HAKCSingleArgumentSize::GetSize(CallInst *Val) {
+ConstantInt *HAKCSimpleArgumentSize::GetSize(CallInst *Val) {
   IRBuilder<> irBuilder(Val);
   Value *size = Val->getArgOperand(ArgNo);
   size = irBuilder.CreateZExtOrBitCast(size, irBuilder.getInt64Ty());
@@ -46,6 +45,7 @@ ConstantInt *HAKCSimpleStaticSize::GetSize(CallInst *Val) {
 }
 
 // e.g., - { name: nlmsg_new, type: StaticPlusArgument, arguments: [ 64,0 ] }
+// i.e., variable size struct = fixed size + argument size
 HAKCStaticPlusArgument::HAKCStaticPlusArgument(Function *AllocationFunction,
                                                StringRef SizeString, StringRef Argument)
     : HAKCAllocationSize(AllocationFunction), StaticSize(0), ArgNo(0) {
@@ -59,12 +59,13 @@ HAKCStaticPlusArgument::HAKCStaticPlusArgument(Function *AllocationFunction,
   Argument.getAsInteger(10, ArgNo);
 }
 ConstantInt *HAKCStaticPlusArgument::GetSize(CallInst *Val) {
-  // TODO
-  // IRBuilder<> irBuilder(Val);
-  // Value *size = Val->getArgOperand(ArgNo);
-  // size = irBuilder.CreateZExtOrBitCast(size, irBuilder.getInt64Ty());
-  // auto *CI = dyn_cast<ConstantInt>(size);
-  // return CI;
+    IRBuilder<> irBuilder(Val);
+    Value *ArgSizeVal = Val->getArgOperand(ArgNo);
+    ArgSizeVal = irBuilder.CreateZExtOrBitCast(ArgSizeVal, irBuilder.getInt64Ty());
+    Value* StaticSizeVal = irBuilder.getInt64(StaticSize);
+    Value* TotalSizeVal = irBuilder.getInt64(dyn_cast<ConstantInt>(StaticSizeVal)->getZExtValue() + dyn_cast<ConstantInt>(ArgSizeVal)->getZExtValue());
+    auto *CI = dyn_cast<ConstantInt>(TotalSizeVal);
+    return CI;
 }
 
 HAKCMultiplyArgumentSize::HAKCMultiplyArgumentSize(Function *AllocationFunction,
@@ -101,6 +102,17 @@ ConstantInt *HAKCMultiplyArgumentSize::GetSize(CallInst *Val) {
 }
 
 // e.g.,  - { name: kmem_cache_alloc, type: ArgumentGEP, arguments: [ 0,1 ] }
+// https://www.kernel.org/doc/html/next/core-api/mm-api.html#c.kmem_cache_alloc
+// void *kmem_cache_alloc(struct kmem_cache *cachep, gfp_t flags)¶
+// struct kmem_cache_args {
+//  unsigned int align;
+//  unsigned int useroffset;
+//  unsigned int usersize;
+//  unsigned int freeptr_offset;
+//  bool use_freeptr_offset;
+//  void (*ctor)(void *);
+//};
+
 HAKCArgumentGEP::HAKCArgumentGEP(Function *AllocationFunction,
                                  StringRef Argument0, StringRef Argument1)
     : HAKCAllocationSize(AllocationFunction), Arg0(0), Arg1(0) {
@@ -114,13 +126,12 @@ HAKCArgumentGEP::HAKCArgumentGEP(Function *AllocationFunction,
   Argument1.getAsInteger(10, Arg1);
 }
 ConstantInt *HAKCArgumentGEP::GetSize(CallInst *Val) {
-  // TODO
-
-  // IRBuilder<> irBuilder(Val);
-  // Value *size = Val->getArgOperand(ArgNo);
-  // size = irBuilder.CreateZExtOrBitCast(size, irBuilder.getInt64Ty());
-  // auto *CI = dyn_cast<ConstantInt>(size);
-  // return CI;
+  // TODO: Derrick - please check this GEP struct dereference logic
+  IRBuilder<> irBuilder(Val);
+  Value *Arg0Val = Val->getArgOperand(Arg0);
+  auto *StructSize = irBuilder.CreateStructGEP(Arg0Val->getType(), Arg0Val, 2);  // idx2 corresponds to 'usersize'
+  auto *CI = dyn_cast<ConstantInt>(StructSize);
+  return CI;
 }
 
 HAKCAllocationSize::HAKCAllocationSize(Function *AllocationFunction)
@@ -140,7 +151,7 @@ HAKCAllocationSize::FromYaml(const hakc::HAKCYAMLAllocationType &YamlAllocation,
         << " is not supported\n";
     throw std::exception();
   case hakc::SimpleArgumentSize:
-    return std::make_shared<HAKCSingleArgumentSize>(
+    return std::make_shared<HAKCSimpleArgumentSize>(
         F, YamlAllocation.Arguments[0]);
   case hakc::SimpleStaticSize:
     return std::make_shared<HAKCSimpleStaticSize>(
@@ -152,8 +163,8 @@ HAKCAllocationSize::FromYaml(const hakc::HAKCYAMLAllocationType &YamlAllocation,
     return std::make_shared<HAKCMultiplyArgumentSize>(
         F, YamlAllocation.Arguments[0], YamlAllocation.Arguments[1]);
   case hakc::ArgumentGEP:
-  return std::make_shared<HAKCArgumentGEP>(
-      F, YamlAllocation.Arguments[0], YamlAllocation.Arguments[1]);
+    return std::make_shared<HAKCArgumentGEP>(
+        F, YamlAllocation.Arguments[0], YamlAllocation.Arguments[1]);
 }
 
 }
