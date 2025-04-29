@@ -30,26 +30,25 @@ protected:
   HAKCAllocationSize() = default;
 
   Function *AllocationFunction;
-  SmallVector<Value*> Parameters;
 };
 
 class HAKCSimpleArgumentSize : public HAKCAllocationSize {
   friend class HAKCAllocationSize;
 
 public:
-  HAKCSimpleArgumentSize(Function *AllocationFunction, std::vector<std::string> ArgStrings);
+  HAKCSimpleArgumentSize(Function *AllocationFunction, StringRef ArgNoString);
 
   ConstantInt *GetSize(CallInst *Val) override;
 
 protected:
-  std::vector<unsigned> Args;
+  unsigned ArgNo;
 };
 
 class HAKCSimpleStaticSize : public HAKCAllocationSize {
   friend class HAKCAllocationSize;
 
 public:
-  HAKCSimpleStaticSize(Function *AllocationFunction, StringRef SizeString);
+  HAKCSimpleStaticSize(Function *AllocationFunction, StringRef StaticSizeString);
 
   ConstantInt *GetSize(CallInst *Val) override;
 
@@ -61,23 +60,25 @@ class HAKCStaticPlusArgument : public HAKCAllocationSize {
   friend class HAKCAllocationSize;
 
 public:
-  HAKCStaticPlusArgument(Function *AllocationFunction, std::vector<StringRef> ArgStrings);
+  HAKCStaticPlusArgument(Function *AllocationFunction, StringRef StaticSizeString, StringRef ArgNoString);
 
   ConstantInt *GetSize(CallInst *Val) override;
 
 protected:
   unsigned StaticSize;
-  std::vector<unsigned> Args;
+  unsigned ArgNo;
 };
 
 
 class HAKCMultiplyArgumentSize : public HAKCAllocationSize {
 public:
-  HAKCMultiplyArgumentSize(Function *AllocationFunction, std::vector<StringRef> Args);
+  // eg alloc n args of size s
+  HAKCMultiplyArgumentSize(Function *AllocationFunction, StringRef NObjsString, StringRef ArgSizePerObjString);
   ConstantInt *GetSize(CallInst *Val) override;
 
 protected:
-  std::vector<unsigned> Args;
+  unsigned NObjs;
+  unsigned ArgSizePerObj;
 };
 
 
@@ -85,12 +86,15 @@ class HAKCArgumentGEP : public HAKCAllocationSize {
   friend class HAKCAllocationSize;
 
 public:
-  HAKCArgumentGEP(Function *AllocationFunction, std::vector<StringRef> Args);
+  // abc->index0->index1->index2
+  // ArgAccessNo is the arg of the struct
+  HAKCArgumentGEP(Function *AllocationFunction, StringRef ArgAccessNoString, ArrayRef<StringRef> IndicesString);
 
   ConstantInt *GetSize(CallInst *Val) override;
 
 protected:
-  std::vector<unsigned> Args;
+  unsigned ArgAccessNo;
+  SmallVector<unsigned> Indices;
 };
 } // namespace llvm::hakc
 

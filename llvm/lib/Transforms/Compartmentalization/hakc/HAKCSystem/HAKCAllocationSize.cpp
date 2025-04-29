@@ -6,51 +6,37 @@
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/CommonHAKCAnalysis.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/yaml/HAKCYaml.h"
 
-#include <llvm/Support/AMDGPUMetadata.h>
-
 namespace llvm::hakc {
 
-HAKCSimpleArgumentSize::HAKCSimpleArgumentSize(Function *AllocationFunction, SmallVector<StringRef> ArgStrings)
-    : HAKCAllocationSize(AllocationFunction) {
-  if (ArgStrings.empty()) {
+HAKCSimpleArgumentSize::HAKCSimpleArgumentSize(Function *AllocationFunction, StringRef ArgNoString)
+    : HAKCAllocationSize(AllocationFunction), ArgNo(0) {
+  if (ArgNoString.empty()) {
     CommonHAKCAnalysis::getWriter(true)
         << "Invalid HAKCSimpleArgumentSize Argument\n";
     throw std::exception();
   }
 
-  for (StringRef Arg : ArgStrings) {
-      unsigned ArgNo;
-      Arg.getAsInteger(10, ArgNo);
-      Args.push_back(ArgNo);
-  }
+  ArgNoString.getAsInteger(10, ArgNo);
+
 }
 ConstantInt *HAKCSimpleArgumentSize::GetSize(CallInst *Val) {
-  // TODO: double check this
   IRBuilder<> irBuilder(Val);
-  Value* Accumulator = irBuilder.getInt64(0);
-  for (unsigned Arg : Args) {
-    Value *size = Val->getArgOperand(Arg);
-    size = irBuilder.CreateZExtOrBitCast(size, irBuilder.getInt64Ty());
-    ConstantInt *CI = dyn_cast<ConstantInt>(size);
-    // TODO: should this use an add instruction, or this casting thing
-    // auto *AddInst = irBuilder.CreateAdd(Accumulator, CI);
-    auto* AddInst = irBuilder.getInt64(dyn_cast<ConstantInt>(Accumulator)->getZExtValue() + dyn_cast<ConstantInt>(CI)->getZExtValue());
-    Accumulator = AddInst;
-  }
-  return dyn_cast<ConstantInt>(Accumulator);
+  Value *size = Val->getArgOperand(ArgNo);
+  size = irBuilder.CreateZExtOrBitCast(size, irBuilder.getInt64Ty());
+  ConstantInt *CI = dyn_cast<ConstantInt>(size);
+  return CI;
 }
 
 // e.g., - { name: neigh_parms_alloc, type: SimpleStaticSize, arguments: [ 144 ] }
-HAKCSimpleStaticSize::HAKCSimpleStaticSize(Function *AllocationFunction,
-                                               StringRef SizeString)
+HAKCSimpleStaticSize::HAKCSimpleStaticSize(Function *AllocationFunction, StringRef StaticSizeString)
     : HAKCAllocationSize(AllocationFunction), StaticSize(0) {
-  if (SizeString.empty()) {
+  if (StaticSizeString.empty()) {
     CommonHAKCAnalysis::getWriter(true)
         << "Invalid HAKCSimpleStaticSize Argument\n";
     throw std::exception();
   }
 
-  SizeString.getAsInteger(10, StaticSize);
+  StaticSizeString.getAsInteger(10, StaticSize);
 }
 ConstantInt *HAKCSimpleStaticSize::GetSize(CallInst *Val) {
   IRBuilder<> irBuilder(Val);
@@ -59,62 +45,46 @@ ConstantInt *HAKCSimpleStaticSize::GetSize(CallInst *Val) {
 
 // e.g., - { name: nlmsg_new, type: StaticPlusArgument, arguments: [ 64,0 ] }
 // i.e., variable size struct = fixed size + argument size
-HAKCStaticPlusArgument::HAKCStaticPlusArgument(Function *AllocationFunction, SmallVector<StringRef> ArgStrings)
+HAKCStaticPlusArgument::HAKCStaticPlusArgument(Function *AllocationFunction, StringRef StaticSizeString, StringRef ArgNoString)
     : HAKCAllocationSize(AllocationFunction), StaticSize(0) {
-  if (ArgStrings.empty()) {
+  if (StaticSizeString.empty() || ArgNoString.empty()) {
     CommonHAKCAnalysis::getWriter(true)
-        << "Invalid HAKCStaticPlusArgument Argument\n";
+        << "Invalid HAKCStaticPlusArgument arguments\n";
     throw std::exception();
   }
 
-  ArgStrings[0].getAsInteger(10, StaticSize);
-  for (unsigned i = 0; i < ArgStrings.size(); ++i){
-    if (i == 0){ continue;};
-    unsigned ArgNo;
-    ArgStrings[i].getAsInteger(10, ArgNo);
-    Args.push_back(ArgNo);
-  }
+  StaticSizeString.getAsInteger(10, StaticSize);
+  ArgNoString.getAsInteger(10, ArgNo);
 }
 ConstantInt *HAKCStaticPlusArgument::GetSize(CallInst *Val) {
     IRBuilder<> irBuilder(Val);
-    Value* Accumulator = irBuilder.getInt64(StaticSize);
-    for (unsigned Arg : Args) {
-      Value *size = Val->getArgOperand(Arg);
-      size = irBuilder.CreateZExtOrBitCast(size, irBuilder.getInt64Ty());
-      ConstantInt *CI = dyn_cast<ConstantInt>(size);
-      // auto *AddInst = irBuilder.CreateAdd(Accumulator, CI);
-      auto* AddInst = irBuilder.getInt64(dyn_cast<ConstantInt>(Accumulator)->getZExtValue() + dyn_cast<ConstantInt>(CI)->getZExtValue());
-      Accumulator = AddInst;
-    }
-    return dyn_cast<ConstantInt>(Accumulator);
+    Value *ArgSizeVal = Val->getArgOperand(ArgNo);
+    ArgSizeVal = irBuilder.CreateZExtOrBitCast(ArgSizeVal, irBuilder.getInt64Ty());
+    Value *StaticSizeVal = irBuilder.getInt64(StaticSize);
+    ConstantInt* CI = irBuilder.getInt64(dyn_cast<ConstantInt>(ArgSizeVal)->getZExtValue() + dyn_cast<ConstantInt>(StaticSizeVal)->getZExtValue());
+    return CI;
 }
 
-HAKCMultiplyArgumentSize::HAKCMultiplyArgumentSize(Function *AllocationFunction, SmallVector<StringRef> ArgStrings)
-    : HAKCAllocationSize(AllocationFunction) {
-  if (ArgStrings.empty()) {
+HAKCMultiplyArgumentSize::HAKCMultiplyArgumentSize(Function *AllocationFunction, StringRef NObjsString, StringRef ArgSizePerObjString)
+    : HAKCAllocationSize(AllocationFunction), NObjs(0), ArgSizePerObj(0) {
+  if (NObjsString.empty() || ArgSizePerObjString.empty()) {
     CommonHAKCAnalysis::getWriter(true)
-        << "ArgStrings in HAKCMultiplyArgumentSize is empty!\n";
+        << "Invalid HAKCMultiplyArgumentSize arguments!\n";
     throw std::exception();
   }
-
-  for (StringRef Arg : ArgStrings) {
-    unsigned ArgNo;
-    Arg.getAsInteger(10, ArgNo);
-    Args.push_back(ArgNo);
-  }
+  NObjsString.getAsInteger(10, NObjs);
+  ArgSizePerObjString.getAsInteger(10, ArgSizePerObj);
 }
 
 ConstantInt *HAKCMultiplyArgumentSize::GetSize(CallInst *Val) {
   IRBuilder<> irBuilder(Val);
-  Value* Accumulator = irBuilder.getInt64(0);
-  for (unsigned Arg : Args) {
-    Value *size = Val->getArgOperand(Arg);
-    size = irBuilder.CreateZExtOrBitCast(size, irBuilder.getInt64Ty());
-    ConstantInt *CI = dyn_cast<ConstantInt>(size);
-    auto* AddInst = irBuilder.getInt64(dyn_cast<ConstantInt>(Accumulator)->getZExtValue() * dyn_cast<ConstantInt>(CI)->getZExtValue());
-    Accumulator = AddInst;
-  }
-  return dyn_cast<ConstantInt>(Accumulator);
+
+  Value *NObjsVal = Val->getArgOperand(NObjs);
+  NObjsVal = irBuilder.CreateZExtOrBitCast(NObjsVal, irBuilder.getInt64Ty());
+  Value *ArgSizePerObjVal = Val->getArgOperand(ArgSizePerObj);
+  ArgSizePerObjVal = irBuilder.CreateZExtOrBitCast(ArgSizePerObjVal, irBuilder.getInt64Ty());
+  ConstantInt *CI = irBuilder.getInt64(dyn_cast<ConstantInt>(NObjsVal)->getZExtValue() * dyn_cast<ConstantInt>(ArgSizePerObjVal)->getZExtValue());
+  return CI;
 }
 
 // e.g.,  - { name: kmem_cache_alloc, type: ArgumentGEP, arguments: [ 0,1 ] }
@@ -129,39 +99,29 @@ ConstantInt *HAKCMultiplyArgumentSize::GetSize(CallInst *Val) {
 //  void (*ctor)(void *);
 //};
 
-HAKCArgumentGEP::HAKCArgumentGEP(Function *AllocationFunction,
-                                 SmallVector<StringRef> ArgStrings)
+HAKCArgumentGEP::HAKCArgumentGEP(Function *AllocationFunction, StringRef ArgAccessNoString, ArrayRef<StringRef> IndicesString)
     : HAKCAllocationSize(AllocationFunction) {
-  if (ArgStrings.empty()) {
+  if (ArgAccessNoString.empty() || IndicesString.empty()) {
     CommonHAKCAnalysis::getWriter(true)
-        << "Invalid HAKCArgumentGEP Argument\n";
+        << "Invalid HAKCArgumentGEP arguments!\n";
     throw std::exception();
   }
-
-  for (StringRef Arg : ArgStrings) {
-    unsigned ArgNo;
-    Arg.getAsInteger(10, ArgNo);
-    Args.push_back(ArgNo);
+  ArgAccessNoString.getAsInteger(10, ArgAccessNo);
+  for (auto IndexString : IndicesString) {
+    unsigned Index;
+    IndexString.getAsInteger(10, Index);
+    Indices.push_back(Index);
   }
 }
 ConstantInt *HAKCArgumentGEP::GetSize(CallInst *Val) {
-  // TODO: Derrick - please check this GEP struct dereference logic
-
-  // TODO: figure out size logic for multiple indices
-
-  //            std::vector<Value*> indices;
-  //            indices.push_back(ConstantInt::get(sizeTy, args[1], false));
-  //            Value *gep = irBuilder.CreateGEP(sizeTy, call->getArgOperand(args[0]), indices);
-  //            Value *size = irBuilder.CreateLoad(sizeTy, gep);
-  //            return size;*/
-  //
-  //            return ConstantInt::get(Type::getInt64Ty(allocation->getContext()), 64, false);
-
-  // IRBuilder<> irBuilder(Val);
-  // Value *Arg0Val = Val->getArgOperand(Arg0);
-  // auto *StructSize = irBuilder.CreateStructGEP(Arg0Val->getType(), Arg0Val, 2);  // idx2 corresponds to 'usersize'
-  // auto *CI = dyn_cast<ConstantInt>(StructSize);
-  // return CI;
+  IRBuilder<> irBuilder(Val);
+  SmallVector<Value*> IndicesVal; // IncidesVal must be of type Value* to be used in CreateGEP
+  for (auto Index : Indices) {
+    IndicesVal.push_back(ConstantInt::get(irBuilder.getInt64Ty(), Index)); //
+  }
+  Value* GEP = irBuilder.CreateGEP(irBuilder.getInt64Ty(), Val->getArgOperand(ArgAccessNo), IndicesVal);
+  Value* Size = irBuilder.CreateLoad(irBuilder.getInt64Ty(), GEP);
+  return dyn_cast<ConstantInt>(Size);
 }
 
 HAKCAllocationSize::HAKCAllocationSize(Function *AllocationFunction)
@@ -180,23 +140,25 @@ HAKCAllocationSize::FromYaml(const hakc::HAKCYAMLAllocationType &YamlAllocation,
         << "HAKCAllocation Type " << YamlAllocation.AllocationType
         << " is not supported\n";
     throw std::exception();
-    // TODO: should we use std::vector, or SmallVector? Also, std::string, or StringRef
-    //    -> hakc yaml stores using strings, but we need stringref functionality
   case hakc::SimpleArgumentSize:
     return std::make_shared<HAKCSimpleArgumentSize>(
-        F, YamlAllocation.Arguments);
+        F, YamlAllocation.Arguments[0]);
   case hakc::SimpleStaticSize:
     return std::make_shared<HAKCSimpleStaticSize>(
         F, YamlAllocation.Arguments[0]);
   case hakc::StaticPlusArgument:
     return std::make_shared<HAKCStaticPlusArgument>(
-        F, YamlAllocation.Arguments);
+        F, YamlAllocation.Arguments[0], YamlAllocation.Arguments[1]);
   case hakc::MultiplyTwoArguments:
     return std::make_shared<HAKCMultiplyArgumentSize>(
-        F, YamlAllocation.Arguments);
+        F, YamlAllocation.Arguments[0], YamlAllocation.Arguments[1]);
   case hakc::ArgumentGEP:
+    // cast from std::vector<std::string> to ArrayRef<StringRef>, skipping the first element (automatic casting is not working here, for some reason)
+    SmallVector<StringRef> YamlAllocationArguments;
+    std::transform(YamlAllocation.Arguments.begin() + 1, YamlAllocation.Arguments.end(), YamlAllocationArguments.begin(), [](const std::string &ArgString){return StringRef(ArgString);});
+
     return std::make_shared<HAKCArgumentGEP>(
-        F, YamlAllocation.Arguments);
+        F, YamlAllocation.Arguments[0], YamlAllocationArguments);
 }
 
 }
