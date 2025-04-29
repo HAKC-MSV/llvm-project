@@ -30,18 +30,19 @@ protected:
   HAKCAllocationSize() = default;
 
   Function *AllocationFunction;
+  SmallVector<Value*> Parameters;
 };
 
 class HAKCSimpleArgumentSize : public HAKCAllocationSize {
   friend class HAKCAllocationSize;
 
 public:
-  HAKCSimpleArgumentSize(Function *AllocationFunction, StringRef Argument);
+  HAKCSimpleArgumentSize(Function *AllocationFunction, std::vector<std::string> ArgStrings);
 
   ConstantInt *GetSize(CallInst *Val) override;
 
 protected:
-  unsigned ArgNo;
+  std::vector<unsigned> Args;
 };
 
 class HAKCSimpleStaticSize : public HAKCAllocationSize {
@@ -60,25 +61,23 @@ class HAKCStaticPlusArgument : public HAKCAllocationSize {
   friend class HAKCAllocationSize;
 
 public:
-  HAKCStaticPlusArgument(Function *AllocationFunction, StringRef SizeString, StringRef Argument);
+  HAKCStaticPlusArgument(Function *AllocationFunction, std::vector<StringRef> ArgStrings);
 
   ConstantInt *GetSize(CallInst *Val) override;
 
 protected:
   unsigned StaticSize;
-  unsigned ArgNo;
+  std::vector<unsigned> Args;
 };
 
 
 class HAKCMultiplyArgumentSize : public HAKCAllocationSize {
 public:
-  HAKCMultiplyArgumentSize(Function *AllocationFunction, StringRef Argument0,
-                           StringRef Argument1);
+  HAKCMultiplyArgumentSize(Function *AllocationFunction, std::vector<StringRef> Args);
   ConstantInt *GetSize(CallInst *Val) override;
 
 protected:
-  unsigned Arg0;
-  unsigned Arg1;
+  std::vector<unsigned> Args;
 };
 
 
@@ -86,13 +85,12 @@ class HAKCArgumentGEP : public HAKCAllocationSize {
   friend class HAKCAllocationSize;
 
 public:
-  HAKCArgumentGEP(Function *AllocationFunction, StringRef Argument0, StringRef Argument1);
+  HAKCArgumentGEP(Function *AllocationFunction, std::vector<StringRef> Args);
 
   ConstantInt *GetSize(CallInst *Val) override;
 
 protected:
-  unsigned Arg0;
-  unsigned Arg1;
+  std::vector<unsigned> Args;
 };
 } // namespace llvm::hakc
 
