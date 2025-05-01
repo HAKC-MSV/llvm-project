@@ -91,9 +91,9 @@ protected:
 
   void FindTypesInFunctions();
 
-  HAKCSymbolP AddUnmappedGlobal(GlobalObject *GlobalObj);
+  HAKCSymbolP AddNoDebugGlobal(GlobalObject *GlobalObj);
 
-  HAKCFunctionP AddUnmappedFunction(Function *F);
+  HAKCFunctionP AddNoDebugFunction(Function *F);
 
   void AddUsedGlobals(const std::set<GlobalObject *> &GlobalObjects,
                       const HAKCSymbolP &UserSymbol);

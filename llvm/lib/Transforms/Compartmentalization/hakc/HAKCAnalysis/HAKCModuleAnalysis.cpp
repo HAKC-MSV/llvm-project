@@ -35,7 +35,7 @@ Module &HAKCModuleAnalysis::GetModule() {
 
 HAKCTransformer &HAKCModuleAnalysis::GetTransformer() { return Transformer; }
 
-HAKCTypeIdentifier &HAKCModuleAnalysis::GetTypeIdentifier() {
+HAKCTypeIdentifier &HAKCModuleAnalysis::GetTypeIdentifier() const {
   return TypeIdentifier;
 }
 
@@ -87,7 +87,7 @@ void HAKCModuleAnalysis::MoveGlobalsToHAKCSection() {
   }
 }
 
-bool HAKCModuleAnalysis::FunctionNeedsAnalysis(Function *F) {
+bool HAKCModuleAnalysis::FunctionNeedsAnalysis(Function *F) const {
   bool needsAnalysis = !F->isIntrinsic() && !F->isDeclaration() &&
                        F->getSubprogram() != nullptr &&
                        !CommonHAKCAnalysis::IsOutsideTransferFunc(F) &&
@@ -141,44 +141,6 @@ bool HAKCModuleAnalysis::AliasShouldBeCreated(Function *F) {
   //         return HAKCModuleAnalysisLinux::AliasShouldBeCreated(F);
   return TransferFunctionShouldBeCreated(F);
 }
-// TODO: fix tictac
-// bool HAKCModuleAnalysis::EpochAliasShouldBeCreated(Function *F) {
-//   auto symbol = getTransformer().getSystemInformation().findSymbol(F);
-//   auto epochs =
-//   getTransformer().getSystemInformation().getApplicableEpochs(symbol); auto
-//   strippedRetType = CommonHAKCAnalysis::StripType(F->getReturnType()); bool
-//   returnsEpochType = false; bool usesEpochTypePointerArg = false; if
-//   (debug_output) {
-//     CommonHAKCAnalysis::getWriter() << "Checking if " << F->getName() << "
-//     should have an epoch alias."; CommonHAKCAnalysis::getWriter() << "Type:
-//     "; strippedRetType->print(CommonHAKCAnalysis::getWriter());
-//     CommonHAKCAnalysis::getWriter() << "\n";
-//   }
-//   for (auto epoch : epochs) {
-//     if (debug_output) {
-//       CommonHAKCAnalysis::getWriter() << "Checking...\n";
-//       CommonHAKCAnalysis::getWriter() << *epoch;
-//     }
-//     if (strippedRetType == epoch->getType()) {
-//       returnsEpochType = true;
-//       break;
-//     }
-//   }
-//   for (Argument &arg : F->args()) {
-//     if (!arg.getType()->isPointerTy()) {
-//       continue; // We don't care about non-pointer types
-//     } else {
-//       auto strippedType = CommonHAKCAnalysis::StripType(arg.getType());
-//       for (auto epoch : epochs) {
-//         if (strippedType == epoch->getType()) {
-//           usesEpochTypePointerArg = true;
-//           break;
-//         }
-//       }
-//     }
-//   }
-//   return !(epochs.empty()) && (returnsEpochType || usesEpochTypePointerArg);
-// }
 
 bool HAKCModuleAnalysis::FunctionDefinedInAssembly(Function *F) {
   StringRef ModuleAsm = GetModule().getModuleInlineAsm();

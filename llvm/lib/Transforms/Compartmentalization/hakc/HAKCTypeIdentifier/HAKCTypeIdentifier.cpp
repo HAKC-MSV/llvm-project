@@ -556,7 +556,7 @@ void hakc::HAKCTypeIdentifier::FindAllGlobalsUsed(
 }
 
 std::shared_ptr<hakc::HAKCFunctionInfo>
-hakc::HAKCTypeIdentifier::AddUnmappedFunction(Function *F) {
+hakc::HAKCTypeIdentifier::AddNoDebugFunction(Function *F) {
   auto debug = AnalysisHelper.GetSystemInfo().OutputDebugInfo(F);
 
   for (const auto &UnmappedFunc : UnmappedFunctions) {
@@ -587,10 +587,10 @@ hakc::HAKCTypeIdentifier::AddUnmappedFunction(Function *F) {
 }
 
 std::shared_ptr<hakc::HAKCSymbolInfo>
-hakc::HAKCTypeIdentifier::AddUnmappedGlobal(GlobalObject *GlobalObj) {
+hakc::HAKCTypeIdentifier::AddNoDebugGlobal(GlobalObject *GlobalObj) {
   auto debug = AnalysisHelper.GetSystemInfo().OutputDebugInfo(GlobalObj);
   if (auto *F = dyn_cast<Function>(GlobalObj)) {
-    return AddUnmappedFunction(F);
+    return AddNoDebugFunction(F);
   } else if (auto *GV = dyn_cast<GlobalVariable>(GlobalObj)) {
     for (auto UnmappedGlobal : UnmappedGlobals) {
       if (UnmappedGlobal->GetGlobalVariable() == GV) {
@@ -604,7 +604,6 @@ hakc::HAKCTypeIdentifier::AddUnmappedGlobal(GlobalObject *GlobalObj) {
     auto HAKCType = FindType(GlobalObj->getValueType());
     if (!HAKCType) {
       HAKCType = CreateNoDebugType(GlobalObj->getValueType());
-      //            AddLLVMTypeMapping(HAKCType, HAKCType->GetLLVMType());
     }
     CommonHAKCAnalysis::getWriter(debug)
         << "HAKCType exists for " << GV->getName() << "\n";
@@ -634,7 +633,7 @@ void hakc::HAKCTypeIdentifier::AddUsedGlobals(
           << "\nGlobal " << UsedGlobal->getName() << " is used in "
           << UserSymbol->GetGlobalObj()->getName()
           << " but the Symbol could not be found\n";
-      Symbol = AddUnmappedGlobal(UsedGlobal);
+      Symbol = AddNoDebugGlobal(UsedGlobal);
     }
     CommonHAKCAnalysis::getWriter(debug)
         << "Found Symbol " << Symbol->GetName() << "\n";
@@ -813,7 +812,7 @@ void hakc::HAKCTypeIdentifier::FindUsesInFunctions() {
             CommonHAKCAnalysis::getWriter(debug)
                 << "Could not find HAKC Symbol for Function "
                 << Call->getCalledFunction()->getName() << "\n";
-            FoundFunction = AddUnmappedFunction(Call->getCalledFunction());
+            FoundFunction = AddNoDebugFunction(Call->getCalledFunction());
           }
           it.second->AddDirectCall(FoundFunction);
         } else if (Call->isIndirectCall()) {

@@ -115,12 +115,7 @@ Instruction *HAKCFunctionAnalysis::addCompartmentTransferCall(
     TransferCall = getTransformer().CreateSizedCompartmentTransfer(
         *HAKCPointer, I, &getFunction(), IsData, Size);
   }
-  // TODO: fix tictac
-  // if (Size == nullptr) {
-  //   // Non-sized transition
-  // } else {
-  //   TransferCall = getTransformer().CreateSizedEpochTransition(operand, I, &getFunction(), isData, Size);
-  // }
+
   TransferCall->setDebugLoc(DebugLoc);
   CompartmentTransferCount++;
   if (DebugActive) {
@@ -134,58 +129,6 @@ Instruction *HAKCFunctionAnalysis::addCompartmentTransferCall(
   }
   return TransferCall;
 }
-
-// TODO: fix tictac
-// Value *HAKCFunctionAnalysis::AddEpochDataAuthCheckAtLocation(Value *signed_ptr, Instruction *location) {
-//   auto *bitcast = getTransformer().CreateEpochDataAuthentication(signed_ptr, location);
-//   return bitcast;
-// }
-//
-// Value *HAKCFunctionAnalysis::AddEpochCodeAuthCheckAtLocation(Value *SignedPtr, Instruction *Location) {
-//   auto *SafePointer = getTransformer().CreateEpochCodeAuthentication(SignedPtr, Location);
-//   return SafePointer;
-// }
-
-// void HAKCFunctionAnalysis::AssignFunctionEpochs() {
-//   if (!SetupHasRun) {
-//     setup();
-//   }
-//   auto CurrentSymbol = getTransformer().getSystemInformation().findSymbol(CurrentFunction);
-//   auto CurrentEpochs = getTransformer().getSystemInformation().getApplicableEpochs(CurrentSymbol);
-//   for (auto pointer: PointerManager.GetManagedPointers()) {
-//     for (auto epoch : CurrentEpochs) {
-//       std::string typeString = epoch->getTypeString();
-//       auto CandidateType = pointer->GetTypeBitcastUse(typeString);
-//       if (debug_output) {
-//         CommonHAKCAnalysis::getWriter() << "Attempting to assign ";
-//         CommonHAKCAnalysis::getWriter() << typeString << " epoch ";
-//         CommonHAKCAnalysis::getWriter() << "to " << CurrentFunction->getName().str() << "\n";
-//       }
-//       if (CandidateType != nullptr) {
-//         epoch->assignType(CandidateType);
-//         function_epochs.insert({CandidateType, epoch});
-//         if(debug_output) {
-//           CommonHAKCAnalysis::getWriter() << "Assigned type: ";
-//           CandidateType->print(CommonHAKCAnalysis::getWriter());
-//           CommonHAKCAnalysis::getWriter() << "\n";
-//           CommonHAKCAnalysis::getWriter() << "to epoch " << *epoch << "\n";
-//         }
-//       }
-//     }
-//   }
-// }
-//
-// // Value is the one we're transfering/etc
-// tictac_epoch_id_t HAKCFunctionAnalysis::GetEpoch(Value *V) {
-//   Type *TypeKey = CommonHAKCAnalysis::GetStrippedTypeFromValue(V);
-//   auto found = function_epochs.find(TypeKey);
-//   if (found == function_epochs.end()) {
-//     return 0;
-//   } else {
-//     return found->second->GetEpochID();
-//   }
-// }
-
 
 /**
  * @brief Checks if a user is in the current function
@@ -982,7 +925,6 @@ bool HAKCFunctionAnalysis::modifiedFunction() const {
 void HAKCFunctionAnalysis::
     CheckForValidCompartmentTransitionAndUpdateIntraCompartmentCalls() {
   auto CurrentDivision = Policy.GetDivision(&getFunction());
-  // now, get valid target from backing store
   Policy.GetValidTargets(CurrentDivision.GetHAKCCompartment());
   for (auto *call : NonKernelDirectFunctionCallSet) {
     auto TargetCompartment =

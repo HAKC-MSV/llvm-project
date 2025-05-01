@@ -34,7 +34,7 @@ protected:
 
   void TransformFunctions();
 
-  bool FunctionNeedsAnalysis(Function *F);
+  bool FunctionNeedsAnalysis(Function *F) const;
 
   Function *CreateInitTransfer(GlobalVariable *GlobalVar);
 
@@ -83,7 +83,7 @@ public:
 
   Function *GetFunctionByName(StringRef Name, FunctionType *FuncTy);
 
-  HAKCTypeIdentifier &GetTypeIdentifier();
+  HAKCTypeIdentifier &GetTypeIdentifier() const;
 
   HAKCTransformer &GetTransformer();
 

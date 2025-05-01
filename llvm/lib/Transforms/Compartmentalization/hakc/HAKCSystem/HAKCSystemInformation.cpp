@@ -13,7 +13,7 @@
 namespace llvm::hakc {
 HAKCDatabaseInformation::HAKCDatabaseInformation()
     : ServerURL(), CompartmentEndpoint(), DivisionEndpoint(),
-      SymbolDivisionEndpoint(), Timeout() {}
+      SymbolDivisionEndpoint(), Timeout(), MaxConnectionRetries(0) {}
 
 StringRef HAKCDatabaseInformation::GetServerURL() const { return ServerURL; }
 

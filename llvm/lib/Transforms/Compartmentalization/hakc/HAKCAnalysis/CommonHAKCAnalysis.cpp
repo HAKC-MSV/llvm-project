@@ -442,19 +442,6 @@ bool CommonHAKCAnalysis::IsKernelUserPointer(Value *V) {
   return valueHasAttribute(V, Attribute::KernelUserPtr);
 }
 
-// TODO: fix tictac
-// bool CommonHAKCAnalysis::functionIsEpochTransferCandidate(Function *f) {
-//   auto NoTransferFuncs = GetNoTransferFunctions();
-//   return NoTransferFuncs.find(f->getName()) == NoTransferFuncs.end() &&
-//       !f->isDeclaration() &&
-//       !isCapabilityReassignmentFunc(f) &&
-//       !FunctionIsComplexVariadic(f) &&
-//       !functionIsModParamGetCtx(f) &&
-//       (FunctionHasPointerArg(f) || f->getReturnType()->isPointerTy()) &&
-//       (!isOutsideTransferFunc(f) ||
-//       !f->hasFnAttribute(Attribute::InlineHint));
-// }
-
 bool CommonHAKCAnalysis::FunctionIsStatic(Function *F) {
   return Function::isLocalLinkage(F->getLinkage()) || F->isDeclaration();
 }
@@ -482,14 +469,20 @@ bool CommonHAKCAnalysis::ValueShouldBeReplacedWithTransfer(
 }
 
 bool CommonHAKCAnalysis::IsOutsideTransferFunc(Function *F) {
-  return (F->getName().starts_with(OUTSIDE_TRANSFER_PREFIX));
+  return F->getName().starts_with(OUTSIDE_TRANSFER_PREFIX) ||
+         F->getName().starts_with(VARIADIC_TRANSFER_PREFIX);
 }
 
 Function *
 CommonHAKCAnalysis::GetOriginalFunctionFromTransferFunction(Function *F) {
   if (IsOutsideTransferFunc(F)) {
-    auto transferTargetName =
-        F->getName().substr(OUTSIDE_TRANSFER_PREFIX.size());
+    StringRef TransferPrefix;
+    if (F->getName().starts_with(OUTSIDE_TRANSFER_PREFIX)) {
+      TransferPrefix = OUTSIDE_TRANSFER_PREFIX;
+    } else {
+      TransferPrefix = VARIADIC_TRANSFER_PREFIX;
+    }
+    auto transferTargetName = F->getName().substr(TransferPrefix.size());
     auto *TransferTarget = F->getParent()->getFunction(transferTargetName);
     return TransferTarget;
   }
