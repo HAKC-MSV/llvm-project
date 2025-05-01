@@ -9,7 +9,7 @@ edges:
       DefiningLine: null
       Name: printf
       is_function: true
-      symbol_hash: 5db68ddfb10652f8
+      symbol_hash: 6120aed57996da06
     target: &id014 !HAKCType
       DebugType: '@UNKNOWN@'
       LLVMType: i32 (ptr, ...)
@@ -18,9 +18,9 @@ edges:
     persisted: true
     source: *id001
     target: &id015 !HAKCScope
-      LocalScopeName: global
-      Scope: global
-      scope_hash: 8001c27439650c5c
+      LocalScopeName: @HAKC_TEST_DIR@/hakc_test14.c
+      Scope: local
+      scope_hash: 600184430e56fdbd
   - key: UsedInCompilationUnit
     persisted: true
     source: *id001
@@ -37,7 +37,7 @@ edges:
     persisted: true
     source: &id002 !HAKCFunction
       DefiningFile: @HAKC_TEST_DIR@/hakc_test14.c
-      DefiningLine: 9
+      DefiningLine: 10
       Name: printstr
       is_function: true
       symbol_hash: decf6bc2c1e4e652
@@ -48,7 +48,7 @@ edges:
   - key: HasScope
     persisted: true
     source: *id002
-    target: !HAKCScope
+    target: &id017 !HAKCScope
       LocalScopeName: global
       Scope: global
       scope_hash: 8001c27439650c5c
@@ -57,7 +57,7 @@ edges:
     source: *id002
     target: *id003
   - key: DefinedIn
-    line: 9
+    line: 10
     persisted: true
     source: *id002
     target: *id003
@@ -83,7 +83,7 @@ edges:
       DefiningLine: null
       Name: printf
       is_function: true
-      symbol_hash: 5db68ddfb10652f8
+      symbol_hash: 6120aed57996da06
   - key: DirectCall
     persisted: true
     source: *id002
@@ -101,7 +101,7 @@ edges:
       DefiningLine: null
       Name: .str.1
       is_function: false
-      symbol_hash: dd80fa8526410d26
+      symbol_hash: 17aff9ceb78d34fe
   - key: DagEdge
     persisted: true
     source: *id002
@@ -145,7 +145,7 @@ edges:
       DefiningLine: null
       Name: .str
       is_function: false
-      symbol_hash: 1db1a975a0396a52
+      symbol_hash: d263f04a760b34ce
   - key: DagEdge
     persisted: true
     source: *id004
@@ -161,17 +161,17 @@ edges:
   - key: IsType
     persisted: true
     source: *id006
-    target: &id018 !HAKCType
-      DebugType: '@UNKNOWN@'
+    target: !HAKCType
+      DebugType: char[]
       LLVMType: '[7 x i8]'
-      type_hash: eb7a7d3745c362c0
+      type_hash: bd3809d4d58084f7
   - key: HasScope
     persisted: true
     source: *id006
     target: !HAKCScope
-      LocalScopeName: global
-      Scope: global
-      scope_hash: 8001c27439650c5c
+      LocalScopeName: @HAKC_TEST_DIR@/hakc_test14.c
+      Scope: local
+      scope_hash: 600184430e56fdbd
   - key: UsedInCompilationUnit
     persisted: true
     source: *id006
@@ -190,18 +190,18 @@ edges:
       DefiningLine: null
       Name: .str
       is_function: false
-      symbol_hash: 1db1a975a0396a52
-    target: &id017 !HAKCType
-      DebugType: '@UNKNOWN@'
+      symbol_hash: d263f04a760b34ce
+    target: &id018 !HAKCType
+      DebugType: char[]
       LLVMType: '[12 x i8]'
-      type_hash: 4238b39c0e79431e
+      type_hash: bd3809d4d58084f7
   - key: HasScope
     persisted: true
     source: *id008
     target: !HAKCScope
-      LocalScopeName: global
-      Scope: global
-      scope_hash: 8001c27439650c5c
+      LocalScopeName: @HAKC_TEST_DIR@/hakc_test14.c
+      Scope: local
+      scope_hash: 600184430e56fdbd
   - key: UsedInCompilationUnit
     persisted: true
     source: *id008
@@ -258,13 +258,13 @@ nodes:
     persisted: true
   - id: *id016
     persisted: true
+  - id: *id017
+    persisted: true
   - id: *id004
     persisted: true
   - id: *id006
     persisted: true
   - id: *id008
-    persisted: true
-  - id: *id017
     persisted: true
   - id: *id018
     persisted: true

@@ -38,24 +38,43 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
                             division.compartment_id = nbr.compartment_id
                             self.add_division(division, nbr)
 
+            symbol_mapping = dict()
             for symbol in self.get_filtered_nodes(nxgraph,
                                                   node_filter=lambda n: isinstance(n, HAKCFunction) or isinstance(n,
                                                                                                                   HAKCGlobalVariable)):
                 compilation_unit = None
                 division: Optional[HAKCDivision] = None
+                if isinstance(symbol, HAKCFunction):
+                    new_symbol = HAKCFunction(Name=symbol.name)
+                else:
+                    new_symbol = HAKCGlobalVariable(Name=symbol.name)
                 for nbr in nxgraph.neighbors(symbol):
                     for edge_data in nxgraph.get_edge_data(symbol, nbr):
                         if edge_data == HAKCSymbol.IsTypeTable:
-                            symbol.type = nbr
+                            new_symbol.type = nbr
                         elif edge_data == HAKCSymbol.HasScopeTable:
-                            symbol.scope = nbr
+                            new_symbol.scope = nbr
                         elif edge_data == HAKCSymbol.SymbolCompilationUnitTable:
                             compilation_unit = nbr
                         elif edge_data == HAKCSymbol.InDivisionTable:
                             division = nbr
+                        elif edge_data == HAKCSymbol.DefinedInTable:
+                            new_symbol.defining_file = nbr.filename
+                            new_symbol.defining_line = nxgraph.get_edge_data(symbol, nbr, key=edge_data)['line']
 
-                self.add_symbol(symbol, compilation_unit)
-                self.set_division(symbol, division.division_id, division.compartment_id)
+                new_symbol.computed_hash = None
+                self.add_symbol(new_symbol, compilation_unit)
+                self.set_division(new_symbol, division.division_id, division.compartment_id)
+                symbol_mapping[symbol] = new_symbol
+
+            for head, tail, edge_name, edge_data in nxgraph.edges.data(keys=True):
+                if edge_name in {HAKCSymbol.UsesSymbolTable, HAKCSymbol.DagEdgeTable}:
+                    new_head = symbol_mapping[head]
+                    new_tail = symbol_mapping[tail]
+                    if edge_name == HAKCSymbol.UsesSymbolTable:
+                        self.add_symbol_use(new_head, new_tail)
+                    elif edge_name == HAKCSymbol.DagEdgeTable:
+                        self.add_dag_edge(new_head, new_tail, edge_data['weight'])
 
     @classmethod
     def from_yaml(cls, loader: yaml.Loader, node):
@@ -116,6 +135,16 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
     def _get_neighbors(self, symbol: HAKCSymbol, edge_key: str) -> list:
         nbrs = list()
         if symbol not in self.nodes:
+            for existing_symbol in self.get_symbols():
+                if existing_symbol.name == symbol.name:
+                    symbol_hash_inputs = symbol.get_hash_inputs()
+                    existing_hash_inputs = symbol.get_hash_inputs()
+                    for symbol_hash_input, existing_hash_input in zip(symbol_hash_inputs, existing_hash_inputs):
+                        print(f'{hash(symbol_hash_input)} ? {hash(existing_hash_input)}')
+                    symbol.computed_hash = None
+                    existing_symbol.computed_hash = None
+                    print(f'{hash(symbol)} ? {hash(existing_symbol)}')
+                    break
             raise RuntimeError(f'Symbol {symbol} could not be found')
         for nbr, edges in self.adj[symbol].items():
             if edge_key in edges:
@@ -251,17 +280,27 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         for table_name, nodes in logger.progress_bar(iterable=unpersisted_nodes.items(), desc="Persisting to database"):
             data_to_persist = dict()
             for node in nodes:
-                for column, data in node.get_db_data().items():
+                db_data = node.get_db_data()
+                if len(data_to_persist) > 0 and len(db_data) != len(data_to_persist):
+                    logger.error(
+                        f'Node {node} does not have all the data needed. Data needed is {" ".join(sorted(data_to_persist.keys()))} and data provided is {" ".join(sorted([column.column_name for column in db_data.keys()]))}')
+                for column, data in db_data.items():
+                    if data is None:
+                        logger.error(f'Node {node} has None for column {column.column_name}')
+                        data = column.column_type.default_value
                     if column.column_name not in data_to_persist:
                         data_to_persist[column.column_name] = list()
                     data_to_persist[column.column_name].append(data)
+
             df = pd.DataFrame(data_to_persist)
             logger.debug(f'Persisting {len(nodes)} Nodes to {table_name}')
             try:
                 conn.insert_from_dataframe(table_name, df)
+                del df
                 for node in nodes:
                     self.nodes[node][HAKCCompartmentalization.persisted_attr] = True
             except Exception as e:
+                del df
                 logger.error(f'Failed to persist to {table_name}: {str(e)}')
                 raise e
 
@@ -297,9 +336,11 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             logger.debug(f'Persisting {len(head_primary_keys)} edges to {table_name}')
             try:
                 conn.insert_from_dataframe(table_name, df)
+                del df
                 for head, tail, _ in edge_data:
                     self.edges[head, tail, table_name][HAKCCompartmentalization.persisted_attr] = True
             except Exception as e:
+                del df
                 match = re.search('Runtime exception: Unable to find primary key value (-?[0-9]+)', str(e))
                 if match:
                     missing_hash = int(match.group(1))

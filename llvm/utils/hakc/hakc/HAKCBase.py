@@ -104,11 +104,34 @@ class HAKCPrintableObj:
         raise NotImplementedError
 
 
+class HAKCDBColumnType(Enum):
+    # Kuzu data type and default value
+    String = ("STRING", "")
+    Int32 = ("INT32", 0)
+    Boolean = ("BOOL", False)
+    UInt64 = ("UINT64", 0)
+
+    @classmethod
+    def from_str(cls, type_str: str):
+        for data_type in cls:
+            if data_type.value[0] == type_str:
+                return data_type
+        raise ValueError(f'Data type {type_str} is invalid')
+
+    @property
+    def type_name(self):
+        return self.value[0]
+
+    @property
+    def default_value(self):
+        return self.value[1]
+
+
 class HAKCDBColumn(HAKCPrintableObj):
     def __init__(self, column_name: str, column_type: str, **kwargs):
         HAKCPrintableObj.__init__(self, **kwargs)
         self.column_name = column_name
-        self.column_type = column_type
+        self.column_type = HAKCDBColumnType.from_str(column_type)
 
     def __str__(self):
         return f'{self.column_name}'
@@ -124,7 +147,7 @@ class HAKCDBColumn(HAKCPrintableObj):
     def get_info_tokens(self, convert_hash=True) -> dict[str, object]:
         return {
             'column_name': self.column_name,
-            'column_type': self.column_type
+            'column_type': self.column_type.type_name
         }
 
     def get_hash_inputs(self) -> list[object]:
@@ -179,7 +202,7 @@ class HAKCDBNode(HAKCPrintableObj):
     def get_table_definition(cls) -> str:
         columns = cls.get_db_table_columns()
         primary_key = cls.get_primary_key()
-        member_str = ", ".join([" ".join([column.column_name, column.column_type]) for column in columns])
+        member_str = ", ".join([" ".join([column.column_name, column.column_type.type_name]) for column in columns])
         return f'{cls.get_table_name()}({member_str}, PRIMARY KEY ({primary_key.column_name}))'
 
     def get_primary_key_data(self, convert_hash=True) -> object:

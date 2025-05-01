@@ -125,7 +125,11 @@ class HAKCPolicyDataSource:
         symbol = yaml.load(symbol, Loader=self.yaml_loader)
         ret = None
 
-        ret = self._get_symbol_division_from_backing_store(symbol)
+        try:
+            ret = self._get_symbol_division_from_backing_store(symbol)
+        except RuntimeError as RE:
+            logger.info(f'_get_symbol_division_from_backing_store raised an error: {RE}')
+
         if ret is None:
             ret = HAKCDivisionCompartmentPayload(division=self._get_default_division(),
                                                  compartment=self._get_default_compartment())
