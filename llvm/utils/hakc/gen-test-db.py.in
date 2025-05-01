@@ -88,6 +88,13 @@ def main():
     print(f'Executing {" ".join(gen_compartmentalization_cmd)}')
     subprocess.check_output(gen_compartmentalization_cmd)
 
+    with open(os.path.join(os.path.dirname(hakc_test_path), 'db.yml.in')) as f:
+        lines = f.readlines()
+    with open(os.path.join(os.path.dirname(hakc_test_path), 'db.yml.in'), 'w') as f:
+        for line in lines:
+            # Ensure that CMake configure file does not output an incorrect string
+            f.write(line.replace(os.path.dirname(hakc_test_path), "".join(['@', 'HAKC_TEST_DIR', '@'])))
+
 
 if __name__ == "__main__":
     main()
