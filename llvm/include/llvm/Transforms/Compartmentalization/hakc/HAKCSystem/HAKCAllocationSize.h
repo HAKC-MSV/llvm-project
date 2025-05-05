@@ -32,11 +32,11 @@ protected:
   Function *AllocationFunction;
 };
 
-class HAKCSingleArgumentSize : public HAKCAllocationSize {
+class HAKCSimpleArgumentSize : public HAKCAllocationSize {
   friend class HAKCAllocationSize;
 
 public:
-  HAKCSingleArgumentSize(Function *AllocationFunction, StringRef Argument);
+  HAKCSimpleArgumentSize(Function *AllocationFunction, StringRef ArgNoString);
 
   ConstantInt *GetSize(CallInst *Val) override;
 
@@ -44,15 +44,57 @@ protected:
   unsigned ArgNo;
 };
 
-class HAKCMultiplyArgumentSize : public HAKCAllocationSize {
+class HAKCSimpleStaticSize : public HAKCAllocationSize {
+  friend class HAKCAllocationSize;
+
 public:
-  HAKCMultiplyArgumentSize(Function *AllocationFunction, StringRef Argument0,
-                           StringRef Argument1);
+  HAKCSimpleStaticSize(Function *AllocationFunction, StringRef StaticSizeString);
+
   ConstantInt *GetSize(CallInst *Val) override;
 
 protected:
-  unsigned Arg0;
-  unsigned Arg1;
+  unsigned StaticSize;
+};
+
+class HAKCStaticPlusArgument : public HAKCAllocationSize {
+  friend class HAKCAllocationSize;
+
+public:
+  HAKCStaticPlusArgument(Function *AllocationFunction, StringRef StaticSizeString, StringRef ArgNoString);
+
+  ConstantInt *GetSize(CallInst *Val) override;
+
+protected:
+  unsigned StaticSize;
+  unsigned ArgNo;
+};
+
+
+class HAKCMultiplyArgumentSize : public HAKCAllocationSize {
+public:
+  // eg alloc n args of size s
+  HAKCMultiplyArgumentSize(Function *AllocationFunction, StringRef NObjsString, StringRef ArgSizePerObjString);
+  ConstantInt *GetSize(CallInst *Val) override;
+
+protected:
+  unsigned NObjs;
+  unsigned ArgSizePerObj;
+};
+
+
+class HAKCArgumentGEP : public HAKCAllocationSize {
+  friend class HAKCAllocationSize;
+
+public:
+  // abc->index0->index1->index2
+  // ArgAccessNo is the arg of the struct
+  HAKCArgumentGEP(Function *AllocationFunction, StringRef ArgAccessNoString, ArrayRef<StringRef> IndicesString);
+
+  ConstantInt *GetSize(CallInst *Val) override;
+
+protected:
+  unsigned ArgAccessNo;
+  SmallVector<unsigned> Indices;
 };
 } // namespace llvm::hakc
 

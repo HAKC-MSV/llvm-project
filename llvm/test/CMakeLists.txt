@@ -231,6 +231,7 @@ endif ()
 
 if (LLVM_ENABLE_HAKC)
     set(HAKC_SOCKET_ROOT "${CMAKE_BINARY_DIR}/hakc-sockets" CACHE STRING "Directory to use for test socket paths")
+    file(MAKE_DIRECTORY "${HAKC_SOCKET_ROOT}") # create the hakc-sockets directory
     string(LENGTH "${HAKC_SOCKET_ROOT}/hakc_test0.db.sock" socket_path_length)
     if (socket_path_length GREATER_EQUAL 107)
         message(WARNING "HAKC_SOCKET_ROOT ${HAKC_SOCKET_ROOT} is too long")
