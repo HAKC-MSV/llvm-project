@@ -974,7 +974,8 @@ hakc::HAKCTransformer::InferHAKCType(Argument &Arg, CallInst *CallSite,
   }
 
   if (auto *LoadI = dyn_cast<LoadInst>(CallSitePtr)) {
-    if (isa<GlobalVariable>(LoadI->getPointerOperand())) {
+    if (isa<GlobalVariable>(LoadI->getPointerOperand()) ||
+        isa<AllocaInst>(LoadI->getPointerOperand())) {
       HAKCTy = ModuleAnalysis.GetTypeIdentifier().FindHAKCType(
           LoadI->getPointerOperand());
       return HAKCTy;

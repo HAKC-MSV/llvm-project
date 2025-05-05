@@ -550,11 +550,6 @@ ManagedHAKCPointerP HAKCPointerManager::GetManagedPointer(Value *V) {
       return ManagedPointer;
     }
   }
-  if (auto *LoadI = dyn_cast<LoadInst>(V)) {
-    if (isa<AllocaInst>(LoadI->getPointerOperand())) {
-      return GetManagedPointer(LoadI->getPointerOperand());
-    }
-  }
 
   return nullptr;
 }
