@@ -395,17 +395,19 @@ hakc::HAKCTypeIdentifier::HandleType(const DIType *type) {
 
 GlobalVariable *
 hakc::HAKCTypeIdentifier::FindGlobal(const DIGlobalVariable *DIGV) const {
-  auto *Scope = DIGV->getScope();
-  std::string Name;
-  llvm::raw_string_ostream sstream(Name);
-  if (Scope) {
-    if (auto *SubProg = dyn_cast<DISubprogram>(Scope)) {
-      sstream << SubProg->getName() << ".";
+  for (auto &GV : GetModule().global_objects()) {
+    SmallVector<MDNode *, 8> DebugMetadata;
+    GV.getMetadata(LLVMContext::MD_dbg, DebugMetadata);
+    for (auto *DbgInfo : DebugMetadata) {
+      if (auto *GVExpression = dyn_cast<DIGlobalVariableExpression>(DbgInfo)) {
+        if (GVExpression->getVariable() == DIGV) {
+          return dyn_cast<GlobalVariable>(&GV);
+        }
+      }
     }
   }
-  sstream << DIGV->getName();
 
-  return GetModule().getGlobalVariable(Name, true);
+  return nullptr;
 }
 
 std::shared_ptr<hakc::HAKCGlobalInfo>
@@ -434,12 +436,16 @@ hakc::HAKCTypeIdentifier::HandleGlobal(const DIGlobalVariable *DIGV) {
   }
 
   auto GVP =
-      std::make_shared<HAKCGlobalInfo>(AnalysisHelper, DIGV->getName(), debug);
+      std::make_shared<HAKCGlobalInfo>(AnalysisHelper, GV->getName(), debug);
   GVP->SetType(DIGVTy);
   GVP->SetGlobalVariable(GV);
   GVP->SetDefiningLocation(DIGV->getFile(), DIGV->getLine());
   if (DIGV->isLocalToUnit()) {
-    GVP->SetLocalScope(DIGV->getScope());
+    const auto *Scope = DIGV->getScope();
+    if (!Scope) {
+      Scope = CompilationUnitScope;
+    }
+    GVP->SetLocalScope(Scope);
   }
   AddGlobalMapping(DIGV, GVP);
 
@@ -614,6 +620,7 @@ hakc::HAKCTypeIdentifier::AddNoDebugGlobal(GlobalObject *GlobalObj) {
     GlobalInfo->SetGlobalVariable(GV);
     GlobalInfo->SetType(HAKCType);
     GlobalInfo->SetLocalScope(CompilationUnitScope);
+
     UnmappedGlobals.insert(GlobalInfo);
     return GlobalInfo;
   } else {

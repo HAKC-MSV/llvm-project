@@ -78,7 +78,21 @@ edges:
   - key: UsesSymbol
     persisted: true
     source: *id002
-    target: &id005 !HAKCFunction
+    target: &id005 !HAKCGlobalVariable
+      DefiningFile: @HAKC_TEST_DIR@/hakc_test14.c
+      DefiningLine: 11
+      Name: .str.1
+      is_function: false
+      symbol_hash: 17aff9ceb78d34fe
+  - key: DagEdge
+    persisted: true
+    source: *id002
+    target: *id005
+    weight: 1
+  - key: UsesSymbol
+    persisted: true
+    source: *id002
+    target: &id006 !HAKCFunction
       DefiningFile: null
       DefiningLine: null
       Name: printf
@@ -87,26 +101,12 @@ edges:
   - key: DirectCall
     persisted: true
     source: *id002
-    target: *id005
-  - key: DagEdge
-    persisted: true
-    source: *id002
-    target: *id005
-    weight: 2
-  - key: UsesSymbol
-    persisted: true
-    source: *id002
-    target: &id006 !HAKCGlobalVariable
-      DefiningFile: null
-      DefiningLine: null
-      Name: .str.1
-      is_function: false
-      symbol_hash: 17aff9ceb78d34fe
+    target: *id006
   - key: DagEdge
     persisted: true
     source: *id002
     target: *id006
-    weight: 1
+    weight: 2
   - key: InDivision
     persisted: true
     source: *id002
@@ -141,8 +141,8 @@ edges:
     persisted: true
     source: *id004
     target: &id007 !HAKCGlobalVariable
-      DefiningFile: null
-      DefiningLine: null
+      DefiningFile: @HAKC_TEST_DIR@/hakc_test14.c
+      DefiningLine: 7
       Name: .str
       is_function: false
       symbol_hash: d263f04a760b34ce
@@ -160,25 +160,30 @@ edges:
       division_hash: 52437522d301286c
   - key: IsType
     persisted: true
-    source: *id006
+    source: *id005
     target: !HAKCType
       DebugType: char[]
       LLVMType: '[7 x i8]'
       type_hash: bd3809d4d58084f7
   - key: HasScope
     persisted: true
-    source: *id006
+    source: *id005
     target: !HAKCScope
       LocalScopeName: @HAKC_TEST_DIR@/hakc_test14.c
       Scope: local
       scope_hash: 600184430e56fdbd
   - key: UsedInCompilationUnit
     persisted: true
-    source: *id006
+    source: *id005
+    target: *id003
+  - key: DefinedIn
+    line: 11
+    persisted: true
+    source: *id005
     target: *id003
   - key: InDivision
     persisted: true
-    source: *id006
+    source: *id005
     target: &id012 !HAKCDivision
       AccessToken: 270336
       DivisionID: 13
@@ -186,8 +191,8 @@ edges:
   - key: IsType
     persisted: true
     source: &id008 !HAKCGlobalVariable
-      DefiningFile: null
-      DefiningLine: null
+      DefiningFile: @HAKC_TEST_DIR@/hakc_test14.c
+      DefiningLine: 7
       Name: .str
       is_function: false
       symbol_hash: d263f04a760b34ce
@@ -203,6 +208,11 @@ edges:
       Scope: local
       scope_hash: 600184430e56fdbd
   - key: UsedInCompilationUnit
+    persisted: true
+    source: *id008
+    target: *id003
+  - key: DefinedIn
+    line: 7
     persisted: true
     source: *id008
     target: *id003
@@ -262,7 +272,7 @@ nodes:
     persisted: true
   - id: *id004
     persisted: true
-  - id: *id006
+  - id: *id005
     persisted: true
   - id: *id008
     persisted: true
