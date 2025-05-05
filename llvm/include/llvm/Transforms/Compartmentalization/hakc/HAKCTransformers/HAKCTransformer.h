@@ -131,43 +131,12 @@ public:
    * Create a transfer function to a variadic function in a different
    * compartment
    * @param Call
+   * @param PointerManager
    * @return
    */
-  Function *CreateTransferToVariadic(CallInst *Call);
-
-  /**
-   * Create Architecture specific transformations for a new transfer function
-   * @param Original
-   * @param Transfer
-   */
-  //        void CreateTransferFunctionFinalize_Arch(Function *Original,
-  //        Function *Transfer);
-
-  /**
-   * Perform architecture specific transformations prior to an argument
-   * transfer to a target compartment
-   * @param F
-   * @param TransferFunction
-   * @param Arg
-   * @param TransferState
-   */
-  void CreateTransferFunctionArg_PreCall(Function *F,
-                                         Function *TransferFunction,
-                                         Argument *Arg,
-                                         HAKCTransferState &TransferState);
-
-  /**
-   * Perform architecture specific transformations after the cross
-   * compartment function call
-   * @param F
-   * @param TransformFunction
-   * @param Arg
-   * @param TransferState
-   */
-  void CreateTransferFunctionArg_PostCall(Function *F,
-                                          Function *TransformFunction,
-                                          Argument *Arg,
-                                          HAKCTransferState &TransferState);
+  Function *
+  CreateTransferToVariadic(CallInst *Call,
+                           HAKCPointerManager *PointerManager = nullptr);
 
   Module &getModule() const;
 
@@ -353,8 +322,10 @@ protected:
 
   Function *CreateNonVariadicTransferFunction(Function *F);
 
-  Function *PopulateTransferFunction(Function *Target,
-                                     Function *TransferFunction);
+  Function *
+  PopulateTransferFunction(Function *Target, Function *TransferFunction,
+                           CallInst *CallSite = nullptr,
+                           HAKCPointerManager *PointerManager = nullptr);
 
   Function *GetTransferFunction(Function *F) const;
 
@@ -384,6 +355,9 @@ protected:
 
   Value *CreateActionCall(HAKCTransferAction &TransferAction,
                           HAKCTransferState &TransferState);
+
+  HAKCTypeP InferHAKCType(Argument &Arg, CallInst *CallSite,
+                          HAKCPointerManager *PointerManager) const;
 };
 } // namespace llvm::hakc
 

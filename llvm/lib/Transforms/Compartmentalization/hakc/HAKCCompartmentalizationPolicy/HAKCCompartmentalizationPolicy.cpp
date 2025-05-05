@@ -292,10 +292,6 @@ void HAKCCompartmentalizationPolicy::GetValidTargets(
   }
   for (auto target = ValidTargets->begin(); target != ValidTargets->end();
        ++target) {
-    CommonHAKCAnalysis::getWriter(SystemInformation.OutputDebugInfo())
-        << "Adding target: "
-        << static_cast<hakc_compartment_id_t>(target->getAsInteger().value())
-        << "\n";
     auto *TargetCompartment = HAKCCompartment::CreateID(
         static_cast<hakc_compartment_id_t>(target->getAsInteger().value()),
         SystemInformation.GetModule());

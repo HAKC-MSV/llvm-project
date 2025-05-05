@@ -5,6 +5,7 @@
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCTransformer.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/CommonHAKCAnalysis.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/HAKCModuleAnalysis.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/HAKCPointerManager.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartmentDivision.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCFunctionDefinition/HAKCCustomTransfer.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCTransferState.h"
@@ -779,7 +780,8 @@ Function *hakc::HAKCTransformer::CreateTransferFunction(Function *F) {
   return TransferFunction;
 }
 
-Function *hakc::HAKCTransformer::CreateTransferToVariadic(CallInst *Call) {
+Function *hakc::HAKCTransformer::CreateTransferToVariadic(
+    CallInst *Call, HAKCPointerManager *PointerManager) {
   auto *Target = Call->getCalledFunction();
   if (!Target) {
     CommonHAKCAnalysis::getWriter(true) << "Null Call target\n";
@@ -820,7 +822,7 @@ Function *hakc::HAKCTransformer::CreateTransferToVariadic(CallInst *Call) {
 
     TransferFunction =
         ModuleAnalysis.GetFunctionByName(TransferName, TransferType);
-    PopulateTransferFunction(Target, TransferFunction);
+    PopulateTransferFunction(Target, TransferFunction, Call, PointerManager);
     TransferFunction->setLinkage(GlobalValue::PrivateLinkage);
 
     /* For every variadic call site, we create a transfer function since we
@@ -957,10 +959,34 @@ void hakc::HAKCTransformer::InitNewFunction(Function *F,
   HAKCIRBuilder.SetInsertPoint(EntryBB);
 }
 
-// TODO: fix tictac, need to add pre/post/epoch transfer functions here
-Function *
-hakc::HAKCTransformer::PopulateTransferFunction(Function *Target,
-                                                Function *TransferFunction) {
+hakc::HAKCTypeP
+hakc::HAKCTransformer::InferHAKCType(Argument &Arg, CallInst *CallSite,
+                                     HAKCPointerManager *PointerManager) const {
+
+  auto *CallSitePtr = CallSite->getOperand(Arg.getArgNo());
+  auto HAKCTy = ModuleAnalysis.GetTypeIdentifier().FindHAKCType(CallSitePtr);
+  if (HAKCTy) {
+    return HAKCTy;
+  }
+  auto ManagedCallSitePointer = PointerManager->GetManagedPointer(CallSitePtr);
+  if (ManagedCallSitePointer && ManagedCallSitePointer->GetType()) {
+    return ManagedCallSitePointer->GetType();
+  }
+
+  if (auto *LoadI = dyn_cast<LoadInst>(CallSitePtr)) {
+    if (isa<GlobalVariable>(LoadI->getPointerOperand())) {
+      HAKCTy = ModuleAnalysis.GetTypeIdentifier().FindHAKCType(
+          LoadI->getPointerOperand());
+      return HAKCTy;
+    }
+  }
+
+  return nullptr;
+}
+
+Function *hakc::HAKCTransformer::PopulateTransferFunction(
+    Function *Target, Function *TransferFunction, CallInst *CallSite,
+    HAKCPointerManager *PointerManager) {
   if (!TransferFunction->empty()) {
     return TransferFunction;
   }
@@ -1001,9 +1027,15 @@ hakc::HAKCTransformer::PopulateTransferFunction(Function *Target,
   Unreachable->removeFromParent();
 
   for (auto &Arg : TransferFunction->args()) {
-    auto ManagedPointer = CreateNewManagedPointer(&Arg);
     if (!CommonHAKCAnalysis::argShouldTransfer(&Arg) || NoKernelXfers) {
       continue;
+    }
+    auto ManagedPointer = CreateNewManagedPointer(&Arg);
+    if (!ManagedPointer->GetType() && CallSite && PointerManager) {
+      auto HAKCTy = InferHAKCType(Arg, CallSite, PointerManager);
+      if (HAKCTy) {
+        ManagedPointer->SetType(HAKCTy);
+      }
     }
     HAKCTransferState TransferState(TargetDivision, *ManagedPointer);
     if (!TransferState) {

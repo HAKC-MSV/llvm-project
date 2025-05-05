@@ -981,18 +981,18 @@ void HAKCFunctionAnalysis::
 
       if (call->getCalledFunction()->isVarArg()) {
         auto *VariadicTransfer =
-            getTransformer().CreateTransferToVariadic(call);
+            getTransformer().CreateTransferToVariadic(call, &PointerManager);
         call->setCalledFunction(VariadicTransfer);
       }
     }
   }
 }
 
-HAKCTransformer &HAKCFunctionAnalysis::getTransformer() {
+HAKCTransformer &HAKCFunctionAnalysis::getTransformer() const {
   return GetModuleAnalysis().GetTransformer();
 }
 
-HAKCModuleAnalysis &HAKCFunctionAnalysis::GetModuleAnalysis() {
+HAKCModuleAnalysis &HAKCFunctionAnalysis::GetModuleAnalysis() const {
   return ModuleAnalysis;
 }
 

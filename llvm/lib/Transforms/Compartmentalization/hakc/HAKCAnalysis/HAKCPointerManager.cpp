@@ -542,10 +542,17 @@ HAKCPointerManager::ManagedPointers() {
 }
 
 ManagedHAKCPointerP HAKCPointerManager::GetManagedPointer(Value *V) {
+  CommonHAKCAnalysis::getWriter(DebugActive)
+      << "Finding Managed Pointer for " << V << "\n";
   auto *Def = GetDef(V);
   for (auto &ManagedPointer : ManagedPointers()) {
     if (*ManagedPointer == Def) {
       return ManagedPointer;
+    }
+  }
+  if (auto *LoadI = dyn_cast<LoadInst>(V)) {
+    if (isa<AllocaInst>(LoadI->getPointerOperand())) {
+      return GetManagedPointer(LoadI->getPointerOperand());
     }
   }
 

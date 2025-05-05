@@ -29,7 +29,7 @@ void HAKCModuleAnalysis::InitAnalysis() {
   CommonHAKCAnalysis::SortFunctionList(AnalysisFunctions);
 }
 
-Module &HAKCModuleAnalysis::GetModule() {
+Module &HAKCModuleAnalysis::GetModule() const {
   return CommonAnalysis.GetSystemInfo().GetModule();
 }
 

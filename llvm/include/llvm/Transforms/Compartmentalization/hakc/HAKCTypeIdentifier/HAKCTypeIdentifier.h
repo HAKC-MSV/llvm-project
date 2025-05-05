@@ -104,7 +104,8 @@ protected:
 
   HAKCFunctionP FindFunction(const Function *F, bool SearchUnmapped = false);
 
-  HAKCGlobalP FindGlobal(const GlobalVariable *GV, bool SearchUnmapped = false);
+  HAKCGlobalP FindGlobal(const GlobalVariable *GV,
+                         bool SearchUnmapped = false) const;
 
   HAKCTypeP FindCalledFunctionType(FunctionType *FunctionTy);
 

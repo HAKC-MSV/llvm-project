@@ -75,7 +75,7 @@ public:
 
   void CreateInitGlobalMemberTransfers();
 
-  Module &GetModule();
+  Module &GetModule() const;
 
   bool FunctionDefinedInAssembly(Function *F);
 

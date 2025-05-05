@@ -16,6 +16,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/BinaryFormat/Dwarf.h"
 #include "llvm/IR/DerivedTypes.h"
+#include "llvm/XRay/BlockPrinter.h"
 
 std::shared_ptr<hakc::HAKCTypeInfo>
 hakc::HAKCTypeIdentifier::FindType(const DIType *type) {
@@ -961,8 +962,9 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::GetArgumentHAKCType(Argument *Arg) {
   HAKCTypeP Result = nullptr;
   if (DISubprog) {
     Result = GetArgumentHAKCType(DISubprog->getType(), Arg->getArgNo());
+  } else {
+    Result = FindType(Arg->getType());
   }
-
   return Result;
 }
 
@@ -1098,7 +1100,12 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
   }
   // maybe remove below
   else if (auto *GlobalVar = dyn_cast<GlobalVariable>(V)) {
-    BaseType = GlobalVar->getValueType(); // or getType()?
+    auto HAKCGlob = FindGlobal(GlobalVar);
+    if (HAKCGlob && HAKCGlob->GetType()) {
+      FoundType = HAKCGlob->GetType();
+    } else {
+      BaseType = GlobalVar->getValueType();
+    }
   } else if (auto *Func = dyn_cast<Function>(V)) {
     BaseType = Func->getReturnType();
   } else if (auto *CallI = dyn_cast<CallInst>(V)) {
@@ -1187,7 +1194,7 @@ hakc::HAKCTypeIdentifier::FindFunction(const Function *F, bool SearchUnmapped) {
 
 std::shared_ptr<hakc::HAKCGlobalInfo>
 hakc::HAKCTypeIdentifier::FindGlobal(const GlobalVariable *GV,
-                                     bool SearchUnmapped) {
+                                     bool SearchUnmapped) const {
   for (auto &it : globals) {
     if (it.second->GetGlobalVariable() == GV) {
       return it.second;

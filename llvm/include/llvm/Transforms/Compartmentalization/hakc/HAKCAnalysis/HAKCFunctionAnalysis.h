@@ -113,7 +113,7 @@ protected:
 
   void CheckForValidCompartmentTransitionAndUpdateIntraCompartmentCalls();
 
-  HAKCTransformer &getTransformer();
+  HAKCTransformer &getTransformer() const;
 
   bool AddManagedPointer(Use &PointerUse);
 
@@ -173,7 +173,7 @@ public:
 
   bool IsPHIOfGlobalsOnly(Value *V);
 
-  HAKCModuleAnalysis &GetModuleAnalysis();
+  HAKCModuleAnalysis &GetModuleAnalysis() const;
 
   bool IsIntrinsicNeedingAuthentication(CallBase *Call);
 
