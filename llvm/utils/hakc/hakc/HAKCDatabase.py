@@ -171,7 +171,7 @@ class HAKCDatabase:
     def get_all_divisions(self):
         cmd = f"""
         MATCH (div:{HAKCDivision.get_table_name()})-[:{HAKCDivision.InCompartmentTable}]->(c:{HAKCCompartment.get_table_name()})
-        RETURN div.DivisionID AS division_id, c.CompartmentID AS compartment_id
+        RETURN div.DivisionID as DivisionID, c.CompartmentID AS compartment_id
         """
         divisions = set()
         response = self.execute_prepared_stmt(cmd)
