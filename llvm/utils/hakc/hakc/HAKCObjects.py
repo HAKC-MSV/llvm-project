@@ -532,8 +532,7 @@ class HAKCCompartmentalizationAdjustment(yaml.YAMLObject):
         self.add_kernel_division = kwargs.get(HAKCCompartmentalizationAdjustment.add_kernel_compartment_entry, False)
         for adjustment in sorted(kwargs.get(HAKCCompartmentalizationAdjustment.compartmentalize_entry, set()),
                                  key=lambda e: e.path):
-            escaped_path = re.escape(adjustment.path)
-            self.adjustment_regexes[re.compile(escaped_path)] = adjustment
+            self.adjustment_regexes[re.compile(adjustment.path)] = adjustment
 
     @classmethod
     def from_yaml(cls, loader: yaml.Loader, node):
