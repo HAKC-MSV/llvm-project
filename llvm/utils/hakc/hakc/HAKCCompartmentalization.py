@@ -286,8 +286,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
                         f'Node {node} does not have all the data needed. Data needed is {" ".join(sorted(data_to_persist.keys()))} and data provided is {" ".join(sorted([column.column_name for column in db_data.keys()]))}')
                 for column, data in db_data.items():
                     if data is None:
-                        logger.debug(f'Node {node} has None for column {
-                        column.column_name}')
+                        logger.debug(f'Node {node} has None for column {column.column_name}')
                         data = column.column_type.default_value
                     if column.column_name not in data_to_persist:
                         data_to_persist[column.column_name] = list()
