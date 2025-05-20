@@ -69,60 +69,92 @@ class HAKCDatabase:
             logger.error(f"Found access_token: {access_token} for division_id: {division_id}")
             return int(access_token)
 
-    def get_division_id_compartment_id_from_symbol(self, symbol: HAKCSymbol) -> Optional[Tuple[int, int, int, int]]:
+    def get_all_symbol_hashes_in_compartment(self, compartment_id: int) -> list[int]:
+        cmd = f"""
+        MATCH (comp1:{HAKCCompartment.get_table_name()})<-[:{HAKCDivision.InCompartmentTable}]-(div1:{HAKCDivision.get_table_name()})<-[:{HAKCSymbol.InDivisionTable}]-(sym1:{HAKCSymbol.get_table_name()})
+        WHERE comp1.CompartmentID = $source_compartment_id
+        return sym1.{str(HAKCSymbol.get_primary_key())} AS symbol_hash;
+        """
+        response = self.execute_prepared_stmt(cmd, source_compartment_id=compartment_id)
+        ret = response.get_as_df()['symbol_hash'].to_list()
+        return ret
+
+    def get_all_divisions_in_compartment(self, compartment_id: int) -> list[HAKCDivision]:
+        cmd = f"""
+        MATCH (comp1:{HAKCCompartment.get_table_name()})<-[:{HAKCDivision.InCompartmentTable}]-(div1:{HAKCDivision.get_table_name()})
+        WHERE comp1.CompartmentID = $source_compartment_id
+        RETURN div1.DivisionID as DivisionID, comp1.CompartmentID AS compartment_id, div1.{str(HAKCDivision.get_primary_key())} AS {str(HAKCDivision.get_primary_key())}
+        """
+        divisions = list()
+        response = self.execute_prepared_stmt(cmd, source_compartment_id=compartment_id)
+        if response.has_next():
+            info = response.get_as_df()
+            for data in info.to_dict(orient='records'):
+                divisions.append(HAKCDivision(**data))
+        return divisions
+
+    def merge_compartments(self, head_compartment_id: int, tail_compartment_id: int):
+        cmd = f"""
+            MATCH (sym:{HAKCSymbol.get_table_name()})-[e:{HAKCSymbol.InDivisionTable}]->(div:{HAKCDivision.get_table_name()})-[:{HAKCDivision.InCompartmentTable}]->(c:{HAKCCompartment.get_table_name()})
+            WHERE c.{str(HAKCCompartment.get_primary_key())} = $compartment_id
+            DELETE e
+            RETURN sym.{str(HAKCSymbol.get_primary_key())} AS SymbolHash, div.DivisionID AS DivisionID;
+        """
+        result = self.execute_prepared_stmt(cmd, compartment_id=tail_compartment_id)
+        data = result.get_as_df()
+        for _, row in data.iterrows():
+            cmd = f"""
+                MATCH (sym:{HAKCSymbol.get_table_name()}), (div:{HAKCDivision.get_table_name()})-[:{HAKCDivision.InCompartmentTable}]->(c:{HAKCCompartment.get_table_name()})
+                WHERE sym.{str(HAKCSymbol.get_primary_key())} = $symbol_hash AND div.DivisionID = $division_id AND c.CompartmentID = $compartment_id
+                CREATE (sym)-[:{HAKCSymbol.InDivisionTable}]->(div)
+                return div.DivisionID
+            """
+            self.execute_prepared_stmt(cmd, symbol_hash=row['SymbolHash'].item(), division_id=row['DivisionID'].item(),
+                                       compartment_id=head_compartment_id)
+        cmd = f"""
+            MATCH (div:{HAKCDivision.get_table_name()})-[:{HAKCDivision.InCompartmentTable}]->(c:{HAKCCompartment.get_table_name()})
+            WHERE c.CompartmentID = $compartment_id
+            DETACH DELETE div;
+        """
+        self.execute_prepared_stmt(cmd, compartment_id=tail_compartment_id)
+        cmd = f"""
+            MATCH (c:{HAKCCompartment.get_table_name()})
+            WHERE c.CompartmentID = $compartment_id
+            DETACH DELETE c;
+        """
+        self.execute_prepared_stmt(cmd, compartment_id=tail_compartment_id)
+
+    def get_division_id_compartment_id_from_symbol(self, symbol: HAKCSymbol) -> Optional[
+        Tuple[HAKCDivision, HAKCCompartment]]:
         cmd = f"""        
         MATCH (scope:{HAKCScope.get_table_name()})<-[:{HAKCSymbol.HasScopeTable}]-(sym:{HAKCSymbol.get_table_name()})-[:{HAKCSymbol.InDivisionTable}]->(div:{HAKCDivision.get_table_name()})-[:{HAKCDivision.InCompartmentTable}]->(comp:{HAKCCompartment.get_table_name()})
-        WITH sym.Name as Name, scope.Scope as Scope, div.DivisionID as division_id, div.AccessToken as access_token, comp.CompartmentID as compartment_id, comp.EntryToken as entry_token
+        WITH sym.Name as Name, scope.Scope as Scope, div.DivisionID as DivisionID, div.AccessToken as AccessToken, comp.CompartmentID as CompartmentID, comp.EntryToken as EntryToken
         WHERE Name = $Name AND Scope = $Scope
-        RETURN division_id, access_token, compartment_id, entry_token
+        RETURN DivisionID, AccessToken, CompartmentID, EntryToken
         """
         response = self.execute_prepared_stmt(cmd, Name=symbol.name, Scope=symbol.scope.scope)
         # TODO: double check that this only returns one row
         ret = response.get_as_df()
         if ret.empty:
-            logger.error(f'Command: {cmd} returned None\n')
-            logger.error(f'Searched with Name: {symbol.name}, Scope: {str(symbol.scope)}')
+            logger.debug(f'Command: {cmd} returned None\n')
+            logger.debug(f'Searched with Name: {symbol.name}, Scope: {str(symbol.scope)}')
             return None
         else:
             # TODO: check that this is correct when this is eventually called
-            division_id = ret["division_id"][0]
-            access_token = ret["access_token"][0]
-            compartment_id = ret["compartment_id"][0]
-            entry_token = ret["entry_token"][0]
-            logger.error(
-                f"Found division_id, access_token, compartment_id, entry_token: ({division_id}, {access_token}, {compartment_id}, {entry_token}) for symbol: {symbol}")
-            # need to cast to int because json cant parse numpy.uint64s apparently
-            return int(division_id), int(access_token), int(compartment_id), int(entry_token)
+            info = ret.to_dict(orient='records')
+            logger.debug(f"Found {info} for symbol: {symbol}")
+            return HAKCDivision(**info), HAKCCompartment(**info)
 
     def get_valid_targets_from_compartment_id(self, source_compartment_id: int) -> list[int]:
-        # TODO: double check this
-        # NOTE: comp1 is fixed to the caller's compartment
-        # from the perspective of the caller, the compartment_id is their own and they are looking for compartment_ids of targets
-        # Get valid target compartments given compartment id
-        # comp1 <- div1 <- symbol1 -(Dag2)-> symbol2 -> div2 -> comp2
         cmd = f"""
         MATCH (comp1:{HAKCCompartment.get_table_name()})<-[:{HAKCDivision.InCompartmentTable}]-(div1:{HAKCDivision.get_table_name()})<-[:{HAKCSymbol.InDivisionTable}]-(sym1:{HAKCSymbol.get_table_name()})-[:{HAKCSymbol.DagEdgeTable}]->(sym2:{HAKCSymbol.get_table_name()})-[:{HAKCSymbol.InDivisionTable}]->(div2:{HAKCDivision.get_table_name()})-[:{HAKCDivision.InCompartmentTable}]->(comp2:{HAKCCompartment.get_table_name()})
-        WITH  *
         WHERE comp1.CompartmentID = $source_compartment_id
-        RETURN comp1.CompartmentID, comp2.CompartmentID, comp2.EntryToken;
+        RETURN DISTINCT comp2.CompartmentID AS Target;
         """
         response = self.execute_prepared_stmt(cmd, source_compartment_id=source_compartment_id)
-        data = response.get_as_df()
-        if data.empty:
-            logger.debug(f'Command: {cmd} returned None\n')
-            logger.debug(f'Searched with CompartmentID: {source_compartment_id}')
-            return list()
-        else:
-            # using dictionary to remove duplicates
-            targets = list()
-            for index, row in data.iterrows():
-                target_id = row["comp2.CompartmentID"]
-                # entry_token = row["comp2.EntryToken"] // probably don't need entry token here
-                if target_id not in targets:
-                    logger.debug(f"Found valid_targets from {row['comp1.CompartmentID']} to {target_id}")
-                    targets.append(int(target_id))
+        targets = response.get_as_df()['Target'].tolist()
 
-            return targets
+        return targets
 
     def persist_dag_edges(self, dag_edge_data):
         head_hashes = list()
@@ -156,6 +188,12 @@ class HAKCDatabase:
             where_clause=f'WHERE sym.symbol_hash in [{", ".join([str(sh) for sh in symbol_hashes])}]')
         return result
 
+    def get_symbols_by_name(self, symbol_name: str) -> list[HAKCSymbol]:
+        result = self._get_symbols(
+            where_clause=f'WHERE sym.Name = {symbol_name}'
+        )
+        return result
+
     def delete_all_compartments(self):
         cmd = f"""
         MATCH (div:{HAKCDivision.get_table_name()})-[:{HAKCDivision.InCompartmentTable}]->(c:{HAKCCompartment.get_table_name()})
@@ -180,6 +218,20 @@ class HAKCDatabase:
             for data in info.to_dict(orient='records'):
                 divisions.add(HAKCDivision(**data))
         return divisions
+
+    def get_all_compartments(self) -> list[HAKCCompartment]:
+        cmd = f"""
+        MATCH (c:{HAKCCompartment.get_table_name()})
+        RETURN {", ".join(["c." + str(col) + " as " + str(col) for col in HAKCCompartment.get_db_table_columns()])}
+        """
+        compartments = list()
+        response = self.execute_prepared_stmt(cmd)
+        if response.has_next():
+            info = response.get_as_df()
+            for data in info.to_dict(orient='records'):
+                compartment = HAKCCompartment(**data)
+                compartments.append(compartment)
+        return compartments
 
     def get_symbol_definition_location(self, symbol: HAKCSymbol) -> tuple[HAKCCompilationUnit, int] | None:
         cmd = f"""
