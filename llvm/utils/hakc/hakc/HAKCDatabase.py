@@ -94,6 +94,7 @@ class HAKCDatabase:
         return divisions
 
     def merge_compartments(self, head_compartment_id: int, tail_compartment_id: int):
+        existing_divisions = self.get_all_divisions_in_compartment(head_compartment_id)
         cmd = f"""
             MATCH (sym:{HAKCSymbol.get_table_name()})-[e:{HAKCSymbol.InDivisionTable}]->(div:{HAKCDivision.get_table_name()})-[:{HAKCDivision.InCompartmentTable}]->(c:{HAKCCompartment.get_table_name()})
             WHERE c.{str(HAKCCompartment.get_primary_key())} = $compartment_id
@@ -102,15 +103,27 @@ class HAKCDatabase:
         """
         result = self.execute_prepared_stmt(cmd, compartment_id=tail_compartment_id)
         data = result.get_as_df()
+        symbol_hashes = list()
+        division_hashes = list()
+
         for _, row in data.iterrows():
-            cmd = f"""
-                MATCH (sym:{HAKCSymbol.get_table_name()}), (div:{HAKCDivision.get_table_name()})-[:{HAKCDivision.InCompartmentTable}]->(c:{HAKCCompartment.get_table_name()})
-                WHERE sym.{str(HAKCSymbol.get_primary_key())} = $symbol_hash AND div.DivisionID = $division_id AND c.CompartmentID = $compartment_id
-                CREATE (sym)-[:{HAKCSymbol.InDivisionTable}]->(div)
-                return div.DivisionID
-            """
-            self.execute_prepared_stmt(cmd, symbol_hash=row['SymbolHash'].item(), division_id=row['DivisionID'].item(),
-                                       compartment_id=head_compartment_id)
+            division_id = row['DivisionID'].item()
+            symbol_hash = row['SymbolHash'].item()
+
+            symbol_hashes.append(symbol_hash)
+            division_hash = hash(existing_divisions[0])
+
+            for existing_division in existing_divisions:
+                if existing_division.division_id == division_id:
+                    division_hash = hash(existing_division)
+            division_hashes.append(division_hash)
+
+        df = pd.DataFrame({
+            "from": symbol_hashes,
+            "to": division_hashes,
+        })
+        self.insert_from_dataframe(HAKCSymbol.InDivisionTable, df)
+
         cmd = f"""
             MATCH (div:{HAKCDivision.get_table_name()})-[:{HAKCDivision.InCompartmentTable}]->(c:{HAKCCompartment.get_table_name()})
             WHERE c.CompartmentID = $compartment_id
