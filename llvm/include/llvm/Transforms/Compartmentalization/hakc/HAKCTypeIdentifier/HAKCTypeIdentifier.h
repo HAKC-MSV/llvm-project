@@ -48,6 +48,8 @@ public:
 
   Module &GetModule() const;
 
+  ModuleAnalysisManager &GetMAM() const;
+
   void GetHAKCTypes(SmallVectorImpl<HAKCTypeP> &Results) const;
 
   Type *GetTypeFromString(StringRef TypeStr) const;

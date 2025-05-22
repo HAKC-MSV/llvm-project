@@ -5,7 +5,7 @@
 
     set(HAKC_CC $<TARGET_FILE:clang>)
     configure_file(gen-test-db.py.in ${CMAKE_BINARY_DIR}/bin/hakc/gen-test-db)
-
+    # TODO: invoke gen-test-db for each test file, if the yaml.in does not already exist?
     file(GLOB HAKC_MODS hakc/*.py)
 
     foreach (BinFile ${BinFiles})

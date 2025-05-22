@@ -19,6 +19,7 @@ typedef std::shared_ptr<llvm::hakc::HAKCAllocationSize> HAKCCustomAllocation;
 
 typedef SmallVector<llvm::hakc::function_def_t> HAKCFunctionList;
 typedef SmallVector<llvm::hakc::function_def_t> HAKCTransferList;
+typedef SmallVector<llvm::hakc::HAKCTypeP> HAKCStructList;
 typedef SmallVector<llvm::hakc::custom_transfer_def_t> HAKCCustomTransferList;
 typedef SmallVector<GlobalVariable *> HAKCGlobalVariableList;
 typedef SmallVector<GlobalValue *> HAKCSymbolList;
@@ -120,6 +121,7 @@ public:
   StringRef GetPlatform() const;
 
   StringRef GetDagAnalysisRootPath() const;
+  HAKCStructList GetStructList() const;
 
   iterator_range<HAKCPreTransferActionList::iterator> PreTransferActions();
 
@@ -156,6 +158,7 @@ protected:
   HAKCCustomTransferList CustomTransferList;
   HAKCPreTransferActionList PreTransferActionList;
   HAKCPostTargetActionList PostTargetActionList;
+  HAKCStructList StructList;
 
   void
   GetAllDefinedHAKCFunctions(SmallVectorImpl<hakc::function_def_t> &Results);

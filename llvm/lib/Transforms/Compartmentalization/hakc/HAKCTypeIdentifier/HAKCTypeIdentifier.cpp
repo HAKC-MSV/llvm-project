@@ -18,6 +18,9 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/XRay/BlockPrinter.h"
 
+#include "llvm/Analysis/CallGraph.h"
+#include "llvm/Analysis/CallPrinter.h"
+
 std::shared_ptr<hakc::HAKCTypeInfo>
 hakc::HAKCTypeIdentifier::FindType(const DIType *type) {
   if (!type) {
@@ -304,8 +307,6 @@ hakc::HAKCTypeIdentifier::HandleType(const DIType *type) {
   }
   if (isa<DICompositeType>(type) || isa<DISubroutineType>(type) ||
       isa<DIBasicType>(type)) {
-    CommonHAKCAnalysis::getWriter(debug) << "Creating HAKCTypeInfo for\n"
-                                         << type << "\n";
     auto TypeName = GetTypeName(type);
     TypeP = std::make_shared<HAKCTypeInfo>(AnalysisHelper, TypeName, debug);
     if (auto *BasicType = dyn_cast<DIBasicType>(type)) {
@@ -486,7 +487,7 @@ hakc::HAKCTypeIdentifier::HandleFunction(const DISubprogram *SubProg) {
   }
   if (F->getSubprogram() != SubProg) {
     CommonHAKCAnalysis::getWriter(debug)
-        << *F << " SubProgram does equal " << *SubProg << "\n";
+        << *F << " SubProgram does (not?) equal " << *SubProg << "\n";
   } else {
     CommonHAKCAnalysis::getWriter(debug)
         << F->getSubprogram() << " == " << SubProg << "\n";
@@ -1349,13 +1350,19 @@ Module &hakc::HAKCTypeIdentifier::GetModule() const {
   return AnalysisHelper.GetModule();
 }
 
+ModuleAnalysisManager &hakc::HAKCTypeIdentifier::GetMAM() const {
+  return AnalysisHelper.GetMAM();
+}
+
 void hakc::HAKCTypeIdentifier::ProcessDebugInfo() {
+  // this is where the dag analysis actually happens!
   DbgInfoFinder.processModule(GetModule());
   auto Debug = AnalysisHelper.GetSystemInfo().OutputDebugInfo();
 
   CommonHAKCAnalysis::getWriter(Debug) << GetModule() << "\n";
 
   StringRef ModulePath = GetModule().getSourceFileName();
+  // Q: what does this do? aren't there going to be multiple scopes, so why exit early?
   for (auto *Scope : DbgInfoFinder.scopes()) {
     if (auto *File = dyn_cast<DIFile>(Scope)) {
       auto Filename = File->getFilename();
@@ -1374,13 +1381,27 @@ void hakc::HAKCTypeIdentifier::ProcessDebugInfo() {
         << "Found Compilation Unit Scope " << CompilationUnitScope << "\n";
   }
 
+  // std::vector<std::shared_ptr<hakc::HAKCTypeInfo>> specialStructs;
   CommonHAKCAnalysis::getWriter(Debug) << "!!!! Starting Type Handling !!!!\n";
   unsigned TypesProcessed = 0;
   for (auto *DITy : DbgInfoFinder.types()) {
     CommonHAKCAnalysis::getWriter(Debug)
         << "Processing Type " << ++TypesProcessed << " of "
         << DbgInfoFinder.type_count() << "\n";
-    auto TypeP = HandleType(DITy);
+    std::shared_ptr<hakc::HAKCTypeInfo> TypeP = HandleType(DITy);
+  //   if (TypeP) {
+  //     if (TypeP->GetDbgType()) {
+  //       CommonHAKCAnalysis::getWriter(true) << "PostDominatorAnalysis found DIType: " << TypeP->GetDbgType() << "\n";
+  //       if (TypeP->GetDbgType()->getTag() == dwarf::DW_TAG_structure_type) {
+  //         CommonHAKCAnalysis::getWriter(true) << "PostDominatorAnalysis found Debug Name: " << TypeP->GetDbgTypeName() << "\n";
+  //         specialStructs.push_back(TypeP);
+  //       }
+  //     }
+  //   }
+  // }
+  // for(auto TypeP : specialStructs){
+  //   CommonHAKCAnalysis::getWriter(true) << "PostDominatorAnalysis found struct: " << *TypeP << "\n";
+  //   // AnalysisHelper.GetSystemInfo().StructList.push_back(TypeP);
   }
   CommonHAKCAnalysis::getWriter(Debug) << "!!!! Finished Type Handling !!!!\n";
 
@@ -1412,6 +1433,12 @@ void hakc::HAKCTypeIdentifier::ProcessDebugInfo() {
       }
     }
   }
+
+  // now try to create a call graph
+  // auto cg = CallGraph(GetModule());
+  // cg.print(errs());
+  // llvm::writeCallGraphDOT(GetModule(), GetMAM(), std::string(AnalysisHelper.GetSystemInfo().GetDagAnalysisRootPath()));
+
 }
 
 void hakc::HAKCTypeIdentifier::OutputYAML(raw_ostream &out) const {

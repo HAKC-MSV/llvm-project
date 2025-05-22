@@ -20,6 +20,8 @@ class CommonHAKCAnalysis {
 protected:
   Module &M;
 
+  ModuleAnalysisManager &MAM;
+
   std::map<Value *, SmallVector<Value *>> DefchainCache;
 
   HAKCSystemInformation SystemInfo;
@@ -32,11 +34,13 @@ protected:
 public:
   virtual ~CommonHAKCAnalysis() = default;
 
-  explicit CommonHAKCAnalysis(Module &M, StringRef ConfigPath);
+  explicit CommonHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM, StringRef ConfigPath);
 
   HAKCSystemInformation &GetSystemInfo();
 
   Module &GetModule() const;
+
+  ModuleAnalysisManager &GetMAM() const;
 
   Value *getDef(Value *V, bool followLoad);
 

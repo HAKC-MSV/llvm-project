@@ -90,12 +90,14 @@ void CommonHAKCAnalysis::InitConfig(StringRef ConfigPath) {
   SystemInfo << SystemConfig;
 }
 
-CommonHAKCAnalysis::CommonHAKCAnalysis(Module &M, StringRef ConfigPath)
-    : M(M), SystemInfo(*this) {
+CommonHAKCAnalysis::CommonHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM, StringRef ConfigPath)
+    : M(M), MAM(MAM), SystemInfo(*this) {
   InitConfig(ConfigPath);
 }
 
 Module &CommonHAKCAnalysis::GetModule() const { return M; }
+
+ModuleAnalysisManager &CommonHAKCAnalysis::GetMAM() const {return MAM;}
 
 bool CommonHAKCAnalysis::IsHAKCTransferFunction(Function *F) {
   return IsFunctionInHAKCTransferFunctionList(

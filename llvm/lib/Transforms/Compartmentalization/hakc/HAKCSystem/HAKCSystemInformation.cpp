@@ -64,7 +64,7 @@ HAKCSystemInformation::HAKCSystemInformation(CommonHAKCAnalysis &CommonAnalysis)
       SeparateNamespacePathList(), HAKCSourcePathList(),
       SafeTransitionFunctionList(), IgnoredGlobalList(),
       AllocationFunctionList(), CustomTransferList(), PreTransferActionList(),
-      PostTargetActionList() {}
+      PostTargetActionList(), StructList(){}
 
 hakc::function_def_t HAKCSystemInformation::CreateHAKCFunction(
     HAKCYAMLFunctionDefinition &YAMLFunctionDef,
@@ -137,7 +137,17 @@ void HAKCSystemInformation::operator<<(HAKCYamlConfig &YamlConfig) {
   DatabaseInformation << YamlConfig.DatabaseConfig;
 
   // ProcessDebugInfo must happen before creating custom transfers
-  TypeIdentifier.ProcessDebugInfo();
+  // dag analysis actually happens here!
+  if (PassMode == RunDataAccessGraphAnalysis){
+    TypeIdentifier.ProcessDebugInfo();
+  }
+  else if (PassMode == RunPostDominatorAnalysis){
+    TypeIdentifier.ProcessDebugInfo();
+    return;
+  }
+  else {
+    TypeIdentifier.ProcessDebugInfo();
+  }
 
   for (auto &NoTransferFunction : YamlConfig.NoTransferFunctions) {
     if (auto *F = GetModule().getFunction(NoTransferFunction.SymbolName)) {
@@ -282,6 +292,10 @@ hakc::HAKCPassModeTypeEnum HAKCSystemInformation::GetPassMode() const {
 
 StringRef HAKCSystemInformation::GetDagAnalysisRootPath() const {
   return DagAnalysisRootPath;
+}
+
+HAKCStructList HAKCSystemInformation::GetStructList() const {
+  return StructList;
 }
 
 llvm::hakc::function_def_t HAKCSystemInformation::CodeValidation() const {

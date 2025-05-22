@@ -232,17 +232,20 @@ endif ()
 if (LLVM_ENABLE_HAKC)
     set(HAKC_SOCKET_ROOT "${CMAKE_BINARY_DIR}/hakc-sockets" CACHE STRING "Directory to use for test socket paths")
     file(MAKE_DIRECTORY "${HAKC_SOCKET_ROOT}") # create the hakc-sockets directory
-    string(LENGTH "${HAKC_SOCKET_ROOT}/hakc_test0.db.sock" socket_path_length)
+    string(LENGTH "${HAKC_SOCKET_ROOT}/hakc_testxx.db.sock" socket_path_length)
     if (socket_path_length GREATER_EQUAL 107)
         message(WARNING "HAKC_SOCKET_ROOT ${HAKC_SOCKET_ROOT} is too long")
     endif ()
 
     set(HAKC_TEST_ROOT_DIR test/Transforms/Compartmentalization/hakc)
+    set(HAKC_TEST_CASE $ENV{HAKC_TEST_CASE})
+
     file(GLOB HAKC_TESTS ${LLVM_MAIN_SRC_DIR}/${HAKC_TEST_ROOT_DIR}/tests/* LIST_DIRECTORIES TRUE)
 
     set(HAKC_CONFIG_DIR ${LLVM_MAIN_SRC_DIR}/${HAKC_TEST_ROOT_DIR}/configs)
 
-    list(APPEND HAKC_TEST_INPUTS ${HAKC_CONFIG_DIR}/hakc_policy_config.yml.in
+    list(APPEND HAKC_TEST_INPUTS
+            ${HAKC_CONFIG_DIR}/hakc_policy_config.yml.in
             ${HAKC_CONFIG_DIR}/hakc_comp_config.yml.in
             ${HAKC_CONFIG_DIR}/lit.local.cfg.in
     )
@@ -299,8 +302,17 @@ if (LLVM_ENABLE_HAKC)
     add_custom_target(check-hakc
             COMMAND "${Python3_EXECUTABLE}" ${LIT_BASE_DIR}/${LIT_FILE_NAME} -a ${LLVM_MAIN_SRC_DIR}/${HAKC_TEST_ROOT_DIR}
     )
-
+    # run specific test (rather than all tests)
+    # using build_llvm.sh script:
+    #   export HAKC_TEST_CASE=hakc_temporal_test3
+    # then once built:
+    #   cmake --build . --target check-hakc-test
+    add_custom_target(check-hakc-test
+            COMMAND "${Python3_EXECUTABLE}" ${LIT_BASE_DIR}/${LIT_FILE_NAME} -a ${LLVM_MAIN_SRC_DIR}/${HAKC_TEST_ROOT_DIR}/tests/${HAKC_TEST_CASE}/
+    )
+    # TODO: update this so that the tests depend on hakc being built
     add_dependencies(check-hakc hakc_test_configs_gen)
+    add_dependencies(check-hakc-test hakc_test_configs_gen)
 
     list(APPEND LLVM_TEST_DEPENDS hakc_test_configs_gen clang)
 endif ()
