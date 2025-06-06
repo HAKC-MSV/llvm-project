@@ -257,6 +257,21 @@ class HAKCDatabase:
                 compartments.append(compartment)
         return compartments
 
+    def get_compartment_symbol_count(self) -> dict[int, int]:
+        cmd = f"""
+        MATCH
+        (comp1:{HAKCCompartment.get_table_name()})
+        RETURN comp1.{str(HAKCCompartment.get_primary_key())} AS CompartmentID,  COUNT {{ MATCH (comp1)<-[:{HAKCDivision.InCompartmentTable}]-(:{HAKCDivision.get_table_name()})<-[:{HAKCSymbol.InDivisionTable}]-(:{HAKCSymbol.get_table_name()}) }} AS Count
+        """
+        response = self.execute_prepared_stmt(cmd)
+        result = dict()
+        for _, row in response.get_as_df().iterrows():
+            compartment_id = int(row['CompartmentID'].item())
+            count = int(row['Count'].item())
+            result[compartment_id] = count
+
+        return result
+
     def get_symbol_definition_location(self, symbol: HAKCSymbol) -> tuple[HAKCCompilationUnit, int] | None:
         cmd = f"""
         MATCH (sym:{HAKCSymbol.get_table_name()})-[e:{HAKCSymbol.DefinedInTable}]->(cu:{HAKCCompilationUnit.get_table_name()})
