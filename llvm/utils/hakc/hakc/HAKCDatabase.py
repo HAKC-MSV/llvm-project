@@ -165,7 +165,7 @@ class HAKCDatabase:
             return None
         else:
             # TODO: check that this is correct when this is eventually called
-            info = ret.to_dict(orient='records')
+            info = ret.to_dict(orient='records')[0]
             logger.debug(f"Found {info} for symbol: {symbol}")
             return HAKCDivision(**info), HAKCCompartment(**info)
 
@@ -214,7 +214,8 @@ class HAKCDatabase:
 
     def get_symbols_by_name(self, symbol_name: str) -> list[HAKCSymbol]:
         result = self._get_symbols(
-            where_clause=f'WHERE sym.Name = {symbol_name}'
+            where_clause=f'WHERE sym.Name = $symbol_name',
+            symbol_name=symbol_name
         )
         return result
 
@@ -326,9 +327,9 @@ class HAKCDatabase:
     def insert_from_dataframe(self, table_name: str, df: pd.DataFrame):
         self.conn.execute(f'COPY {table_name} FROM df')
 
-    def _get_symbols(self, where_clause: None | str = None, limit: int = 0) -> list[HAKCSymbol] | int:
+    def _get_symbols(self, where_clause: None | str = None, limit: int = 0, **kwargs) -> list[HAKCSymbol] | int:
         cmd = [f"""
-        OPTIONAL MATCH (scope:{HAKCScope.get_table_name()})<-[:{HAKCSymbol.HasScopeTable}]-(sym:{HAKCSymbol.get_table_name()})-[:{HAKCSymbol.IsTypeTable}]->(ty:{HAKCType.get_table_name()}),
+        MATCH (scope:{HAKCScope.get_table_name()})<-[:{HAKCSymbol.HasScopeTable}]-(sym:{HAKCSymbol.get_table_name()})-[:{HAKCSymbol.IsTypeTable}]->(ty:{HAKCType.get_table_name()}),
         (sym)-[def:{HAKCSymbol.DefinedInTable}]->(cu:{HAKCCompilationUnit.get_table_name()})
         """]
         if where_clause is not None:
@@ -345,7 +346,8 @@ class HAKCDatabase:
         if limit > 0:
             cmd.append(f'LIMIT {limit}')
         symbols = list()
-        response = self.execute_prepared_stmt(prepared_stmt=" ".join(cmd))
+        cmd_str = " ".join(cmd)
+        response = self.execute_prepared_stmt(prepared_stmt=cmd_str, **kwargs)
         if response.has_next():
             info = response.get_as_df()
             for data in info.to_dict(orient='records'):
