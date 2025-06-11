@@ -195,12 +195,12 @@ class HAKCCompartment(HAKCDBNode, yaml.YAMLObject):
             schema[1]: self.entry_token
         }
 
-
 class HAKCType(HashedHAKCDBNode, yaml.YAMLObject):
     yaml_tag = "!HAKCType"
     unknown_type = "@UNKNOWN@"
 
     def __init__(self, DebugType: Optional[str] = None, LLVMType: Optional[str] = None, **kwargs):
+        # print(f"DebugType: {DebugType}, LLVMType: {LLVMType}, kwargs: {kwargs}")
         yaml.YAMLObject.__init__(self)
         if 'Name' not in kwargs:
             kwargs['Name'] = DebugType if DebugType is not None and DebugType != HAKCType.unknown_type else LLVMType
@@ -241,7 +241,9 @@ class HAKCType(HashedHAKCDBNode, yaml.YAMLObject):
         }
 
         result = type_str
+        # print(f"type of type_str: {type(type_str)}")
         for regex, sub in transforms.items():
+            # print(f"type of regex, sub: {type(regex)}, {type(sub)}")
             result = re.sub(regex, sub, result)
 
         return result
@@ -252,7 +254,8 @@ class HAKCType(HashedHAKCDBNode, yaml.YAMLObject):
 
     @classmethod
     def get_data_columns(cls) -> list[HAKCDBColumn]:
-        return [HAKCDBColumn('DebugType', "STRING"), HAKCDBColumn('LLVMType', 'STRING')]
+        return [HAKCDBColumn('DebugType', "STRING"),
+                HAKCDBColumn('LLVMType', 'STRING')]
 
     @staticmethod
     def get_table_name() -> str:
@@ -266,6 +269,58 @@ class HAKCType(HashedHAKCDBNode, yaml.YAMLObject):
             schema[2]: self.llvm_type
         }
 
+
+class HAKCTypePerm(HashedHAKCDBNode, yaml.YAMLObject):
+    yaml_tag = "!HAKCTypePerm"
+    hasTypeTable = "Type"
+
+    # note: the yaml keys seem to line up with exactly the parameters in __init__
+    # def __init__(self, RWX: Optional[str] = None, PermType: Optional[HAKCType] = None, **kwargs):
+    def __init__(self, RWX: Optional[str] = None, PermType: Optional[HAKCType] = None, **kwargs):
+        # print(f"RWX: {RWX}, Type: {PermType}, kwargs: {kwargs}")
+        # HAKCType.__init__(self, **kwargs)
+        yaml.YAMLObject.__init__(self)
+        HashedHAKCDBNode.__init__(self, **kwargs)
+        self.RWX = RWX
+        self.perm_type = PermType
+
+    @classmethod
+    def from_yaml(cls, loader: yaml.Loader, node):
+        return cls(**loader.construct_mapping(node, deep=True))
+
+    def get_hash_inputs(self) -> list[object]:
+        return [self.RWX, self.perm_type]
+
+    @staticmethod
+    def get_primary_key() -> HAKCDBColumn:
+        return HAKCDBColumn('type_perm_hash', 'UINT64')
+
+    @classmethod
+    def get_data_columns(cls) -> list[HAKCDBColumn]:
+        return [HAKCDBColumn('RWX', "STRING")]
+
+    @staticmethod
+    def get_table_name() -> str:
+        return HAKCTypePerm.yaml_tag[1:]
+
+    @staticmethod
+    def get_db_relations() -> list[HAKCDBRelation]:
+        return [HAKCDBRelation(HAKCTypePerm.hasTypeTable, HAKCTypePerm, HAKCType)]
+
+    def __hash__(self):
+        return HAKCDBNode.__hash__(self)
+
+    def __eq__(self, other):
+        if isinstance(other, HAKCTypePerm):
+            return (self.RWX == other.RWX) and (self.computed_hash == other.computed_hash)
+        return False
+
+    def get_db_data(self, convert_hash=True) -> dict[HAKCDBColumn, object]:
+        schema = HAKCTypePerm.get_db_table_columns()
+        return {
+            schema[0]: hash(self) if convert_hash else self.get_computed_hash(),
+            schema[1]: self.RWX
+        }
 
 class HAKCScope(HashedHAKCDBNode, yaml.YAMLObject):
     yaml_tag = "!HAKCScope"
@@ -473,11 +528,13 @@ class HAKCFunction(HAKCSymbol):
     yaml_tag = "!HAKCFunction"
     IndirectCallTable = "IndirectCall"
     DirectCallTable = "DirectCall"
+    TypesUsedTable = "TypesUsed"
 
-    def __init__(self, DirectCalls: Optional[list] = None, IndirectCalls: Optional[list] = None, **kwargs):
+    def __init__(self, DirectCalls: Optional[list] = None, IndirectCalls: Optional[list] = None, TypesUsed: Optional[list[HAKCTypePerm]] = None, **kwargs):
         HAKCSymbol.__init__(self, **kwargs)
         self.direct_calls = DirectCalls if DirectCalls is not None else list()
         self.indirect_calls = IndirectCalls if IndirectCalls is not None else list()
+        self.types_used = TypesUsed if TypesUsed is not None else list()
 
     @classmethod
     def from_yaml(cls, loader: yaml.Loader, node):
@@ -487,7 +544,8 @@ class HAKCFunction(HAKCSymbol):
     def get_db_relations() -> list[HAKCDBRelation]:
         return [
             HAKCDBRelation(HAKCFunction.IndirectCallTable, HAKCFunction, HAKCType),
-            HAKCDBRelation(HAKCFunction.DirectCallTable, HAKCFunction, HAKCSymbol)
+            HAKCDBRelation(HAKCFunction.DirectCallTable, HAKCFunction, HAKCSymbol),
+            HAKCDBRelation(HAKCFunction.TypesUsedTable, HAKCFunction, HAKCTypePerm)
         ]
 
     def get_db_data(self, convert_hash=True) -> dict[HAKCDBColumn, object]:

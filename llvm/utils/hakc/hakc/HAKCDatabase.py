@@ -145,16 +145,27 @@ class HAKCDatabase:
     def get_all_symbol_hashes(self) -> list[int]:
         cmd = f"""
         MATCH (sym:{HAKCSymbol.get_table_name()})
-        RETURN sym.{HAKCSymbol.get_primary_key().column_name} AS symbol_hash;
+        RETURN sym.{str(HAKCSymbol.get_primary_key())} AS symbol_hash;
         """
         response = self.execute_prepared_stmt(cmd)
         ret = response.get_as_df()['symbol_hash'].to_list()
         return ret
 
-    def get_symbol_by_hash(self, symbol_hashes: list[int]) -> list[HAKCSymbol]:
+    def get_symbol_by_hash(self, symbol_hashes: list[int], **kwargs) -> list[HAKCSymbol]:
         result = self._get_symbols(
-            where_clause=f'WHERE sym.symbol_hash in [{", ".join([str(sh) for sh in symbol_hashes])}]')
+            where_clause=f'WHERE sym.symbol_hash in [{", ".join([str(sh) for sh in symbol_hashes])}]', **kwargs)
         return result
+
+    def get_symbol_hashes_to_symbols(self):
+        symbol_hashes = self.get_all_symbol_hashes()
+        symbols = self.get_symbol_by_hash(symbol_hashes, assume_defined=False)
+        try:
+            assert(len(symbol_hashes) == len(symbols))
+        except AssertionError as e:
+            print(f"Asserting len(symbol_hashes) == len(symbols); {len(symbol_hashes)} =?= {len(symbols)}")
+            print(e)
+        return dict(zip(symbol_hashes, symbols))
+
 
     def delete_all_compartments(self):
         cmd = f"""
@@ -235,19 +246,24 @@ class HAKCDatabase:
     def insert_from_dataframe(self, table_name: str, df: pd.DataFrame):
         self.conn.execute(f'COPY {table_name} FROM df')
 
-    def _get_symbols(self, where_clause: None | str = None, limit: int = 0) -> list[HAKCSymbol] | int:
+    def _get_symbols(self, where_clause: None | str = None, limit: int = 0, assume_defined: bool = True) -> list[HAKCSymbol] | int:
+        # assumes all symobls are defined, but this may not be a valid assumption
+        # print(f"assume_defined is {assume_defined}")
         cmd = [f"""
-        OPTIONAL MATCH (scope:{HAKCScope.get_table_name()})<-[:{HAKCSymbol.HasScopeTable}]-(sym:{HAKCSymbol.get_table_name()})-[:{HAKCSymbol.IsTypeTable}]->(ty:{HAKCType.get_table_name()}),
-        (sym)-[def:{HAKCSymbol.DefinedInTable}]->(cu:{HAKCCompilationUnit.get_table_name()})
+        MATCH (scope:{HAKCScope.get_table_name()})<-[:{HAKCSymbol.HasScopeTable}]-(sym:{HAKCSymbol.get_table_name()})-[:{HAKCSymbol.IsTypeTable}]->(ty:{HAKCType.get_table_name()})
         """]
+        if assume_defined:
+            cmd.append(f",(sym)-[def:{HAKCSymbol.DefinedInTable}]->(cu:{HAKCCompilationUnit.get_table_name()})")
         if where_clause is not None:
             cmd.append(where_clause)
 
         cmd.append("RETURN")
         return_str = """
-        sym.Name, sym.is_function AS is_function, scope.Scope, scope.LocalScopeName, ty.DebugType, ty.LLVMType, cu.filename AS DefiningFile, def.line AS DefiningLine
+        sym.Name, sym.is_function AS is_function, scope.Scope, scope.LocalScopeName, ty.DebugType, ty.LLVMType
         """
         cmd.append(f'{return_str}')
+        if assume_defined:
+            cmd.append(", def.line AS DefiningLine, cu.filename AS DefiningFile")
         cmd.append(f"""
             ORDER BY sym.Name, ty.DebugType, scope.Scope, scope.LocalScopeName
         """)
@@ -262,6 +278,12 @@ class HAKCDatabase:
                 symbols.append(symbol)
 
         return symbols
+
+    def _create_perm_edge_from_response(self, perm_prefix: str = "rwx.", **kwargs):
+        perm_data = {key.removeprefix(perm_prefix): val for key, val in kwargs.items() if key.startswith(perm_prefix)}
+        if len(perm_data) == 0:
+            raise RuntimeError('No type data provided')
+        return perm_data
 
     def _create_type_from_response(self, type_prefix: str = "ty.", **kwargs) -> HAKCType:
         type_data = {key.removeprefix(type_prefix): val for key, val in kwargs.items()}
@@ -310,6 +332,35 @@ class HAKCDatabase:
             raise e
         return types
 
+    def get_direct_calls(self, symbol: HAKCSymbol) -> list[HAKCType]:
+        #
+        cmd = f"""
+                MATCH (head: {HAKCSymbol.get_table_name()})-[:{HAKCFunction.DirectCallTable}]->(tail: {HAKCSymbol.get_table_name()})-[:{HAKCSymbol.IsTypeTable}]->(ty:{HAKCType.get_table_name()})
+                OPTIONAL MATCH (head)-[def:{HAKCSymbol.DefinedInTable}]->(cu:{HAKCCompilationUnit.get_table_name()})
+                WHERE head.symbol_hash = $symbol_hash and head.symbol_hash <> tail.symbol_hash
+                RETURN DISTINCT head.*, tail.*, ty.*, def.*, cu.*;
+            """
+        try:
+            response = self.execute_prepared_stmt(cmd, symbol_hash=hash(symbol))
+            direct_calls = []
+            if response.has_next():
+                info = response.get_as_df()
+                # print(info)
+                # for data in info.to_dict(orient='records'):
+                for index, row in info.iterrows():
+                    entry = row.to_dict()
+                    # print(entry)
+                    # TODO put this check in the kuzu query?
+                    # TODO: also rely on the head not being equal to the tail?
+                    if entry["head.is_function"] and entry["tail.is_function"]:
+                        call = self._create_symbol_from_response(is_function=True, symbol_prefix='tail.', **entry)
+                        direct_calls.append(call)
+        except Exception as e:
+            logger.error(f'get_direct_calls failed')
+            raise e
+        return direct_calls
+
+
     def get_used_symbols(self, symbol: HAKCSymbol):
         cmd = f"""
             MATCH (head:{HAKCSymbol.get_table_name()})-[:{HAKCSymbol.UsesSymbolTable}]->(tail:{HAKCSymbol.get_table_name()}),
@@ -333,8 +384,47 @@ class HAKCDatabase:
 
         return used_symbols
 
+
+    def get_function_perm_types(self):
+        cmd = f"""
+            MATCH (head:{HAKCSymbol.get_table_name()})-[rwx:{HAKCFunction.TypesUsedTable}]->(usety:{HAKCType.get_table_name()}),
+            (head)-[:{HAKCSymbol.IsTypeTable}]->(ty:{HAKCType.get_table_name()})
+            RETURN DISTINCT head.*, rwx.*, ty.*, usety.*;
+        """
+        try:
+            response = self.execute_prepared_stmt(cmd)
+            function_perm_types = []
+            if response.has_next():
+                info = response.get_as_df()
+                # print(info)
+                for index, row in info.iterrows():
+                    entry = row.to_dict()
+                    # print(entry)
+                    if entry["head.is_function"]:
+                        func = self._create_symbol_from_response(is_function=True, symbol_prefix='head.', **entry)
+                        perm = self._create_perm_edge_from_response(perm_prefix="rwx.", **entry)
+                        ty = self._create_type_from_response(type_prefix='usety.', **entry)
+                        print(f"Function {func} [- {perm} -> {ty}")
+                        function_perm_types.append((func, perm, ty))
+
+        except Exception as e:
+            logger.error(f'get_function_to_types')
+            raise e
+
+        return function_perm_types
+
+
     def get_symbols(self, limit: int = 0):
         return self._get_symbols(limit=limit)
+
+    def get_all_types_used(self) -> list:
+        # this [:edge*1..2] which reucrsively searches is probably not needed
+        cmd = f"""
+        MATCH p = (head:HAKCSymbol)-[:TypesUsed*1..2]->(tail:HAKCType)
+        RETURN DISTINCT nodes(p), rels(p)
+        """
+        response = self.execute_prepared_stmt(cmd)
+        return response.get_as_df()
 
     def create_node_table(self, node_type: Type[HAKCDBNode]):
         create_cmd = f'CREATE NODE TABLE IF NOT EXISTS {node_type.get_table_definition()}'

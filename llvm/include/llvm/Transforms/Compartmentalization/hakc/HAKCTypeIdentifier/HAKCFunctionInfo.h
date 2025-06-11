@@ -7,6 +7,7 @@
 
 #include "HAKCSymbolInfo.h"
 #include "HAKCIndirectCallSource.h"
+#include <bitset>
 
 using namespace llvm;
 
@@ -19,6 +20,16 @@ namespace llvm::hakc {
 
         Function *GetFunction() const;
 
+        void AddTypeUse(const std::shared_ptr<HAKCTypeInfo> &Ty);
+
+        unsigned GetTypeUse(const std::shared_ptr<HAKCTypeInfo> &Ty);
+
+        void ModifyTypeUseR(const std::shared_ptr<HAKCTypeInfo> &Ty);
+
+        void ModifyTypeUseW(const std::shared_ptr<HAKCTypeInfo> &Ty);
+
+        void ModifyTypeUseX(const std::shared_ptr<HAKCTypeInfo> &Ty);
+
         void AddDirectCall(const std::shared_ptr<HAKCFunctionInfo> &DirectCall);
 
         void AddIndirectCall(const std::shared_ptr<HAKCIndirectCallSource> &Source);
@@ -27,9 +38,11 @@ namespace llvm::hakc {
 
         StringRef GetYamlIdentifier() const override;
 
+    std::map<std::shared_ptr<HAKCTypeInfo>, unsigned> TypesUsed;
     protected:
         std::set<std::shared_ptr<HAKCFunctionInfo> > DirectCalls;
         std::set<std::shared_ptr<HAKCIndirectCallSource> > IndirectCalls;
+        void ModifyTypeUse(const std::shared_ptr<HAKCTypeInfo> &Ty, unsigned);
     };
 } // hakc
 

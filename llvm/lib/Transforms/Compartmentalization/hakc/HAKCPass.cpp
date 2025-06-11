@@ -125,7 +125,7 @@ static bool RunHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM) {
   }
   CommonHAKCAnalysis HAKCAnalysis(M, MAM, HAKC_CONFIG_PATH);
 
-  llvm::writeCallGraphDOT(M, MAM, std::string(HAKCAnalysis.GetSystemInfo().GetDagAnalysisRootPath()));
+  // llvm::writeCallGraphDOT(M, MAM, std::string(HAKCAnalysis.GetSystemInfo().GetDagAnalysisRootPath()));
 
   switch (HAKCAnalysis.GetSystemInfo().GetPassMode()) {
   case RunDataAccessGraphAnalysis:

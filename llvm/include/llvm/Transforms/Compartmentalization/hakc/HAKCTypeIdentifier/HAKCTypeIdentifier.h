@@ -82,6 +82,10 @@ protected:
 
   HAKCFunctionP HandleFunction(const DISubprogram *SubProg);
 
+  void FunctionTemporalAnalysis(const DISubprogram *SubProg);
+
+  // HAKCFunctionP HandleFunctionTemporalAnalysis(const DISubprogram *SubProg);
+
   void AddFunctionMapping(const DISubprogram *SubProg,
                           const HAKCFunctionP &HAKCFunction);
 
