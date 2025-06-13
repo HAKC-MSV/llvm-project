@@ -66,7 +66,6 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
                 symbol_mapping[symbol] = new_symbol
 
             for head, tail, edge_name, edge_data in nxgraph.edges.data(keys=True):
-                print(f"edges (head, tail, edge_name, edge_data): ({head},{tail},{edge_name},{edge_data})")
                 if edge_name in {HAKCSymbol.UsesSymbolTable, HAKCSymbol.DagEdgeTable, HAKCFunction.TypesUsedTable}:
                     new_head = symbol_mapping[head]
                     new_tail = symbol_mapping[tail]
@@ -74,9 +73,8 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
                         self.add_symbol_use(new_head, new_tail)
                     elif edge_name == HAKCSymbol.DagEdgeTable:
                         self.add_dag_edge(new_head, new_tail, edge_data['weight'])
-                    # TODO: this probably is never being called since compartmentalization is created from scratch
                     elif edge_name == HAKCFunction.TypesUsedTable:
-                        self.add_type_use_edge(new_head, new_tail, new_head.RWX[0], new_head.RWX[1], new_head.RWX[2])
+                        self.add_type_perm_type_edge(new_head, new_tail)
 
     @classmethod
     def from_yaml(cls, loader: yaml.Loader, node):
@@ -97,15 +95,20 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             self.add_persistent_edge(head, tail, key=HAKCSymbol.DagEdgeTable, add_nodes=add_nodes,
                                      weight=dag_edge_weight)
 
-    def add_type_use_edge(self, symbol: HAKCSymbol, used_type: HAKCType, R = 0, W = 0, X = 0):
-        print(f"Adding type_use edge with perms {R} {W} {X}")
-        self.add_persistent_edge(symbol, used_type, key=HAKCFunction.TypesUsedTable, R=R, W=W, X=X)
+    def add_type_use_nodes_edges(self, func: HAKCSymbol, type_perm: HAKCTypePerm):
+        # self.add_persistent_edge(func, type_perm, key=HAKCFunction.TypesUsedTable, R = int(type_perm.RWX[0]), W = int(type_perm.RWX[1]), X = int(type_perm.RWX[2]))
+        self.add_persistent_edge(func, type_perm, key=HAKCFunction.TypesUsedTable)
+        self.add_type_perm_type_edge(type_perm, type_perm.perm_type)
 
-    def add_function_edge_ty_triple(self, func: HAKCSymbol, perm: dict, ty: HAKCType):
-        self.add_persistent_node(func)
-        self.add_persistent_node(ty)
-        print(f"Function {func} [- {perm['R']}{perm['W']}{perm['X']} -> {ty}")
-        self.add_type_use_edge(func, ty, R=perm["R"], W=perm["W"], X=perm["X"])
+    def add_type_perm_type_edge(self, type_perm: HAKCTypePerm, _type: HAKCType):
+        self.add_persistent_edge(type_perm, _type, key=HAKCTypePerm.hasTypeTable)
+
+    def add_function_edge_perm_type(self, func: HAKCSymbol, type_perm: HAKCTypePerm):
+        # used to reconstruct compartmentalization from database
+        # self.add_persistent_node(func)
+        # self.add_persistent_node(type_perm)
+        # print(f"Function {func} [- {type_perm.RWX} -> {type_perm.perm_type}")
+        self.add_type_use_nodes_edges(func, type_perm)
 
     def add_persistent_node(self, node: HAKCDBNode, already_persisted: bool = False):
         if not self.has_node(node):
@@ -144,8 +147,8 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             for direct_call in symbol.direct_calls:
                 self.add_symbol_use(symbol, direct_call, key=HAKCFunction.DirectCallTable)
             for type_use in symbol.types_used:
-                print(f"Adding type_use symbol: {type_use}")
-                self.add_type_use_edge(symbol, type_use, R = int(type_use.RWX[0]), W = int(type_use.RWX[1]), X = int(type_use.RWX[2]))
+                # print(f"Adding edge from \n\t{symbol} to \n\t{type_use} with Type {type_use.perm_type}")
+                self.add_type_use_nodes_edges(symbol, type_use)
 
     def _get_neighbors(self, symbol: HAKCSymbol, edge_key: str) -> list:
         nbrs = list()
@@ -268,8 +271,6 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
 
     def get_unpersisted_nodes(self) -> dict[str, list[HAKCDBNode]]:
         result = dict()
-        print(f"get_unpersisted_nodes all nodes: {self.nodes}")
-        print(f"get_unpersisted_nodes unpersisted nodes: {self.nodes(data=HAKCCompartmentalization.persisted_attr)}")
         for node, is_persisted in self.nodes(data=HAKCCompartmentalization.persisted_attr):
             if not is_persisted:
                 table_name = node.get_table_name()
@@ -382,12 +383,10 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
 
     def create_node_table(self, conn: HAKCDatabase, node_class: Type[HAKCDBNode]):
         logger.debug(f'Creating node table {node_class.get_table_name()}')
-        print(f'Creating node table {node_class.get_table_name()}')
         conn.create_node_table(node_class)
 
     def create_rel_table(self, conn: HAKCDatabase, database_relation: HAKCDBRelation):
         logger.debug(f'Creating relation table {database_relation}')
-        print(f'Creating relation table {database_relation}')
         conn.create_relationship_table(database_relation)
 
     def create_schema(self, conn: HAKCDatabase):

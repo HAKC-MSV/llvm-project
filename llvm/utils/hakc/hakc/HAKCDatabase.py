@@ -5,7 +5,7 @@ from typing import Type, Optional, Tuple
 import pandas as pd
 
 from .HAKCBase import HAKCDBNode, HAKCDBRelation
-from .HAKCObjects import HAKCSymbol, HAKCFunction, HAKCScope, HAKCType, HAKCGlobalVariable, HAKCDivision, \
+from .HAKCObjects import HAKCSymbol, HAKCFunction, HAKCScope, HAKCTypePerm, HAKCType, HAKCGlobalVariable, HAKCDivision, \
     HAKCCompartment, HAKCCompilationUnit
 
 logger = logging.getLogger('hakc-dag')
@@ -17,6 +17,7 @@ class HAKCDatabase:
         self.database = None
         self.conn = None
         self.open(read_only=read_only, max_num_threads=max_num_threads)
+        self.count_executed_statements = 0
 
     def close(self):
         if self.conn is not None:
@@ -240,6 +241,7 @@ class HAKCDatabase:
         return result
 
     def execute_prepared_stmt(self, prepared_stmt: str, **kwargs):
+        self.count_executed_statements += 1
         response = self.conn.execute(prepared_stmt, parameters=kwargs)
         return response
 
@@ -253,13 +255,13 @@ class HAKCDatabase:
         MATCH (scope:{HAKCScope.get_table_name()})<-[:{HAKCSymbol.HasScopeTable}]-(sym:{HAKCSymbol.get_table_name()})-[:{HAKCSymbol.IsTypeTable}]->(ty:{HAKCType.get_table_name()})
         """]
         if assume_defined:
-            cmd.append(f",(sym)-[def:{HAKCSymbol.DefinedInTable}]->(cu:{HAKCCompilationUnit.get_table_name()})")
+            cmd.append(f", MATCH (sym)-[def:{HAKCSymbol.DefinedInTable}]->(cu:{HAKCCompilationUnit.get_table_name()})")
         if where_clause is not None:
             cmd.append(where_clause)
 
         cmd.append("RETURN")
         return_str = """
-        sym.Name, sym.is_function AS is_function, scope.Scope, scope.LocalScopeName, ty.DebugType, ty.LLVMType
+        sym.*, sym.is_function AS is_function, scope.Scope, scope.LocalScopeName, ty.DebugType, ty.LLVMType
         """
         cmd.append(f'{return_str}')
         if assume_defined:
@@ -279,11 +281,14 @@ class HAKCDatabase:
 
         return symbols
 
-    def _create_perm_edge_from_response(self, perm_prefix: str = "rwx.", **kwargs):
+    def _create_type_perm_from_response(self, perm_prefix: str = "type_perm.", **kwargs) -> HAKCTypePerm:
+        _type = self._create_type_from_response(**kwargs)
+        # print(f"Reconstructed type {_type} from **kwargs {kwargs}")
         perm_data = {key.removeprefix(perm_prefix): val for key, val in kwargs.items() if key.startswith(perm_prefix)}
         if len(perm_data) == 0:
             raise RuntimeError('No type data provided')
-        return perm_data
+        type_perm = HAKCTypePerm(Type=_type, **perm_data)
+        return type_perm
 
     def _create_type_from_response(self, type_prefix: str = "ty.", **kwargs) -> HAKCType:
         type_data = {key.removeprefix(type_prefix): val for key, val in kwargs.items()}
@@ -307,6 +312,7 @@ class HAKCDatabase:
 
         if is_function:
             symbol = HAKCFunction(**symbol_data)
+
         else:
             symbol = HAKCGlobalVariable(**symbol_data)
 
@@ -333,19 +339,22 @@ class HAKCDatabase:
         return types
 
     def get_direct_calls(self, symbol: HAKCSymbol) -> list[HAKCType]:
-        #
+        # NOTE: this seems to not properly return HAKCFunction with defining line and file information
+        # seems to be duplicate defining line showing up as DefiningLine, and head.DefiningLine, which is causing issues...
+        # so, I guess, don't try to manually rename things in the return statement or it might not be processed correctly
         cmd = f"""
                 MATCH (head: {HAKCSymbol.get_table_name()})-[:{HAKCFunction.DirectCallTable}]->(tail: {HAKCSymbol.get_table_name()})-[:{HAKCSymbol.IsTypeTable}]->(ty:{HAKCType.get_table_name()})
-                OPTIONAL MATCH (head)-[def:{HAKCSymbol.DefinedInTable}]->(cu:{HAKCCompilationUnit.get_table_name()})
                 WHERE head.symbol_hash = $symbol_hash and head.symbol_hash <> tail.symbol_hash
-                RETURN DISTINCT head.*, tail.*, ty.*, def.*, cu.*;
+                RETURN DISTINCT head.*, tail.*, ty.*;
             """
+                # OPTIONAL MATCH (head)-[def:{HAKCSymbol.DefinedInTable}]->(cu:{HAKCCompilationUnit.get_table_name()})
+                # RETURN DISTINCT head.*, tail.*, ty.*, def.line AS DefiningLine, cu.filename AS DefiningFile;
         try:
             response = self.execute_prepared_stmt(cmd, symbol_hash=hash(symbol))
             direct_calls = []
             if response.has_next():
                 info = response.get_as_df()
-                # print(info)
+                print(info)
                 # for data in info.to_dict(orient='records'):
                 for index, row in info.iterrows():
                     entry = row.to_dict()
@@ -386,10 +395,11 @@ class HAKCDatabase:
 
 
     def get_function_perm_types(self):
+        # need to include definition and cu, even if its missing, because other queries use it and if its missing in one it will cause the nodes to not be equal (causing duplicates)
         cmd = f"""
-            MATCH (head:{HAKCSymbol.get_table_name()})-[rwx:{HAKCFunction.TypesUsedTable}]->(usety:{HAKCType.get_table_name()}),
-            (head)-[:{HAKCSymbol.IsTypeTable}]->(ty:{HAKCType.get_table_name()})
-            RETURN DISTINCT head.*, rwx.*, ty.*, usety.*;
+            MATCH (head:{HAKCSymbol.get_table_name()})-[:{HAKCFunction.TypesUsedTable}]->(type_perm:{HAKCTypePerm.get_table_name()}),
+            (type_perm)-[:{HAKCTypePerm.hasTypeTable}]->(ty:{HAKCType.get_table_name()})
+            RETURN DISTINCT head.*, type_perm.*, ty.*;
         """
         try:
             response = self.execute_prepared_stmt(cmd)
@@ -402,10 +412,9 @@ class HAKCDatabase:
                     # print(entry)
                     if entry["head.is_function"]:
                         func = self._create_symbol_from_response(is_function=True, symbol_prefix='head.', **entry)
-                        perm = self._create_perm_edge_from_response(perm_prefix="rwx.", **entry)
-                        ty = self._create_type_from_response(type_prefix='usety.', **entry)
-                        print(f"Function {func} [- {perm} -> {ty}")
-                        function_perm_types.append((func, perm, ty))
+                        type_perm = self._create_type_perm_from_response(perm_prefix="type_perm.", **entry)
+                        # print(f"Function {func} [- {type_perm} -> {type_perm.perm_type}")
+                        function_perm_types.append((func, type_perm))
 
         except Exception as e:
             logger.error(f'get_function_to_types')
@@ -433,3 +442,20 @@ class HAKCDatabase:
     def create_relationship_table(self, edge_type: HAKCDBRelation):
         create_cmd = f'CREATE REL TABLE IF NOT EXISTS {edge_type.get_definition()}'
         self.execute_prepared_stmt(create_cmd)
+
+    def get_symbol_hash(self, Name, DefiningFile, DefiningLine):
+        cmd = f"""
+            MATCH (sym:HAKCSymbol)
+            WHERE sym.Name=$Name AND sym.DefiningFile=$DefiningFile AND sym.DefiningLine=$DefiningLine
+            RETURN DISTINCT sym.symbol_hash
+        """
+        response = self.execute_prepared_stmt(cmd, Name=Name, DefiningFile=DefiningFile, DefiningLine=DefiningLine)
+        ret = response.get_as_df()
+        if("sym.symbol_hash" in ret) and (len(ret["sym.symbol_hash"]) > 0):
+            hash = ret["sym.symbol_hash"][0]
+            # print(type(hash))
+            print(f"Queried symbol hash: {hash} from (Name, DefiningFile, DefiningLine) = ({Name}, {DefiningFile}, {DefiningLine})")
+            return int(hash)
+        else:
+            print(f"Queried symbol hash from (Name, DefiningFile, DefiningLine) = ({Name}, {DefiningFile}, {DefiningLine}), but could not find symbol hash!")
+            return None

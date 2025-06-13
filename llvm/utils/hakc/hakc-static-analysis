@@ -12,6 +12,8 @@ import pstats
 import shutil
 import time
 import networkx as nx
+from networkx.drawing.nx_pydot import to_pydot
+
 
 import yaml
 
@@ -113,19 +115,27 @@ def add_symbols(compartmentalization: HAKCCompartmentalization, compilation_unit
     for glob in global_variables:
         compartmentalization.add_symbol(glob, cu)
 
+def debug_print_yaml(filename):
+    compilation_unit, functions, global_variables = parse_yaml(filename)
+    print(f"debugging yaml parsing of {filename}")
+    if compilation_unit:
+        print(f"compilation_unit: {compilation_unit}")
+    if global_variables:
+        print(f"global_variables: {global_variables}")
+    for function in functions:
+        print(f"HAKCFunction: {function}")
+        for type_perm in function.types_used:
+            print(f"\tHAKCTypePerm: {type_perm}\n\t\t with HAKCType: {type_perm.perm_type}")
+
 
 def create_dag_single_thread(files: set[str], conn: HAKCDatabase) -> HAKCCompartmentalization:
     compartmentalization = HAKCCompartmentalization()
     for filename in logger.progress_bar(iterable=sorted(files), desc='Parsing YAML'):
+        # debug_print_yaml(filename)
         compilation_unit, functions, global_variables = parse_yaml(filename)
-        print(f"YAML FOUND: {parse_yaml(filename)}")
         logger.debug(
             f'{compilation_unit} found {len(functions)} functions and {len(global_variables)} globals')
-        print(f"YAML FOUND Function: {functions[0]}")
-        print(f"YAML FOUND Type: {functions[0].types_used[0]}")
-        print(f"YAML FOUND Type: {functions[0].types_used[1]}")
         add_symbols(compartmentalization, compilation_unit, functions, global_variables)
-
     compartmentalization.persist_to_database(conn, create_schema=True)
     dag_edges = dict()
     dag_edges_added = 0
@@ -180,82 +190,62 @@ def adjust_compartmentalization(db_dir: str, adjustment: HAKCCompartmentalizatio
     logger.info(f'Compartmentalization now has {len(divisions)} divisions across {len(compartments)} compartments')
     conn.close()
 
+def format_graph(G: nx.MultiDiGraph):
+    #
+    # for node_id in G.nodes:
+    #     print(G.nodes[node_id])
+    print(len(G.nodes))
+    # NOTE: don't use to_pydot(G), since it is very hacky and will show an incorrect number of nodes / edges
+
+    return G
+
 def save_graph(G, fname, N=50):
-    top_n_node_ids = show_top_n_degrees(G, N)
-    subgraph = G.subgraph(top_n_node_ids)
+    # top_n_node_ids = show_top_n_degrees(G, N)
+    # subgraph = G.subgraph(top_n_node_ids)
     # print(G.nodes)
-    G = subgraph
+    # G = subgraph
+    G = nx.relabel_nodes(G, lambda x: x.pretty_print())
+    dot = to_pydot(G)
+
+    dot.set_splines("true")
+    # dot.set("rankdir", "LR")
+    dot.set("overlap", "false")
+    for node in dot.get_nodes():
+        node.set("shape", "box")
+
+
+    dot.write_png("clean_multidigraph.png")  # Requires Graphviz installed
+
     # reformatting the label to have new lines so it can be read on graph
-    G = nx.relabel_nodes(G, lambda x: str(x).replace(",","\n").replace("(","(\n"))
+    # G = nx.relabel_nodes(G, lambda x: str(x).replace(",","\n").replace("(","(\n"))
+    # G = format_graph(G)
+    # G = nx.relabel_nodes(G, lambda x: x.pretty_print())
     # print(G.edges()[0])
     # print(subgraph)
     # https://graphviz.org/docs/layouts/
     # pos = graphviz_layout(G, prog='neato')
-    pos = graphviz_layout(G, prog='sfdp')
+    # pos = graphviz_layout(G, prog='dot', args='-Grankdir="LR"')
+
+    pos = graphviz_layout(G, prog='osage', args='-Grankdir="LR" -Gminlen="1" -Gordering="in"')
+    # pos = graphviz_layout(G, prog='sfdp')
+
     plt.figure(figsize=(16,9))
-    nx.draw(G, pos, with_labels=True)
-    nx.draw_networkx_edge_labels(G, pos)
+    nx.draw(G, pos, with_labels=True, node_shape="o", node_color='none', edgecolors='black', node_size=20000)
+    # nodelist=nodes,
+    # node_shape=marker,
+    # node_color=node_colors,
+    # node_size=2000,
+    # edgecolors="black"
+    # node_color='none',     # transparent fill
+    # edgecolors='black'
+
     # print(G.edges)
     plt.savefig(fname)
     plt.close()
     print(f"Saved {fname}")
+
     return G
 
-def get_node_dag_connections(conn, symbol_hash, Name):
-    cmd = f"""
-        MATCH p = (head:HAKCSymbol)-[:DagEdge*1..2]->(tail:HAKCSymbol)
-        WHERE head.symbol_hash=$symbol_hash
-        RETURN DISTINCT properties(nodes(p), 'Name') as Name, properties(rels(p), '_src') as src
-    """
-    response = conn.execute_prepared_stmt(cmd, symbol_hash=symbol_hash)
-    ret = response.get_as_df()
-    G = nx.DiGraph()
-    G.add_node(Name)
-    # then add each tail as a connection
-    for path in ret["Name"]:
-        for node in path:
-            if node not in G:
-                G.add_node(node)
-        nx.add_path(G, path)
-
-    # go and remove nodes with .str in them
-    # nodes_to_remove = [node for node in G.nodes if ".str" in node]
-    # G.remove_nodes_from(nodes_to_remove)
-    return G
-
-def get_symbol_hash(conn, Name, DefiningFile, DefiningLine):
-    cmd = f"""
-        MATCH (sym:HAKCSymbol)
-        WHERE sym.Name=$Name AND sym.DefiningFile=$DefiningFile AND sym.DefiningLine=$DefiningLine
-        RETURN DISTINCT sym.symbol_hash
-    """
-    response = conn.execute_prepared_stmt(cmd, Name=Name, DefiningFile=DefiningFile, DefiningLine=DefiningLine)
-    ret = response.get_as_df()
-    if("sym.symbol_hash" in ret) and (len(ret["sym.symbol_hash"]) > 0):
-        hash = ret["sym.symbol_hash"][0]
-        # print(type(hash))
-        print(f"Queried symbol hash: {hash} from (Name, DefiningFile, DefiningLine) = ({Name}, {DefiningFile}, {DefiningLine})")
-        return int(hash)
-    else:
-        print(f"Queried symbol hash from (Name, DefiningFile, DefiningLine) = ({Name}, {DefiningFile}, {DefiningLine}), but could not find symbol hash!")
-        return None
-
-def get_symbol_name(conn, symbol_hash: int):
-    cmd = f"""
-        MATCH (sym:HAKCSymbol)
-        WHERE sym.symbol_hash=$symbol_hash
-        RETURN DISTINCT sym.Name
-    """
-    response = conn.execute_prepared_stmt(cmd, symbol_hash=symbol_hash)
-    ret = response.get_as_df()
-    if("sym.Name" in ret) and (len(ret["sym.Name"]) > 0):
-        Name = ret["sym.Name"][0]
-        # print(type(hash))
-        print(f"Queried symbol name ({Name}) from symbol hash ({symbol_hash})")
-        return str(Name)
-    else:
-        print(f"Queried symbol name from symbol hash ({symbol_hash}), but could not find symbol name!")
-        return None
 
 def node_with_max_edges(graph):
     """
@@ -273,234 +263,6 @@ def node_with_max_edges(graph):
     # print(graph.degree)
     return max(graph.degree, key=lambda item: item[1])[0]
 
-
-def create_ddg_single_thread(files: set[str], conn: HAKCDatabase):
-    print("In create_ddg_single_thread")
-
-    total_nodes = 0
-    G_ddg = nx.MultiDiGraph()
-    # Q: are the dot files MultiDiGraphs, or regular graph?
-    i = 0
-    fname = None
-    for file in files:
-        # i += 1
-        # if(i == 10):
-        #     break
-        print(file)
-        fname = file.replace(os.path.dirname(file) + "/", "")
-
-        if(fname != "badblocks.c.callgraph.dot"):
-            continue
-        print(fname)
-
-        # if file != "/home/al32163/HAKC/cmake-build-hakc/linux/x86/hakc-dag-analysis/dag-files/home/al32163/HAKC/linux/net/ipv6/route.c.callgraph.dot":
-        #     continue
-
-        n = "badblocks_store"
-        nnode = None
-        h = 1963676170691382460
-
-        dot = nx.drawing.nx_agraph.read_dot(file)
-        print(f"Dot size (nodes, edges) ({len(dot.nodes)}, {len(dot.edges)})")
-        G_ddg = nx.union(G_ddg, dot)
-
-        rename_map = {}
-        G_ddg_tmp = G_ddg.copy()
-        for node, attrs in G_ddg_tmp.nodes(data=True):
-            if(attrs["label"] == n):
-                nnode = node
-            # print(f"Renaming node {node} to {attrs['label']} with attrs {attrs}")
-            print(f"Renaming node {node} to {attrs['label']}")
-            rename_map[node] = attrs["label"].replace("{","").replace("}","")
-        G_ddg = nx.relabel_nodes(G_ddg_tmp, rename_map)
-        nnode = G_ddg.nodes[n]
-        dec = nx.descendants(G_ddg, n)
-        print(dec)
-        print(nnode)
-        dec.add(n)
-        G_ddg = G_ddg.subgraph(dec)
-        # add the root node
-        # G_ddg_out = G_ddg.copy()
-        # G_ddg_out.add_node(nnode)
-        save_graph(G_ddg, f"ddg_.png")
-
-
-        # for node, attrs in G_ddg.nodes(data=True):
-        #     if("Name" in attrs) and ("DefiningFile" in attrs) and ("DefiningLine" in attrs):
-        #         NodeHash = get_symbol_hash(conn, attrs["Name"], attrs["DefiningFile"], attrs["DefiningLine"])
-        #         print(f"{attrs['Name']} -> {NodeHash}")
-
-
-
-        G_dag = get_node_dag_connections(conn, h, n)
-        print(G_dag)
-        # save_graph(G_dag, f"dag_{node0['Name']}.png")
-        save_graph(G_dag, f"dag_.png")
-
-
-        break
-
-        # replace the random node names with the actual node names (or I guess symbol hash)
-        # nodes_attrs = G_ddg.nodes(data=True)
-        # rename_map = {}
-        # delete_set = []
-        # for node, attrs in nodes_attrs:
-        #     if("Name" in attrs) and ("DefiningFile" in attrs) and ("DefiningLine" in attrs):
-        #         # print(attrs)
-        #         hash = get_symbol_hash(conn, attrs["Name"], attrs["DefiningFile"], attrs["DefiningLine"])
-        #         if(hash):
-        #             rename_map[node] = hash
-        #         else:
-        #             delete_set.append(attrs["Name"])
-        #     else:
-        #         # TODO: what to do when function is declaration?
-        #         continue
-        save_graph(G_ddg, f"ddg_orig.png")
-        # print(f"Removing {len(delete_set)} symbol nodes not found in database!")
-        # G_ddg.remove_nodes_from(delete_set)
-        # remove the nodes with 0 edges
-        # G_ddg.remove_nodes_from(list(nx.isolates(G_ddg)))
-        # print(f"Renaming {len(rename_map.items())} symbol node hashes found in database!")
-        # now, ddg is all hashes
-        # G_ddg = nx.relabel_nodes(G_ddg, rename_map)
-        # save_graph(G_ddg, f"ddg_1.png")
-
-        # rename node ids to symbol hash, or delete if symbol not found
-        #     G_ddg = nx.relabel_nodes(G_ddg, lambda n: n = get_symbol_name(conn, n) if True)
-        # or, actually that wont work for declarations because they dont have the line and file definition
-        # just replace the node id with the function name
-        rename_map = {}
-        G_ddg_tmp = G_ddg.copy()
-        for node, attrs in G_ddg_tmp.nodes(data=True):
-            # print(f"Renaming node {node} to {attrs['label']} with attrs {attrs}")
-            print(f"Renaming node {node} to {attrs['label']}")
-            rename_map[node] = attrs["label"].replace("{","").replace("}","")
-        G_ddg = nx.relabel_nodes(G_ddg_tmp, rename_map)
-
-        # get the node with the most connections to be able to compare the dag and ddg
-        node_degrees = sorted(G_ddg.degree, key=lambda x: x[1], reverse=True)
-        # print(f"Sorted node degrees: {node_degrees}")
-
-        MaxNodeName = None
-        MaxNodeAttrs = None
-        for node in node_degrees:
-            # Node is tuple (name, degree)
-            print(node)
-            attrs = G_ddg.nodes[node[0]]
-            # print(attrs)
-            if("Name" in attrs) and ("DefiningFile" in attrs) and ("DefiningLine" in attrs):
-                MaxNodeName = node[0]
-                MaxNodeAttrs = attrs
-                break
-            # can only get hash if defining file, defining line present
-            # so, only consider these nodes (otherwise, can't match the cfg)
-        if MaxNodeName == None:
-            print(f"Couldn't find a node with a corresponding symbol hash!")
-            return
-
-        print(f"The node with the most edges is {MaxNodeName}")
-        MaxNodeHash = get_symbol_hash(conn, MaxNodeAttrs["Name"], MaxNodeAttrs["DefiningFile"], MaxNodeAttrs["DefiningLine"])
-
-        # prune graph to only have this graph
-        print(f"Nodes in DDG: {G_ddg.nodes()}")
-        MaxNodeDescendants = nx.descendants(G_ddg, MaxNodeName)
-        print(f"MaxNode Descendents {MaxNodeDescendants}")
-        G_ddg = G_ddg.subgraph(MaxNodeDescendants)
-
-        # total_nodes += len(dot.nodes)
-        # for node, attrs in dot.nodes(data=True):
-        #     print(f"Node: {node}")
-        #     print(f"  Attrs: {attrs}")
-
-        print(f"Max node {MaxNodeName} -> {MaxNodeAttrs} with found hash {MaxNodeHash}")
-
-        # save_graph(G_ddg, f"ddg_{fname}.png")
-        save_graph(G_ddg, f"ddg_.png")
-
-        G_dag = get_node_dag_connections(conn, MaxNodeHash, MaxNodeName)
-        print(G_dag)
-        # save_graph(G_dag, f"dag_{node0['Name']}.png")
-        save_graph(G_dag, f"dag_.png")
-
-        # this seems to be non deterministic, so something weird is going on
-        # print(f"Total nodes found: {total_nodes}, final graph {len(G.nodes)}")
-        print(f"Total (Nodes, Edges) in dag: ({len(G_dag.nodes)}, {len(G_dag.edges)}), in ddg: ({len(G_ddg.nodes)}, {len(G_ddg.edges)})")
-
-        # cmd = f"""
-        #     MATCH p = (head:HAKCSymbol)-[:DagEdge*1..2]->(tail:HAKCSymbol)
-        #     WHERE head.symbol_hash=$name
-        #     RETURN DISTINCT nodes(p), rels(p)
-        # """
-        # sym_name = MaxNodeName
-        # print(f"Trying to find symbol name {sym_name} in the DAG from the symbol name in the DDG and compare the hashes")
-        # response = conn.execute_prepared_stmt(cmd, name=sym_name)
-        # ret = response.get_as_df()
-        # # print(ret)
-        # if ("NODES(p)" in ret) and (len(ret) > 0):
-        #     # print(ret)
-        #     # print(type(ret["NODES(p)"][0]))
-        #     # print(type(ret["NODES(p)"][0][0]))
-        #     # dict_keys(['_id', '_label', 'symbol_hash', 'DefiningFile', 'DefiningLine', 'is_function', 'Name'])
-        #     # print(ret["NODES(p)"][0][0].keys())
-        #     # print("Key:Value")
-        #     # for key, value in ret["NODES(p)"][0][0].items():
-        #     #     print(key + ": "  + str(value))
-        #     node0 = ret["NODES(p)"][0][0]
-        #     hash = get_symbol_hash(conn, node0["Name"], node0["DefiningFile"], node0["DefiningLine"])
-        #     # G_dag = get_node_dag_connections(conn, hash, node0["Name"])
-        #     # print(G_dag)
-        #     # # save_graph(G_dag, f"dag_{node0['Name']}.png")
-        #     # save_graph(G_dag, f"dag_.png")
-        #     #
-        #     # # this seems to be non deterministic, so something weird is going on
-        #     # # print(f"Total nodes found: {total_nodes}, final graph {len(G.nodes)}")
-        #     # print(f"Total (Nodes, Edges) in dag: ({len(G_dag.nodes)}, {len(G_dag.edges)}), in ddg: ({len(G_ddg.nodes)}, {len(G_ddg.edges)})")
-        # else:
-        #     # if(MaxNodeAttrs):
-        #     #     MaxNodeHashReal = get_symbol_hash(conn, MaxNodeAttrs["Name"], MaxNodeAttrs["DefiningFile"], MaxNodeAttrs["DefiningLine"])
-        #     #     print(f"Error: Could not find corresponding symbol hash {MaxNodeHash} in DAG from database, but it found {MaxNodeHashReal}!")
-        #     # else:
-        #     print(f"Error: Could not find corresponding DDG symbol hash {MaxNodeHash} ({MaxNodeName}) in DAG !")
-        break
-
-
-# python3 /home/al32163/HAKC/llvm-project/llvm/utils/hakc/hakc-static-analysis --temporal-analysis --db-dir /home/al32163/HAKC/cmake-build-hakc/linux/x86/hakc-db-temporal --dag-files-root /home/al32163/HAKC/cmake-build-hakc/linux/x86/hakc-dag-analysis
-# python3 /home/al32163/HAKC/llvm-project/llvm/utils/hakc/hakc-static-analysis --temporal-analysis --db-dir /home/al32163/HAKC/cmake-build-hakc/linux/x86/hakc-db --dag-files-root /home/al32163/HAKC/cmake-build-hakc/linux/x86/hakc-dag-analysis
-def create_new_ddg(analysis_root: str, core_count: int, db_dir: str,
-                    delete_existing_db: bool):
-    logger.info(f'Finding DAG DOT files starting from {os.path.abspath(analysis_root)}')
-    single_thread = core_count == 1
-    filenames = set()
-    for root, subdirs, files in os.walk(analysis_root):
-        for f in files:
-            filename = os.path.join(root, f)
-            if not filename.endswith(".callgraph.dot"):
-                continue
-            filenames.add(str(filename))
-
-    # if delete_existing_db:
-    #     if os.path.exists(db_dir) and os.path.isdir(db_dir):
-    #         logger.info(f'Removing existing database at {db_dir}')
-    #         shutil.rmtree(db_dir)
-    #
-    conn = HAKCDatabase(db_dir, max_num_threads=core_count)
-    logger.info(f'Starting DDG construction from {len(filenames)} files')
-    start = time.time()
-    # if single_thread:
-    ddg = create_ddg_single_thread(filenames, conn)
-    # ddg = create_ddg_single_thread(filenames, conn)
-    # else:
-    #     core_count = max(1, core_count)
-    #     compartmentalization = create_dag_multithread(filenames, core_count, conn)
-
-    end = time.time()
-    logger.info(f'Finished creating DDG.')
-    logger.info(f'    Total Time: {end - start} seconds')
-    # logger.info(f'    Type Count: {len(compartmentalization.get_types())}')
-    # logger.info(f'  Global Count: {len(compartmentalization.get_global_variables())}')
-    # logger.info(f'Function Count: {len(compartmentalization.get_functions())}')
-    # conn.close()
-    # return compartmentalization
 
 def show_top_n_degrees(graph, n):
     """
@@ -521,144 +283,65 @@ def show_top_n_degrees(graph, n):
     return [node for node, degree in sorted_degrees[:n]]
 
 
-# python3 /home/al32163/HAKC/llvm-project/llvm/utils/hakc/hakc-static-analysis --postdominator-analysis --db-dir /home/al32163/HAKC/cmake-build-hakc/linux/x86/hakc-db
-def postdominator_analysis(db_dir: str):
-    # https://docs.kuzudb.com/get-started/graph-algorithms/
-    logger.info(f'Running Post Dominator analysis')
-    logger.info(f'Reading database {db_dir}')
-    conn = HAKCDatabase(db_dir)
-    logger.info(f'Finished reading database {db_dir}')
-
-    # cmd = f"""
-    #     MATCH (head:HAKCSymbol)-[:DagEdge]->(tail:HAKCSymbol)
-    #     WHERE head.Name=$name
-    #     RETURN DISTINCT head, tail
-    # """
-    # https://docs.kuzudb.com/cypher/expressions/recursive-rel-functions/
-    # follow the path from some starting symbol to any other symbol recursively
-    # cmd = f"""
-    #     MATCH p = (head:HAKCSymbol)-[:DagEdge*1..2]->(tail:HAKCSymbol)
-    #     WHERE head.Name=$name
-    #     RETURN DISTINCT nodes(p), rels(p)
-    # """
-    # RETURN properties(nodes(p), 'name') AS name, properties(rels(p), 'since') AS since;
-    # cmd = f"""
-    #     MATCH p = (head:HAKCSymbol)-[:DagEdge*1..2]->(tail:HAKCSymbol)
-    #     WHERE head.Name=$name
-    #     RETURN DISTINCT properties(nodes(p), 'Name') as Name, properties(rels(p), '_src') as src
-    # """
-    cmd = f"""
-        MATCH p = (head:HAKCSymbol)-[:DagEdge*1..2]->(tail:HAKCSymbol)
-        WHERE head.Name=~$name
-        RETURN DISTINCT properties(nodes(p), 'Name') as Name, properties(rels(p), '_src') as src
-    """
-    # sym_name = "hakc_transfer_to_clique"
-    # sym_name = "f_.*"
-    sym_name = "kmalloc.*"
-    # sym_name = "pci_select_bars"
-    # sym_name = "ahci_enable_fbs"
-    end_node = "kernel_write"
-    response = conn.execute_prepared_stmt(cmd, name=sym_name)
-    # response = conn.execute_prepared_stmt(cmd)
-    ret = response.get_as_df()
-    print(ret)
-    # print(ret.shape)
-    # print(ret["head"][0])
-    # print(ret["tail"][0])
-    # print(ret["tail"][1])
-    # print(ret["tail"][2])
-    # print(ret["Name"][0])
-    # print(ret["src"][0])
-
-    # add root node
-    G = nx.DiGraph()
-    G.add_node(sym_name)
-    # then add each tail as a connection
-    for path in ret["Name"]:
-        for node in path:
-            # if ".str" in node:
-            #     print("aaa")
-            #     continue
-            if node not in G:
-                G.add_node(node)
-        nx.add_path(G, path)
-
-    # go and remove nodes with .str in them
-    nodes_to_remove = [node for node in G.nodes if ".str" in node]
-    G.remove_nodes_from(nodes_to_remove)
-
-    n = 1000
-    top_n_node_ids = show_top_n_degrees(G, n)
-    subgraph = G.subgraph(top_n_node_ids)
-    print(G.nodes)
-    G = subgraph
-    print(subgraph)
-    # pos = graphviz_layout(G, prog='dot', args='-Gmclimit=10')
-    pos = graphviz_layout(G, prog='dot', args='-Grankdir="LR"')
-    plt.figure(figsize=(16,9))
-    nx.draw(G, pos, with_labels=True)
-    # plt.tight_layout()
-    fname = "ddg.png"
-    plt.savefig(fname)
-    plt.close()
-    print(f"Saved {fname}")
-
-
-    post_dominators = nx.immediate_dominators(nx.reverse(G), end_node)
-    # Display post-dominator relationships
-    print("Post-dominators:")
-    for node, post_dom in post_dominators.items():
-        print(f"{post_dom} post-dominates {node}")
-    print("Creating post dominator tree")
-    # Create the post-dominator tree
-    post_dom_tree = nx.DiGraph()
-    print("\t adding post doms")
-    # Add edges from each node to its immediate post-dominator
-    for node, idom in post_dominators.items():
-        if node != idom:  # skip self-loop (exit node dominates itself)
-            post_dom_tree.add_edge(idom, node)
-    print("finished building post dom tree")
-    # Draw the post-dominator tree
-    pos = graphviz_layout(post_dom_tree, prog='neato') # Requires Graphviz
-    nx.draw(post_dom_tree, pos, with_labels=True)
-    plt.title("Post-Dominator Tree")
-    plt.savefig("dt.png")
-
-    conn.close()
-    print("exiting function")
 
 def temporal_analysis(db_dir: str):
+
+    logger.info(f'Starting Temporal Analysis')
+    start = time.time()
 
     conn = HAKCDatabase(db_dir)
 
     hash_to_sym = conn.get_symbol_hashes_to_symbols()
-    print(hash_to_sym)
-    return
+    # print(hash_to_sym)
     compartmentalization = HAKCCompartmentalization()
 
-    for symbol_hash, symbol in logger.progress_bar(iterable=hash_to_sym.items()):
+    count_direct_calls = 0
+    for symbol_hash, symbol in logger.progress_bar(iterable=hash_to_sym.items(), desc='Adding direct_calls from db!'):
         if isinstance(symbol, HAKCFunction):
             direct_calls = conn.get_direct_calls(symbol)
             compartmentalization.add_persistent_node(symbol, already_persisted=True)
+            # below there is some issue with defining line and defining file hakcfunctions being incorrectly created with nan values, causing duplicate nodes or something weird
             for direct_call in direct_calls:
-                print(f"{symbol} [- DirectCall -> {direct_call}")
+                print(direct_call)
+                count_direct_calls += 1
+                # print(f"{symbol} [- DirectCall -> {direct_call}")
                 compartmentalization.add_persistent_node(direct_call, already_persisted=True)
                 compartmentalization.add_persistent_edge(symbol, direct_call, key=HAKCFunction.DirectCallTable)
 
     function_perm_types = conn.get_function_perm_types()
-    print(function_perm_types)
-    for triple in logger.progress_bar(iterable=function_perm_types):
-        func = triple[0]
-        perm = triple[1]
-        ty = triple[2]
-        compartmentalization.add_function_edge_ty_triple(func, perm, ty)
+    # print(function_perm_types)
+    count_type_perms = 0
+    for func, type_perm in logger.progress_bar(iterable=function_perm_types, desc='Adding function type permissions from db!'):
+        count_type_perms += 1
+        compartmentalization.add_function_edge_perm_type(func, type_perm)
         # print(f"Function {func} [- {perm} -> {ty}")
 
     # strip self loops
     compartmentalization.remove_edges_from(nx.selfloop_edges(compartmentalization))
 
+    end = time.time()
+
+    logger.info(f'Finished Temporal Analysis!')
+    logger.info(f'        Total Time: {end - start} seconds')
+    logger.info(f'        Type Count: {len(compartmentalization.get_types())}')
+    logger.info(f'      Global Count: {len(compartmentalization.get_global_variables())}')
+    logger.info(f'    Function Count: {len(compartmentalization.get_functions())}')
+    # logger.info(f' Direct Call Count: {count_direct_calls}')
+    # logger.info(f'   Type Perm Count: {count_type_perms}')
+    logger.info(f'  DB queries Count: {conn.count_executed_statements}')
     save_graph(compartmentalization, "loaded_dag.png")
     conn.close()
+
+    """
+    node_degrees = sorted(G_ddg.degree, key=lambda x: x[1], reverse=True)
+    # prune graph to only have this graph
+    print(f"Nodes in DDG: {G_ddg.nodes()}")
+    MaxNodeDescendants = nx.descendants(G_ddg, MaxNodeName)
+    print(f"MaxNode Descendents {MaxNodeDescendants}")
+    G_ddg = G_ddg.subgraph(MaxNodeDescendants)
+    print(f"Max node {MaxNodeName} -> {MaxNodeAttrs} with found hash {MaxNodeHash}")
+    """
+
 
 def add_default_compartmentalization(conn: HAKCDatabase, compartmentalization: HAKCCompartmentalization,
                                      create_schema: bool = False):

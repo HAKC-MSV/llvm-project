@@ -184,9 +184,11 @@ class HAKCDBNode(HAKCPrintableObj):
 
     @classmethod
     def get_db_table_columns(cls) -> list[HAKCDBColumn]:
+        # assert the size of the data columns matches the schema (for db data normalization)
         columns = [cls.get_primary_key()]
         for column in cls.get_data_columns():
             columns.append(column)
+        # assert(len(cls.get_db_data(HAKCDBNode)) == len(columns))
         return columns
 
     @staticmethod
