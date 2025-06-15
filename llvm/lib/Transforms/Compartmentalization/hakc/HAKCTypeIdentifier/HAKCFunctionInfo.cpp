@@ -8,8 +8,8 @@
 namespace llvm::hakc {
 HAKCFunctionInfo::HAKCFunctionInfo(CommonHAKCAnalysis &Analysis, StringRef Name,
                                    bool DebugActive)
-    : HAKCSymbolInfo(Analysis, Name, DebugActive), DirectCalls(),
-      IndirectCalls(), TypesUsed() {}
+    : HAKCSymbolInfo(Analysis, Name, DebugActive), TypesUsed(), DirectCalls(),
+      IndirectCalls() {}
 
 void HAKCFunctionInfo::SetFunction(Function *F) { SetGlobalObj(F); }
 
@@ -115,6 +115,18 @@ std::string HAKCFunctionInfo::GetYaml(unsigned Indents) const {
   llvm::raw_string_ostream sstream(Yaml);
 
   unsigned Count;
+  // adding HAKCCompilation_unit to function
+  if (DefiningLocation) {
+    SmallString<256> PathName;
+    GetTransformedPathName(DefiningLocation, PathName);
+    sstream << "\n";
+    sstream.indent(Indents + EntrySpaces()) << "CompilationUnit:\n";
+    sstream.indent(Indents + EntrySpaces() + 4) << "!HAKCCompilationUnit\n";
+    sstream.indent(Indents + EntrySpaces() + 4)
+        << "DefiningFile: \"" << PathName << "\"\n";
+    sstream.indent(Indents + EntrySpaces() + 4)
+        << "DefiningLine: " << DefiningLine;
+  }
   if (!DirectCalls.empty()) {
     sstream << "\n";
     sstream.indent(Indents + EntrySpaces()) << "DirectCalls:\n";
@@ -140,13 +152,6 @@ std::string HAKCFunctionInfo::GetYaml(unsigned Indents) const {
       }
     }
   }
-  // - !HAKCTypePerm
-  // RWX: "001"
-  // Type:
-  //   !HAKCType
-  //   Name: "int (struct data_struct_a*)"
-  //   DebugType: "int (struct data_struct_a*)"
-  //   LLVMType: "i32 (ptr)"
   if (!TypesUsed.empty()) {
     sstream << "\n";
     sstream.indent(Indents + EntrySpaces()) << "TypesUsed:\n";

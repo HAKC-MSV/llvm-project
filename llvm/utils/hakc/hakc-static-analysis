@@ -10,6 +10,7 @@ import multiprocessing as mp
 import os
 import pstats
 import shutil
+import sys
 import time
 import networkx as nx
 from networkx.drawing.nx_pydot import to_pydot
@@ -24,7 +25,6 @@ from hakc.HAKCObjects import HAKCSymbol, HAKCFunction, HAKCGlobalVariable, \
     HAKCCompartment, HAKCDivision, HAKCCompilationUnit, HAKCCompartmentalizationAdjustment
 
 import matplotlib.pyplot as plt
-import networkx as nx
 from networkx.drawing.nx_agraph import graphviz_layout
 
 logging.setLoggerClass(HAKCLogger)
@@ -40,26 +40,36 @@ def batched(iterable, n):
         yield batch
 
 
-def parse_yaml(filename: str):
+
+def parse_yaml(filename: str, debug = False):
+    # parse_yaml needed here instead of in compartmentalization for use in multithreading
     with open(filename, 'rb') as f:
         parsed_yaml = yaml.load(f, Loader=yaml.Loader)
-        compilation_unit = parsed_yaml["CU"]
-        # type_perms = parsed_yaml['type_perms'] if 'type_perms' in parsed_yaml else list()
         functions = parsed_yaml['functions'] if 'functions' in parsed_yaml else list()
         global_variables = parsed_yaml['globals'] if 'globals' in parsed_yaml else list()
-    return compilation_unit, functions, global_variables
 
+    if(debug):
+        print(f"debugging yaml parsing of {filename}")
+        for global_variable in global_variables:
+            assert(isinstance(global_variable, HAKCGlobalVariable))
+            print(HAKCGlobalVariable.debug_print(global_variable))
+        for function in functions:
+            assert(isinstance(function, HAKCFunction))
+            print(HAKCFunction.debug_print(function))
 
+    return functions, global_variables
+
+#
 def compute_dag_edge_weight(**kwargs) -> int:
     edge_weight = 0
 
-    if kwargs.get(HAKCFunction.DirectCallTable, False):
+    if kwargs.get(HAKCFunction.relation_indirect_calls, False):
         edge_weight += 1
 
-    if kwargs.get(HAKCSymbol.UsesSymbolTable, False):
+    if kwargs.get(HAKCFunction.relation_direct_calls, False):
         edge_weight += 1
 
-    if kwargs.get(HAKCFunction.IndirectCallTable, False):
+    if kwargs.get(HAKCSymbol.relation_symbol, False):
         edge_weight += 1
 
     return edge_weight
@@ -92,50 +102,39 @@ def init_mp_database(db_dir: str):
     mp_conn = HAKCDatabase(db_dir, read_only=True)
 
 
-def compute_dag_edges_for_symbol(symbol_hashes):
-    global mp_conn
-    conn = mp_conn
-    results = list()
-    for symbol_hash in symbol_hashes:
-        try:
-            for t in compute_dag_edges_for_symbol_with_conn(conn, symbol_hash):
-                results.append(t)
-            logger.debug(f'Finished computing DAG edges for {symbol_hash}')
-        except Exception as e:
-            logger.error(f'compute_dag_edges_for_symbol failed for {symbol_hash}: {str(e)}')
+# def compute_dag_edges_for_symbol(symbol_hashes):
+#     global mp_conn
+#     conn = mp_conn
+#     results = list()
+#     for symbol_hash in symbol_hashes:
+#         try:
+#             for t in compute_dag_edges_for_symbol_with_conn(conn, symbol_hash):
+#                 results.append(t)
+#             logger.debug(f'Finished computing DAG edges for {symbol_hash}')
+#         except Exception as e:
+#             logger.error(f'compute_dag_edges_for_symbol failed for {symbol_hash}: {str(e)}')
+#
+#     return results
+#
 
-    return results
+# def add_symbols(compartmentalization: HAKCCompartmentalization, compilation_unit: str, functions: set[HAKCFunction],
+#                 global_variables: set[HAKCGlobalVariable]):
+#     for func in functions:
+#         compartmentalization.add_symbol(func, cu)
+#     for glob in global_variables:
+#         compartmentalization.add_symbol(glob, cu)
 
 
-def add_symbols(compartmentalization: HAKCCompartmentalization, compilation_unit: str, functions: set[HAKCFunction],
-                global_variables: set[HAKCGlobalVariable]):
-    cu = HAKCCompilationUnit(filename=compilation_unit)
-    for func in functions:
-        compartmentalization.add_symbol(func, cu)
-    for glob in global_variables:
-        compartmentalization.add_symbol(glob, cu)
-
-def debug_print_yaml(filename):
-    compilation_unit, functions, global_variables = parse_yaml(filename)
-    print(f"debugging yaml parsing of {filename}")
-    if compilation_unit:
-        print(f"compilation_unit: {compilation_unit}")
-    if global_variables:
-        print(f"global_variables: {global_variables}")
-    for function in functions:
-        print(f"HAKCFunction: {function}")
-        for type_perm in function.types_used:
-            print(f"\tHAKCTypePerm: {type_perm}\n\t\t with HAKCType: {type_perm.perm_type}")
 
 
 def create_dag_single_thread(files: set[str], conn: HAKCDatabase) -> HAKCCompartmentalization:
     compartmentalization = HAKCCompartmentalization()
     for filename in logger.progress_bar(iterable=sorted(files), desc='Parsing YAML'):
-        # debug_print_yaml(filename)
-        compilation_unit, functions, global_variables = parse_yaml(filename)
+        functions, global_variables = parse_yaml(filename, debug=True)
         logger.debug(
-            f'{compilation_unit} found {len(functions)} functions and {len(global_variables)} globals')
-        add_symbols(compartmentalization, compilation_unit, functions, global_variables)
+            f'{filename} found {len(functions)} functions and {len(global_variables)} globals')
+        compartmentalization.add_symbols(functions, global_variables)
+
     compartmentalization.persist_to_database(conn, create_schema=True)
     dag_edges = dict()
     dag_edges_added = 0
@@ -152,6 +151,9 @@ def create_dag_single_thread(files: set[str], conn: HAKCDatabase) -> HAKCCompart
     conn.persist_dag_edges(dag_edges)
     logger.info(f'Adding compartmentalization')
     add_default_compartmentalization(conn, compartmentalization)
+    for node in compartmentalization.nodes:
+        print(node)
+        print(nx.get_node_attributes(compartmentalization, node))
     return compartmentalization
 
 
@@ -190,61 +192,61 @@ def adjust_compartmentalization(db_dir: str, adjustment: HAKCCompartmentalizatio
     logger.info(f'Compartmentalization now has {len(divisions)} divisions across {len(compartments)} compartments')
     conn.close()
 
-def format_graph(G: nx.MultiDiGraph):
-    #
-    # for node_id in G.nodes:
-    #     print(G.nodes[node_id])
-    print(len(G.nodes))
-    # NOTE: don't use to_pydot(G), since it is very hacky and will show an incorrect number of nodes / edges
-
-    return G
-
-def save_graph(G, fname, N=50):
-    # top_n_node_ids = show_top_n_degrees(G, N)
-    # subgraph = G.subgraph(top_n_node_ids)
-    # print(G.nodes)
-    # G = subgraph
-    G = nx.relabel_nodes(G, lambda x: x.pretty_print())
-    dot = to_pydot(G)
-
-    dot.set_splines("true")
-    # dot.set("rankdir", "LR")
-    dot.set("overlap", "false")
-    for node in dot.get_nodes():
-        node.set("shape", "box")
-
-
-    dot.write_png("clean_multidigraph.png")  # Requires Graphviz installed
-
-    # reformatting the label to have new lines so it can be read on graph
-    # G = nx.relabel_nodes(G, lambda x: str(x).replace(",","\n").replace("(","(\n"))
-    # G = format_graph(G)
-    # G = nx.relabel_nodes(G, lambda x: x.pretty_print())
-    # print(G.edges()[0])
-    # print(subgraph)
-    # https://graphviz.org/docs/layouts/
-    # pos = graphviz_layout(G, prog='neato')
-    # pos = graphviz_layout(G, prog='dot', args='-Grankdir="LR"')
-
-    pos = graphviz_layout(G, prog='osage', args='-Grankdir="LR" -Gminlen="1" -Gordering="in"')
-    # pos = graphviz_layout(G, prog='sfdp')
-
-    plt.figure(figsize=(16,9))
-    nx.draw(G, pos, with_labels=True, node_shape="o", node_color='none', edgecolors='black', node_size=20000)
-    # nodelist=nodes,
-    # node_shape=marker,
-    # node_color=node_colors,
-    # node_size=2000,
-    # edgecolors="black"
-    # node_color='none',     # transparent fill
-    # edgecolors='black'
-
-    # print(G.edges)
-    plt.savefig(fname)
-    plt.close()
-    print(f"Saved {fname}")
-
-    return G
+# def format_graph(G: nx.MultiDiGraph):
+#     #
+#     # for node_id in G.nodes:
+#     #     print(G.nodes[node_id])
+#     print(len(G.nodes))
+#     # NOTE: don't use to_pydot(G), since it is very hacky and will show an incorrect number of nodes / edges
+#
+#     return G
+#
+# def save_graph(G, fname, N=50):
+#     # top_n_node_ids = show_top_n_degrees(G, N)
+#     # subgraph = G.subgraph(top_n_node_ids)
+#     # print(G.nodes)
+#     # G = subgraph
+#     G = nx.relabel_nodes(G, lambda x: x.pretty_print())
+#     dot = to_pydot(G)
+#
+#     dot.set_splines("true")
+#     # dot.set("rankdir", "LR")
+#     dot.set("overlap", "false")
+#     for node in dot.get_nodes():
+#         node.set("shape", "box")
+#
+#
+#     dot.write_png("clean_multidigraph.png")  # Requires Graphviz installed
+#
+#     # reformatting the label to have new lines so it can be read on graph
+#     # G = nx.relabel_nodes(G, lambda x: str(x).replace(",","\n").replace("(","(\n"))
+#     # G = format_graph(G)
+#     # G = nx.relabel_nodes(G, lambda x: x.pretty_print())
+#     # print(G.edges()[0])
+#     # print(subgraph)
+#     # https://graphviz.org/docs/layouts/
+#     # pos = graphviz_layout(G, prog='neato')
+#     # pos = graphviz_layout(G, prog='dot', args='-Grankdir="LR"')
+#
+#     pos = graphviz_layout(G, prog='osage', args='-Grankdir="LR" -Gminlen="1" -Gordering="in"')
+#     # pos = graphviz_layout(G, prog='sfdp')
+#
+#     plt.figure(figsize=(16,9))
+#     nx.draw(G, pos, with_labels=True, node_shape="o", node_color='none', edgecolors='black', node_size=20000)
+#     # nodelist=nodes,
+#     # node_shape=marker,
+#     # node_color=node_colors,
+#     # node_size=2000,
+#     # edgecolors="black"
+#     # node_color='none',     # transparent fill
+#     # edgecolors='black'
+#
+#     # print(G.edges)
+#     plt.savefig(fname)
+#     plt.close()
+#     print(f"Saved {fname}")
+#
+#     return G
 
 
 def node_with_max_edges(graph):
@@ -262,26 +264,6 @@ def node_with_max_edges(graph):
     # max(graph.degree, key=lambda item: print(item))
     # print(graph.degree)
     return max(graph.degree, key=lambda item: item[1])[0]
-
-
-def show_top_n_degrees(graph, n):
-    """
-    Returns a list of the top n nodes with the highest degrees of freedom.
-
-    Args:
-    graph: A NetworkX graph object.
-    n: The number of top nodes to return.
-
-    Returns:
-    A list of node IDs sorted by degree in descending order.
-    """
-    degrees = dict(nx.degree(graph))
-
-    # Sort the degrees in descending order
-    sorted_degrees = sorted(degrees.items(), key=lambda item: item[1], reverse=True)
-
-    return [node for node, degree in sorted_degrees[:n]]
-
 
 
 def temporal_analysis(db_dir: str):
@@ -329,7 +311,7 @@ def temporal_analysis(db_dir: str):
     # logger.info(f' Direct Call Count: {count_direct_calls}')
     # logger.info(f'   Type Perm Count: {count_type_perms}')
     logger.info(f'  DB queries Count: {conn.count_executed_statements}')
-    save_graph(compartmentalization, "loaded_dag.png")
+    compartmentalization.save_graph("loaded_dag.png")
     conn.close()
 
     """
@@ -369,10 +351,10 @@ def create_dag_multithread(files: set[str], core_count: int, conn: HAKCDatabase)
                 pbar.update(1)
                 file = futures_to_files[future]
                 try:
-                    compilation_unit, functions, global_variables = future.result()
+                    functions, global_variables = future.result()
                     logger.debug(
-                        f'{compilation_unit} found {len(functions)} functions and {len(global_variables)} globals')
-                    add_symbols(compartmentalization, compilation_unit, functions, global_variables)
+                        f'found {len(functions)} functions and {len(global_variables)} globals')
+                    compartmentalization.add_symbols(functions, global_variables)
                 except Exception as e:
                     logger.error(f'Error parsing {file}: {str(e)}')
 
@@ -461,7 +443,9 @@ def create_new_dag(analysis_root: str, core_count: int, db_dir: str,
     logger.info(f'    Type Count: {len(compartmentalization.get_types())}')
     logger.info(f'  Global Count: {len(compartmentalization.get_global_variables())}')
     logger.info(f'Function Count: {len(compartmentalization.get_functions())}')
-    conn.close()
+    # TODO: figure out why closing the connection here causes a segfault
+    # conn.close()
+    logger.info(f'Exiting create_new_dag')
     return compartmentalization
 
 def print_edge_data(G):
@@ -520,11 +504,17 @@ def main():
         if profile:
             profile.enable()
         compartmentalization = create_new_dag(args.dag_files_root, args.core_count, args.db_dir, args.delete_db)
+        # print(f"create_new_dag post")
+        # print(f"pre profile")
         if profile:
             profile.disable()
             output_profile_stats(profile)
+        # print(f"post profile")
+        # print(f"pre save_g")
         if args.save_g:
-            save_graph(compartmentalization, args.save_g)
+            compartmentalization.save_graph(args.save_g)
+            compartmentalization.save_graph_alt("alt.png")
+        # print(f"post save_g")
 
     if args.adjust:
         logger.info(f'Adjusting compartmentalization based on {args.adjust_path}')
@@ -534,7 +524,7 @@ def main():
         logger.info("Done")
 
     if args.dump_dag:
-        logger.info(f'Dumping compartmentalization to {args.dump_dag}')
+        logger.error(f'Dumping compartmentalization to {args.dump_dag}')
         with open(args.dump_dag, "w") as f:
             yaml.dump(compartmentalization, f)
         logger.info("Done")
@@ -542,3 +532,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    sys.exit(0)

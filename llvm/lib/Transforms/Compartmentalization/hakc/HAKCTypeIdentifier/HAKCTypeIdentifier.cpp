@@ -1546,9 +1546,9 @@ void hakc::HAKCTypeIdentifier::OutputYAML(raw_ostream &out) const {
   CommonHAKCAnalysis::GetModuleFullPath(GetModule(), RealPath);
 
   out << "---\n";
-  out << "CU: ";
-  out << RealPath;
-  out << "\n";
+  // out << "CU: ";
+  // out << RealPath;
+  // out << "\n";
 
   auto GlobalCount = globals.size() + UnmappedGlobals.size();
   if (GlobalCount > 0) {
