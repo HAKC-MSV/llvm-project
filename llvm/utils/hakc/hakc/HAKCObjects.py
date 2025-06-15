@@ -12,7 +12,6 @@ logger = logging.getLogger('hakc-dag')
 
 class HAKCCompilationUnit(HAKCDBNode, yaml.YAMLObject):
     yaml_tag = "!HAKCCompilationUnit"
-    node_key = "cu"
 
     def __init__(self, DefiningFile: str, DefiningLine: str, **kwargs):
         yaml.YAMLObject.__init__(self)
@@ -48,7 +47,7 @@ class HAKCCompilationUnit(HAKCDBNode, yaml.YAMLObject):
 
     @staticmethod
     def get_primary_key() -> HAKCDBColumn:
-        return HAKCDBColumn('cu_hash', "STRING")
+        return HAKCDBColumn('cu_hash', "UINT64")
 
     @classmethod
     def get_data_columns(cls) -> list[HAKCDBColumn]:
@@ -71,7 +70,6 @@ class HAKCCompilationUnit(HAKCDBNode, yaml.YAMLObject):
 class HAKCDivision(HashedHAKCDBNode, yaml.YAMLObject):
     yaml_tag = "!HAKCDivision"
     relation_compartment = "has_compartment"
-    node_key = "div"
 
     def __init__(self, DivisionID: Optional[int] = None, CompartmentID: Optional[int] = None,
                  DivisionCount: int = len(HAKCDivisionEnum) - 1, AccessToken: Optional[int] = None, **kwargs):
@@ -153,7 +151,6 @@ class HAKCDivision(HashedHAKCDBNode, yaml.YAMLObject):
 
 class HAKCCompartment(HAKCDBNode, yaml.YAMLObject):
     yaml_tag = "!HAKCCompartment"
-    node_key = "comp"
 
     def __init__(self, CompartmentID: Optional[int] = None, division_count: int = len(HAKCDivisionEnum) - 1,
                  Divisions: Optional[set[HAKCDivision]] = None,
@@ -238,9 +235,10 @@ class HAKCCompartment(HAKCDBNode, yaml.YAMLObject):
 class HAKCType(HashedHAKCDBNode, yaml.YAMLObject):
     yaml_tag = "!HAKCType"
     unknown_type = "@UNKNOWN@"
-    node_key = "ty"
 
-    def __init__(self, DebugType: Optional[str] = None, LLVMType: Optional[str] = None, **kwargs):
+    def __init__(self, LLVMType: str, DebugType: Optional[str] = None, **kwargs):
+        # del kwargs["type_hash"]
+        print(f"LLVMType: {LLVMType}, DebugType: {DebugType}, kwargs: {kwargs}")
         yaml.YAMLObject.__init__(self)
         if 'Name' not in kwargs:
             kwargs['Name'] = DebugType if DebugType is not None and DebugType != HAKCType.unknown_type else LLVMType
@@ -250,7 +248,10 @@ class HAKCType(HashedHAKCDBNode, yaml.YAMLObject):
         self._debug_type_transformed = HAKCType.transform_type_str(self.debug_type)
         self._debug_type_is_known = self.debug_type != HAKCType.unknown_type
         self._llvm_type_is_known = self.llvm_type != HAKCType.unknown_type
-        assert (isinstance(self.llvm_type, str) and self.llvm_type != "")
+        assert(isinstance(self.llvm_type, str) and self.llvm_type != "")
+        if "type_hash" in kwargs:
+            print(f"assert type_hash ({type(kwargs['type_hash'])}) =?= hash(self) ({self.get_computed_hash()})")
+            assert(kwargs["type_hash"] == self.get_computed_hash())
 
     def pretty_print(self):
         return f"HAKCType({self.debug_type})"
@@ -281,6 +282,7 @@ class HAKCType(HashedHAKCDBNode, yaml.YAMLObject):
 
     def __hash__(self):
         return HAKCDBNode.__hash__(self)
+        # return hash(self.llvm_type)
 
     @staticmethod
     def transform_type_str(type_str: str) -> str:
@@ -359,7 +361,6 @@ class HAKCScope(HashedHAKCDBNode, yaml.YAMLObject):
     yaml_tag = "!HAKCScope"
     global_scope = "global"
     local_scope = "local"
-    node_key = "scope"
 
     def __init__(self, Scope: str, LocalScopeName: Optional[str] = None, **kwargs):
         yaml.YAMLObject.__init__(self)
@@ -441,7 +442,6 @@ class HAKCSymbol(HashedHAKCDBNode, yaml.YAMLObject):
     relation_compilation_unit="has_compilation_unit"
     relation_division="has_division"
     relation_dag="has_dag"
-    node_key = "sym"
 
 
     # Init takes the attributes directly from the original dag.yml file the pass creates
@@ -532,7 +532,6 @@ class HAKCFunction(HAKCSymbol):
     relation_indirect_calls = "has_indirect_calls"
     relation_types_used = "has_types_used"
 
-    node_key = "func"
 
     def __init__(self, DirectCalls: Optional[list] = None, IndirectCalls: Optional[list] = None,
                  TypesUsed: Optional[list] = None, **kwargs):
@@ -585,7 +584,6 @@ class HAKCFunction(HAKCSymbol):
 
 class HAKCGlobalVariable(HAKCSymbol):
     yaml_tag = "!HAKCGlobalVariable"
-    node_key = "gv"
 
     def __init__(self, **kwargs):
         HAKCSymbol.__init__(self, **kwargs)

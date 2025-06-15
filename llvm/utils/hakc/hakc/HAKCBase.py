@@ -58,7 +58,16 @@ class HAKCHashValue:
     def __hash__(self):
         return self.final_hash
 
+    def __eq__(self, other):
+        if isinstance(other, int):
+            return self.final_hash == other
+        elif isinstance(other, HAKCHashValue):
+            return self.final_hash == other.final_hash
+        else:
+            return False
+
     def __str__(self):
+        assert(isinstance(self.final_hash, int))
         return f'{self.final_hash:0x}'
 
     def __repr__(self):

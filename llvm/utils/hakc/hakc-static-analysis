@@ -48,7 +48,7 @@ def parse_yaml(filename: str, debug = False):
         functions = parsed_yaml['functions'] if 'functions' in parsed_yaml else list()
         global_variables = parsed_yaml['globals'] if 'globals' in parsed_yaml else list()
 
-    if(debug):
+    if debug:
         print(f"debugging yaml parsing of {filename}")
         for global_variable in global_variables:
             assert(isinstance(global_variable, HAKCGlobalVariable))
@@ -102,29 +102,19 @@ def init_mp_database(db_dir: str):
     mp_conn = HAKCDatabase(db_dir, read_only=True)
 
 
-# def compute_dag_edges_for_symbol(symbol_hashes):
-#     global mp_conn
-#     conn = mp_conn
-#     results = list()
-#     for symbol_hash in symbol_hashes:
-#         try:
-#             for t in compute_dag_edges_for_symbol_with_conn(conn, symbol_hash):
-#                 results.append(t)
-#             logger.debug(f'Finished computing DAG edges for {symbol_hash}')
-#         except Exception as e:
-#             logger.error(f'compute_dag_edges_for_symbol failed for {symbol_hash}: {str(e)}')
-#
-#     return results
-#
+def compute_dag_edges_for_symbol(symbol_hashes):
+    global mp_conn
+    conn = mp_conn
+    results = list()
+    for symbol_hash in symbol_hashes:
+        try:
+            for t in compute_dag_edges_for_symbol_with_conn(conn, symbol_hash):
+                results.append(t)
+            logger.debug(f'Finished computing DAG edges for {symbol_hash}')
+        except Exception as e:
+            logger.error(f'compute_dag_edges_for_symbol failed for {symbol_hash}: {str(e)}')
 
-# def add_symbols(compartmentalization: HAKCCompartmentalization, compilation_unit: str, functions: set[HAKCFunction],
-#                 global_variables: set[HAKCGlobalVariable]):
-#     for func in functions:
-#         compartmentalization.add_symbol(func, cu)
-#     for glob in global_variables:
-#         compartmentalization.add_symbol(glob, cu)
-
-
+    return results
 
 
 def create_dag_single_thread(files: set[str], conn: HAKCDatabase) -> HAKCCompartmentalization:
@@ -151,9 +141,9 @@ def create_dag_single_thread(files: set[str], conn: HAKCDatabase) -> HAKCCompart
     conn.persist_dag_edges(dag_edges)
     logger.info(f'Adding compartmentalization')
     add_default_compartmentalization(conn, compartmentalization)
-    for node in compartmentalization.nodes:
-        print(node)
-        print(nx.get_node_attributes(compartmentalization, node))
+    # for node in compartmentalization.nodes:
+    #     print(node)
+    #     print(nx.get_node_attributes(compartmentalization, node))
     return compartmentalization
 
 
@@ -192,63 +182,6 @@ def adjust_compartmentalization(db_dir: str, adjustment: HAKCCompartmentalizatio
     logger.info(f'Compartmentalization now has {len(divisions)} divisions across {len(compartments)} compartments')
     conn.close()
 
-# def format_graph(G: nx.MultiDiGraph):
-#     #
-#     # for node_id in G.nodes:
-#     #     print(G.nodes[node_id])
-#     print(len(G.nodes))
-#     # NOTE: don't use to_pydot(G), since it is very hacky and will show an incorrect number of nodes / edges
-#
-#     return G
-#
-# def save_graph(G, fname, N=50):
-#     # top_n_node_ids = show_top_n_degrees(G, N)
-#     # subgraph = G.subgraph(top_n_node_ids)
-#     # print(G.nodes)
-#     # G = subgraph
-#     G = nx.relabel_nodes(G, lambda x: x.pretty_print())
-#     dot = to_pydot(G)
-#
-#     dot.set_splines("true")
-#     # dot.set("rankdir", "LR")
-#     dot.set("overlap", "false")
-#     for node in dot.get_nodes():
-#         node.set("shape", "box")
-#
-#
-#     dot.write_png("clean_multidigraph.png")  # Requires Graphviz installed
-#
-#     # reformatting the label to have new lines so it can be read on graph
-#     # G = nx.relabel_nodes(G, lambda x: str(x).replace(",","\n").replace("(","(\n"))
-#     # G = format_graph(G)
-#     # G = nx.relabel_nodes(G, lambda x: x.pretty_print())
-#     # print(G.edges()[0])
-#     # print(subgraph)
-#     # https://graphviz.org/docs/layouts/
-#     # pos = graphviz_layout(G, prog='neato')
-#     # pos = graphviz_layout(G, prog='dot', args='-Grankdir="LR"')
-#
-#     pos = graphviz_layout(G, prog='osage', args='-Grankdir="LR" -Gminlen="1" -Gordering="in"')
-#     # pos = graphviz_layout(G, prog='sfdp')
-#
-#     plt.figure(figsize=(16,9))
-#     nx.draw(G, pos, with_labels=True, node_shape="o", node_color='none', edgecolors='black', node_size=20000)
-#     # nodelist=nodes,
-#     # node_shape=marker,
-#     # node_color=node_colors,
-#     # node_size=2000,
-#     # edgecolors="black"
-#     # node_color='none',     # transparent fill
-#     # edgecolors='black'
-#
-#     # print(G.edges)
-#     plt.savefig(fname)
-#     plt.close()
-#     print(f"Saved {fname}")
-#
-#     return G
-
-
 def node_with_max_edges(graph):
     """
     Finds the node with the most edges in a NetworkX graph.
@@ -273,46 +206,49 @@ def temporal_analysis(db_dir: str):
 
     conn = HAKCDatabase(db_dir)
 
-    hash_to_sym = conn.get_symbol_hashes_to_symbols()
+    # load the HAKCCompartmentalization from the database
+
+    # hash_to_sym = conn.get_symbol_hashes_to_symbols()
     # print(hash_to_sym)
     compartmentalization = HAKCCompartmentalization()
+    compartmentalization.load_from_db(conn)
 
-    count_direct_calls = 0
-    for symbol_hash, symbol in logger.progress_bar(iterable=hash_to_sym.items(), desc='Adding direct_calls from db!'):
-        if isinstance(symbol, HAKCFunction):
-            direct_calls = conn.get_direct_calls(symbol)
-            compartmentalization.add_persistent_node(symbol, already_persisted=True)
-            # below there is some issue with defining line and defining file hakcfunctions being incorrectly created with nan values, causing duplicate nodes or something weird
-            for direct_call in direct_calls:
-                print(direct_call)
-                count_direct_calls += 1
-                # print(f"{symbol} [- DirectCall -> {direct_call}")
-                compartmentalization.add_persistent_node(direct_call, already_persisted=True)
-                compartmentalization.add_persistent_edge(symbol, direct_call, key=HAKCFunction.DirectCallTable)
-
-    function_perm_types = conn.get_function_perm_types()
-    # print(function_perm_types)
-    count_type_perms = 0
-    for func, type_perm in logger.progress_bar(iterable=function_perm_types, desc='Adding function type permissions from db!'):
-        count_type_perms += 1
-        compartmentalization.add_function_edge_perm_type(func, type_perm)
-        # print(f"Function {func} [- {perm} -> {ty}")
-
-    # strip self loops
-    compartmentalization.remove_edges_from(nx.selfloop_edges(compartmentalization))
-
-    end = time.time()
-
-    logger.info(f'Finished Temporal Analysis!')
-    logger.info(f'        Total Time: {end - start} seconds')
-    logger.info(f'        Type Count: {len(compartmentalization.get_types())}')
-    logger.info(f'      Global Count: {len(compartmentalization.get_global_variables())}')
-    logger.info(f'    Function Count: {len(compartmentalization.get_functions())}')
-    # logger.info(f' Direct Call Count: {count_direct_calls}')
-    # logger.info(f'   Type Perm Count: {count_type_perms}')
-    logger.info(f'  DB queries Count: {conn.count_executed_statements}')
-    compartmentalization.save_graph("loaded_dag.png")
-    conn.close()
+    # count_direct_calls = 0
+    # for symbol_hash, symbol in logger.progress_bar(iterable=hash_to_sym.items(), desc='Adding direct_calls from db!'):
+    #     if isinstance(symbol, HAKCFunction):
+    #         direct_calls = conn.get_direct_calls(symbol)
+    #         compartmentalization.add_persistent_node(symbol, already_persisted=True)
+    #         # below there is some issue with defining line and defining file hakcfunctions being incorrectly created with nan values, causing duplicate nodes or something weird
+    #         for direct_call in direct_calls:
+    #             print(direct_call)
+    #             count_direct_calls += 1
+    #             # print(f"{symbol} [- DirectCall -> {direct_call}")
+    #             compartmentalization.add_persistent_node(direct_call, already_persisted=True)
+    #             compartmentalization.add_persistent_edge(symbol, direct_call, key=HAKCFunction.DirectCallTable)
+    #
+    # function_perm_types = conn.get_function_perm_types()
+    # # print(function_perm_types)
+    # count_type_perms = 0
+    # for func, type_perm in logger.progress_bar(iterable=function_perm_types, desc='Adding function type permissions from db!'):
+    #     count_type_perms += 1
+    #     compartmentalization.add_function_edge_perm_type(func, type_perm)
+    #     # print(f"Function {func} [- {perm} -> {ty}")
+    #
+    # # strip self loops
+    # compartmentalization.remove_edges_from(nx.selfloop_edges(compartmentalization))
+    #
+    # end = time.time()
+    #
+    # logger.info(f'Finished Temporal Analysis!')
+    # logger.info(f'        Total Time: {end - start} seconds')
+    # logger.info(f'        Type Count: {len(compartmentalization.get_types())}')
+    # logger.info(f'      Global Count: {len(compartmentalization.get_global_variables())}')
+    # logger.info(f'    Function Count: {len(compartmentalization.get_functions())}')
+    # # logger.info(f' Direct Call Count: {count_direct_calls}')
+    # # logger.info(f'   Type Perm Count: {count_type_perms}')
+    # logger.info(f'  DB queries Count: {conn.count_executed_statements}')
+    # compartmentalization.save_graph("loaded_dag.png")
+    # conn.close()
 
     """
     node_degrees = sorted(G_ddg.degree, key=lambda x: x[1], reverse=True)

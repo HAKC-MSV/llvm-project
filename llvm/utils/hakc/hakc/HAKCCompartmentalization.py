@@ -76,8 +76,11 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         #             elif edge_name == HAKCFunction.TypesUsedTable:
         #                 self.add_type_perm_type_edge(new_head, new_tail)
 
+    def load_from_db(self, conn: HAKCDatabase):
+        assert(isinstance(conn, HAKCDatabase))
+        syms = conn.get_everything()
 
-
+        print(syms)
 
     @classmethod
     def to_yaml(cls, dumper: yaml.Dumper, data):
@@ -152,13 +155,6 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         print(f"Adding TypePerm {type_perm}")
         self.add_persistent_edge(func, type_perm.perm_type, key=HAKCFunction.relation_types_used, R = int(type_perm.RWX[0]), W = int(type_perm.RWX[1]), X = int(type_perm.RWX[2]))
 
-    def add_function_type_use(self, func: HAKCSymbol, type_perm: HAKCTypePerm):
-        # used to reconstruct compartmentalization from database
-        # self.add_persistent_node(func)
-        # self.add_persistent_node(type_perm)
-        # print(f"Function {func} [- {type_perm.RWX} -> {type_perm.perm_type}")
-        self.add_type_use_edge(func, type_perm.perm_type, int(type_perm.RWX[0]), int(type_perm.RWX[1]), int(type_perm.RWX[2]))
-
     def add_persistent_node(self, node: HAKCDBNode, already_persisted: bool = False):
         if not self.has_node(node):
             attrs = {HAKCCompartmentalization.persisted_attr: already_persisted}
@@ -177,27 +173,6 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
 
     def add_symbol_type_use(self, symbol: HAKCSymbol, used_type: HAKCType, key=HAKCSymbol.relation_type):
         self.add_persistent_edge(symbol, used_type, key=key)
-
-    # def add_symbol(self, symbol: HAKCSymbol, compilation_unit: HAKCCompilationUnit):
-    #     self.add_symbol_type_use(symbol, symbol.type)
-    #     self.add_persistent_edge(symbol, symbol.scope, key=HAKCSymbol.relation_scope)
-    #     if compilation_unit is not None:
-    #         self.add_persistent_edge(symbol, compilation_unit, key=HAKCSymbol.relation_compilation_unit)
-    #     if symbol.defining_file is not None:
-    #         self.add_persistent_edge(symbol, HAKCCompilationUnit(filename=symbol.defining_file),
-    #                                  key=HAKCSymbol.DefinedInTable, line=symbol.defining_line)
-    #
-    #     for used_symbol in symbol.used_symbols:
-    #         self.add_symbol_use(symbol, used_symbol)
-    #
-    #     if isinstance(symbol, HAKCFunction):
-    #         for indirect_call in symbol.indirect_calls:
-    #             self.add_symbol_type_use(symbol, indirect_call.type, key=HAKCFunction.IndirectCallTable)
-    #         for direct_call in symbol.direct_calls:
-    #             self.add_symbol_use(symbol, direct_call, key=HAKCFunction.DirectCallTable)
-    #         for type_use in symbol.types_used:
-    #             # print(f"Adding edge from \n\t{symbol} to \n\t{type_use} with Type {type_use.perm_type}")
-    #             self.add_type_use_nodes_edges(symbol, type_use)
 
     def _get_neighbors(self, symbol: HAKCSymbol, edge_key: str) -> list:
         nbrs = list()
@@ -430,23 +405,15 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         logger.info('Persisting new edges to database')
         self._persist_edges(conn)
 
-    def create_node_table(self, conn: HAKCDatabase, node_class: Type[HAKCDBNode]):
-        logger.debug(f'Creating node table {node_class.get_table_name()}')
-        conn.create_node_table(node_class)
-
-    def create_rel_table(self, conn: HAKCDatabase, database_relation: HAKCDBRelation):
-        logger.debug(f'Creating relation table {database_relation}')
-        conn.create_relationship_table(database_relation)
-
     def create_schema(self, conn: HAKCDatabase):
         node_tables = HAKCCompartmentalization.get_table_classes()
         for cls in logger.progress_bar(iterable=node_tables, desc='Creating data tables'):
-            self.create_node_table(conn, node_class=cls)
+            conn.create_node_table(node_type=cls)
 
         for cls in logger.progress_bar(iterable=node_tables, desc='Creating relationship tables'):
             db_relations = cls.get_db_relations()
             for db_relation in db_relations:
-                self.create_rel_table(conn, db_relation)
+                conn.create_relationship_table(edge_type=db_relation)
 
     def get_symbol_hashes(self) -> dict[int, HAKCSymbol]:
         symbol_hashes = dict()
