@@ -273,7 +273,8 @@ class HAKCDatabase:
 
         return result
 
-    def get_symbol_definition_location(self, symbol: HAKCSymbol) -> tuple[HAKCCompilationUnit, int] | None:
+    def get_symbol_definition_location(self, symbol: HAKCSymbol) -> Optional[
+        tuple[HAKCCompilationUnit, int]]:
         cmd = f"""
         MATCH (sym:{HAKCSymbol.get_table_name()})-[e:{HAKCSymbol.DefinedInTable}]->(cu:{HAKCCompilationUnit.get_table_name()})
         WHERE sym.{HAKCSymbol.get_primary_key().column_name} = $symbol_hash
@@ -327,7 +328,7 @@ class HAKCDatabase:
     def insert_from_dataframe(self, table_name: str, df: pd.DataFrame):
         self.conn.execute(f'COPY {table_name} FROM df')
 
-    def _get_symbols(self, where_clause: None | str = None, limit: int = 0, **kwargs) -> list[HAKCSymbol] | int:
+    def _get_symbols(self, where_clause: Optional[str] = None, limit: int = 0, **kwargs) -> list[HAKCSymbol]:
         cmd = [f"""
         MATCH (scope:{HAKCScope.get_table_name()})<-[:{HAKCSymbol.HasScopeTable}]-(sym:{HAKCSymbol.get_table_name()})-[:{HAKCSymbol.IsTypeTable}]->(ty:{HAKCType.get_table_name()}),
         (sym)-[def:{HAKCSymbol.DefinedInTable}]->(cu:{HAKCCompilationUnit.get_table_name()})
