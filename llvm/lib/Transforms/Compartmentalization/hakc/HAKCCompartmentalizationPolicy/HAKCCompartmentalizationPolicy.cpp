@@ -43,13 +43,24 @@ void HAKCDatabaseRequest::operator>>(raw_ostream &OS) const {
 
 HAKCDatabaseResponse::operator bool() const { return Success; }
 
+ssize_t HAKCDatabaseResponse::ReadFromSocket(raw_socket_stream &OS, void *Dest,
+                                             ssize_t Size) const {
+  ssize_t BytesRead;
+  do {
+    BytesRead = OS.read(static_cast<char *>(Dest), Size, Timeout);
+  } while (BytesRead != Size);
+
+  return BytesRead;
+}
+
 void HAKCDatabaseResponse::operator<<(raw_socket_stream &OS) {
   Response = "";
-  size_t ResponseSize = 0;
-  OS.read((char *)&ResponseSize, sizeof(ResponseSize), Timeout);
+  ssize_t ResponseSize = 0;
+
+  ReadFromSocket(OS, &ResponseSize, sizeof(ResponseSize));
   Response.resize(ResponseSize);
-  auto LastReadSize = OS.read(Response.data(), ResponseSize, Timeout);
-  Success = LastReadSize >= 0;
+  auto LastReadSize = ReadFromSocket(OS, Response.data(), ResponseSize);
+  Success = LastReadSize > 0 && ResponseSize == LastReadSize;
 }
 
 HAKCDatabaseConnection::HAKCDatabaseConnection(
@@ -90,7 +101,8 @@ void HAKCDatabaseConnection::connect() {
           DatabaseInformation.GetServerURL());
       if (!NewConnection) {
         /* NB: calling consuming all the errors is required in order for the
-         * Expected object to be properly destructed. llvm::toString does this.
+         * Expected object to be properly destructed. llvm::toString does
+         * this.
          */
         CommonHAKCAnalysis::getWriter(Debug)
             << "Error connecting to " << DatabaseInformation.GetServerURL()
