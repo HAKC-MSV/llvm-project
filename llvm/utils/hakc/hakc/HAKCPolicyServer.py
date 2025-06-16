@@ -238,15 +238,9 @@ class KUZUHAKCPolicyDataStore(HAKCPolicyDataSource):
         if compartment_id_division_id_tuple is None:
             logger.error(f"get_division_id_compartment_id_from_symbol returned None for symbol: {symbol}")
             return None
-        logger.debug(f"compartment_id_division_id_tuple: {compartment_id_division_id_tuple}")
-        division_id = compartment_id_division_id_tuple[0]
-        access_token = compartment_id_division_id_tuple[1]
-        compartment_id = compartment_id_division_id_tuple[2]
-        entry_token = compartment_id_division_id_tuple[3]
         ret = HAKCDivisionCompartmentPayload(
-            division=HAKCDivision(DivisionID=division_id, CompartmentID=compartment_id, AccessToken=access_token),
-            compartment=HAKCCompartment(CompartmentID=compartment_id, EntryToken=entry_token))
-        logger.debug(f"get symbol division returning: {ret}")
+            division=compartment_id_division_id_tuple[0],
+            compartment=compartment_id_division_id_tuple[1])
         return ret
 
     def _get_valid_targets_from_compartment_id(self, compartment_id: int) -> Optional[HAKCPayload]:

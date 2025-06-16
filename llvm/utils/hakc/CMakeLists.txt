@@ -31,6 +31,10 @@
     install(PROGRAMS requirements.txt
             DESTINATION ${CMAKE_INSTALL_BINDIR}/hakc
             COMPONENT hakc-policy-process)
+    install(PROGRAMS setup.py
+            DESTINATION ${CMAKE_INSTALL_BINDIR}/hakc
+            COMPONENT hakc-policy-process
+    )
 
     foreach (HAKCMod ${HAKC_MODS})
         add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/bin/hakc/hakc/${HAKCMod}
