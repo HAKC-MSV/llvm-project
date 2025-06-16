@@ -310,12 +310,13 @@ class HAKCRequestHandler(socketserver.StreamRequestHandler):
             return
         except ConnectionResetError:
             logger.debug(f'Client Reset Connection')
-            raise
+            return
         except TimeoutException:
             logger.debug(f'Timeout received')
             return
         except Exception as e:
             logger.error(f"Error handling request: {e}")
+            raise e
 
 
 class HAKCPolicyServer(socketserver.ThreadingUnixStreamServer):
