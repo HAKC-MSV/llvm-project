@@ -522,6 +522,93 @@ hakc::HAKCTypeIdentifier::HandleFunction(const DISubprogram *SubProg) {
   return FP;
 }
 
+void hakc::HAKCTypeIdentifier::FunctionTemporalAnalysis(
+    const DISubprogram *SubProg) {
+  auto debug = true;
+
+  CommonHAKCAnalysis::getWriter(true)
+      << "Temporal Analysis for function " << *SubProg << "\n";
+  HAKCFunctionP FP = functions[SubProg];
+  Function *F = FP->GetFunction();
+
+  for (auto InstIt = inst_begin(F); InstIt != inst_end(F); ++InstIt) {
+    auto *I = &(*InstIt);
+    if (I->isDebugOrPseudoInst() || isa<IntrinsicInst>(I) ||
+        isa<BranchInst>(I)) {
+      continue;
+    }
+    CommonHAKCAnalysis::getWriter(true) << "Looking at instruction " << *I << "\n";
+    if (auto *Call = dyn_cast<CallInst>(I)) {
+      if (Call->getCalledFunction()) {
+        auto FoundFunction = FindFunction(Call->getCalledFunction(), true);
+        if (!FoundFunction) {
+          CommonHAKCAnalysis::getWriter(debug)
+              << "Could not find HAKC Symbol for Function "
+              << Call->getCalledFunction()->getName() << "\n";
+          FoundFunction = AddNoDebugFunction(Call->getCalledFunction());
+        }
+        CommonHAKCAnalysis::getWriter(true) << "Found function " << *FoundFunction << "\n";
+        auto HAKCTy = FoundFunction->GetType();
+        if (HAKCTy) {
+          FP->ModifyTypeUseX(HAKCTy);
+        }
+      }
+      // else if (Call->isIndirectCall()) {
+      //   auto *FunctionTy = GetIndirectCallFunctionType(Call);
+      //   CommonHAKCAnalysis::getWriter(debug)
+      //       << "Source of indirect call operand in Function " << F->getName()
+      //       << ": " << AnalysisHelper.getDef(Call->getCalledOperand(), true)
+      //       << "\n";
+      //   auto HAKCType = FindCalledFunctionType(FunctionTy);
+      //   if (!HAKCType) {
+      //     CommonHAKCAnalysis::getWriter(true)
+      //         << "Could not find called HAKCType for " << *Call
+      //         << " with Searched Type " << *FunctionTy << " in Function "
+      //         << F->getName() << "\n";
+      //     HAKCType = FindType(Call->getCalledOperand()->getType());
+      //     if (HAKCType) {
+      //       CommonHAKCAnalysis::getWriter(true)
+      //           << "But the Pointer HAKCType exists: " << HAKCType->GetName()
+      //           << "\n";
+      //     }
+      //     throw std::exception();
+      //   }
+      //   std::vector<std::shared_ptr<HAKCIndirectCallSourceLink>> SourcePath;
+      //   if (!HAKCType->GetLLVMType()) {
+      //     HAKCType->SetLLVMType(FunctionTy);
+      //   }
+      //   FP->ModifyTypeUseX(HAKCType);
+      // }
+    }
+    else if (auto *Store = dyn_cast<StoreInst>(I)) {
+      auto HAKCTy = FindHAKCType(Store);
+      if (HAKCTy) {
+        FP->ModifyTypeUseW(HAKCTy);
+      }
+      else {
+        CommonHAKCAnalysis::getWriter(debug)
+          << "Could not find HAKC Symbol for Store "
+          << *Store << "\n";
+      }
+    }
+    else if (auto *Load = dyn_cast<LoadInst>(I)) {
+      auto HAKCTy = FindHAKCType(Load);
+      if (HAKCTy) {
+        FP->ModifyTypeUseR(HAKCTy);
+      }
+      else {
+        CommonHAKCAnalysis::getWriter(debug)
+          << "Could not find HAKC Symbol for Store "
+          << *Load << "\n";
+      }
+    }
+  }
+  for (auto &it : FP->TypesUsed) {
+    CommonHAKCAnalysis::getWriter(true)
+        << "Found Type use " << *it.first << " with RWX " << it.second << "\n";
+  }
+}
+
 void hakc::HAKCTypeIdentifier::AddFunctionMapping(
     const DISubprogram *SubProg,
     const std::shared_ptr<HAKCFunctionInfo> &HAKCFunction) {
@@ -1362,7 +1449,8 @@ void hakc::HAKCTypeIdentifier::ProcessDebugInfo() {
   CommonHAKCAnalysis::getWriter(Debug) << GetModule() << "\n";
 
   StringRef ModulePath = GetModule().getSourceFileName();
-  // Q: what does this do? aren't there going to be multiple scopes, so why exit early?
+  // Q: what does this do? aren't there going to be multiple scopes, so why exit
+  // early?
   for (auto *Scope : DbgInfoFinder.scopes()) {
     if (auto *File = dyn_cast<DIFile>(Scope)) {
       auto Filename = File->getFilename();
@@ -1389,19 +1477,22 @@ void hakc::HAKCTypeIdentifier::ProcessDebugInfo() {
         << "Processing Type " << ++TypesProcessed << " of "
         << DbgInfoFinder.type_count() << "\n";
     std::shared_ptr<hakc::HAKCTypeInfo> TypeP = HandleType(DITy);
-  //   if (TypeP) {
-  //     if (TypeP->GetDbgType()) {
-  //       CommonHAKCAnalysis::getWriter(true) << "PostDominatorAnalysis found DIType: " << TypeP->GetDbgType() << "\n";
-  //       if (TypeP->GetDbgType()->getTag() == dwarf::DW_TAG_structure_type) {
-  //         CommonHAKCAnalysis::getWriter(true) << "PostDominatorAnalysis found Debug Name: " << TypeP->GetDbgTypeName() << "\n";
-  //         specialStructs.push_back(TypeP);
-  //       }
-  //     }
-  //   }
-  // }
-  // for(auto TypeP : specialStructs){
-  //   CommonHAKCAnalysis::getWriter(true) << "PostDominatorAnalysis found struct: " << *TypeP << "\n";
-  //   // AnalysisHelper.GetSystemInfo().StructList.push_back(TypeP);
+    //   if (TypeP) {
+    //     if (TypeP->GetDbgType()) {
+    //       CommonHAKCAnalysis::getWriter(true) << "PostDominatorAnalysis found
+    //       DIType: " << TypeP->GetDbgType() << "\n"; if
+    //       (TypeP->GetDbgType()->getTag() == dwarf::DW_TAG_structure_type) {
+    //         CommonHAKCAnalysis::getWriter(true) << "PostDominatorAnalysis
+    //         found Debug Name: " << TypeP->GetDbgTypeName() << "\n";
+    //         specialStructs.push_back(TypeP);
+    //       }
+    //     }
+    //   }
+    // }
+    // for(auto TypeP : specialStructs){
+    //   CommonHAKCAnalysis::getWriter(true) << "PostDominatorAnalysis found
+    //   struct: " << *TypeP << "\n";
+    //   // AnalysisHelper.GetSystemInfo().StructList.push_back(TypeP);
   }
   CommonHAKCAnalysis::getWriter(Debug) << "!!!! Finished Type Handling !!!!\n";
 
@@ -1434,11 +1525,20 @@ void hakc::HAKCTypeIdentifier::ProcessDebugInfo() {
     }
   }
 
-  // now try to create a call graph
+  // FunctionTemporalAnalysis
+  CommonHAKCAnalysis::getWriter(true)
+      << "!!!! Starting Temporal Analysis !!!!\n";
+  for (auto *DISubProg : DbgInfoFinder.subprograms()) {
+    FunctionTemporalAnalysis(DISubProg);
+  }
+  CommonHAKCAnalysis::getWriter(true)
+      << "!!!! Finished Temporal Analysis !!!!\n";
+
+  // now try to create a call graph and save as dot file
   // auto cg = CallGraph(GetModule());
   // cg.print(errs());
-  // llvm::writeCallGraphDOT(GetModule(), GetMAM(), std::string(AnalysisHelper.GetSystemInfo().GetDagAnalysisRootPath()));
-
+  // llvm::writeCallGraphDOT(GetModule(), GetMAM(),
+  // std::string(AnalysisHelper.GetSystemInfo().GetDagAnalysisRootPath()));
 }
 
 void hakc::HAKCTypeIdentifier::OutputYAML(raw_ostream &out) const {
@@ -1446,9 +1546,9 @@ void hakc::HAKCTypeIdentifier::OutputYAML(raw_ostream &out) const {
   CommonHAKCAnalysis::GetModuleFullPath(GetModule(), RealPath);
 
   out << "---\n";
-  out << "CU: ";
-  out << RealPath;
-  out << "\n";
+  // out << "CU: ";
+  // out << RealPath;
+  // out << "\n";
 
   auto GlobalCount = globals.size() + UnmappedGlobals.size();
   if (GlobalCount > 0) {

@@ -58,7 +58,16 @@ class HAKCHashValue:
     def __hash__(self):
         return self.final_hash
 
+    def __eq__(self, other):
+        if isinstance(other, int):
+            return self.final_hash == other
+        elif isinstance(other, HAKCHashValue):
+            return self.final_hash == other.final_hash
+        else:
+            return False
+
     def __str__(self):
+        assert(isinstance(self.final_hash, int))
         return f'{self.final_hash:0x}'
 
     def __repr__(self):
@@ -159,7 +168,7 @@ class HAKCDBNode(HAKCPrintableObj):
         HAKCPrintableObj.__init__(self, **kwargs)
         for key, value in kwargs.items():
             if key == self.get_primary_key().column_name and self.uses_hashed_key():
-                self.computed_hash = HAKCHashValue.from_int(int(value, 16))
+                self.computed_hash = HAKCHashValue.from_int(value)
 
     @classmethod
     def to_yaml(cls, dumper: yaml.Dumper, data):
@@ -181,9 +190,11 @@ class HAKCDBNode(HAKCPrintableObj):
 
     @classmethod
     def get_db_table_columns(cls) -> list[HAKCDBColumn]:
+        # assert the size of the data columns matches the schema (for db data normalization)
         columns = [cls.get_primary_key()]
         for column in cls.get_data_columns():
             columns.append(column)
+        # assert(len(cls.get_db_data(HAKCDBNode)) == len(columns))
         return columns
 
     @staticmethod

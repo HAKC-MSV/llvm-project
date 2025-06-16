@@ -8,13 +8,83 @@
 namespace llvm::hakc {
 HAKCFunctionInfo::HAKCFunctionInfo(CommonHAKCAnalysis &Analysis, StringRef Name,
                                    bool DebugActive)
-    : HAKCSymbolInfo(Analysis, Name, DebugActive), DirectCalls(),
+    : HAKCSymbolInfo(Analysis, Name, DebugActive), TypesUsed(), DirectCalls(),
       IndirectCalls() {}
 
 void HAKCFunctionInfo::SetFunction(Function *F) { SetGlobalObj(F); }
 
 Function *HAKCFunctionInfo::GetFunction() const {
   return dyn_cast<Function>(GetGlobalObj());
+}
+
+void HAKCFunctionInfo::AddTypeUse(const std::shared_ptr<HAKCTypeInfo> &Ty) {
+  if (!Ty) {
+    CommonHAKCAnalysis::getWriter(true)
+        << "Trying to add type use of type null\n";
+    throw std::exception();
+  }
+  if (!TypesUsed.contains(Ty)) {
+    TypesUsed[Ty] = 0;
+  }
+  CommonHAKCAnalysis::getWriter(true) << "Adding type " << *Ty << "\n";
+}
+
+unsigned HAKCFunctionInfo::GetTypeUse(const std::shared_ptr<HAKCTypeInfo> &Ty) {
+  if (!Ty) {
+    CommonHAKCAnalysis::getWriter(true)
+        << "Trying to get type use of type null\n";
+    throw std::exception();
+  }
+  if (!TypesUsed.contains(Ty)) {
+    CommonHAKCAnalysis::getWriter(true)
+        << "Trying to get type use of type that is not in TypesUsed\n";
+    throw std::exception();
+  }
+  return TypesUsed[Ty];
+}
+
+void HAKCFunctionInfo::ModifyTypeUseR(const std::shared_ptr<HAKCTypeInfo> &Ty) {
+  if (!Ty) {
+    CommonHAKCAnalysis::getWriter(true)
+        << "Trying to modify type use of type null\n";
+    throw std::exception();
+  }
+  // if not in TypesUsed
+  if (!TypesUsed.contains(Ty)) {
+    AddTypeUse(Ty);
+  }
+  ModifyTypeUse(Ty, 0b100);
+}
+
+void HAKCFunctionInfo::ModifyTypeUseW(const std::shared_ptr<HAKCTypeInfo> &Ty) {
+  if (!Ty) {
+    CommonHAKCAnalysis::getWriter(true)
+        << "Trying to modify type use of type null\n";
+    throw std::exception();
+  }
+  // if not in TypesUsed
+  if (!TypesUsed.contains(Ty)) {
+    AddTypeUse(Ty);
+  }
+  ModifyTypeUse(Ty, 0b010);
+}
+
+void HAKCFunctionInfo::ModifyTypeUseX(const std::shared_ptr<HAKCTypeInfo> &Ty) {
+  if (!Ty) {
+    CommonHAKCAnalysis::getWriter(true)
+        << "Trying to modify type use of type null\n";
+    throw std::exception();
+  }
+  // if not in TypesUsed
+  if (!TypesUsed.contains(Ty)) {
+    AddTypeUse(Ty);
+  }
+  ModifyTypeUse(Ty, 0b001);
+}
+
+void HAKCFunctionInfo::ModifyTypeUse(const std::shared_ptr<HAKCTypeInfo> &Ty, unsigned perm) {
+  // Note: Only to be used internally, and only to add uses, not remove them
+  TypesUsed[Ty] |= perm;
 }
 
 StringRef HAKCFunctionInfo::GetYamlIdentifier() const {
@@ -45,6 +115,18 @@ std::string HAKCFunctionInfo::GetYaml(unsigned Indents) const {
   llvm::raw_string_ostream sstream(Yaml);
 
   unsigned Count;
+  // adding HAKCCompilation_unit to function
+  if (DefiningLocation) {
+    SmallString<256> PathName;
+    GetTransformedPathName(DefiningLocation, PathName);
+    sstream << "\n";
+    sstream.indent(Indents + EntrySpaces()) << "CompilationUnit:\n";
+    sstream.indent(Indents + EntrySpaces() + 4) << "!HAKCCompilationUnit\n";
+    sstream.indent(Indents + EntrySpaces() + 4)
+        << "DefiningFile: \"" << PathName << "\"\n";
+    sstream.indent(Indents + EntrySpaces() + 4)
+        << "DefiningLine: " << DefiningLine;
+  }
   if (!DirectCalls.empty()) {
     sstream << "\n";
     sstream.indent(Indents + EntrySpaces()) << "DirectCalls:\n";
@@ -66,6 +148,18 @@ std::string HAKCFunctionInfo::GetYaml(unsigned Indents) const {
           << "- "
           << IndirectSource->GetYaml(Indents + HAKCInfo::IndentSpaces());
       if (++Count != IndirectCalls.size()) {
+        sstream << "\n";
+      }
+    }
+  }
+  if (!TypesUsed.empty()) {
+    sstream << "\n";
+    sstream.indent(Indents + EntrySpaces()) << "TypesUsed:\n";
+    Count = 0;
+    for (auto &it : TypesUsed) {
+      sstream.indent(Indents + HAKCInfo::IndentSpaces())
+          << "- " << it.first->GetYamlHeader(Indents + HAKCInfo::IndentSpaces(), it.second);
+      if (++Count != TypesUsed.size()) {
         sstream << "\n";
       }
     }

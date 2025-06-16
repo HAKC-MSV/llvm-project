@@ -10,7 +10,7 @@ from networkx.readwrite import json_graph
 from .HAKCBase import HAKCDivisionEnum, HAKCDBNode, HAKCDBRelation
 from .HAKCDatabase import HAKCDatabase
 from .HAKCLogger import HAKCLogger
-from .HAKCObjects import HAKCSymbol, HAKCCompilationUnit, HAKCFunction, HAKCType, HAKCCompartment, HAKCDivision, \
+from .HAKCObjects import HAKCSymbol, HAKCCompilationUnit, HAKCFunction, HAKCType, HAKCTypePerm, HAKCCompartment, HAKCDivision, \
     HAKCScope, HAKCGlobalVariable
 
 logging.setLoggerClass(HAKCLogger)
@@ -30,59 +30,69 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         yaml.YAMLObject.__init__(self)
         nx.MultiDiGraph.__init__(self)
         self.division_count = division_count
-        if nxgraph is not None:
-            for division in self.get_filtered_nodes(nxgraph, node_filter=lambda n: isinstance(n, HAKCDivision))():
-                for nbr in nxgraph.neighbors(division):
-                    for edge_data in nxgraph.get_edge_data(division, nbr):
-                        if edge_data == HAKCDivision.InCompartmentTable:
-                            division.compartment_id = nbr.compartment_id
-                            self.add_division(division, nbr)
+        # if nxgraph is not None:
+        #     for division in self.get_filtered_nodes(nxgraph, node_filter=lambda n: isinstance(n, HAKCDivision))():
+        #         for nbr in nxgraph.neighbors(division):
+        #             for edge_data in nxgraph.get_edge_data(division, nbr):
+        #                 if edge_data == HAKCDivision.InCompartmentTable:
+        #                     division.compartment_id = nbr.compartment_id
+        #                     self.add_division(division, nbr)
+        #
+        #     symbol_mapping = dict()
+        #     for symbol in self.get_filtered_nodes(nxgraph, node_filter=lambda n: isinstance(n, HAKCFunction) or isinstance(n, HAKCGlobalVariable)):
+        #         compilation_unit = None
+        #         division: Optional[HAKCDivision] = None
+        #         if isinstance(symbol, HAKCFunction):
+        #             new_symbol = HAKCFunction(Name=symbol.name)
+        #         else:
+        #             new_symbol = HAKCGlobalVariable(Name=symbol.name)
+        #         for nbr in nxgraph.neighbors(symbol):
+        #             for edge_data in nxgraph.get_edge_data(symbol, nbr):
+        #                 if edge_data == HAKCSymbol.IsTypeTable:
+        #                     new_symbol.type = nbr
+        #                 elif edge_data == HAKCSymbol.HasScopeTable:
+        #                     new_symbol.scope = nbr
+        #                 elif edge_data == HAKCSymbol.SymbolCompilationUnitTable:
+        #                     compilation_unit = nbr
+        #                 elif edge_data == HAKCSymbol.InDivisionTable:
+        #                     division = nbr
+        #                 elif edge_data == HAKCSymbol.DefinedInTable:
+        #                     new_symbol.defining_file = nbr.filename
+        #                     new_symbol.defining_line = nxgraph.get_edge_data(symbol, nbr, key=edge_data)['line']
+        #
+        #         new_symbol.computed_hash = None
+        #         self.add_symbol(new_symbol, compilation_unit)
+        #         self.set_division(new_symbol, division.division_id, division.compartment_id)
+        #         symbol_mapping[symbol] = new_symbol
+        #
+        #     for head, tail, edge_name, edge_data in nxgraph.edges.data(keys=True):
+        #         if edge_name in {HAKCSymbol.UsesSymbolTable, HAKCSymbol.DagEdgeTable, HAKCFunction.TypesUsedTable}:
+        #             new_head = symbol_mapping[head]
+        #             new_tail = symbol_mapping[tail]
+        #             if edge_name == HAKCSymbol.UsesSymbolTable:
+        #                 self.add_symbol_use(new_head, new_tail)
+        #             elif edge_name == HAKCSymbol.DagEdgeTable:
+        #                 self.add_dag_edge(new_head, new_tail, edge_data['weight'])
+        #             elif edge_name == HAKCFunction.TypesUsedTable:
+        #                 self.add_type_perm_type_edge(new_head, new_tail)
 
-            symbol_mapping = dict()
-            for symbol in self.get_filtered_nodes(nxgraph,
-                                                  node_filter=lambda n: isinstance(n, HAKCFunction) or isinstance(n,
-                                                                                                                  HAKCGlobalVariable)):
-                compilation_unit = None
-                division: Optional[HAKCDivision] = None
-                if isinstance(symbol, HAKCFunction):
-                    new_symbol = HAKCFunction(Name=symbol.name)
-                else:
-                    new_symbol = HAKCGlobalVariable(Name=symbol.name)
-                for nbr in nxgraph.neighbors(symbol):
-                    for edge_data in nxgraph.get_edge_data(symbol, nbr):
-                        if edge_data == HAKCSymbol.IsTypeTable:
-                            new_symbol.type = nbr
-                        elif edge_data == HAKCSymbol.HasScopeTable:
-                            new_symbol.scope = nbr
-                        elif edge_data == HAKCSymbol.SymbolCompilationUnitTable:
-                            compilation_unit = nbr
-                        elif edge_data == HAKCSymbol.InDivisionTable:
-                            division = nbr
-                        elif edge_data == HAKCSymbol.DefinedInTable:
-                            new_symbol.defining_file = nbr.filename
-                            new_symbol.defining_line = nxgraph.get_edge_data(symbol, nbr, key=edge_data)['line']
 
-                new_symbol.computed_hash = None
-                self.add_symbol(new_symbol, compilation_unit)
-                self.set_division(new_symbol, division.division_id, division.compartment_id)
-                symbol_mapping[symbol] = new_symbol
+    def load_from_db(self, conn: HAKCDatabase):
+        assert(isinstance(conn, HAKCDatabase))
+        functions = conn.get_functions()
+        for function in functions:
+            self.__add_function(function)
+            dag_edges = conn.get_dag_edges(function)
+            for dag_edge in dag_edges:
+                self.add_dag_edge(dag_edge[0], function, dag_edge[1])
+                # print(f"Adding dag_edge: ({function})-[{dag_edge[1]}]->({dag_edge[0]})")
+            division, compartment, = conn.get_division_compartment(function)
+            self.add_division(division, compartment)
+            self.set_division(function, division.division_id, compartment.compartment_id)
 
-            for head, tail, edge_name, edge_data in nxgraph.edges.data(keys=True):
-                if edge_name in {HAKCSymbol.UsesSymbolTable, HAKCSymbol.DagEdgeTable}:
-                    new_head = symbol_mapping[head]
-                    new_tail = symbol_mapping[tail]
-                    if edge_name == HAKCSymbol.UsesSymbolTable:
-                        self.add_symbol_use(new_head, new_tail)
-                    elif edge_name == HAKCSymbol.DagEdgeTable:
-                        self.add_dag_edge(new_head, new_tail, edge_data['weight'])
+        self.save_graph("loaded_from_db.png")
 
-    @classmethod
-    def from_yaml(cls, loader: yaml.Loader, node):
-        graph_data = loader.construct_mapping(node, deep=True)
-        graph = json_graph.node_link_graph(graph_data, edges='edges')
-        compartmentalization = cls(division_count=graph_data.get('division_count', 16), nxgraph=graph)
-
-        return compartmentalization
+        print(self)
 
     @classmethod
     def to_yaml(cls, dumper: yaml.Dumper, data):
@@ -90,10 +100,72 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         compartmentalization_data['division_count'] = data.division_count
         return dumper.represent_mapping(cls.yaml_tag, compartmentalization_data)
 
+    def add_symbols(self, functions: list[HAKCFunction], global_variables: list[HAKCGlobalVariable]):
+
+        for global_variable in global_variables:
+            self.__add_global_variable(global_variable)
+
+        for function in functions:
+            self.__add_function(function)
+
+    def __add_function(self, function: HAKCFunction):
+        assert(isinstance(function, HAKCFunction))
+
+        # add symbol with all its attributes
+        self.__add_symbol(function)
+        # print(self)
+
+        # add function specific attributes,
+        for direct_call in function.direct_calls:
+            assert(isinstance(direct_call, HAKCFunction))
+            self.__add_symbol(direct_call)
+            self.add_persistent_edge(function, direct_call, key=HAKCFunction.relation_direct_calls , add_nodes=True)
+
+        for indirect_call in function.indirect_calls:
+            assert(isinstance(indirect_call, HAKCType))
+            self.__add_type(indirect_call)
+            self.add_persistent_edge(function, indirect_call, key=HAKCFunction.relation_indirect_calls)
+
+        for type_used in function.types_used:
+            self.add_type_used(function, type_used)
+
+
+    def __add_type(self, _type: HAKCType):
+        assert(isinstance(_type, HAKCType))
+        self.add_persistent_node(_type)
+
+    def __add_symbol(self, symbol: HAKCSymbol):
+        # add 'sanitized' version of the HAKCSymbol (e.g., don't include HAKCTypePerm as a node, since it should be an edge?)
+        assert(isinstance(symbol, HAKCSymbol))
+
+        # add the symbol node
+        self.add_persistent_node(symbol)
+
+        # now add all the edges from the symbol node to node (and add the nodes at the same time!)
+        self.add_persistent_edge(symbol, symbol.type, key=HAKCSymbol.relation_type , add_nodes=True)
+        self.add_persistent_edge(symbol, symbol.scope, key=HAKCSymbol.relation_scope, add_nodes=True)
+        if symbol.compilation_unit:
+            print(f"Adding CompilationUnit! {symbol}")
+            self.add_persistent_edge(symbol, symbol.compilation_unit, key=HAKCSymbol.relation_compilation_unit, defining_line=symbol.compilation_unit.defining_line, add_nodes=True)
+        for used_symbol in symbol.used_symbols:
+            self.add_persistent_edge(symbol, used_symbol, key=HAKCSymbol.relation_symbol, add_nodes=True)
+        return
+
+
+    def __add_global_variable(self, global_variable: HAKCGlobalVariable):
+        assert(isinstance(global_variable, HAKCGlobalVariable))
+        assert(False)
+        return
+
     def add_dag_edge(self, head: HAKCSymbol, tail: HAKCSymbol, dag_edge_weight: int, add_nodes: bool = True):
         if dag_edge_weight > 0:
-            self.add_persistent_edge(head, tail, key=HAKCSymbol.DagEdgeTable, add_nodes=add_nodes,
-                                     weight=dag_edge_weight)
+            self.add_persistent_edge(head, tail, key=HAKCSymbol.relation_dag, add_nodes=add_nodes, weight=dag_edge_weight)
+
+    def add_type_used(self, func: HAKCSymbol, type_perm: HAKCTypePerm):
+        assert(isinstance(type_perm, HAKCTypePerm))
+        self.__add_type(type_perm.perm_type)
+        print(f"Adding TypePerm {type_perm}")
+        self.add_persistent_edge(func, type_perm.perm_type, key=HAKCFunction.relation_types_used, R = int(type_perm.RWX[0]), W = int(type_perm.RWX[1]), X = int(type_perm.RWX[2]))
 
     def add_persistent_node(self, node: HAKCDBNode, already_persisted: bool = False):
         if not self.has_node(node):
@@ -108,29 +180,11 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             attr[HAKCCompartmentalization.persisted_attr] = False
             self.add_edge(u_for_edge, v_for_edge, key, **attr)
 
-    def add_symbol_use(self, symbol: HAKCSymbol, used_symbol: HAKCSymbol, key=HAKCSymbol.UsesSymbolTable):
+    def add_symbol_use(self, symbol: HAKCSymbol, used_symbol: HAKCSymbol, key=HAKCSymbol.relation_symbol):
         self.add_persistent_edge(symbol, used_symbol, key=key)
 
-    def add_symbol_type_use(self, symbol: HAKCSymbol, used_type: HAKCType, key=HAKCSymbol.IsTypeTable):
+    def add_symbol_type_use(self, symbol: HAKCSymbol, used_type: HAKCType, key=HAKCSymbol.relation_type):
         self.add_persistent_edge(symbol, used_type, key=key)
-
-    def add_symbol(self, symbol: HAKCSymbol, compilation_unit: HAKCCompilationUnit):
-        self.add_symbol_type_use(symbol, symbol.type)
-        self.add_persistent_edge(symbol, symbol.scope, key=HAKCSymbol.HasScopeTable)
-        if compilation_unit is not None:
-            self.add_persistent_edge(symbol, compilation_unit, key=HAKCSymbol.SymbolCompilationUnitTable)
-        if symbol.defining_file is not None:
-            self.add_persistent_edge(symbol, HAKCCompilationUnit(filename=symbol.defining_file),
-                                     key=HAKCSymbol.DefinedInTable, line=symbol.defining_line)
-
-        for used_symbol in symbol.used_symbols:
-            self.add_symbol_use(symbol, used_symbol)
-
-        if isinstance(symbol, HAKCFunction):
-            for indirect_call in symbol.indirect_calls:
-                self.add_symbol_type_use(symbol, indirect_call.type, key=HAKCFunction.IndirectCallTable)
-            for direct_call in symbol.direct_calls:
-                self.add_symbol_use(symbol, direct_call, key=HAKCFunction.DirectCallTable)
 
     def _get_neighbors(self, symbol: HAKCSymbol, edge_key: str) -> list:
         nbrs = list()
@@ -152,7 +206,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         return nbrs
 
     def get_indirect_calls(self, symbol: HAKCSymbol) -> list[HAKCType]:
-        return self._get_neighbors(symbol, HAKCFunction.IndirectCallTable)
+        return self._get_neighbors(symbol, HAKCFunction.relation_indirect_calls)
 
     def get_compartment_node(self, compartment_id: int):
         for compartment in self.get_filtered_nodes(self, node_filter=lambda
@@ -178,14 +232,14 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
 
     def add_division(self, division: HAKCDivision, compartment: HAKCCompartment):
         compartment.add_division(division)
-        self.add_persistent_edge(division, compartment, key=HAKCDivision.InCompartmentTable)
+        self.add_persistent_edge(division, compartment, key=HAKCDivision.relation_compartment)
 
     def set_symbol_division(self, symbol: HAKCSymbol, division: HAKCDivision, compartment: HAKCCompartment):
         self.add_division(division, compartment)
-        self.add_persistent_edge(symbol, division, key=HAKCSymbol.InDivisionTable)
+        self.add_persistent_edge(symbol, division, key=HAKCSymbol.relation_division)
 
     def get_division(self, symbol: HAKCSymbol) -> HAKCDivision | None:
-        nbrs = self._get_neighbors(symbol, HAKCSymbol.InDivisionTable)
+        nbrs = self._get_neighbors(symbol, HAKCSymbol.relation_division)
         if len(nbrs) == 0:
             return None
         elif len(nbrs) > 1:
@@ -363,23 +417,15 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         logger.info('Persisting new edges to database')
         self._persist_edges(conn)
 
-    def create_node_table(self, conn: HAKCDatabase, node_class: Type[HAKCDBNode]):
-        logger.debug(f'Creating node table {node_class.get_table_name()}')
-        conn.create_node_table(node_class)
-
-    def create_rel_table(self, conn: HAKCDatabase, database_relation: HAKCDBRelation):
-        logger.debug(f'Creating relation table {database_relation}')
-        conn.create_relationship_table(database_relation)
-
     def create_schema(self, conn: HAKCDatabase):
         node_tables = HAKCCompartmentalization.get_table_classes()
         for cls in logger.progress_bar(iterable=node_tables, desc='Creating data tables'):
-            self.create_node_table(conn, node_class=cls)
+            conn.create_node_table(node_type=cls)
 
         for cls in logger.progress_bar(iterable=node_tables, desc='Creating relationship tables'):
             db_relations = cls.get_db_relations()
             for db_relation in db_relations:
-                self.create_rel_table(conn, db_relation)
+                conn.create_relationship_table(edge_type=db_relation)
 
     def get_symbol_hashes(self) -> dict[int, HAKCSymbol]:
         symbol_hashes = dict()
@@ -405,3 +451,68 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             HAKCCompilationUnit,
             HAKCFunction
         ]
+
+    @staticmethod
+    def show_top_n_degrees(G, n):
+        """
+        Returns a list of the top n nodes with the highest degrees of freedom.
+
+        Args:
+        graph: A NetworkX graph object.
+        n: The number of top nodes to return.
+
+        Returns:
+        A list of node IDs sorted by degree in descending order.
+        """
+        degrees = dict(nx.degree(G))
+
+        # Sort the degrees in descending order
+        sorted_degrees = sorted(degrees.items(), key=lambda item: item[1], reverse=True)
+
+        return [node for node, degree in sorted_degrees[:n]]
+
+
+    def save_graph(self, fname, prune = False, N=50):
+
+        from networkx.drawing.nx_pydot import to_pydot
+        G = self.subgraph(self.nodes)
+        if prune:
+            top_n_node_ids = HAKCCompartmentalization.show_top_n_degrees(G, N)
+            subgraph = G.subgraph(top_n_node_ids)
+            print(G.nodes)
+            G = subgraph
+
+        G = nx.relabel_nodes(G, lambda x: x.pretty_print())
+
+        dot = to_pydot(G)
+        dot.set_splines("true")
+        dot.set("overlap", "false")
+        dot.set("rankdir","LR")
+        for node in dot.get_nodes():
+            node.set("shape", "box")
+        # set edge labels
+        for edge in dot.get_edges():
+            # print(edge.obj_dict)
+            # ignore all 'persisted' attributes
+            del edge.obj_dict["attributes"]["persisted"]
+            edge.set_label(str(edge.obj_dict["attributes"]))
+
+        dot.write_png(fname)  # Requires Graphviz installed
+        print(f"Saved {fname}")
+
+    def save_graph_alt(self, fname):
+        import matplotlib.pyplot as plt
+        from networkx.drawing.nx_agraph import graphviz_layout
+
+        G = self.subgraph(self.nodes)
+        G = nx.relabel_nodes(G, lambda x: x.pretty_print())
+
+        pos = graphviz_layout(G, prog='dot', args='-Grankdir="LR" -Gminlen="1"')
+
+        plt.figure(figsize=(16,9))
+        nx.draw(G, pos, with_labels=True, node_shape="o", node_color='none', edgecolors='black')
+        nx.draw_networkx_edge_labels(G, pos)
+        # print(G.edges)
+        plt.savefig(fname)
+        plt.close()
+        print(f"Saved {fname}")

@@ -43,6 +43,8 @@ public:
 
   std::string GetYamlHeader(unsigned Indents) const override;
 
+  std::string GetYamlHeader(unsigned int Indents, unsigned RWX) const;
+
   StringRef GetYamlIdentifier() const override;
 
   static StringRef UnknownType;
