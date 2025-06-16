@@ -76,11 +76,23 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         #             elif edge_name == HAKCFunction.TypesUsedTable:
         #                 self.add_type_perm_type_edge(new_head, new_tail)
 
+
     def load_from_db(self, conn: HAKCDatabase):
         assert(isinstance(conn, HAKCDatabase))
-        syms = conn.get_everything()
+        functions = conn.get_functions()
+        for function in functions:
+            self.__add_function(function)
+            dag_edges = conn.get_dag_edges(function)
+            for dag_edge in dag_edges:
+                self.add_dag_edge(dag_edge[0], function, dag_edge[1])
+                # print(f"Adding dag_edge: ({function})-[{dag_edge[1]}]->({dag_edge[0]})")
+            division, compartment, = conn.get_division_compartment(function)
+            self.add_division(division, compartment)
+            self.set_division(function, division.division_id, compartment.compartment_id)
 
-        print(syms)
+        self.save_graph("loaded_from_db.png")
+
+        print(self)
 
     @classmethod
     def to_yaml(cls, dumper: yaml.Dumper, data):
@@ -101,7 +113,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
 
         # add symbol with all its attributes
         self.__add_symbol(function)
-        print(self)
+        # print(self)
 
         # add function specific attributes,
         for direct_call in function.direct_calls:
@@ -133,10 +145,10 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         self.add_persistent_edge(symbol, symbol.type, key=HAKCSymbol.relation_type , add_nodes=True)
         self.add_persistent_edge(symbol, symbol.scope, key=HAKCSymbol.relation_scope, add_nodes=True)
         if symbol.compilation_unit:
+            print(f"Adding CompilationUnit! {symbol}")
             self.add_persistent_edge(symbol, symbol.compilation_unit, key=HAKCSymbol.relation_compilation_unit, defining_line=symbol.compilation_unit.defining_line, add_nodes=True)
         for used_symbol in symbol.used_symbols:
             self.add_persistent_edge(symbol, used_symbol, key=HAKCSymbol.relation_symbol, add_nodes=True)
-
         return
 
 

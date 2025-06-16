@@ -213,6 +213,11 @@ def temporal_analysis(db_dir: str):
     compartmentalization = HAKCCompartmentalization()
     compartmentalization.load_from_db(conn)
 
+    pair = conn.get_functions_to_merge()
+    hash_to_sym_map = conn.get_symbol_hashes_to_symbols()
+    for child0, child1 in pair:
+        print(f"Could merge {hash_to_sym_map[child0]} and {hash_to_sym_map[child1]}")
+
     # count_direct_calls = 0
     # for symbol_hash, symbol in logger.progress_bar(iterable=hash_to_sym.items(), desc='Adding direct_calls from db!'):
     #     if isinstance(symbol, HAKCFunction):

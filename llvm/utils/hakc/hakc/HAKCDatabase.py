@@ -36,14 +36,6 @@ class HAKCDatabase:
     def new_conn(self, read_only: bool = False):
         import kuzu
         self.conn = kuzu.Connection(self.database)  # thread i connection
-    #
-    # def create_node_table(self, node_class: Type[HAKCDBNode]):
-    #     logger.debug(f'Creating node table {node_class.get_table_name()}')
-    #     self.create_node_table(node_class)
-    #
-    # def create_rel_table(self, database_relation: HAKCDBRelation):
-    #     logger.debug(f'Creating relation table {database_relation}')
-    #     self.create_relationship_table(database_relation)
 
     def get_compartment_entry_token_from_id(self, compartment_id: int) -> Optional[int]:
         cmd = f"""
@@ -155,20 +147,22 @@ class HAKCDatabase:
         self.insert_from_dataframe(HAKCSymbol.relation_dag, df)
 
     def get_all_symbol_hashes(self) -> list[int]:
-        # symbol = HAKCSymbol.node_key
         symbol = HAKCSymbol.get_table_name()
-        symbol_hash = str(HAKCSymbol.get_primary_key())
+        symbol_hash = HAKCSymbol.get_primary_key()
         cmd = f"""
         MATCH ({symbol})
-        RETURN {symbol}.{symbol_hash};
+        WHERE {symbol}.{symbol_hash} IS NOT NULL
+        RETURN DISTINCT {symbol}.{symbol_hash};
         """
         response = self.execute_prepared_stmt(cmd)
         ret = response.get_as_df()[f"{symbol}.{symbol_hash}"].to_list()
         return ret
 
     def get_symbol_by_hash(self, symbol_hashes: list[int], **kwargs) -> list[HAKCSymbol]:
+        symbol = HAKCSymbol.get_table_name()
+        symbol_hash = HAKCSymbol.get_primary_key()
         result = self._get_symbols(
-            where_clause=f'WHERE sym.symbol_hash in [{", ".join([str(sh) for sh in symbol_hashes])}]', **kwargs)
+            where_clause=f'WHERE {symbol}.{symbol_hash} in [{", ".join([str(sh) for sh in symbol_hashes])}]', **kwargs)
         return result
 
     def get_symbol_hashes_to_symbols(self):
@@ -235,7 +229,6 @@ class HAKCDatabase:
     def get_dag_computation_edges(self, symbol_hash: int) -> dict[str, list[int]]:
         symbol = HAKCSymbol.get_table_name()
         _symbol_hash = HAKCSymbol.get_primary_key()
-        # symbol_hash = HAKCSymbol.get_primary_key().column_name
         symbol_cu_edge = HAKCSymbol.relation_compilation_unit
         symbol_type_indirect_call_edge = HAKCFunction.relation_indirect_calls
         symbol_symbol_direct_call_edge = HAKCFunction.relation_direct_calls
@@ -302,6 +295,10 @@ class HAKCDatabase:
         _type = HAKCType.get_table_name()
         scope = HAKCScope.get_table_name()
         symbol_scope_edge = HAKCSymbol.relation_scope
+        type_attrs = ", ".join([f"{HAKCType.get_table_name()}.{x.column_name}" for x in HAKCType.get_data_columns()] + [f"{HAKCType.get_table_name()}.{HAKCType.get_primary_key()}"])
+        scope_attrs = ", ".join([f"{HAKCScope.get_table_name()}.{x.column_name}" for x in HAKCScope.get_data_columns()] + [f"{HAKCScope.get_table_name()}.{HAKCScope.get_primary_key()}"])
+        symbol_attrs = ", ".join([f"{HAKCSymbol.get_table_name()}.{x.column_name}" for x in HAKCSymbol.get_data_columns()] + [f"{HAKCSymbol.get_table_name()}.{HAKCSymbol.get_primary_key()}"])
+        cu_attrs = ", ".join([f"{HAKCCompilationUnit.get_table_name()}.{x.column_name}" for x in HAKCCompilationUnit.get_data_columns()] + [f"{HAKCCompilationUnit.get_table_name()}.{HAKCCompilationUnit.get_primary_key()}"])
         cmd = [f"""
         MATCH ({scope})<-[:{symbol_scope_edge}]-({symbol})-[:{symbol_type_edge}]->({_type})
         """]
@@ -312,7 +309,7 @@ class HAKCDatabase:
 
         cmd.append("RETURN")
         return_str = f"""
-        {symbol}.*, {symbol}.IsFunction, {scope}.Scope, {scope}.LocalScopeName, {_type}.DebugType, {_type}.LLVMType
+        {symbol_attrs}, {scope_attrs}, {type_attrs}, {cu_attrs}
         """
         cmd.append(f'{return_str}')
         if assume_defined:
@@ -327,199 +324,161 @@ class HAKCDatabase:
         if response.has_next():
             info = response.get_as_df()
             for data in info.to_dict(orient='records'):
-
-                symbol = self._create_symbol_from_response(**data)
+                symbol = self.__create_object_from_response(HAKCFunction, **data)
                 symbols.append(symbol)
 
         return symbols
 
-    def _create_type_perm_from_response(self, perm_prefix: str = f"{HAKCFunction.relation_types_used}.", **kwargs) -> HAKCTypePerm:
-        _type = self._create_type_from_response(**kwargs)
-        # print(f"Reconstructed type {_type} from **kwargs {kwargs}")
-        perm_data = {key.removeprefix(perm_prefix): val for key, val in kwargs.items() if key.startswith(perm_prefix)}
-        if len(perm_data) == 0:
-            raise RuntimeError('No type data provided')
-        type_perm = HAKCTypePerm(Type=_type, **perm_data)
-        return type_perm
 
-    def _create_type_from_response(self, type_prefix: str = f"{HAKCType.get_table_name()}.", **kwargs) -> HAKCType:
-        type_data = {key.removeprefix(type_prefix): val for key, val in kwargs.items()}
-        if len(type_data) == 0:
-            raise RuntimeError('No type data provided')
-        ty = HAKCType(**type_data)
-        return ty
-
-    def _create_symbol_from_response(self, is_function: bool, type_prefix: str = f"{HAKCType.get_table_name()}.", scope_prefix: str = f"{HAKCScope.get_table_name()}.",
-                                     symbol_prefix: str = f"{HAKCSymbol.get_table_name()}.", **kwargs) -> HAKCSymbol:
-        ty = self._create_type_from_response(type_prefix=type_prefix, **kwargs)
-        scope_data = {key.removeprefix(scope_prefix): val for key, val in kwargs.items()}
-        if len(scope_data) == 0:
-            raise RuntimeError('No scope data provided')
-        scope = HAKCScope(**scope_data)
-        symbol_data = {key.removeprefix(symbol_prefix): val for key, val in kwargs.items()}
-        if len(symbol_data) == 0:
-            raise RuntimeError('No symbol data provided')
-        symbol_data['Type'] = ty
-        symbol_data['Scope'] = scope
-
-        if is_function:
-            symbol = HAKCFunction(**symbol_data)
-
-        else:
-            symbol = HAKCGlobalVariable(**symbol_data)
-
-        return symbol
-
-    def get_indirect_calls(self, symbol: HAKCSymbol) -> list[HAKCType]:
+    def get_indirect_calls(self, _symbol: HAKCSymbol) -> set[HAKCFunction]:
+        _type = HAKCType.get_table_name()
         symbol = HAKCSymbol.get_table_name()
         symbol_hash = HAKCSymbol.get_primary_key()
-        # symbol_hash = HAKCSymbol.get_primary_key().column_name
-        symbol_cu_edge = HAKCSymbol.relation_compilation_unit
-        symbol_type_indirect_call_edge = HAKCFunction.relation_indirect_calls
-        symbol_symbol_direct_call_edge = HAKCFunction.relation_direct_calls
-        symbol_type_edge = HAKCSymbol.relation_type
-        symbol_symbol_edge = HAKCSymbol.relation_symbol
-        cu = HAKCCompilationUnit.get_table_name()
-        _type = HAKCType.get_table_name()
         scope = HAKCScope.get_table_name()
+        compilation_unit = HAKCCompilationUnit.get_table_name()
+        _type = HAKCType.get_table_name()
         symbol_scope_edge = HAKCSymbol.relation_scope
+        symbol_compilation_unit_edge = HAKCSymbol.relation_compilation_unit
+        function_indirect_calls = HAKCFunction.relation_indirect_calls
+
+        type_attrs = ", ".join([f"{HAKCType.get_table_name()}.{x.column_name}" for x in HAKCType.get_data_columns()] + [f"{HAKCType.get_table_name()}.{HAKCType.get_primary_key()}"])
+        scope_attrs = ", ".join([f"{HAKCScope.get_table_name()}.{x.column_name}" for x in HAKCScope.get_data_columns()] + [f"{HAKCScope.get_table_name()}.{HAKCScope.get_primary_key()}"])
+        symbol_attrs = ", ".join([f"{HAKCSymbol.get_table_name()}.{x.column_name}" for x in HAKCSymbol.get_data_columns()] + [f"{HAKCSymbol.get_table_name()}.{HAKCSymbol.get_primary_key()}"])
+        cu_attrs = ", ".join([f"{HAKCCompilationUnit.get_table_name()}.{x.column_name}" for x in HAKCCompilationUnit.get_data_columns()] + [f"{HAKCCompilationUnit.get_table_name()}.{HAKCCompilationUnit.get_primary_key()}"])
         cmd = f"""
-            MATCH ({symbol})-[:{symbol_type_indirect_call_edge}]->({_type})
-            WHERE {symbol}.{symbol_hash} = $symbol_hash
-            RETURN {_type}.DebugType, {_type}.LLVMType
-            ORDER BY {_type}.DebugType, {_type}.LLVMType;
+        MATCH (_:{symbol})-[:{function_indirect_calls}]->({_type}), 
+        ({symbol})-[{symbol_scope_edge}]->({scope})
+        WHERE _.{symbol_hash} = $symbol_hash AND _.{symbol_hash} <> {symbol}.{symbol_hash} AND  
+                {_type}.{HAKCType.get_primary_key()} IS NOT NULL AND {symbol}.{symbol_hash} IS NOT NULL AND {scope}.{HAKCScope.get_primary_key()} IS NOT NULL
+        OPTIONAL MATCH ({symbol})-[{symbol_compilation_unit_edge}]-({compilation_unit})
+        RETURN DISTINCT {type_attrs}, {scope_attrs}, {symbol_attrs}, {cu_attrs};
         """
         try:
-            response = self.execute_prepared_stmt(cmd, symbol_hash=hash(symbol))
-            types = []
+            response = self.execute_prepared_stmt(cmd, symbol_hash=int(_symbol.get_computed_hash().final_hash))
+            indirect_calls = set()
             if response.has_next():
                 info = response.get_as_df()
+                # print(info)
                 for data in info.to_dict(orient='records'):
-                    ty = self._create_type_from_response(**data)
-                    types.append(ty)
+                    ty = HAKCDatabase.__create_object_from_response(HAKCType, **data)
+                    indirect_calls.add(ty)
         except Exception as e:
             logger.error(f'get_indirect_calls failed')
             raise e
-        return types
+        return indirect_calls
 
-    def get_direct_calls(self, symbol: HAKCSymbol) -> list[HAKCType]:
-        # NOTE: this seems to not properly return HAKCFunction with defining line and file information
-        # seems to be duplicate defining line showing up as DefiningLine, and head.DefiningLine, which is causing issues...
-        # so, I guess, don't try to manually rename things in the return statement or it might not be processed correctly
+
+    def get_direct_calls(self, _symbol: HAKCSymbol) -> set[HAKCFunction]:
+        # TODO: should compilation unit be added to the direct call output in dag.yaml?
+        symbol_symbol_direct_call_edge = HAKCFunction.relation_direct_calls
+        _type = HAKCType.get_table_name()
         symbol = HAKCSymbol.get_table_name()
         symbol_hash = HAKCSymbol.get_primary_key()
-        # symbol_hash = HAKCSymbol.get_primary_key().column_name
-        symbol_cu_edge = HAKCSymbol.relation_compilation_unit
-        symbol_type_indirect_call_edge = HAKCFunction.relation_indirect_calls
-        symbol_symbol_direct_call_edge = HAKCFunction.relation_direct_calls
-        symbol_type_edge = HAKCSymbol.relation_type
-        symbol_symbol_edge = HAKCSymbol.relation_symbol
-        cu = HAKCCompilationUnit.get_table_name()
-        _type = HAKCType.get_table_name()
         scope = HAKCScope.get_table_name()
+        compilation_unit = HAKCCompilationUnit.get_table_name()
+        _type = HAKCType.get_table_name()
+        symbol_type_edge = HAKCSymbol.relation_type
         symbol_scope_edge = HAKCSymbol.relation_scope
+        symbol_compilation_unit_edge = HAKCSymbol.relation_compilation_unit
+
+        type_attrs = ", ".join([f"{HAKCType.get_table_name()}.{x.column_name}" for x in HAKCType.get_data_columns()] + [f"{HAKCType.get_table_name()}.{HAKCType.get_primary_key()}"])
+        scope_attrs = ", ".join([f"{HAKCScope.get_table_name()}.{x.column_name}" for x in HAKCScope.get_data_columns()] + [f"{HAKCScope.get_table_name()}.{HAKCScope.get_primary_key()}"])
+        symbol_attrs = ", ".join([f"{HAKCSymbol.get_table_name()}.{x.column_name}" for x in HAKCSymbol.get_data_columns()] + [f"{HAKCSymbol.get_table_name()}.{HAKCSymbol.get_primary_key()}"])
+        cu_attrs = ", ".join([f"{HAKCCompilationUnit.get_table_name()}.{x.column_name}" for x in HAKCCompilationUnit.get_data_columns()] + [f"{HAKCCompilationUnit.get_table_name()}.{HAKCCompilationUnit.get_primary_key()}"])
         cmd = f"""
-                MATCH (_:{symbol})-[:{symbol_symbol_direct_call_edge}]->({symbol})-[:{symbol_type_edge}]->({_type})
-                WHERE _.{symbol_hash} = $symbol_hash and _.{symbol_hash} <> {symbol}.{symbol_hash}
-                RETURN DISTINCT _.*, {symbol}.*, {_type}.*;
-            """
-                # OPTIONAL MATCH (head)-[def:{HAKCSymbol.DefinedInTable}]->(cu:{HAKCCompilationUnit.get_table_name()})
-                # RETURN DISTINCT head.*, tail.*, ty.*, def.line AS DefiningLine, cu.filename AS DefiningFile;
+        MATCH (_:{symbol})-[:{symbol_symbol_direct_call_edge}]->({symbol})-[:{symbol_type_edge}]->({_type}), 
+        ({symbol})-[{symbol_scope_edge}]->({scope})
+        WHERE _.{symbol_hash} = $symbol_hash AND _.{symbol_hash} <> {symbol}.{symbol_hash} AND {symbol}.IsFunction AND  
+                {_type}.{HAKCType.get_primary_key()} IS NOT NULL AND {symbol}.{symbol_hash} IS NOT NULL AND {scope}.{HAKCScope.get_primary_key()} IS NOT NULL
+        OPTIONAL MATCH ({symbol})-[{symbol_compilation_unit_edge}]-({compilation_unit})
+        RETURN DISTINCT {type_attrs}, {scope_attrs}, {symbol_attrs}, {cu_attrs};
+        """
         try:
-            response = self.execute_prepared_stmt(cmd, symbol_hash=hash(symbol))
-            direct_calls = []
+            response = self.execute_prepared_stmt(cmd, symbol_hash=int(_symbol.get_computed_hash().final_hash))
+            direct_calls = set()
             if response.has_next():
                 info = response.get_as_df()
-                print(info)
-                # for data in info.to_dict(orient='records'):
-                for index, row in info.iterrows():
-                    entry = row.to_dict()
-                    # print(entry)
-                    # TODO put this check in the kuzu query?
-                    # TODO: also rely on the head not being equal to the tail?
-                    if entry["head.is_function"] and entry["tail.is_function"]:
-                        call = self._create_symbol_from_response(is_function=True, symbol_prefix='tail.', **entry)
-                        direct_calls.append(call)
+                # print(info)
+                for data in info.to_dict(orient='records'):
+                    func = HAKCDatabase.__create_object_from_response(HAKCFunction, **data)
+                    direct_calls.add(func)
         except Exception as e:
             logger.error(f'get_direct_calls failed')
             raise e
         return direct_calls
 
 
-    def get_used_symbols(self, symbol: HAKCSymbol):
+    def get_used_symbols(self, _symbol: HAKCSymbol) -> set[HAKCSymbol]:
+        # NOTE: this seems to not properly return HAKCFunction with defining line and file information
+        # seems to be duplicate defining line showing up as DefiningLine, and head.DefiningLine, which is causing issues...
+        # so, I guess, don't try to manually rename things in the return statement or it might not be processed correctly
+        symbol_symbol_edge = HAKCSymbol.relation_symbol
+        _type = HAKCType.get_table_name()
         symbol = HAKCSymbol.get_table_name()
         symbol_hash = HAKCSymbol.get_primary_key()
-        # symbol_hash = HAKCSymbol.get_primary_key().column_name
-        symbol_cu_edge = HAKCSymbol.relation_compilation_unit
-        symbol_type_indirect_call_edge = HAKCFunction.relation_indirect_calls
-        symbol_symbol_direct_call_edge = HAKCFunction.relation_direct_calls
-        symbol_type_edge = HAKCSymbol.relation_type
-        symbol_symbol_edge = HAKCSymbol.relation_symbol
-        cu = HAKCCompilationUnit.get_table_name()
-        _type = HAKCType.get_table_name()
         scope = HAKCScope.get_table_name()
+        compilation_unit = HAKCCompilationUnit.get_table_name()
+        _type = HAKCType.get_table_name()
+        symbol_type_edge = HAKCSymbol.relation_type
         symbol_scope_edge = HAKCSymbol.relation_scope
+        symbol_compilation_unit_edge = HAKCSymbol.relation_compilation_unit
+
+        type_attrs = ", ".join([f"{HAKCType.get_table_name()}.{x.column_name}" for x in HAKCType.get_data_columns()] + [f"{HAKCType.get_table_name()}.{HAKCType.get_primary_key()}"])
+        scope_attrs = ", ".join([f"{HAKCScope.get_table_name()}.{x.column_name}" for x in HAKCScope.get_data_columns()] + [f"{HAKCScope.get_table_name()}.{HAKCScope.get_primary_key()}"])
+        symbol_attrs = ", ".join([f"{HAKCSymbol.get_table_name()}.{x.column_name}" for x in HAKCSymbol.get_data_columns()] + [f"{HAKCSymbol.get_table_name()}.{HAKCSymbol.get_primary_key()}"])
+        cu_attrs = ", ".join([f"{HAKCCompilationUnit.get_table_name()}.{x.column_name}" for x in HAKCCompilationUnit.get_data_columns()] + [f"{HAKCCompilationUnit.get_table_name()}.{HAKCCompilationUnit.get_primary_key()}"])
         cmd = f"""
-            MATCH (_:{symbol})-[:{symbol_symbol_edge}]->({symbol}),
-            ({scope})<-[:{symbol_scope_edge}]-({symbol})-[:{symbol_type_edge}]->({_type})
-            WHERE _.{symbol_hash}=$symbol_hash
-            RETURN {symbol}.*, {scope}.*, {_type}.*;
+        MATCH (_:{symbol})-[:{symbol_symbol_edge}]->({symbol})-[:{symbol_type_edge}]->({_type}), 
+        ({symbol})-[{symbol_scope_edge}]->({scope})
+        WHERE _.{symbol_hash} = $symbol_hash AND _.{symbol_hash} <> {symbol}.{symbol_hash} AND {symbol}.IsFunction AND  
+                {_type}.{HAKCType.get_primary_key()} IS NOT NULL AND {symbol}.{symbol_hash} IS NOT NULL AND {scope}.{HAKCScope.get_primary_key()} IS NOT NULL
+        OPTIONAL MATCH ({symbol})-[{symbol_compilation_unit_edge}]->({compilation_unit})
+        RETURN DISTINCT {type_attrs}, {scope_attrs}, {symbol_attrs}, {cu_attrs};
         """
         try:
-            response = self.execute_prepared_stmt(cmd, symbol_hash=hash(symbol))
-            used_symbols = []
-            if response.has_next():
-                info = response.get_as_df()
-                for data in info.to_dict(orient='records'):
-                    symbol = self._create_symbol_from_response(**data)
-                    used_symbols.append(symbol)
-        except Exception as e:
-            logger.error(f'get_used_symbols failed')
-            raise e
-
-        return used_symbols
-
-
-    def get_function_perm_types(self):
-        symbol = HAKCSymbol.get_table_name()
-        function = HAKCFunction.get_table_name()
-        function_types_used_edge = HAKCFunction.relation_types_used
-        symbol_hash = HAKCSymbol.get_primary_key()
-        # symbol_hash = HAKCSymbol.get_primary_key().column_name
-        symbol_cu_edge = HAKCSymbol.relation_compilation_unit
-        symbol_type_indirect_call_edge = HAKCFunction.relation_indirect_calls
-        symbol_symbol_direct_call_edge = HAKCFunction.relation_direct_calls
-        symbol_type_edge = HAKCSymbol.relation_type
-        symbol_symbol_edge = HAKCSymbol.relation_symbol
-        cu = HAKCCompilationUnit.get_table_name()
-        _type = HAKCType.get_table_name()
-        scope = HAKCScope.get_table_name()
-        symbol_scope_edge = HAKCSymbol.relation_scope
-        # need to include definition and cu, even if its missing, because other queries use it and if its missing in one it will cause the nodes to not be equal (causing duplicates)
-        cmd = f"""
-            MATCH ({function})-[{function_types_used_edge}]->({_type}),
-            RETURN DISTINCT {function}.*, {function_types_used_edge}.*, {_type}.*;
-        """
-        try:
-            response = self.execute_prepared_stmt(cmd)
-            function_perm_types = []
+            response = self.execute_prepared_stmt(cmd, symbol_hash=int(_symbol.get_computed_hash().final_hash))
+            used_symbols = set()
             if response.has_next():
                 info = response.get_as_df()
                 # print(info)
-                for index, row in info.iterrows():
-                    entry = row.to_dict()
-                    # print(entry)
-                    if entry["head.is_function"]:
-                        func = self._create_symbol_from_response(is_function=True,  **entry)
-                        type_perm = self._create_type_perm_from_response(**entry)
-                        # print(f"Function {func} [- {type_perm} -> {type_perm.perm_type}")
-                        function_perm_types.append((func, type_perm))
-
+                for data in info.to_dict(orient='records'):
+                    func = HAKCDatabase.__create_object_from_response(HAKCFunction, **data)
+                    used_symbols.add(func)
         except Exception as e:
-            logger.error(f'get_function_to_types')
+            logger.error(f'get_used_symbols_calls failed')
             raise e
+        return used_symbols
 
-        return function_perm_types
+    def get_types_used(self, _symbol: HAKCSymbol) -> set[HAKCTypePerm]:
+        # NOTE: this seems to not properly return HAKCFunction with defining line and file information
+        # seems to be duplicate defining line showing up as DefiningLine, and head.DefiningLine, which is causing issues...
+        # so, I guess, don't try to manually rename things in the return statement or it might not be processed correctly
+        symbol = HAKCSymbol.get_table_name()
+        symbol_hash = HAKCSymbol.get_primary_key()
+        _type = HAKCType.get_table_name()
+        function_types_used = HAKCFunction.relation_types_used
+
+        type_attrs = ", ".join([f"{HAKCType.get_table_name()}.{x.column_name}" for x in HAKCType.get_data_columns()] + [f"{HAKCType.get_table_name()}.{HAKCType.get_primary_key()}"])
+        cmd = f"""
+        MATCH (_:{symbol})-[RWX:{function_types_used}]->({_type}) 
+        WHERE _.{symbol_hash} = $symbol_hash AND {_type}.{HAKCType.get_primary_key()} IS NOT NULL  
+        RETURN DISTINCT {type_attrs}, RWX.*;
+        """
+        try:
+            response = self.execute_prepared_stmt(cmd, symbol_hash=int(_symbol.get_computed_hash().final_hash))
+            types_used = set()
+            if response.has_next():
+                info = response.get_as_df()
+                # print(info)
+                for data in info.to_dict(orient='records'):
+                    # print(data)
+                    ty = HAKCDatabase.__create_object_from_response(HAKCType, **data)
+                    ty_perm = HAKCTypePerm(Type=ty, RWX="".join([str(data["RWX.R"]), str(data["RWX.W"]), str(data["RWX.X"])]))
+                    types_used.add(ty_perm)
+        except Exception as e:
+            logger.error(f'get_types_used failed')
+            raise e
+        return types_used
 
 
     def get_symbols(self, limit: int = 0):
@@ -530,26 +489,42 @@ class HAKCDatabase:
         return [x.column_name for x in cls.get_data_columns()] + [cls.get_primary_key().column_name]
 
     @staticmethod
-    def __create_object_from_db(cls, **data):
+    def __create_object_from_response(cls, **data):
+        # print(cls)
+        if cls == HAKCFunction:
+            ty = HAKCDatabase.__create_object_from_response(HAKCType, **data)
+            # print(ty)
+            sc = HAKCDatabase.__create_object_from_response(HAKCScope, **data)
+            # print(sc)
+            data["HAKCSymbol.Scope"] = sc
+            data["HAKCSymbol.Type"] = ty
+            # print(data.keys())
+            # if HAKCCompilationUnit.get_primary_key().column_name in data:
+            if "HAKCCompilationUnit.DefiningLine" in data:
+                # print(f"Found CompilationUnit")
+                cu = HAKCDatabase.__create_object_from_response(HAKCCompilationUnit, **data)
+                data["HAKCSymbol.CompilationUnit"] = cu
+            cls_data = {key.removeprefix(f"{cls.get_table_name()}."): val for key, val in data.items()}
+            return HAKCFunction(**cls_data)
+        elif cls == HAKCDivision:
+            compartment = HAKCDatabase.__create_object_from_response(HAKCCompartment, **data)
+            data["HAKCDivision.CompartmentID"] = data["HAKCCompartment.CompartmentID"]
+            div_data = {key.removeprefix(f"{cls.get_table_name()}."): val for key, val in data.items() if key.startswith(cls.get_table_name())}
+            return HAKCDivision(**div_data), compartment
+        elif cls == HAKCCompartment:
+            cls_data = {key.removeprefix(f"{cls.get_table_name()}."): val for key, val in data.items() if key.startswith(cls.get_table_name())}
+            return HAKCCompartment(**cls_data)
+
         cls_data = {key.removeprefix(f"{cls.get_table_name()}."): val for key, val in data.items() if key.startswith(cls.get_table_name())}
+        if len(cls_data) == 0:
+            raise RuntimeError('No type data provided')
         return cls(**cls_data)
 
-    # @staticmethod
-    # def __create_
 
-    @staticmethod
-    def __create_object_query_cmd(cls):
-        attrs = ", ".join([f"{cls.get_table_name()}.{x.column_name}" for x in cls.get_data_columns()] + [f"{cls.get_table_name()}.{cls.get_primary_key()}"])
-        return f"""
-        MATCH ({cls.get_table_name()})
-        WHERE {cls.get_table_name()}.{cls.get_primary_key()} IS NOT NULL
-        RETURN DISTINCT {attrs};
-        """
-
-
-    def get_everything(self) -> list:
+    def get_dag_edges(self, _symbol: HAKCSymbol) -> set[(HAKCSymbol, int)]:
         # want to reconstruct the output from the yaml exactly, so the compartmentalization can be rebuilt from the database
-        # this [:edge*1..2] which recursively searches is probably not needed
+        # Note: Only need to get enough data to match the node in the networkx graph
+
         symbol = HAKCSymbol.get_table_name()
         symbol_hash = HAKCSymbol.get_primary_key()
         scope = HAKCScope.get_table_name()
@@ -559,112 +534,188 @@ class HAKCDatabase:
         symbol_type_edge = HAKCSymbol.relation_type
         symbol_scope_edge = HAKCSymbol.relation_scope
         symbol_compilation_unit_edge = HAKCSymbol.relation_compilation_unit
-        symbol_division_edge = HAKCSymbol.relation_division
-        function = HAKCFunction.get_table_name()
-        function_direct_calls = HAKCFunction.relation_direct_calls
-        function_indirect_calls = HAKCFunction.relation_indirect_calls
-        function_types_used = HAKCFunction.relation_types_used
-
-        # MATCH p = (a)-[b:*1..2]-(c)
-        # cmd = f"""
-        # MATCH p = (a)-[b*1..2]-(c)
-        # RETURN DISTINCT nodes(p), rels(p)
-        # """
-        # construct all objects, from the leaf to the root
-        # get all functions first
-
-        # cmd = f"""
-        # MATCH ({symbol})-[{symbol_type_edge}]-({_type}),
-        #       ({symbol})-[{symbol_scope_edge}]-({scope}),
-        #
-        #       ({symbol})-[{symbol_division_edge}]-({division})
-        # RETURN DISTINCT {symbol}.*, {symbol_type_edge}.*, {_type}.*;
-        # """
-        # attrs = ", ".join([f"HAKCType.{x.column_name}" for x in HAKCType.get_data_columns()] + [f"HAKCType.{HAKCType.get_primary_key()}"])
-        # cmd = f"""
-        # MATCH ({_type})
-        # WHERE {_type}.type_hash IS NOT NULL
-        # RETURN DISTINCT {attrs};
-        # """
-        # print(f"Querying DB for HAKCTypes")
-        # cmd = HAKCDatabase.__create_object_query_cmd(HAKCType)
-        # print(cmd)
-        # response = self.execute_prepared_stmt(cmd)
-        # # print(response.get_as_df())
-        # used_symbols = []
-        # if response.has_next():
-        #     info = response.get_as_df()
-        #     for data in info.to_dict(orient='records'):
-        #         print(data)
-        #         ty = HAKCDatabase.__create_object_from_db(HAKCType, **data)
-        #         print(ty)
-        #
-        # print(f"Querying DB for HAKCSymbols")
-        # cmd = HAKCDatabase.__create_object_query_cmd(HAKCSymbol)
-        # print(cmd)
-        # response = self.execute_prepared_stmt(cmd)
-        # # print(response.get_as_df())
-        # used_symbols = []
-        # if response.has_next():
-        #     info = response.get_as_df()
-        #     for data in info.to_dict(orient='records'):
-        #         print(data)
-        #         ty = HAKCDatabase.__create_object_from_db(HAKCSymbol, **data)
-        #         print(ty)
+        symbol_symbol_dag_edge = HAKCSymbol.relation_dag
 
         type_attrs = ", ".join([f"{HAKCType.get_table_name()}.{x.column_name}" for x in HAKCType.get_data_columns()] + [f"{HAKCType.get_table_name()}.{HAKCType.get_primary_key()}"])
         scope_attrs = ", ".join([f"{HAKCScope.get_table_name()}.{x.column_name}" for x in HAKCScope.get_data_columns()] + [f"{HAKCScope.get_table_name()}.{HAKCScope.get_primary_key()}"])
         symbol_attrs = ", ".join([f"{HAKCSymbol.get_table_name()}.{x.column_name}" for x in HAKCSymbol.get_data_columns()] + [f"{HAKCSymbol.get_table_name()}.{HAKCSymbol.get_primary_key()}"])
         cu_attrs = ", ".join([f"{HAKCCompilationUnit.get_table_name()}.{x.column_name}" for x in HAKCCompilationUnit.get_data_columns()] + [f"{HAKCCompilationUnit.get_table_name()}.{HAKCCompilationUnit.get_primary_key()}"])
         cmd = f"""
-        MATCH ({_type})-[{symbol_type_edge}]-({symbol})-[{symbol_scope_edge}]-({scope})
-        WHERE {_type}.{HAKCType.get_primary_key()} IS NOT NULL AND {symbol}.{symbol_hash} IS NOT NULL AND {scope}.{HAKCScope.get_primary_key()} IS NOT NULL
+        MATCH (_:{symbol})<-[{symbol_symbol_dag_edge}]-({symbol})-[{symbol_type_edge}]->({_type}),
+              ({symbol})-[{symbol_scope_edge}]->({scope})
+        WHERE _.{symbol_hash} = $symbol_hash AND {_type}.{HAKCType.get_primary_key()} IS NOT NULL 
+                AND {symbol}.{symbol_hash} IS NOT NULL AND {scope}.{HAKCScope.get_primary_key()} IS NOT NULL
+                AND {symbol_symbol_dag_edge}.weight IS NOT NULL 
         OPTIONAL MATCH ({symbol})-[{symbol_compilation_unit_edge}]-({compilation_unit})
-        RETURN DISTINCT {type_attrs}, {scope_attrs}, {symbol_attrs}, {cu_attrs};
+        RETURN DISTINCT {type_attrs}, {scope_attrs}, {symbol_attrs}, {cu_attrs}, {symbol_symbol_dag_edge}.weight;
         """
-        # HAKCDBRelation(HAKCSymbol.relation_symbol, HAKCSymbol, HAKCSymbol),
-        # HAKCDBRelation(HAKCSymbol.relation_division, HAKCSymbol, HAKCDivision),
-        # HAKCDBRelation(HAKCSymbol.relation_dag, HAKCSymbol, HAKCSymbol, weight="INT32")
+        # print(cmd)
+        response = self.execute_prepared_stmt(cmd, symbol_hash=int(_symbol.get_computed_hash().final_hash))
+        dag_edges = set()
+
+        if response.has_next():
+            # Note: the uint64 hashes seem to be cast to floats if a nan is present
+            info = response.get_as_df()
+            # print(info)
+            for data in info.to_dict(orient='records'):
+                if data["HAKCSymbol.IsFunction"] is True:
+                    func = HAKCDatabase.__create_object_from_response(HAKCFunction, **data)
+                    dag_edge = (func, data[f"{symbol_symbol_dag_edge}.weight"])
+                    dag_edges.add(dag_edge)
+                    # print(f"Found DAG: {dag_edge}")
+                else:
+                    gv = HAKCDatabase.__create_object_from_response(HAKCGlobalVariable, **data)
+                    dag_edge = (gv, data[f"{symbol_symbol_dag_edge}.weight"])
+                    dag_edges.add(dag_edge)
+                    # print(f"Found DAG: {dag_edge}")
+        return dag_edges
+
+
+    def get_division_compartment(self, _symbol: HAKCSymbol) -> tuple[HAKCDivision, HAKCCompartment]:
+        # want to reconstruct the output from the yaml exactly, so the compartmentalization can be rebuilt from the database
+        # Note: Only need to get enough data to match the node in the networkx graph
+        symbol = HAKCSymbol.get_table_name()
+        symbol_hash = HAKCSymbol.get_primary_key()
+        division = HAKCDivision.get_table_name()
+        symbol_division_edge = HAKCSymbol.relation_division
+        _type = HAKCType.get_table_name()
+        division_compartment_edge = HAKCDivision.relation_compartment
+        compartment = HAKCCompartment.get_table_name()
+
+        symbol_attrs = ", ".join([f"{HAKCSymbol.get_table_name()}.{x.column_name}" for x in HAKCSymbol.get_data_columns()] + [f"{HAKCSymbol.get_table_name()}.{HAKCSymbol.get_primary_key()}"])
+        division_attrs = ", ".join([f"{HAKCDivision.get_table_name()}.{x.column_name}" for x in HAKCDivision.get_data_columns()] + [f"{HAKCDivision.get_table_name()}.{HAKCDivision.get_primary_key()}"])
+        compartment_attrs = ", ".join([f"{HAKCCompartment.get_table_name()}.{x.column_name}" for x in HAKCCompartment.get_data_columns()] + [f"{HAKCCompartment.get_table_name()}.{HAKCCompartment.get_primary_key()}"])
+        cmd = f"""
+        MATCH ({symbol})-[{symbol_division_edge}]->({division})-[{division_compartment_edge}]->({compartment})
+        WHERE {symbol}.{symbol_hash} = $symbol_hash AND {division}.division_hash IS NOT NULL AND {compartment}.compartment_hash IS NOT NULL 
+        RETURN DISTINCT {symbol_attrs}, {symbol_division_edge}, {division_attrs}, {division_compartment_edge}, {compartment_attrs};
+        """
+        # print(cmd)
+        response = self.execute_prepared_stmt(cmd, symbol_hash=int(_symbol.get_computed_hash().final_hash))
+        div, comp = None, None
+        if response.has_next():
+            # Note: the uint64 hashes seem to be cast to floats if a nan is present
+            info = response.get_as_df()
+            # print(info)
+            for data in info.to_dict(orient='records'):
+                # TODO: assert there is only 1 possible division and compartment?
+                div, comp = HAKCDatabase.__create_object_from_response(HAKCDivision, **data)
+                print(div)
+                print(comp)
+        assert(div and comp)
+        return div, comp
+
+
+    def get_functions(self) -> set:
+        # want to reconstruct the output from the yaml exactly, so the compartmentalization can be rebuilt from the database
+        # this [:edge*1..2] which recursively searches is probably not needed
+        symbol = HAKCSymbol.get_table_name()
+        symbol_hash = HAKCSymbol.get_primary_key()
+        scope = HAKCScope.get_table_name()
+        compilation_unit = HAKCCompilationUnit.get_table_name()
+        cu_hash = HAKCCompilationUnit.get_primary_key()
+        _type = HAKCType.get_table_name()
+        symbol_type_edge = HAKCSymbol.relation_type
+        symbol_scope_edge = HAKCSymbol.relation_scope
+        symbol_compilation_unit_edge = HAKCSymbol.relation_compilation_unit
+
+        type_attrs = ", ".join([f"{HAKCType.get_table_name()}.{x.column_name}" for x in HAKCType.get_data_columns()] + [f"{HAKCType.get_table_name()}.{HAKCType.get_primary_key()}"])
+        scope_attrs = ", ".join([f"{HAKCScope.get_table_name()}.{x.column_name}" for x in HAKCScope.get_data_columns()] + [f"{HAKCScope.get_table_name()}.{HAKCScope.get_primary_key()}"])
+        symbol_attrs = ", ".join([f"{HAKCSymbol.get_table_name()}.{x.column_name}" for x in HAKCSymbol.get_data_columns()] + [f"{HAKCSymbol.get_table_name()}.{HAKCSymbol.get_primary_key()}"])
+        cu_attrs = ", ".join([f"{HAKCCompilationUnit.get_table_name()}.{x.column_name}" for x in HAKCCompilationUnit.get_data_columns()] + [f"{HAKCCompilationUnit.get_table_name()}.{HAKCCompilationUnit.get_primary_key()}"])
+        cmd = f"""
+        MATCH ({_type})<-[{symbol_type_edge}]-({symbol})-[{symbol_scope_edge}]->({scope})
+        WHERE {_type}.{HAKCType.get_primary_key()} IS NOT NULL AND {symbol}.{symbol_hash} IS NOT NULL AND {scope}.{HAKCScope.get_primary_key()} IS NOT NULL
+        OPTIONAL MATCH ({symbol})-[{symbol_compilation_unit_edge}]->({compilation_unit})
+        RETURN DISTINCT {type_attrs}, {scope_attrs}, {symbol_attrs}, {cu_attrs}, {symbol_compilation_unit_edge}.defining_line;
+        """
+        # print(cmd)
+        response = self.execute_prepared_stmt(cmd)
+        functions = set()
+        gvs = set()
+        if response.has_next():
+            # Note: the uint64 hashes seem to be cast to floats if a nan is present
+            info = response.get_as_df()
+            # print(info)
+            for data in info.to_dict(orient='records'):
+                # print(data)
+                # only NaN is not equal to itself
+                if ((data[f"{compilation_unit}.DefiningFile"] == data[f"{compilation_unit}.DefiningFile"]) and
+                        (data[f"{compilation_unit}.{cu_hash}"] == data[f"{compilation_unit}.{cu_hash}"]) and
+                        (data[f"{symbol_compilation_unit_edge}.defining_line"] == data[f"{symbol_compilation_unit_edge}.defining_line"])):
+                    # print(f"Found compilation_unit! {data}")
+                    # print(data[f"{symbol_compilation_unit_edge}.defining_line"])
+                    # with this query, the compilation_unit will sometimes be nan, which is a float, so I have to cast the found value back to int
+                    print(data)
+                    data[f"{compilation_unit}.DefiningLine"] = int(data[f"{symbol_compilation_unit_edge}.defining_line"])
+                    data[f"{compilation_unit}.{cu_hash}"] = int(data[f"{compilation_unit}.{cu_hash}"])
+                if data["HAKCSymbol.IsFunction"] is True:
+                    func = HAKCDatabase.__create_object_from_response(HAKCFunction, **data)
+                    functions.add(func)
+                    # print(func)
+                else:
+                    assert(False)
+                    gv = HAKCDatabase.__create_object_from_response(HAKCGlobalVariable, **data)
+                    # print(gv)
+                    gvs.add(gv)
+
+        # the 'base' HAKCSymbol is now created, now look for all symbols used, direct calls, indirect calls, types used
+        for func in functions:
+            # print(func)
+            used_symbols = self.get_used_symbols(func)
+            # print(f"used_symbols: {used_symbols}")
+            for used_symbol in used_symbols:
+                func.used_symbols.append(used_symbol)
+
+            direct_calls = self.get_direct_calls(func)
+            # print(f"direct_calls: {direct_calls}")
+            for direct_call in direct_calls:
+                func.direct_calls.append(direct_call)
+
+            indirect_calls = self.get_indirect_calls(func)
+            # print(f"indirect_calls: {indirect_calls}")
+            for indirect_call in indirect_calls:
+                func.indirect_calls.append(indirect_call)
+
+            types_used = self.get_types_used(func)
+            # print(f"types_used: {types_used}")
+            for type_used in types_used:
+                func.types_used.append(type_used)
+        return functions
+
+
+    def get_functions_to_merge(self) -> set:
+        # find two functions that are a child of a function (direct call), and both have the same RWX to the same type
+        #   and then join?
+        # e.g.,
+        # foo->bar-110->int, foo->baz-100->int
+        function_types_used = HAKCFunction.relation_types_used
+        symbol_symbol_direct_call_edge = HAKCFunction.relation_direct_calls
+        symbol = HAKCSymbol.get_table_name()
+        symbol_hash = HAKCSymbol.get_primary_key()
+        _type = HAKCType.get_table_name()
+
+        cmd = f"""
+        MATCH (parent:{symbol})-[dir0:{symbol_symbol_direct_call_edge}]->(child0:{symbol})-[RWX0:{function_types_used}]->(ty0:{_type}),
+              (parent:{symbol})-[dir1:{symbol_symbol_direct_call_edge}]->(child1:{symbol})-[RWX1:{function_types_used}]->(ty1:{_type})
+        WHERE  child0.name <> child1.name AND RWX0.R=RWX1.R AND RWX0.W=RWX1.W AND RWX0.X=RWX1.X
+        RETURN DISTINCT child0.*, child1.*;
+        """
         print(cmd)
         response = self.execute_prepared_stmt(cmd)
-        functions = []
-        gvs = []
+        merge_functions = set()
         if response.has_next():
             # Note: the uint64 hashes seem to be cast to floats if a nan is present
             info = response.get_as_df()
             # print(info)
             for data in info.to_dict(orient='records'):
                 print(data)
-                ty = HAKCDatabase.__create_object_from_db(HAKCType, **data)
-                # print(ty)
-                sc = HAKCDatabase.__create_object_from_db(HAKCScope, **data)
-                # print(sc)
-                data["HAKCSymbol.Scope"] = sc
-                data["HAKCSymbol.Type"] = ty
-                if HAKCCompilationUnit.get_primary_key() in data:
-                    # print(f"Found CompilationUnit")
-                    cu = HAKCDatabase.__create_object_from_db(HAKCCompilationUnit, **data)
-                    data["HAKCSymbol.CompilationUnit"] = cu
-                if data["HAKCSymbol.IsFunction"] is True:
-                    func = HAKCDatabase.__create_object_from_db(HAKCFunction, **data)
-                    functions.append(func)
-                    print(func)
-                else:
-                    gv = HAKCDatabase.__create_object_from_db(HAKCGlobalVariable, **data)
-                    print(gv)
-                    gvs.append(gv)
-
-        # the 'base' HAKCSymbol is now created, now look for all symbols used, direct calls, indirect calls, types used
-        for func in functions:
-            print(func)
-        # cmd = f"""
-        # MATCH ({_type})-[{symbol_type_edge}]-({symbol})-[{symbol_scope_edge}]-({scope})
-        # OPTIONAL MATCH ({symbol})-[{symbol_compilation_unit_edge}]-({compilation_unit})
-        # WHERE {symbol}.{symbol_hash} IS NOT NULL AND {scope}.{HAKCScope.get_primary_key()} IS NOT NULL AND {_type}.{HAKCType.get_primary_key()} IS NOT NULL AND {compilation_unit}.{HAKCCompilationUnit.get_primary_key()} IS NOT NULL
-        # RETURN DISTINCT {type_attrs}, {scope_attrs}, {symbol_attrs}, {cu_attrs};
-        # """
-
-        # return response.get_as_df()
+                if data["child0.IsFunction"] is True:
+                    child0 = data['child0.symbol_hash']
+                    child1 = data['child1.symbol_hash']
+                    print(f"Child0 and Child1: ({child0},{child1})")
+                    merge_functions.add((child0, child1))
+        return merge_functions
 
     def create_node_table(self, node_type: Type[HAKCDBNode]):
         create_cmd = f'CREATE NODE TABLE IF NOT EXISTS {node_type.get_table_definition()}'
@@ -677,16 +728,9 @@ class HAKCDatabase:
     def get_symbol_hash(self, Name, DefiningFile, DefiningLine):
         symbol = HAKCSymbol.get_table_name()
         symbol_hash = HAKCSymbol.get_primary_key()
-        # symbol_hash = HAKCSymbol.get_primary_key().column_name
         symbol_cu_edge = HAKCSymbol.relation_compilation_unit
-        symbol_type_indirect_call_edge = HAKCFunction.relation_indirect_calls
-        symbol_symbol_direct_call_edge = HAKCFunction.relation_direct_calls
-        symbol_type_edge = HAKCSymbol.relation_type
-        symbol_symbol_edge = HAKCSymbol.relation_symbol
         cu = HAKCCompilationUnit.get_table_name()
         _type = HAKCType.get_table_name()
-        scope = HAKCScope.get_table_name()
-        symbol_scope_edge = HAKCSymbol.relation_scope
         cmd = f"""
             MATCH ({symbol})-[{symbol_cu_edge}]->({cu})
             WHERE {symbol}.Name=$Name AND {cu}.DefiningFile=$DefiningFile AND {cu}.DefiningLine=$DefiningLine

@@ -168,10 +168,7 @@ class HAKCDBNode(HAKCPrintableObj):
         HAKCPrintableObj.__init__(self, **kwargs)
         for key, value in kwargs.items():
             if key == self.get_primary_key().column_name and self.uses_hashed_key():
-                try:
-                    self.computed_hash = HAKCHashValue.from_int(value)
-                except:
-                    self.computed_hash = HAKCHashValue.from_int(int(value, 16))
+                self.computed_hash = HAKCHashValue.from_int(value)
 
     @classmethod
     def to_yaml(cls, dumper: yaml.Dumper, data):

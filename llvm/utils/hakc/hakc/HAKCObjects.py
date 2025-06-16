@@ -18,9 +18,8 @@ class HAKCCompilationUnit(HAKCDBNode, yaml.YAMLObject):
         HAKCDBNode.__init__(self, **kwargs)
         self.defining_file = DefiningFile
         self.defining_line = DefiningLine
-        print(f"{self.defining_file}, {self.defining_line}")
-        # assert(isinstance(self.defining_file, str))
-        # assert(isinstance(self.defining_line, str))
+        # if "cu_hash" in kwargs:
+        #     assert kwargs["cu_hash"] == self.get_computed_hash(), f"cu_hash ({kwargs['cu_hash']}) =?= hash(self) ({self.get_computed_hash()})"
 
     def pretty_print(self):
         return f"HAKCCompilationUnit({self.defining_file}:{self.defining_line})"
@@ -71,7 +70,7 @@ class HAKCDivision(HashedHAKCDBNode, yaml.YAMLObject):
     yaml_tag = "!HAKCDivision"
     relation_compartment = "has_compartment"
 
-    def __init__(self, DivisionID: Optional[int] = None, CompartmentID: Optional[int] = None,
+    def __init__(self, DivisionID: int, CompartmentID: Optional[int] = None,
                  DivisionCount: int = len(HAKCDivisionEnum) - 1, AccessToken: Optional[int] = None, **kwargs):
         yaml.YAMLObject.__init__(self)
         HashedHAKCDBNode.__init__(self, **kwargs)
@@ -79,6 +78,8 @@ class HAKCDivision(HashedHAKCDBNode, yaml.YAMLObject):
         self.compartment_id = CompartmentID
         self.division_count = DivisionCount
         self.access_token = AccessToken if AccessToken is not None else self.compute_access_token([])
+        if "division_hash" in kwargs:
+            assert kwargs["division_hash"] == self.get_computed_hash(), f"division_hash ({kwargs['division_hash']}) =?= hash(self) ({self.get_computed_hash()})"
 
     def pretty_print(self):
         return f"HAKCDivision({self.division_id})"
@@ -148,13 +149,21 @@ class HAKCDivision(HashedHAKCDBNode, yaml.YAMLObject):
             access_token = 0xFFFF
         return access_token
 
+# HAKCCompartment(CompartmentID=1, EntryToken=65536, compartment_hash=cd2662154e6d76b2)
+# HAKCCompartment(CompartmentID=2, EntryToken=131072, compartment_hash=cd04a4754498e06d)
+# HAKCCompartment(CompartmentID=3, EntryToken=196608, compartment_hash=d5688a52d55a02ec)
+# HAKCCompartment(CompartmentID=4, EntryToken=262144, compartment_hash=8005f02d43fa06e7)
+# HAKCCompartment(CompartmentID=5, EntryToken=327680, compartment_hash=5dee4dd60ff8d0ba)
+# HAKCCompartment(CompartmentID=6, EntryToken=393216, compartment_hash=14ac577cdb2ef6d9)
+# HAKCCompartment(CompartmentID=3, EntryToken=204800, compartment_hash=d5688a52d55a02ec)
 
 class HAKCCompartment(HAKCDBNode, yaml.YAMLObject):
     yaml_tag = "!HAKCCompartment"
 
-    def __init__(self, CompartmentID: Optional[int] = None, division_count: int = len(HAKCDivisionEnum) - 1,
+    def __init__(self, CompartmentID: int, division_count: int = len(HAKCDivisionEnum) - 1,
                  Divisions: Optional[set[HAKCDivision]] = None,
                  EntryToken: Optional[int] = None, **kwargs):
+        print(f"kwargs {kwargs}")
         yaml.YAMLObject.__init__(self)
         kwargs["Name"] = kwargs.get("Name", str(CompartmentID))
         HAKCDBNode.__init__(self, **kwargs)
@@ -162,6 +171,10 @@ class HAKCCompartment(HAKCDBNode, yaml.YAMLObject):
         self.division_count = division_count
         self.divisions = Divisions if Divisions is not None else set()
         self.entry_token = EntryToken if EntryToken is not None else self.compute_entry_token()
+        print(self)
+        # TODO: figure out why the hash seems to match but fails the assertion
+        # if "compartment_hash" in kwargs:
+        #     assert kwargs["compartment_hash"] == self.get_computed_hash(), f"compartment_hash ({kwargs['compartment_hash']}) =?= hash(self) ({self.get_computed_hash()})"
 
     def pretty_print(self):
         return f"HAKCCompartment({self.compartment_id})"
@@ -176,7 +189,7 @@ class HAKCCompartment(HAKCDBNode, yaml.YAMLObject):
         return False
 
     def __hash__(self):
-        return hash(self.compartment_id)
+        return HAKCDBNode.__hash__(self)
 
     def add_division(self, division: HAKCDivision):
         self.divisions.add(division)
@@ -189,7 +202,7 @@ class HAKCCompartment(HAKCDBNode, yaml.YAMLObject):
         return hash(self) < hash(other)
 
     def get_hash_inputs(self) -> list[object]:
-        return [self.compartment_id]
+        return [self.compartment_id, self.entry_token]
 
     @staticmethod
     def compute_access_token(division_id: int, compartment_id: int, division_count: int) -> int:
@@ -238,7 +251,7 @@ class HAKCType(HashedHAKCDBNode, yaml.YAMLObject):
 
     def __init__(self, LLVMType: str, DebugType: Optional[str] = None, **kwargs):
         # del kwargs["type_hash"]
-        print(f"LLVMType: {LLVMType}, DebugType: {DebugType}, kwargs: {kwargs}")
+        # print(f"LLVMType: {LLVMType}, DebugType: {DebugType}, kwargs: {kwargs}")
         yaml.YAMLObject.__init__(self)
         if 'Name' not in kwargs:
             kwargs['Name'] = DebugType if DebugType is not None and DebugType != HAKCType.unknown_type else LLVMType
@@ -250,8 +263,7 @@ class HAKCType(HashedHAKCDBNode, yaml.YAMLObject):
         self._llvm_type_is_known = self.llvm_type != HAKCType.unknown_type
         assert(isinstance(self.llvm_type, str) and self.llvm_type != "")
         if "type_hash" in kwargs:
-            print(f"assert type_hash ({type(kwargs['type_hash'])}) =?= hash(self) ({self.get_computed_hash()})")
-            assert(kwargs["type_hash"] == self.get_computed_hash())
+            assert kwargs["type_hash"] == self.get_computed_hash(), f"type_hash ({kwargs['type_hash']}) =?= hash(self) ({self.get_computed_hash()})"
 
     def pretty_print(self):
         return f"HAKCType({self.debug_type})"
@@ -345,9 +357,9 @@ class HAKCTypePerm(yaml.YAMLObject):
     def get_relation_perm_type():
         return "has_perm_type"
 
-    # def __hash__(self):
-    #     return HAKCDBNode.__hash__(self)
-    #
+    def __hash__(self):
+        return HAKCDBNode.__hash__(self.perm_type) + hash(self.RWX)
+
     def get_hash_inputs(self) -> list[object]:
         return [self.RWX, self.perm_type]
 
@@ -461,6 +473,8 @@ class HAKCSymbol(HashedHAKCDBNode, yaml.YAMLObject):
         assert (self.name != "")
         assert (isinstance(self.type, HAKCType))
         assert (isinstance(self.scope, HAKCScope))
+        if "type_hash" in kwargs:
+            assert kwargs["type_hash"] == self.get_computed_hash(), f"type_hash ({kwargs['type_hash']}) =?= hash(self) ({self.get_computed_hash()})"
 
     def debug_print(self, root=True, whitespace=""):
         out = f"{whitespace}{self.name} of {self.type.debug_print()} in {self.scope.debug_print()}" + (
