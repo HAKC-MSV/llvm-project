@@ -5,9 +5,11 @@ from typing import Type, Optional, Tuple
 import pandas as pd
 
 from .HAKCBase import HAKCDBNode, HAKCDBRelation
+from .HAKCLogger import HAKCLogger
 from .HAKCObjects import HAKCSymbol, HAKCFunction, HAKCScope, HAKCType, HAKCGlobalVariable, HAKCDivision, \
     HAKCCompartment, HAKCCompilationUnit
 
+logging.setLoggerClass(HAKCLogger)
 logger = logging.getLogger('hakc-dag')
 
 
@@ -45,12 +47,12 @@ class HAKCDatabase:
         response = self.execute_prepared_stmt(cmd, compartment_id=compartment_id)
         ret = response.get_as_df()
         if ret.empty:
-            logger.error(f'Command: {cmd} returned None')
-            logger.error(f'Searched with compartment_id: {compartment_id}')
+            logger.debug(f'Command: {cmd} returned None')
+            logger.debug(f'Searched with compartment_id: {compartment_id}')
             return None
         else:
             entry_token = ret["entry_token"][0]
-            logger.error(f"Found entry_token: {entry_token} for compartment_id: {compartment_id}")
+            logger.debug(f"Found entry_token: {entry_token} for compartment_id: {compartment_id}")
             return int(entry_token)
 
     def get_division_access_token_from_id(self, division_id: int, compartment_id: int) -> Optional[int]:
@@ -63,12 +65,12 @@ class HAKCDatabase:
         response = self.execute_prepared_stmt(cmd, division_id=division_id, compartment_id=compartment_id)
         ret = response.get_as_df()
         if ret.empty:
-            logger.error(f'Command: {cmd} returned None')
-            logger.error(f'Searched with division_id: {division_id}, compartment_id: {compartment_id}')
+            logger.debug(f'Command: {cmd} returned None')
+            logger.debug(f'Searched with division_id: {division_id}, compartment_id: {compartment_id}')
             return None
         else:
             access_token = ret["access_token"][0]
-            logger.error(f"Found access_token: {access_token} for division_id: {division_id}")
+            logger.debug(f"Found access_token: {access_token} for division_id: {division_id}")
             return int(access_token)
 
     def get_all_symbol_hashes_in_compartment(self, compartment_id: int) -> list[int]:
