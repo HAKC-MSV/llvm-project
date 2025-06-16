@@ -269,7 +269,7 @@ class HAKCRequestHandler(socketserver.StreamRequestHandler):
 
     def write_raw_bytes(self, raw_bytes: bytes):
         try:
-            self.wfile.write(raw_bytes)
+            return self.wfile.write(raw_bytes)
         except OSError:
             raise ConnectionAbortedError
 
@@ -298,10 +298,12 @@ class HAKCRequestHandler(socketserver.StreamRequestHandler):
                 logger.debug(f"data got from handle request: {data}")
                 response_data = json.dumps(data.to_yaml_dict(), default=str)
                 encoded_data = response_data.encode('utf-8')
-                logger.debug(f"dumped json {encoded_data}")
+                logger.debug(f"dumping json {encoded_data}")
 
-                self.write_raw_bytes(struct.pack(HAKCRequestHandler.size_fmt, len(encoded_data)))
-                self.write_raw_bytes(encoded_data)
+                bytes_written = self.write_raw_bytes(struct.pack(
+                    HAKCRequestHandler.size_fmt, len(encoded_data)))
+                bytes_written += self.write_raw_bytes(encoded_data)
+                logger.debug(f'dumped {bytes_written} bytes')
         # the 'raise' will call 'handle_error' in HAKCPolicyServer 
         except ConnectionAbortedError:
             logger.debug(f'Client Aborted Connection')
