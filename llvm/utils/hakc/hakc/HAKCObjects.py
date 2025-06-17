@@ -80,8 +80,8 @@ class HAKCDivision(HashedHAKCDBNode, yaml.YAMLObject):
         yaml.YAMLObject.__init__(self)
         HashedHAKCDBNode.__init__(self, **kwargs)
         self.division_id = DivisionID
-        self.compartment_id = CompartmentID
-        self.division_count = DivisionCount
+        # self.compartment_id = CompartmentID
+        # self.division_count = DivisionCount
         self.access_token = AccessToken if AccessToken is not None else self.compute_access_token([])
         if "division_hash" in kwargs:
             assert kwargs["division_hash"] == self.get_computed_hash(), f"division_hash ({kwargs['division_hash']}) =?= hash(self) ({self.get_computed_hash()})"
@@ -167,13 +167,22 @@ class HAKCCompartment(HAKCDBNode, yaml.YAMLObject):
         kwargs["Name"] = kwargs.get("Name", str(CompartmentID))
         HAKCDBNode.__init__(self, **kwargs)
         self.compartment_id = CompartmentID
-        self.division_count = division_count
-        self.divisions = Divisions if Divisions is not None else set()
+        # self.division_count = division_count
+        # self.divisions = Divisions if Divisions is not None else set()
         self.entry_token = EntryToken if EntryToken is not None else self.compute_entry_token()
-        # print(self)
+        print(self)
+        # HAKCCompartment(CompartmentID=5, EntryToken=335872, compartment_hash=e8783453fec22d64)
+        # HAKCCompartment(CompartmentID=7, EntryToken=466944, compartment_hash=c995ac679a3e2fd0)
+        # HAKCCompartment(CompartmentID=3, EntryToken=204800, compartment_hash=470c1234d4658452)
+        # HAKCCompartment(CompartmentID=2, EntryToken=139264, compartment_hash=6bd74cf8494dea11)
+        # HAKCCompartment(CompartmentID=6, EntryToken=401408, compartment_hash=5e5c132e1df88a41)
+        # HAKCCompartment(CompartmentID=1, EntryToken=73728, compartment_hash=6651596b8b49c073)
+        # HAKCCompartment(CompartmentID=8, EntryToken=532480, compartment_hash=6fbcedd1f2195fbd)
+        # HAKCCompartment(CompartmentID=4, EntryToken=270336, compartment_hash=a9060e1231752277)
+        # 8783453FEC22D6B
         # TODO: figure out why the hash seems to match but fails the assertion
-        # if "compartment_hash" in kwargs:
-        #     assert kwargs["compartment_hash"] == self.get_computed_hash(), f"compartment_hash ({kwargs['compartment_hash']}) =?= hash(self) ({self.get_computed_hash()})"
+        if "compartment_hash" in kwargs:
+            assert kwargs["compartment_hash"] == self.get_computed_hash(), f"compartment_hash ({kwargs['compartment_hash']}) =?= hash(self) ({self.get_computed_hash()})"
 
     def pretty_print(self):
         return f"HAKCCompartment({self.compartment_id})"
@@ -201,7 +210,7 @@ class HAKCCompartment(HAKCDBNode, yaml.YAMLObject):
         return hash(self) < hash(other)
 
     def get_hash_inputs(self) -> list[object]:
-        return [self.compartment_id, self.entry_token]
+        return [self.compartment_id]
 
     @staticmethod
     def compute_access_token(division_id: int, compartment_id: int, division_count: int) -> int:
@@ -356,7 +365,7 @@ class HAKCTypePerm(yaml.YAMLObject):
         assert (isinstance(self.perm_type, HAKCType))
 
     def pretty_print(self):
-        return f"HAKCTypePerm(RWX({self.RWX} of {self.perm_type.debug_type}))"
+        return f"{self.yaml_tag[1:]}(RWX({self.RWX} of {self.perm_type.debug_type}))"
 
     def debug_print(self):
         return f"""\t{self.yaml_tag} [:- {self.RWX} -> {self.perm_type.debug_print()}\n"""

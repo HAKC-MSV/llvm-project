@@ -252,6 +252,7 @@ class HashedHAKCDBNode(HAKCDBNode):
 
 class HAKCDBRelation:
     def __init__(self, relation_name: str, from_class: Type[HAKCDBNode], to_class: Type[HAKCDBNode], **kwargs):
+        # TODO: extract the property name from db relation automatically (same as getting object attributes)
         self.relation_name = relation_name
         self.from_class = from_class
         self.to_class = to_class

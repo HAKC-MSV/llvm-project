@@ -643,6 +643,7 @@ class HAKCDatabase:
         scope_attrs = HAKCDatabase.get_object_attributes(HAKCScope)
         symbol_attrs = HAKCDatabase.get_object_attributes(HAKCSymbol)
         cu_attrs = HAKCDatabase.get_object_attributes(HAKCCompilationUnit)
+        # probably can remove any null checks from primary keys
         cmd = f"""
         MATCH ({_type})<-[:{symbol_type_edge}]-({symbol})-[:{symbol_scope_edge}]->({scope})
         WHERE {_type}.{HAKCType.get_primary_key()} IS NOT NULL AND {symbol}.{symbol_hash} IS NOT NULL AND {scope}.{HAKCScope.get_primary_key()} IS NOT NULL
