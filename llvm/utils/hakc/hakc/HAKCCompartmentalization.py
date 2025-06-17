@@ -179,6 +179,8 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         # print(f"FOUND {self.node_map[node_hash]} =?= {node}")
         return self.node_map[node_hash]
 
+
+
     def add_persistent_edge(self, u_for_edge: HAKCDBNode, v_for_edge: HAKCDBNode, key, **attr):
         # need to either add or get nodes (or else G.add_edge will create the nodes automatically but incorrectly)
         u = self.__get_or_add_persistent_node(u_for_edge)

@@ -549,7 +549,7 @@ class HAKCDatabase:
         cu_attrs = HAKCDatabase.get_object_attributes(HAKCCompilationUnit)
 
         cmd = f"""
-        MATCH (_:{symbol})<-[{symbol_symbol_dag_edge}]-({symbol})-[{symbol_type_edge}]->({_type}),
+        MATCH (_:{symbol})<-[{symbol_symbol_dag_edge}]-({symbol})-[:{symbol_type_edge}]->({_type}),
               ({symbol})-[{symbol_scope_edge}]->({scope})
         WHERE _.{symbol_hash} = $symbol_hash AND {_type}.{HAKCType.get_primary_key()} IS NOT NULL 
                 AND {symbol}.{symbol_hash} IS NOT NULL AND {scope}.{HAKCScope.get_primary_key()} IS NOT NULL
@@ -592,15 +592,16 @@ class HAKCDatabase:
         compartment = HAKCCompartment.get_table_name()
         scope = HAKCScope.get_table_name()
         symbol_scope_edge = HAKCSymbol.relation_scope
+        scope_hash = HAKCScope.get_primary_key()
 
         symbol_attrs = HAKCDatabase.get_object_attributes(HAKCSymbol)
         division_attrs = HAKCDatabase.get_object_attributes(HAKCDivision)
         compartment_attrs = HAKCDatabase.get_object_attributes(HAKCCompartment)
         scope_attrs = HAKCDatabase.get_object_attributes(HAKCScope)
         cmd = f"""
-        MATCH ({scope})<-[{symbol_scope_edge}]-({symbol})-[{symbol_division_edge}]->({division})-[{division_compartment_edge}]->({compartment})
-        WHERE {symbol}.{symbol_hash} = $symbol_hash AND {division}.division_hash IS NOT NULL AND {compartment}.compartment_hash IS NOT NULL 
-        RETURN DISTINCT {scope_attrs}, {symbol_attrs}, {symbol_division_edge}, {division_attrs}, {division_compartment_edge}, {compartment_attrs};
+        MATCH ({scope})<-[:{symbol_scope_edge}]-({symbol})-[:{symbol_division_edge}]->({division})-[:{division_compartment_edge}]->({compartment})
+        WHERE {symbol}.{symbol_hash} = $symbol_hash AND {division}.division_hash IS NOT NULL AND {compartment}.compartment_hash IS NOT NULL AND {scope}.{scope_hash} IS NOT NULL 
+        RETURN DISTINCT {scope_attrs}, {symbol_attrs}, {division_attrs}, {compartment_attrs};
         """
         # print(cmd)
         response = self.execute_prepared_stmt(cmd, symbol_hash=int(_symbol.get_computed_hash().final_hash))
@@ -609,7 +610,7 @@ class HAKCDatabase:
             # Note: the uint64 hashes seem to be cast to floats if a nan is present
             info = response.get_as_df()
             # print(info)
-            # assert len(info) == 1, print(info)
+            assert len(info) == 1, print(info)
             for data in info.to_dict(orient='records'):
                 # print(f"Division and Compartment data: {data}")
                 # TODO: assert there is only 1 possible division and compartment?
@@ -624,6 +625,8 @@ class HAKCDatabase:
         assert(cls in {HAKCType, HAKCScope, HAKCSymbol, HAKCFunction, HAKCCompilationUnit, HAKCDivision, HAKCCompartment})
         return ", ".join([f"{cls.get_table_name()}.{x.column_name}" for x in cls.get_data_columns()] + [f"{cls.get_table_name()}.{cls.get_primary_key()}"])
 
+    # fix to determinism is using semicolon on edge for kuzu query
+    # otherwise, I guess the edge is just labeled but not actually matched
     def get_functions(self) -> set:
         # want to reconstruct the output from the yaml exactly, so the compartmentalization can be rebuilt from the database
         # this [:edge*1..2] which recursively searches is probably not needed
@@ -642,7 +645,7 @@ class HAKCDatabase:
         symbol_attrs = HAKCDatabase.get_object_attributes(HAKCSymbol)
         cu_attrs = HAKCDatabase.get_object_attributes(HAKCCompilationUnit)
         cmd = f"""
-        MATCH ({_type})<-[{symbol_type_edge}]-({symbol})-[{symbol_scope_edge}]->({scope})
+        MATCH ({_type})<-[:{symbol_type_edge}]-({symbol})-[:{symbol_scope_edge}]->({scope})
         WHERE {_type}.{HAKCType.get_primary_key()} IS NOT NULL AND {symbol}.{symbol_hash} IS NOT NULL AND {scope}.{HAKCScope.get_primary_key()} IS NOT NULL
         OPTIONAL MATCH ({symbol})-[{symbol_compilation_unit_edge}]->({compilation_unit})
         WHERE {symbol_compilation_unit_edge}.DefiningLine IS NOT NULL
@@ -655,7 +658,7 @@ class HAKCDatabase:
         if response.has_next():
             # Note: the uint64 hashes seem to be cast to floats if a nan is present
             info = response.get_as_df()
-            print(len(info))
+            # print(len(info))
             for data in info.to_dict(orient='records'):
                 # print(data)
                 # only NaN is not equal to itself
@@ -700,7 +703,7 @@ class HAKCDatabase:
             # print(f"types_used: {len(types_used)}")
             for type_used in types_used:
                 func.types_used.append(type_used)
-        print(f"Returning {len(functions)} functions")
+        # print(f"Returning {len(functions)} functions")
         return functions
 
 
@@ -717,7 +720,8 @@ class HAKCDatabase:
 
         cmd = f"""
         MATCH (parent:{symbol})-[dir0:{symbol_symbol_direct_call_edge}]->(child0:{symbol})-[RWX0:{function_types_used}]->(ty0:{_type}),
-              (parent:{symbol})-[dir1:{symbol_symbol_direct_call_edge}]->(child1:{symbol})-[RWX1:{function_types_used}]->(ty1:{_type})
+              (parent:{symbol})-[dir1:{symbol_symbol_direct_call_edge}]->(child1:{symbol})-[RWX1:{function_types_used}]->(ty1:{_type}),
+              (child0)-[:{symbol_symbol_direct_call_edge}]->(post:{symbol})<-[:{symbol_symbol_direct_call_edge}]-(child1)
         WHERE child0.name <> child1.name AND RWX0.R=RWX1.R AND RWX0.W=RWX1.W AND RWX0.X=RWX1.X AND ty0.LLVMType=ty1.LLVMType
         RETURN DISTINCT child0.*, child1.*;
         """
@@ -739,10 +743,12 @@ class HAKCDatabase:
 
     def create_node_table(self, node_type: Type[HAKCDBNode]):
         create_cmd = f'CREATE NODE TABLE IF NOT EXISTS {node_type.get_table_definition()}'
+        # print(create_cmd)
         self.execute_prepared_stmt(create_cmd)
 
     def create_relationship_table(self, edge_type: HAKCDBRelation):
         create_cmd = f'CREATE REL TABLE IF NOT EXISTS {edge_type.get_definition()}'
+        # print(create_cmd)
         self.execute_prepared_stmt(create_cmd)
 
     def get_symbol_hash(self, Name, DefiningFile, DefiningLine):

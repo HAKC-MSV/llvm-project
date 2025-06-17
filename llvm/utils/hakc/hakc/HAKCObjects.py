@@ -474,7 +474,7 @@ class HAKCSymbol(HashedHAKCDBNode, yaml.YAMLObject):
     # Init takes the attributes directly from the original dag.yml file the pass creates
     # Also, enforcing that some minimum amount of data is present (e.g., symbol needs a name and a type)
     # TODO add asserts here
-    def __init__(self, Name: str, Type: HAKCType, Scope: HAKCScope,
+    def __init__(self, Name: str, Type: HAKCType = None, Scope: HAKCScope = None,
                  CompilationUnit: Optional[HAKCCompilationUnit] = None,
                  UsedSymbols: Optional[list] = None, **kwargs):
         yaml.YAMLObject.__init__(self)
@@ -485,11 +485,11 @@ class HAKCSymbol(HashedHAKCDBNode, yaml.YAMLObject):
         self.compilation_unit = CompilationUnit if CompilationUnit else None
         # TODO: ignoring used symbols for now
         self.used_symbols = UsedSymbols if UsedSymbols else list()
-        assert (self.name != "")
-        assert (isinstance(self.type, HAKCType))
-        assert (isinstance(self.scope, HAKCScope))
-        if "type_hash" in kwargs:
-            assert kwargs["type_hash"] == self.get_computed_hash(), f"type_hash ({kwargs['type_hash']}) =?= hash(self) ({self.get_computed_hash()})"
+        # assert (self.name != "")
+        # assert (isinstance(self.type, HAKCType))
+        # assert (isinstance(self.scope, HAKCScope))
+        # if "type_hash" in kwargs:
+        #     assert kwargs["type_hash"] == self.get_computed_hash(), f"type_hash ({kwargs['type_hash']}) =?= hash(self) ({self.get_computed_hash()})"
 
     def debug_print(self, root=True, whitespace=""):
         out = f"{whitespace}{self.name} of {self.type.debug_print()} in {self.scope.debug_print()}" + (

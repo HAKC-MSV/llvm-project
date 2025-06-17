@@ -210,86 +210,12 @@ def temporal_analysis(db_dir: str):
     compartmentalization = HAKCCompartmentalization()
     compartmentalization.load_from_db(conn)
 
-    # pair = conn.get_functions_to_merge()
-    # hash_to_sym_map = conn.get_symbol_hashes_to_symbols()
-    # for child0, child1 in pair:
-    #     print(f"Could merge {hash_to_sym_map[child0]} and {hash_to_sym_map[child1]}")
-    # print(f"Found {len(pair)} pairs to merge")
+    pair = conn.get_functions_to_merge()
+    hash_to_sym_map = conn.get_symbol_hashes_to_symbols()
+    for child0, child1 in pair:
+        print(f"Could merge {hash_to_sym_map[child0]} and {hash_to_sym_map[child1]}")
+    print(f"Found {len(pair)} pairs to merge")
 
-
-    # comparing compartmentalization
-    A = HAKCCompartmentalization()
-    A.load_from_db(conn)
-    B = HAKCCompartmentalization()
-    B.load_from_db(conn)
-
-    A.save_graph("A.png")
-    B.save_graph("B.png")
-
-
-    # symmetric difference (^) i.e., not of inner
-    A_nodes = set(A.nodes)
-    B_nodes = set(B.nodes)
-    print(f"Nodes A, Nodes B: {len(A_nodes)}, {len(B_nodes)}")
-    diffs_nodes = A_nodes ^ B_nodes
-    print(f"Found {len(diffs_nodes)} diffs in Nodes")
-    for diff in diffs_nodes:
-        print(f"Found diff: {diff.debug_print()}")
-
-    A_edges = set(A.edges)
-    B_edges = set(B.edges)
-    print(f"Edges A, Edges B: {len(A_edges)}, {len(B_edges)}")
-    diffs_edges = A_edges ^ B_edges
-    print(f"Found {len(diffs_edges)} diffs in Edges")
-    for diff in diffs_edges:
-        print(f"Found diff: {diff[0].debug_print()}, {diff[1].debug_print()}, {diff[2]}")
-
-    A_types = A.get_types()
-    B_types = B.get_types()
-    for diff in A_types ^ B_types:
-        print(f"Found type diff: {diff}")
-
-
-    print(f"Saved ({compartmentalization.cnt}, {A.cnt}, {B.cnt}) function types")
-
-    nx_dif = nx.difference(A, B)
-    print(nx_dif)
-    nx_dif.save_graph("nx_diff.png")
-
-
-
-    # G = compartmentalization
-    # for node, attributes in G.nodes(data=True):
-    #     print(f"Node: {node}")
-    #     for key, value in attributes.items():
-    #         print(f"  {key}: {value}")
-    # print("-" * 20)
-
-
-    # count_direct_calls = 0
-    # for symbol_hash, symbol in logger.progress_bar(iterable=hash_to_sym.items(), desc='Adding direct_calls from db!'):
-    #     if isinstance(symbol, HAKCFunction):
-    #         direct_calls = conn.get_direct_calls(symbol)
-    #         compartmentalization.add_persistent_node(symbol, already_persisted=True)
-    #         # below there is some issue with defining line and defining file hakcfunctions being incorrectly created with nan values, causing duplicate nodes or something weird
-    #         for direct_call in direct_calls:
-    #             print(direct_call)
-    #             count_direct_calls += 1
-    #             # print(f"{symbol} [- DirectCall -> {direct_call}")
-    #             compartmentalization.add_persistent_node(direct_call, already_persisted=True)
-    #             compartmentalization.add_persistent_edge(symbol, direct_call, key=HAKCFunction.DirectCallTable)
-    #
-    # function_perm_types = conn.get_function_perm_types()
-    # # print(function_perm_types)
-    # count_type_perms = 0
-    # for func, type_perm in logger.progress_bar(iterable=function_perm_types, desc='Adding function type permissions from db!'):
-    #     count_type_perms += 1
-    #     compartmentalization.add_function_edge_perm_type(func, type_perm)
-    #     # print(f"Function {func} [- {perm} -> {ty}")
-    #
-    # # strip self loops
-    # compartmentalization.remove_edges_from(nx.selfloop_edges(compartmentalization))
-    #
     # end = time.time()
     #
     # logger.info(f'Finished Temporal Analysis!')
