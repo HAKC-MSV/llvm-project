@@ -50,6 +50,13 @@ ssize_t HAKCDatabaseResponse::ReadFromSocket(raw_socket_stream &OS, void *Dest,
     BytesRead = OS.read(static_cast<char *>(Dest), Size, Timeout);
   } while (BytesRead != Size);
 
+  if (OS.has_error()) {
+    CommonHAKCAnalysis::getWriter(true)
+        << "There was an error reading the policy server socket: "
+        << OS.error().message() << "\n";
+    throw std::exception();
+  }
+
   return BytesRead;
 }
 
@@ -79,6 +86,7 @@ HAKCDatabaseConnection::operator bool() const { return CheckConnection(); }
 
 void HAKCDatabaseConnection::close() {
   if (Socket) {
+    Socket->flush();
     Socket->close();
     Socket = nullptr;
   }

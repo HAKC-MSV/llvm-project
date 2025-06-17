@@ -320,7 +320,7 @@ bool HAKCPointerManager::UseShouldBeCloned(Use &U) {
   return CloneUse;
 }
 
-bool HAKCPointerManager::UseShouldUtilizeAuthenticatedPointer(Use &U) {
+bool HAKCPointerManager::UseShouldUtilizeAuthenticatedPointer(Use &U) const {
   auto *UserP = U.getUser();
   bool UseAuthenticatedPointer =
       isa<CmpInst>(UserP) || isa<LoadInst>(UserP) || isa<SubOperator>(UserP);
@@ -336,7 +336,6 @@ bool HAKCPointerManager::UseShouldUtilizeAuthenticatedPointer(Use &U) {
                    .IsSafeTransitionCall(Call) ||
                Call->isInlineAsm() ||
                Call->getCalledOperandUse().getOperandNo() == U.getOperandNo() ||
-               Call->getCalledFunction() == nullptr ||
                GetFunctionAnalysis().IsIntrinsicNeedingCloning(Call) ||
                GetFunctionAnalysis().IsIntrinsicNeedingAuthentication(Call)) {
       UseAuthenticatedPointer = true;
@@ -372,7 +371,7 @@ bool HAKCPointerManager::UseShouldUtilizeAuthenticatedPointer(Use &U) {
   return UseAuthenticatedPointer;
 }
 
-bool HAKCPointerManager::UseShouldUtilizeSignedBasePointer(Use &U) {
+bool HAKCPointerManager::UseShouldUtilizeSignedBasePointer(Use &U) const {
   auto *UserP = U.getUser();
   bool UseSignedPointer =
       isa<AddrSpaceCastOperator>(UserP) || isa<BitCastOperator>(UserP) ||
@@ -425,7 +424,7 @@ bool HAKCPointerManager::UseShouldUtilizeSignedBasePointer(Use &U) {
 bool HAKCPointerManager::IsClonedUseNeedingAdditionalClassification(Use &U) {
   bool NeedsAdditionalClassification = !isa<PHINode>(U.getUser());
   auto ManagedPointer = GetManagedPointer(U.getUser());
-  if (U.getUser() == ManagedPointer->GetBaseDefinition()) {
+  if (ManagedPointer && U.getUser() == ManagedPointer->GetBaseDefinition()) {
     NeedsAdditionalClassification = false;
   }
 
@@ -446,6 +445,12 @@ void HAKCPointerManager::ClassifyAllUsesOfDefinition(
       << " uses of " << Definition << "\n";
   for (auto &U : Definition->uses()) {
     auto *User = U.getUser();
+    if (auto *I = dyn_cast<Instruction>(User)) {
+      if (I->getFunction() != &GetFunctionAnalysis().getFunction()) {
+        continue;
+      }
+    }
+
     auto UPtr = CreateManagedPointerUse(ManagedPointer, User, U.getOperandNo());
     if (UseIsAnalyzed(*UPtr)) {
       CommonHAKCAnalysis::getWriter(DebugActive)
@@ -992,7 +997,6 @@ Value *HAKCPointerManager::CreateAuthenticationAtLocation(
       << "Adding Authenticated Pointer for " << *ManagedPointer
       << " with HAKCType " << *ManagedPointer->GetType() << "\n"
       << " at " << *InsertLocation << "\n";
-  // TODO: insert tictac check here (maybe)
   if (CommonHAKCAnalysis::PointerShouldBeConsideredCode(*ManagedPointer)) {
     CodeAuthenticationsAdded++;
     return GetFunctionAnalysis().AddCodeAuthCheckAtLocation(Pointer,
