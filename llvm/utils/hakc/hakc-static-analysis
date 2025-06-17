@@ -205,8 +205,6 @@ def temporal_analysis(db_dir: str):
 
     # load the HAKCCompartmentalization from the database
 
-    # hash_to_sym = conn.get_symbol_hashes_to_symbols()
-    # print(hash_to_sym)
     compartmentalization = HAKCCompartmentalization()
     compartmentalization.load_from_db(conn)
 
@@ -216,18 +214,16 @@ def temporal_analysis(db_dir: str):
         print(f"Could merge {hash_to_sym_map[child0]} and {hash_to_sym_map[child1]}")
     print(f"Found {len(pair)} pairs to merge")
 
-    # end = time.time()
-    #
-    # logger.info(f'Finished Temporal Analysis!')
-    # logger.info(f'        Total Time: {end - start} seconds')
-    # logger.info(f'        Type Count: {len(compartmentalization.get_types())}')
-    # logger.info(f'      Global Count: {len(compartmentalization.get_global_variables())}')
-    # logger.info(f'    Function Count: {len(compartmentalization.get_functions())}')
-    # # logger.info(f' Direct Call Count: {count_direct_calls}')
-    # # logger.info(f'   Type Perm Count: {count_type_perms}')
-    # logger.info(f'  DB queries Count: {conn.count_executed_statements}')
-    # compartmentalization.save_graph("loaded_dag.png")
-    # conn.close()
+    end = time.time()
+
+    logger.info(f'Finished Temporal Analysis!')
+    logger.info(f'        Total Time: {end - start} seconds')
+    logger.info(f'        Type Count: {len(compartmentalization.get_types())}')
+    logger.info(f'      Global Count: {len(compartmentalization.get_global_variables())}')
+    logger.info(f'    Function Count: {len(compartmentalization.get_functions())}')
+    logger.info(f'  DB queries Count: {conn.count_executed_statements}')
+    compartmentalization.save_graph("loaded_dag.png")
+    conn.close()
 
     """
     node_degrees = sorted(G_ddg.degree, key=lambda x: x[1], reverse=True)

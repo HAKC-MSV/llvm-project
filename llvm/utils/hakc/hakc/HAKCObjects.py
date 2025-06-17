@@ -18,8 +18,8 @@ class HAKCCompilationUnit(HAKCDBNode, yaml.YAMLObject):
         HAKCDBNode.__init__(self, **kwargs)
         self.defining_file = DefiningFile
         self.defining_line = DefiningLine
-        # if "cu_hash" in kwargs:
-        #     assert kwargs["cu_hash"] == self.get_computed_hash(), f"cu_hash ({kwargs['cu_hash']}) =?= hash(self) ({self.get_computed_hash()})"
+        if "cu_hash" in kwargs:
+            assert kwargs["cu_hash"] == self.get_computed_hash(), f"cu_hash ({kwargs['cu_hash']}) =?= hash(self) ({self.get_computed_hash()})"
 
     def pretty_print(self):
         return f"HAKCCompilationUnit({self.defining_file}:{self.defining_line})"
@@ -70,8 +70,6 @@ class HAKCCompilationUnit(HAKCDBNode, yaml.YAMLObject):
             schema[0]: hash(self) if convert_hash else self.get_computed_hash(),
             schema[1]: self.defining_file,
         }
-        # schema[2]: self.defining_line
-
 
 class HAKCDivision(HashedHAKCDBNode, yaml.YAMLObject):
     yaml_tag = "!HAKCDivision"
@@ -264,7 +262,6 @@ class HAKCType(HashedHAKCDBNode, yaml.YAMLObject):
         self._llvm_type_is_known = self.llvm_type != HAKCType.unknown_type
         assert(isinstance(self.llvm_type, str) and self.llvm_type != "")
         if "type_hash" in kwargs:
-            # print(f"Type hash in kwargs")
             assert kwargs["type_hash"] == self.get_computed_hash(), f"type_hash ({kwargs['type_hash']}) =?= hash(self) ({self.get_computed_hash()})"
 
     def pretty_print(self):
@@ -398,6 +395,8 @@ class HAKCScope(HashedHAKCDBNode, yaml.YAMLObject):
         self.is_global_scope = self.scope == HAKCScope.global_scope
         self.is_local_scope = self.scope == HAKCScope.local_scope
         assert (isinstance(self.scope, str))
+        if "scope_hash" in kwargs:
+            assert kwargs["scope_hash"] == self.get_computed_hash(), f"scope_hash ({kwargs['scope_hash']}) =?= hash(self) ({self.get_computed_hash()})"
 
     def pretty_print(self):
         return f"HAKCScope({self.scope})"
@@ -470,10 +469,8 @@ class HAKCSymbol(HashedHAKCDBNode, yaml.YAMLObject):
     relation_division="has_division"
     relation_dag="has_dag"
 
-
     # Init takes the attributes directly from the original dag.yml file the pass creates
     # Also, enforcing that some minimum amount of data is present (e.g., symbol needs a name and a type)
-    # TODO add asserts here
     def __init__(self, Name: str, Type: HAKCType = None, Scope: HAKCScope = None,
                  CompilationUnit: Optional[HAKCCompilationUnit] = None,
                  UsedSymbols: Optional[list] = None, **kwargs):
@@ -485,11 +482,12 @@ class HAKCSymbol(HashedHAKCDBNode, yaml.YAMLObject):
         self.compilation_unit = CompilationUnit if CompilationUnit else None
         # TODO: ignoring used symbols for now
         self.used_symbols = UsedSymbols if UsedSymbols else list()
-        # assert (self.name != "")
-        # assert (isinstance(self.type, HAKCType))
-        # assert (isinstance(self.scope, HAKCScope))
-        # if "type_hash" in kwargs:
-        #     assert kwargs["type_hash"] == self.get_computed_hash(), f"type_hash ({kwargs['type_hash']}) =?= hash(self) ({self.get_computed_hash()})"
+        assert (self.name != "")
+        assert (isinstance(self.type, HAKCType))
+        assert (isinstance(self.scope, HAKCScope))
+        if "type_hash" in kwargs:
+            assert kwargs["type_hash"] == self.get_computed_hash(), f"type_hash ({kwargs['type_hash']}) =?= hash(self) ({self.get_computed_hash()})"
+
 
     def debug_print(self, root=True, whitespace=""):
         out = f"{whitespace}{self.name} of {self.type.debug_print()} in {self.scope.debug_print()}" + (
@@ -623,8 +621,12 @@ class HAKCGlobalVariable(HAKCSymbol):
     def __init__(self, **kwargs):
         HAKCSymbol.__init__(self, **kwargs)
 
+    def pretty_print(self):
+        return f"HAKCGlobalVariable({self.name})"
+
+
     def debug_print(self, root=True, whitespace=""):
-        return "TODO IMPLEMENT GLOBAL VARIABLE DEBUG PRINT"
+        return HAKCSymbol.debug_print(self)
 
     @classmethod
     def from_yaml(cls, loader: yaml.Loader, node):

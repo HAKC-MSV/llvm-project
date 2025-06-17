@@ -30,9 +30,6 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         yaml.YAMLObject.__init__(self)
         nx.MultiDiGraph.__init__(self)
         self.division_count = division_count
-        self.node_map = dict()
-        self.edge_map = set()
-        self.cnt = 0
         # if nxgraph is not None:
         #     for division in self.get_filtered_nodes(nxgraph, node_filter=lambda n: isinstance(n, HAKCDivision))():
         #         for nbr in nxgraph.neighbors(division):
@@ -147,20 +144,18 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
 
         # now add all the edges from the symbol node to node (and add the nodes at the same time!)
         self.add_persistent_edge(symbol, symbol.type, key=HAKCSymbol.relation_type)
-        self.cnt += 1 # remove
         self.add_persistent_edge(symbol, symbol.scope, key=HAKCSymbol.relation_scope)
         if symbol.compilation_unit:
             # print(f"Adding CompilationUnit! {symbol}")
             self.add_persistent_edge(symbol, symbol.compilation_unit, key=HAKCSymbol.relation_compilation_unit, DefiningLine=symbol.compilation_unit.defining_line)
         for used_symbol in symbol.used_symbols:
             self.add_persistent_edge(symbol, used_symbol, key=HAKCSymbol.relation_symbol)
-        return
 
 
     def __add_global_variable(self, global_variable: HAKCGlobalVariable):
         assert(isinstance(global_variable, HAKCGlobalVariable))
-        assert(False)
-        return
+        self.__add_symbol(global_variable)
+
 
     def add_dag_edge(self, head: HAKCSymbol, tail: HAKCSymbol, dag_edge_weight: int):
         if dag_edge_weight > 0:
@@ -170,28 +165,22 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         # Note: networkx determines if a node is already in the graph if the id(node) exists, meaning the memory address, not the actual hash
         # need to maintain internal map of object hashes to the actual networkx node (prevent duplicates, ensure data normalcy)
         assert(isinstance(node, HAKCDBNode))
-        node_hash = node.get_computed_hash()
-        if node_hash not in self.node_map.keys():
+        if node not in self:
             attrs = {HAKCCompartmentalization.persisted_attr: already_persisted}
             self.add_node(node, **attrs)
-            self.node_map[node_hash] = node
-        assert self.node_map[node_hash] == node, f"{self.node_map[node_hash]} =?= {node}"
+            # self.node_map[node_hash] = node
+        # assert self.node_map[node_hash] == node, f"{self.node_map[node_hash]} =?= {node}"
         # print(f"FOUND {self.node_map[node_hash]} =?= {node}")
-        return self.node_map[node_hash]
+        # return self.node_map[node_hash]
+        return node
 
 
 
     def add_persistent_edge(self, u_for_edge: HAKCDBNode, v_for_edge: HAKCDBNode, key, **attr):
-        # need to either add or get nodes (or else G.add_edge will create the nodes automatically but incorrectly)
-        u = self.__get_or_add_persistent_node(u_for_edge)
-        v = self.__get_or_add_persistent_node(v_for_edge)
-        # if not self.has_edge(u, v, key):
-        # print(f"Persistent edge attrs: {attr}")
-        # print(f"Trying to add {u}")
-        if (u, v, key) not in self.edge_map:
+
+        if not(self.has_edge(u_for_edge, v_for_edge, key)):
             attr[HAKCCompartmentalization.persisted_attr] = False
-            self.add_edge(u, v, key, **attr)
-            self.edge_map.add((u,v,key))
+            self.add_edge(u_for_edge, v_for_edge, key, **attr)
 
     def add_symbol_use(self, symbol: HAKCSymbol, used_symbol: HAKCSymbol, key=HAKCSymbol.relation_symbol):
         self.add_persistent_edge(symbol, used_symbol, key=key)

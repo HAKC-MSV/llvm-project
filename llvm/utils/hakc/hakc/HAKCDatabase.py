@@ -613,7 +613,6 @@ class HAKCDatabase:
             assert len(info) == 1, print(info)
             for data in info.to_dict(orient='records'):
                 # print(f"Division and Compartment data: {data}")
-                # TODO: assert there is only 1 possible division and compartment?
                 div, comp = HAKCDatabase.__create_object_from_response(HAKCDivision, **data)
                 # print(div)
                 # print(comp)
