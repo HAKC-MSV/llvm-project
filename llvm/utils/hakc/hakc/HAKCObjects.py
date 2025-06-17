@@ -30,7 +30,15 @@ class HAKCCompilationUnit(HAKCDBNode, yaml.YAMLObject):
 
     def __eq__(self, other):
         if isinstance(other, HAKCCompilationUnit):
-            return (self.defining_file == other.defining_file) and (self.defining_line == other.defining_line)
+            return (self.defining_file == other.defining_file)
+        return False
+
+    def __lt__(self, other):
+        if isinstance(other, HAKCCompilationUnit):
+            if self.defining_file == other.defining_file:
+                return self.defining_line < other.defining_line
+            else:
+                return self.defining_file < other.defining_file
         return False
 
     def __hash__(self):
@@ -41,8 +49,7 @@ class HAKCCompilationUnit(HAKCDBNode, yaml.YAMLObject):
         return f"{whitespace}{self.yaml_tag} defined in line {self.defining_line} of file {self.defining_file}\n"
 
     def get_hash_inputs(self) -> list[object]:
-        return [self.defining_file, self.defining_line]
-        # return self.get_data_columns()
+        return [self.defining_file]
 
     @staticmethod
     def get_primary_key() -> HAKCDBColumn:
@@ -98,6 +105,7 @@ class HAKCDivision(HashedHAKCDBNode, yaml.YAMLObject):
         return HAKCDBNode.__hash__(self)
 
     def __lt__(self, other):
+        # TODO: figure out non-determinism -> missing nodes and edges in different runs -> might be an unstable sorting implementation?
         # TODO: why is it a runtime error to compare these two classes?
         # Dumping the dag seems to sort hakc objects (requiring lt gt comparison)
         # for now, lets just compare hashes
@@ -107,6 +115,7 @@ class HAKCDivision(HashedHAKCDBNode, yaml.YAMLObject):
         return hash(self) < hash(other)
 
     def get_hash_inputs(self) -> list[object]:
+        # TODO: should we have multiple division objects? or just one with pointers?
         return [self.division_id, self.access_token]
         # return self.get_data_columns()
 
@@ -149,21 +158,13 @@ class HAKCDivision(HashedHAKCDBNode, yaml.YAMLObject):
             access_token = 0xFFFF
         return access_token
 
-# HAKCCompartment(CompartmentID=1, EntryToken=65536, compartment_hash=cd2662154e6d76b2)
-# HAKCCompartment(CompartmentID=2, EntryToken=131072, compartment_hash=cd04a4754498e06d)
-# HAKCCompartment(CompartmentID=3, EntryToken=196608, compartment_hash=d5688a52d55a02ec)
-# HAKCCompartment(CompartmentID=4, EntryToken=262144, compartment_hash=8005f02d43fa06e7)
-# HAKCCompartment(CompartmentID=5, EntryToken=327680, compartment_hash=5dee4dd60ff8d0ba)
-# HAKCCompartment(CompartmentID=6, EntryToken=393216, compartment_hash=14ac577cdb2ef6d9)
-# HAKCCompartment(CompartmentID=3, EntryToken=204800, compartment_hash=d5688a52d55a02ec)
-
 class HAKCCompartment(HAKCDBNode, yaml.YAMLObject):
     yaml_tag = "!HAKCCompartment"
 
     def __init__(self, CompartmentID: int, division_count: int = len(HAKCDivisionEnum) - 1,
                  Divisions: Optional[set[HAKCDivision]] = None,
                  EntryToken: Optional[int] = None, **kwargs):
-        print(f"kwargs {kwargs}")
+        # print(f"kwargs {kwargs}")
         yaml.YAMLObject.__init__(self)
         kwargs["Name"] = kwargs.get("Name", str(CompartmentID))
         HAKCDBNode.__init__(self, **kwargs)
@@ -171,7 +172,7 @@ class HAKCCompartment(HAKCDBNode, yaml.YAMLObject):
         self.division_count = division_count
         self.divisions = Divisions if Divisions is not None else set()
         self.entry_token = EntryToken if EntryToken is not None else self.compute_entry_token()
-        print(self)
+        # print(self)
         # TODO: figure out why the hash seems to match but fails the assertion
         # if "compartment_hash" in kwargs:
         #     assert kwargs["compartment_hash"] == self.get_computed_hash(), f"compartment_hash ({kwargs['compartment_hash']}) =?= hash(self) ({self.get_computed_hash()})"
@@ -263,13 +264,14 @@ class HAKCType(HashedHAKCDBNode, yaml.YAMLObject):
         self._llvm_type_is_known = self.llvm_type != HAKCType.unknown_type
         assert(isinstance(self.llvm_type, str) and self.llvm_type != "")
         if "type_hash" in kwargs:
+            # print(f"Type hash in kwargs")
             assert kwargs["type_hash"] == self.get_computed_hash(), f"type_hash ({kwargs['type_hash']}) =?= hash(self) ({self.get_computed_hash()})"
 
     def pretty_print(self):
         return f"HAKCType({self.debug_type})"
 
     def debug_print(self):
-        return f"{self.yaml_tag}(DebugType: {self.debug_type}, LLVMType:  {self.llvm_type})"
+        return f"{self.yaml_tag}(DebugType: {self.debug_type}, LLVMType: {self.llvm_type})"
 
     @classmethod
     def from_yaml(cls, loader: yaml.Loader, node):
@@ -285,11 +287,24 @@ class HAKCType(HashedHAKCDBNode, yaml.YAMLObject):
                 return False
         return False
 
+    def __lt__(self, other):
+        if isinstance(other, HAKCType):
+            if self._debug_type_is_known and other._debug_type_is_known:
+                return self._debug_type_transformed < other._debug_type_transformed
+            elif self._llvm_type_is_known and other._llvm_type_is_known:
+                return self.llvm_type < other.llvm_type
+            else:
+                return False
+        return False
+
     def get_hash_inputs(self) -> list[object]:
-        if self._debug_type_is_known:
-            return [self._debug_type_transformed]
-        else:
-            return [self.llvm_type]
+        # TODO: is this the source of non-determinism? -> it appears that when only llvm_type is returned the compartmentalization is fixed
+        # a type 'int ()' might be converted to 'int', causing an improper alias
+        # if self._debug_type_is_known:
+        #     print(f"Transformed debug type: {self._debug_type_transformed}")
+        #     return [self._debug_type_transformed]
+        # else:
+        return [self.llvm_type]
         # return self.get_data_columns()
 
     def __hash__(self):
@@ -525,7 +540,7 @@ class HAKCSymbol(HashedHAKCDBNode, yaml.YAMLObject):
             HAKCDBRelation(HAKCSymbol.relation_type, HAKCSymbol, HAKCType),
             HAKCDBRelation(HAKCSymbol.relation_scope, HAKCSymbol, HAKCScope),
             HAKCDBRelation(HAKCSymbol.relation_symbol, HAKCSymbol, HAKCSymbol),
-            HAKCDBRelation(HAKCSymbol.relation_compilation_unit, HAKCSymbol, HAKCCompilationUnit, defining_line="UINT64"),
+            HAKCDBRelation(HAKCSymbol.relation_compilation_unit, HAKCSymbol, HAKCCompilationUnit, DefiningLine="UINT64"),
             HAKCDBRelation(HAKCSymbol.relation_division, HAKCSymbol, HAKCDivision),
             HAKCDBRelation(HAKCSymbol.relation_dag, HAKCSymbol, HAKCSymbol, weight="INT32")
         ]
@@ -558,6 +573,11 @@ class HAKCFunction(HAKCSymbol):
     def pretty_print(self):
         return f"HAKCFunction({self.name})"
 
+    def __str__(self):
+        return f"HAKCFunction({self.name})"
+        # return f"HAKCFunction({self.name}, {self.type})"
+
+
     # need non_recursive parameter or else this will cause infinite recursion
     def debug_print(self, root=True, whitespace=""):
         out = f"{self.yaml_tag}\n" if root else ''
@@ -578,7 +598,8 @@ class HAKCFunction(HAKCSymbol):
         return out
 
     # def get_hash_inputs(self) -> list[object]:
-    #     return [HAKCSymbol.get_hash_inputs(self), self.direct_calls, self.indirect_calls, self.types_used]
+        # return [HAKCSymbol.get_hash_inputs(self), self.direct_calls, self.indirect_calls, self.types_used]
+
     @classmethod
     def from_yaml(cls, loader: yaml.Loader, node):
         return cls(**loader.construct_mapping(node, deep=True))
@@ -711,8 +732,8 @@ class HAKCIndirectCallSource(HAKCPrintableObj, yaml.YAMLObject):
     def from_yaml(cls, loader: yaml.Loader, node):
         return cls(**loader.construct_mapping(node, deep=True))
 
-    def get_hash_inputs(self) -> list[object]:
-        result = [self.type]
-        for link in self.source:
-            result.append(link)
-        return result
+    # def get_hash_inputs(self) -> list[object]:
+    #     result = [self.type]
+    #     for link in self.source:
+    #         result.append(link)
+    #     return result

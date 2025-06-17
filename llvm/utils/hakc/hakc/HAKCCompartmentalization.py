@@ -30,6 +30,9 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         yaml.YAMLObject.__init__(self)
         nx.MultiDiGraph.__init__(self)
         self.division_count = division_count
+        self.node_map = dict()
+        self.edge_map = set()
+        self.cnt = 0
         # if nxgraph is not None:
         #     for division in self.get_filtered_nodes(nxgraph, node_filter=lambda n: isinstance(n, HAKCDivision))():
         #         for nbr in nxgraph.neighbors(division):
@@ -119,7 +122,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         for direct_call in function.direct_calls:
             assert(isinstance(direct_call, HAKCFunction))
             self.__add_symbol(direct_call)
-            self.add_persistent_edge(function, direct_call, key=HAKCFunction.relation_direct_calls , add_nodes=True)
+            self.add_persistent_edge(function, direct_call, key=HAKCFunction.relation_direct_calls)
 
         for indirect_call in function.indirect_calls:
             assert(isinstance(indirect_call, HAKCType))
@@ -127,28 +130,30 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             self.add_persistent_edge(function, indirect_call, key=HAKCFunction.relation_indirect_calls)
 
         for type_used in function.types_used:
-            self.add_type_used(function, type_used)
+            assert(isinstance(type_used, HAKCTypePerm))
+            self.add_persistent_edge(function, type_used.perm_type, key=HAKCFunction.relation_types_used, R = int(type_used.RWX[0]), W = int(type_used.RWX[1]), X = int(type_used.RWX[2]))
 
 
     def __add_type(self, _type: HAKCType):
         assert(isinstance(_type, HAKCType))
-        self.add_persistent_node(_type)
+        self.__get_or_add_persistent_node(_type)
 
     def __add_symbol(self, symbol: HAKCSymbol):
         # add 'sanitized' version of the HAKCSymbol (e.g., don't include HAKCTypePerm as a node, since it should be an edge?)
         assert(isinstance(symbol, HAKCSymbol))
 
         # add the symbol node
-        self.add_persistent_node(symbol)
+        self.__get_or_add_persistent_node(symbol)
 
         # now add all the edges from the symbol node to node (and add the nodes at the same time!)
-        self.add_persistent_edge(symbol, symbol.type, key=HAKCSymbol.relation_type , add_nodes=True)
-        self.add_persistent_edge(symbol, symbol.scope, key=HAKCSymbol.relation_scope, add_nodes=True)
+        self.add_persistent_edge(symbol, symbol.type, key=HAKCSymbol.relation_type)
+        self.cnt += 1 # remove
+        self.add_persistent_edge(symbol, symbol.scope, key=HAKCSymbol.relation_scope)
         if symbol.compilation_unit:
-            print(f"Adding CompilationUnit! {symbol}")
-            self.add_persistent_edge(symbol, symbol.compilation_unit, key=HAKCSymbol.relation_compilation_unit, defining_line=symbol.compilation_unit.defining_line, add_nodes=True)
+            # print(f"Adding CompilationUnit! {symbol}")
+            self.add_persistent_edge(symbol, symbol.compilation_unit, key=HAKCSymbol.relation_compilation_unit, DefiningLine=symbol.compilation_unit.defining_line)
         for used_symbol in symbol.used_symbols:
-            self.add_persistent_edge(symbol, used_symbol, key=HAKCSymbol.relation_symbol, add_nodes=True)
+            self.add_persistent_edge(symbol, used_symbol, key=HAKCSymbol.relation_symbol)
         return
 
 
@@ -157,28 +162,34 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         assert(False)
         return
 
-    def add_dag_edge(self, head: HAKCSymbol, tail: HAKCSymbol, dag_edge_weight: int, add_nodes: bool = True):
+    def add_dag_edge(self, head: HAKCSymbol, tail: HAKCSymbol, dag_edge_weight: int):
         if dag_edge_weight > 0:
-            self.add_persistent_edge(head, tail, key=HAKCSymbol.relation_dag, add_nodes=add_nodes, weight=dag_edge_weight)
+            self.add_persistent_edge(head, tail, key=HAKCSymbol.relation_dag, weight=dag_edge_weight)
 
-    def add_type_used(self, func: HAKCSymbol, type_perm: HAKCTypePerm):
-        assert(isinstance(type_perm, HAKCTypePerm))
-        self.__add_type(type_perm.perm_type)
-        print(f"Adding TypePerm {type_perm}")
-        self.add_persistent_edge(func, type_perm.perm_type, key=HAKCFunction.relation_types_used, R = int(type_perm.RWX[0]), W = int(type_perm.RWX[1]), X = int(type_perm.RWX[2]))
-
-    def add_persistent_node(self, node: HAKCDBNode, already_persisted: bool = False):
-        if not self.has_node(node):
+    def __get_or_add_persistent_node(self, node: HAKCDBNode, already_persisted: bool = False):
+        # Note: networkx determines if a node is already in the graph if the id(node) exists, meaning the memory address, not the actual hash
+        # need to maintain internal map of object hashes to the actual networkx node (prevent duplicates, ensure data normalcy)
+        assert(isinstance(node, HAKCDBNode))
+        node_hash = node.get_computed_hash()
+        if node_hash not in self.node_map.keys():
             attrs = {HAKCCompartmentalization.persisted_attr: already_persisted}
             self.add_node(node, **attrs)
+            self.node_map[node_hash] = node
+        assert self.node_map[node_hash] == node, f"{self.node_map[node_hash]} =?= {node}"
+        # print(f"FOUND {self.node_map[node_hash]} =?= {node}")
+        return self.node_map[node_hash]
 
-    def add_persistent_edge(self, u_for_edge: HAKCDBNode, v_for_edge: HAKCDBNode, key, add_nodes: bool = True, **attr):
-        if add_nodes:
-            self.add_persistent_node(u_for_edge)
-            self.add_persistent_node(v_for_edge)
-        if not self.has_edge(u_for_edge, v_for_edge, key):
+    def add_persistent_edge(self, u_for_edge: HAKCDBNode, v_for_edge: HAKCDBNode, key, **attr):
+        # need to either add or get nodes (or else G.add_edge will create the nodes automatically but incorrectly)
+        u = self.__get_or_add_persistent_node(u_for_edge)
+        v = self.__get_or_add_persistent_node(v_for_edge)
+        # if not self.has_edge(u, v, key):
+        # print(f"Persistent edge attrs: {attr}")
+        # print(f"Trying to add {u}")
+        if (u, v, key) not in self.edge_map:
             attr[HAKCCompartmentalization.persisted_attr] = False
-            self.add_edge(u_for_edge, v_for_edge, key, **attr)
+            self.add_edge(u, v, key, **attr)
+            self.edge_map.add((u,v,key))
 
     def add_symbol_use(self, symbol: HAKCSymbol, used_symbol: HAKCSymbol, key=HAKCSymbol.relation_symbol):
         self.add_persistent_edge(symbol, used_symbol, key=key)
@@ -193,11 +204,11 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
                 if existing_symbol.name == symbol.name:
                     symbol_hash_inputs = symbol.get_hash_inputs()
                     existing_hash_inputs = symbol.get_hash_inputs()
-                    for symbol_hash_input, existing_hash_input in zip(symbol_hash_inputs, existing_hash_inputs):
-                        print(f'{hash(symbol_hash_input)} ? {hash(existing_hash_input)}')
+                    # for symbol_hash_input, existing_hash_input in zip(symbol_hash_inputs, existing_hash_inputs):
+                        # print(f'{hash(symbol_hash_input)} ? {hash(existing_hash_input)}')
                     symbol.computed_hash = None
                     existing_symbol.computed_hash = None
-                    print(f'{hash(symbol)} ? {hash(existing_symbol)}')
+                    # print(f'{hash(symbol)} ? {hash(existing_symbol)}')
                     break
             raise RuntimeError(f'Symbol {symbol} could not be found')
         for nbr, edges in self.adj[symbol].items():
@@ -235,6 +246,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         self.add_persistent_edge(division, compartment, key=HAKCDivision.relation_compartment)
 
     def set_symbol_division(self, symbol: HAKCSymbol, division: HAKCDivision, compartment: HAKCCompartment):
+        # print(f"Adding symbol division for {symbol} in division {division} with compartment {compartment}")
         self.add_division(division, compartment)
         self.add_persistent_edge(symbol, division, key=HAKCSymbol.relation_division)
 
@@ -263,8 +275,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         return self.get_filtered_nodes(self, node_filter=lambda n: isinstance(n, HAKCGlobalVariable))
 
     def get_symbols(self):
-        return self.get_filtered_nodes(self, node_filter=lambda n: isinstance(n, HAKCFunction) or isinstance(n,
-                                                                                                             HAKCGlobalVariable))
+        return self.get_filtered_nodes(self, node_filter=lambda n: isinstance(n, HAKCFunction) or isinstance(n, HAKCGlobalVariable))
 
     def get_scopes(self):
         return self.get_filtered_nodes(self, node_filter=lambda n: isinstance(n, HAKCScope))
@@ -479,7 +490,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         if prune:
             top_n_node_ids = HAKCCompartmentalization.show_top_n_degrees(G, N)
             subgraph = G.subgraph(top_n_node_ids)
-            print(G.nodes)
+            # print(G.nodes)
             G = subgraph
 
         G = nx.relabel_nodes(G, lambda x: x.pretty_print())
@@ -494,11 +505,13 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         for edge in dot.get_edges():
             # print(edge.obj_dict)
             # ignore all 'persisted' attributes
-            del edge.obj_dict["attributes"]["persisted"]
+            if "persisted" in edge.obj_dict["attributes"]:
+                del edge.obj_dict["attributes"]["persisted"]
+
             edge.set_label(str(edge.obj_dict["attributes"]))
 
         dot.write_png(fname)  # Requires Graphviz installed
-        print(f"Saved {fname}")
+        print(f"Saved {self} to {fname}")
 
     def save_graph_alt(self, fname):
         import matplotlib.pyplot as plt
@@ -515,4 +528,4 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         # print(G.edges)
         plt.savefig(fname)
         plt.close()
-        print(f"Saved {fname}")
+        print(f"Saved {self} to {fname}")

@@ -120,7 +120,7 @@ def compute_dag_edges_for_symbol(symbol_hashes):
 def create_dag_single_thread(files: set[str], conn: HAKCDatabase) -> HAKCCompartmentalization:
     compartmentalization = HAKCCompartmentalization()
     for filename in logger.progress_bar(iterable=sorted(files), desc='Parsing YAML'):
-        functions, global_variables = parse_yaml(filename, debug=True)
+        functions, global_variables = parse_yaml(filename)
         logger.debug(
             f'{filename} found {len(functions)} functions and {len(global_variables)} globals')
         compartmentalization.add_symbols(functions, global_variables)
@@ -135,15 +135,12 @@ def create_dag_single_thread(files: set[str], conn: HAKCDatabase) -> HAKCCompart
                 dag_edges[head_hash] = dict()
             dag_edges[head_hash][tail_hash] = dag_edge_weight
             tail_symbol = compartmentalization.get_symbol_by_hash(tail_hash)
-            compartmentalization.add_dag_edge(symbol, tail_symbol, dag_edge_weight=dag_edge_weight, add_nodes=False)
+            compartmentalization.add_dag_edge(symbol, tail_symbol, dag_edge_weight=dag_edge_weight)
             dag_edges_added += 1
     logger.info(f'Adding {dag_edges_added} DAG edges to compartmentalization')
     conn.persist_dag_edges(dag_edges)
     logger.info(f'Adding compartmentalization')
     add_default_compartmentalization(conn, compartmentalization)
-    # for node in compartmentalization.nodes:
-    #     print(node)
-    #     print(nx.get_node_attributes(compartmentalization, node))
     return compartmentalization
 
 
@@ -213,10 +210,61 @@ def temporal_analysis(db_dir: str):
     compartmentalization = HAKCCompartmentalization()
     compartmentalization.load_from_db(conn)
 
-    pair = conn.get_functions_to_merge()
-    hash_to_sym_map = conn.get_symbol_hashes_to_symbols()
-    for child0, child1 in pair:
-        print(f"Could merge {hash_to_sym_map[child0]} and {hash_to_sym_map[child1]}")
+    # pair = conn.get_functions_to_merge()
+    # hash_to_sym_map = conn.get_symbol_hashes_to_symbols()
+    # for child0, child1 in pair:
+    #     print(f"Could merge {hash_to_sym_map[child0]} and {hash_to_sym_map[child1]}")
+    # print(f"Found {len(pair)} pairs to merge")
+
+
+    # comparing compartmentalization
+    A = HAKCCompartmentalization()
+    A.load_from_db(conn)
+    B = HAKCCompartmentalization()
+    B.load_from_db(conn)
+
+    A.save_graph("A.png")
+    B.save_graph("B.png")
+
+
+    # symmetric difference (^) i.e., not of inner
+    A_nodes = set(A.nodes)
+    B_nodes = set(B.nodes)
+    print(f"Nodes A, Nodes B: {len(A_nodes)}, {len(B_nodes)}")
+    diffs_nodes = A_nodes ^ B_nodes
+    print(f"Found {len(diffs_nodes)} diffs in Nodes")
+    for diff in diffs_nodes:
+        print(f"Found diff: {diff.debug_print()}")
+
+    A_edges = set(A.edges)
+    B_edges = set(B.edges)
+    print(f"Edges A, Edges B: {len(A_edges)}, {len(B_edges)}")
+    diffs_edges = A_edges ^ B_edges
+    print(f"Found {len(diffs_edges)} diffs in Edges")
+    for diff in diffs_edges:
+        print(f"Found diff: {diff[0].debug_print()}, {diff[1].debug_print()}, {diff[2]}")
+
+    A_types = A.get_types()
+    B_types = B.get_types()
+    for diff in A_types ^ B_types:
+        print(f"Found type diff: {diff}")
+
+
+    print(f"Saved ({compartmentalization.cnt}, {A.cnt}, {B.cnt}) function types")
+
+    nx_dif = nx.difference(A, B)
+    print(nx_dif)
+    nx_dif.save_graph("nx_diff.png")
+
+
+
+    # G = compartmentalization
+    # for node, attributes in G.nodes(data=True):
+    #     print(f"Node: {node}")
+    #     for key, value in attributes.items():
+    #         print(f"  {key}: {value}")
+    # print("-" * 20)
+
 
     # count_direct_calls = 0
     # for symbol_hash, symbol in logger.progress_bar(iterable=hash_to_sym.items(), desc='Adding direct_calls from db!'):
@@ -332,8 +380,7 @@ def create_dag_multithread(files: set[str], core_count: int, conn: HAKCDatabase)
                                 dag_edges[head_hash] = dict()
                             head_symbol = symbol_hashes[head_hash]
                             tail_symbol = symbol_hashes[tail_hash]
-                            compartmentalization.add_dag_edge(head_symbol, tail_symbol, dag_edge_weight=dag_edge_weight,
-                                                              add_nodes=False)
+                            compartmentalization.add_dag_edge(head_symbol, tail_symbol, dag_edge_weight=dag_edge_weight)
                             dag_edges[head_hash][tail_hash] = dag_edge_weight
                             dag_edges_added += 1
                     except Exception as e:
@@ -386,7 +433,7 @@ def create_new_dag(analysis_root: str, core_count: int, db_dir: str,
     logger.info(f'Function Count: {len(compartmentalization.get_functions())}')
     # TODO: figure out why closing the connection here causes a segfault
     # conn.close()
-    logger.info(f'Exiting create_new_dag')
+    # logger.info(f'Exiting create_new_dag')
     return compartmentalization
 
 def print_edge_data(G):
@@ -465,7 +512,7 @@ def main():
         logger.info("Done")
 
     if args.dump_dag:
-        logger.error(f'Dumping compartmentalization to {args.dump_dag}')
+        logger.info(f'Dumping compartmentalization to {args.dump_dag}')
         with open(args.dump_dag, "w") as f:
             yaml.dump(compartmentalization, f)
         logger.info("Done")
