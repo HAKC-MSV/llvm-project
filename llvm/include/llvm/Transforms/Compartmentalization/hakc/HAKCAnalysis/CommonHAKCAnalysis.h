@@ -51,8 +51,6 @@ public:
 
   bool IsNoTransferFunction(Function *F);
 
-  static bool valueIsReadonlyPtr(Value *value);
-
   static bool FunctionIsStatic(Function *F);
 
   static bool FunctionHasPointerArg(Function *F);

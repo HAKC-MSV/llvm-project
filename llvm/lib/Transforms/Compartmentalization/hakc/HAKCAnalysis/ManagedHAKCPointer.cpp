@@ -59,6 +59,12 @@ Value *HAKCPointerBase::GetAuthenticatedPointer() const {
   return AuthenticatedPointer;
 }
 
+bool ManagedHAKCPointer::IsDataPointer() const {
+  return !HAKCTy->IsFunctionType() ||
+         (HAKCTy->GetPointeeType() &&
+          HAKCTy->GetPointeeType()->IsFunctionType());
+}
+
 void HAKCPointerBase::SetAuthenticatedPointer(Value *NewAuthenticatedPointer) {
   AuthenticatedPointer = NewAuthenticatedPointer;
 }

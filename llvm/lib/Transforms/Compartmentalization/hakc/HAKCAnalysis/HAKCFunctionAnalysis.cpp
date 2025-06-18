@@ -102,8 +102,7 @@ Instruction *HAKCFunctionAnalysis::addCompartmentTransferCall(
     throw std::exception();
   }
 
-  bool IsData =
-      !hakc::CommonHAKCAnalysis::valueIsReadonlyPtr(getDef(Operand, false));
+  bool IsData = HAKCPointer->IsDataPointer();
   CommonHAKCAnalysis::getWriter(DebugActive)
       << "isData: " << std::to_string(IsData) << " for " << Operand << "\n";
 

@@ -1078,12 +1078,21 @@ hakc::HAKCTypeIdentifier::AddMissingPointerType(const HAKCTypeP &BaseType) {
 
 hakc::HAKCTypeP
 hakc::HAKCTypeIdentifier::FindPointerType(const HAKCTypeInfo &BaseType) {
+  std::set<dwarf::Tag> TagsToRecurseInto = {dwarf::DW_TAG_typedef,
+                                            dwarf::DW_TAG_const_type};
   for (auto &It : types) {
     auto *DebugType = It.first;
     if (DebugType->getTag() == dwarf::DW_TAG_pointer_type) {
-      if (dyn_cast<DIDerivedType>(DebugType)->getBaseType() ==
-          BaseType.GetDbgType()) {
-        return It.second;
+      auto *DbgBaseTy = dyn_cast<DIDerivedType>(DebugType)->getBaseType();
+      while (true) {
+        if (DbgBaseTy == BaseType.GetDbgType()) {
+          return It.second;
+        }
+        if (DbgBaseTy && TagsToRecurseInto.contains(DbgBaseTy->getTag())) {
+          DbgBaseTy = dyn_cast<DIDerivedType>(DbgBaseTy)->getBaseType();
+        } else {
+          break;
+        }
       }
     }
   }
@@ -1106,12 +1115,9 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
 
   auto Declarations = llvm::findDVRDeclares(V);
   for (auto *Declaration : Declarations) {
-    auto *DbgLocalVar = Declaration->getVariable();
-    if (DbgLocalVar) {
-      auto *DbgType = DbgLocalVar->getType();
-      if (DbgType) {
-        auto HAKCTy = FindType(DbgType);
-        if (HAKCTy) {
+    if (auto *DbgLocalVar = Declaration->getVariable()) {
+      if (auto *DbgType = DbgLocalVar->getType()) {
+        if (auto HAKCTy = FindType(DbgType)) {
           return HAKCTy;
         }
       }
@@ -1146,6 +1152,15 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
     }
     BaseType = Func->getFunctionType();
   } else if (auto *CallI = dyn_cast<CallInst>(V)) {
+    if (CallI->getCalledFunction() &&
+        CallI->getCalledFunction()->getSubprogram()) {
+      const auto *SubprogramTy =
+          CallI->getCalledFunction()->getSubprogram()->getType();
+      const auto *ReturnTy = SubprogramTy->getTypeArray()[0];
+      if (auto Result = FindType(ReturnTy)) {
+        return Result;
+      }
+    }
     BaseType = CallI->getType();
   }
   // maybe remove above
