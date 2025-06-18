@@ -67,6 +67,8 @@ class HAKCHashValue:
 
 class HAKCPrintableObj:
     def __init__(self, **kwargs):
+        if kwargs.get("name", "") == "do_initcall_level":
+            print("Found it")
         self.computed_hash = None
 
     def __str__(self):
@@ -159,6 +161,8 @@ class HAKCDBNode(HAKCPrintableObj):
         HAKCPrintableObj.__init__(self, **kwargs)
         for key, value in kwargs.items():
             if key == self.get_primary_key().column_name and self.uses_hashed_key():
+                if isinstance(value, str):
+                    value = int(value, 16)
                 self.computed_hash = HAKCHashValue.from_int(value)
 
     @classmethod

@@ -1096,6 +1096,20 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
       AnalysisHelper.GetSystemInfo().OutputDebugInfo())
       << "Attempting to find HAKCTypeInfo for " << *V << "\n";
 
+  auto Declarations = llvm::findDVRDeclares(V);
+  for (auto *Declaration : Declarations) {
+    auto *DbgLocalVar = Declaration->getVariable();
+    if (DbgLocalVar) {
+      auto *DbgType = DbgLocalVar->getType();
+      if (DbgType) {
+        auto HAKCTy = FindType(DbgType);
+        if (HAKCTy) {
+          return HAKCTy;
+        }
+      }
+    }
+  }
+
   if (isa<LoadInst>(V) || isa<StoreInst>(V)) {
     BaseType = getLoadStoreType(V);
   } else if (isa<GetElementPtrInst>(V)) {
@@ -1107,7 +1121,7 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
   }
   // maybe remove below
   else if (auto *GlobalVar = dyn_cast<GlobalVariable>(V)) {
-    auto HAKCGlob = FindGlobal(GlobalVar);
+    auto HAKCGlob = FindGlobal(GlobalVar, true);
     if (HAKCGlob && HAKCGlob->GetType()) {
       FoundType = HAKCGlob->GetType();
     } else {
