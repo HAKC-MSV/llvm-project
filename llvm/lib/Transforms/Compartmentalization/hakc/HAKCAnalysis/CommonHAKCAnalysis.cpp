@@ -594,15 +594,6 @@ bool CommonHAKCAnalysis::argShouldTransfer(Value *V) {
          !isa<ConstantPointerNull>(V) && !IsKernelUserPointer(V);
 }
 
-bool CommonHAKCAnalysis::valueIsReadonlyPtr(Value *value) {
-  Type *Ty = value->getType();
-  if (auto *Call = dyn_cast<CallInst>(value)) {
-    Ty = Call->getFunctionType()->getReturnType();
-  }
-  bool result = isa<FunctionType>(Ty);
-  return result;
-}
-
 void CommonHAKCAnalysis::SortGlobalList(
     std::vector<GlobalVariable *> &GlobalList) {
   llvm::sort(GlobalList.begin(), GlobalList.end(),

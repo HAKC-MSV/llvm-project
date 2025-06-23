@@ -57,7 +57,7 @@ public:
   void AddIgnoredType(StringRef TypeName) const;
 
 protected:
-  HAKCTypeP FindType(Type *Ty);
+  HAKCTypeP FindType(Type *Ty) const;
 
   HAKCTypeP FindPointeeType(HAKCPointerBase &HAKCPointer);
 
@@ -133,7 +133,7 @@ protected:
 
   Type *GetLLVMType(const DIType *);
 
-  HAKCTypeP AddAllocaType(const HAKCTypeP &BaseType);
+  HAKCTypeP AddMissingPointerType(const HAKCTypeP &BaseType);
 
   Type *FindNamedType(StringRef TypeName) const;
 
@@ -150,7 +150,7 @@ protected:
   std::map<const DISubprogram *, HAKCFunctionP> functions;
   std::set<HAKCGlobalP> UnmappedGlobals;
   std::set<HAKCFunctionP> UnmappedFunctions;
-  std::set<HAKCTypeP> AllocaTypes;
+  std::set<HAKCTypeP> MissingPointerTypes;
   std::map<CallInst *, HAKCTypeP> IndirectCallsTypes;
   std::map<const DICompositeType *, Type *> AnonymousTypes;
   std::map<Value*, HAKCTypeP> FindHAKCTypeMap;

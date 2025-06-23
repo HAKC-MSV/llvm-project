@@ -255,6 +255,8 @@ public:
 
   void SetAuthenticatedPointer(Value *NewAuthenticatedPointer) override;
 
+  bool IsDataPointer() const;
+
 private:
   void InitBaseDefinitionInfo();
 

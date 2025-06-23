@@ -49,6 +49,8 @@ public:
 
   HAKCWriter &operator<<(unsigned long i);
 
+  HAKCWriter &operator<<(ssize_t i);
+
   HAKCWriter &operator<<(bool b);
 
   HAKCWriter &operator<<(const std::string &str);

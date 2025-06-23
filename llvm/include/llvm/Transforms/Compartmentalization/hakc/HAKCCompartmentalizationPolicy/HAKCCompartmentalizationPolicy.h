@@ -44,6 +44,8 @@ protected:
   std::string Response;
   std::chrono::milliseconds Timeout;
   bool Success;
+
+  ssize_t ReadFromSocket(raw_socket_stream &OS, void *Dest, ssize_t Size) const;
 };
 
 class HAKCDatabaseConnection {
@@ -78,8 +80,6 @@ public:
 
   HAKCCompartmentP GetCompartment(hakc_compartment_id_t CompartmentID);
 
-  HAKCDivisionP GetDivisionFromSymbol(hakc::HAKCYamlSymbol symbol);
-
   void GetValidTargets(HAKCCompartment &Compartment) const;
 
   hakc::HAKCCompartmentDivision &GetDefaultDivision();
@@ -109,8 +109,6 @@ protected:
   HAKCCompartmentP CreateCompartment(hakc_compartment_id_t CompartmentID,
                                      hakc_access_token_t AccessToken,
                                      bool CheckForExisting);
-
-  void GetValidCompartmentTargets(HAKCCompartment &Compartment);
 };
 } // namespace llvm::hakc
 

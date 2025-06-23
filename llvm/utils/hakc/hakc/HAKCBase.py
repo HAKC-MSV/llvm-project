@@ -76,6 +76,8 @@ class HAKCHashValue:
 
 class HAKCPrintableObj:
     def __init__(self, **kwargs):
+        if kwargs.get("name", "") == "do_initcall_level":
+            print("Found it")
         self.computed_hash = None
 
     def __str__(self):

@@ -497,7 +497,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             symbol_hashes[hash(symbol)] = symbol
         return symbol_hashes
 
-    def get_symbol_by_hash(self, symbol_hash: int) -> HAKCSymbol | None:
+    def get_symbol_by_hash(self, symbol_hash: int) -> Optional[HAKCSymbol]:
         for symbol in self.get_symbols():
             if hash(symbol) == symbol_hash:
                 return symbol

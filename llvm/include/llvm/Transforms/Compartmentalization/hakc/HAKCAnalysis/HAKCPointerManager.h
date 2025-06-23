@@ -163,9 +163,9 @@ protected:
 
   static bool UseShouldBeCloned(Use &U);
 
-  bool UseShouldUtilizeAuthenticatedPointer(Use &U);
+  bool UseShouldUtilizeAuthenticatedPointer(Use &U) const;
 
-  bool UseShouldUtilizeSignedBasePointer(Use &U);
+  bool UseShouldUtilizeSignedBasePointer(Use &U) const;
 
   bool IsClonedUseNeedingAdditionalClassification(Use &U);
 

@@ -987,7 +987,7 @@ void hakc::HAKCTypeIdentifier::FindUsesInFunctions() {
 }
 
 std::shared_ptr<hakc::HAKCTypeInfo>
-hakc::HAKCTypeIdentifier::FindType(Type *Ty) {
+hakc::HAKCTypeIdentifier::FindType(Type *Ty) const {
   // remove this functionality, because it would only work for non pointers and
   // is logically incorrect
   recursion_depth_llvm++;
@@ -1094,6 +1094,14 @@ hakc::HAKCTypeIdentifier::FindPointeeType(const HAKCTypeInfo &BaseType) {
           dyn_cast<DICompositeType>(BaseType.GetDbgType())->getBaseType();
     }
   }
+
+  if (!TypeToFind && !BaseType.GetDbgType()) {
+    auto *LLVMTy = BaseType.GetLLVMType();
+    if (auto *ArrayTy = dyn_cast<ArrayType>(LLVMTy)) {
+      return FindType(ArrayTy->getElementType());
+    }
+  }
+
   if (!TypeToFind) {
     recursion_depth_other = 0;
     CommonHAKCAnalysis::getWriter(Debug) << "Could not find PointeeType\n";
@@ -1193,7 +1201,7 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCTypeForUse(Use &U) {
     if (Result) {
       auto PointerTy = FindPointerType(*Result);
       if (!PointerTy && isa<AllocaInst>(U.get())) {
-        Result = AddAllocaType(Result);
+        Result = AddMissingPointerType(Result);
       } else {
         Result = PointerTy;
       }
@@ -1219,7 +1227,7 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCTypeForUse(Use &U) {
       if (U.getOperandNo() == StoreInst::getPointerOperandIndex()) {
         auto PointerType = FindPointerType(*Result);
         if (!PointerType && isa<AllocaInst>(U.get())) {
-          Result = AddAllocaType(Result);
+          Result = AddMissingPointerType(Result);
         } else {
           Result = PointerType;
         }
@@ -1238,7 +1246,7 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCTypeForUse(Use &U) {
 }
 
 hakc::HAKCTypeP
-hakc::HAKCTypeIdentifier::AddAllocaType(const HAKCTypeP &BaseType) {
+hakc::HAKCTypeIdentifier::AddMissingPointerType(const HAKCTypeP &BaseType) {
   std::string AllocaName = BaseType->GetDbgTypeName().str();
   AllocaName += "*";
   auto HAKCType = std::make_shared<HAKCTypeInfo>(
@@ -1250,24 +1258,33 @@ hakc::HAKCTypeIdentifier::AddAllocaType(const HAKCTypeP &BaseType) {
                        HAKCType->GetLLVMType()
                            ? HAKCType->GetLLVMType()->getPointerAddressSpace()
                            : 0));
-  AllocaTypes.insert(HAKCType);
+  MissingPointerTypes.insert(HAKCType);
 
   return HAKCType;
 }
 
 hakc::HAKCTypeP
 hakc::HAKCTypeIdentifier::FindPointerType(const HAKCTypeInfo &BaseType) {
+  std::set<dwarf::Tag> TagsToRecurseInto = {dwarf::DW_TAG_typedef,
+                                            dwarf::DW_TAG_const_type};
   for (auto &It : types) {
     auto *DebugType = It.first;
     if (DebugType->getTag() == dwarf::DW_TAG_pointer_type) {
-      if (dyn_cast<DIDerivedType>(DebugType)->getBaseType() ==
-          BaseType.GetDbgType()) {
-        return It.second;
+      auto *DbgBaseTy = dyn_cast<DIDerivedType>(DebugType)->getBaseType();
+      while (true) {
+        if (DbgBaseTy == BaseType.GetDbgType()) {
+          return It.second;
+        }
+        if (DbgBaseTy && TagsToRecurseInto.contains(DbgBaseTy->getTag())) {
+          DbgBaseTy = dyn_cast<DIDerivedType>(DbgBaseTy)->getBaseType();
+        } else {
+          break;
+        }
       }
     }
   }
 
-  for (auto &AllocaType : AllocaTypes) {
+  for (auto &AllocaType : MissingPointerTypes) {
     if (AllocaType->GetPointeeType()->GetDbgType() == BaseType.GetDbgType()) {
       return AllocaType;
     }
@@ -1291,6 +1308,17 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
       AnalysisHelper.GetSystemInfo().OutputDebugInfo())
       << "Attempting to find HAKCTypeInfo for " << *V << "\n";
 
+  auto Declarations = llvm::findDVRDeclares(V);
+  for (auto *Declaration : Declarations) {
+    if (auto *DbgLocalVar = Declaration->getVariable()) {
+      if (auto *DbgType = DbgLocalVar->getType()) {
+        if (auto HAKCTy = FindType(DbgType)) {
+          return HAKCTy;
+        }
+      }
+    }
+  }
+
   if (isa<LoadInst>(V) || isa<StoreInst>(V)) {
     BaseType = getLoadStoreType(V);
   } else if (isa<GetElementPtrInst>(V)) {
@@ -1305,15 +1333,32 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
   }
   // maybe remove below
   else if (auto *GlobalVar = dyn_cast<GlobalVariable>(V)) {
-    auto HAKCGlob = FindGlobal(GlobalVar);
+    auto HAKCGlob = FindGlobal(GlobalVar, true);
     if (HAKCGlob && HAKCGlob->GetType()) {
       FoundType = HAKCGlob->GetType();
     } else {
       BaseType = GlobalVar->getValueType();
     }
   } else if (auto *Func = dyn_cast<Function>(V)) {
-    BaseType = Func->getReturnType();
+    if (Func->getSubprogram()) {
+      auto FuncTy = FindType(Func->getSubprogram()->getType());
+      auto Result = FindPointerType(*FuncTy);
+      if (!Result) {
+        Result = AddMissingPointerType(FuncTy);
+      }
+      return Result;
+    }
+    BaseType = Func->getFunctionType();
   } else if (auto *CallI = dyn_cast<CallInst>(V)) {
+    if (CallI->getCalledFunction() &&
+        CallI->getCalledFunction()->getSubprogram()) {
+      const auto *SubprogramTy =
+          CallI->getCalledFunction()->getSubprogram()->getType();
+      const auto *ReturnTy = SubprogramTy->getTypeArray()[0];
+      if (auto Result = FindType(ReturnTy)) {
+        return Result;
+      }
+    }
     BaseType = CallI->getType();
   }
   // maybe remove above
@@ -1524,6 +1569,17 @@ hakc::HAKCTypeIdentifier::CreateNoDebugType(Type *Ty) const {
   auto HAKCType = std::make_shared<HAKCTypeInfo>(
       AnalysisHelper, Name, AnalysisHelper.GetSystemInfo().OutputDebugInfo());
   HAKCType->SetLLVMType(Ty);
+  HAKCTypeP PointeeTy = nullptr;
+  if (auto *ArrayTy = dyn_cast<ArrayType>(Ty)) {
+    PointeeTy = FindType(ArrayTy->getElementType());
+    if (!PointeeTy) {
+      PointeeTy = CreateNoDebugType(ArrayTy->getElementType());
+    }
+  } else if (auto *PointerTy = dyn_cast<PointerType>(Ty)) {
+    /* We can't know what this points to, so have it point to one byte */
+    PointeeTy = FindType(IntegerType::getInt8Ty(Ty->getContext()));
+  }
+  HAKCType->SetPointeeType(PointeeTy);
   return HAKCType;
 }
 
@@ -1549,6 +1605,8 @@ hakc::HAKCTypeIdentifier::HAKCTypeIdentifier(CommonHAKCAnalysis &AnalysisHelper)
     : AnalysisHelper(AnalysisHelper), DbgInfoFinder(), types(), globals(),
       functions(), AllocaTypes(), IndirectCallsTypes(), AnonymousTypes(),
       CompilationUnitScope(nullptr), recursion_depth_di(0), recursion_depth_llvm(0), recursion_depth_other(0) {}
+      functions(), MissingPointerTypes(), IndirectCallsTypes(),
+      AnonymousTypes(), CompilationUnitScope(nullptr) {}
 
 Module &hakc::HAKCTypeIdentifier::GetModule() const {
   return AnalysisHelper.GetModule();

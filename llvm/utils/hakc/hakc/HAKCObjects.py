@@ -626,7 +626,7 @@ class HAKCCompartmentalizationAdjustment(yaml.YAMLObject):
     def from_yaml(cls, loader: yaml.Loader, node):
         return cls(**loader.construct_mapping(node, deep=True))
 
-    def get_adjusted_compartment(self, defining_path: str) -> HAKCDivision | None:
+    def get_adjusted_compartment(self, defining_path: str) -> Optional[HAKCDivision]:
         if defining_path is None:
             return None
 

@@ -238,15 +238,9 @@ class KUZUHAKCPolicyDataStore(HAKCPolicyDataSource):
         if compartment_id_division_id_tuple is None:
             logger.error(f"get_division_id_compartment_id_from_symbol returned None for symbol: {symbol}")
             return None
-        logger.debug(f"compartment_id_division_id_tuple: {compartment_id_division_id_tuple}")
-        division_id = compartment_id_division_id_tuple[0]
-        access_token = compartment_id_division_id_tuple[1]
-        compartment_id = compartment_id_division_id_tuple[2]
-        entry_token = compartment_id_division_id_tuple[3]
         ret = HAKCDivisionCompartmentPayload(
-            division=HAKCDivision(DivisionID=division_id, CompartmentID=compartment_id, AccessToken=access_token),
-            compartment=HAKCCompartment(CompartmentID=compartment_id, EntryToken=entry_token))
-        logger.debug(f"get symbol division returning: {ret}")
+            division=compartment_id_division_id_tuple[0],
+            compartment=compartment_id_division_id_tuple[1])
         return ret
 
     def _get_valid_targets_from_compartment_id(self, compartment_id: int) -> Optional[HAKCPayload]:
@@ -275,7 +269,7 @@ class HAKCRequestHandler(socketserver.StreamRequestHandler):
 
     def write_raw_bytes(self, raw_bytes: bytes):
         try:
-            self.wfile.write(raw_bytes)
+            return self.wfile.write(raw_bytes)
         except OSError:
             raise ConnectionAbortedError
 
@@ -304,10 +298,12 @@ class HAKCRequestHandler(socketserver.StreamRequestHandler):
                 logger.debug(f"data got from handle request: {data}")
                 response_data = json.dumps(data.to_yaml_dict(), default=str)
                 encoded_data = response_data.encode('utf-8')
-                logger.debug(f"dumped json {encoded_data}")
+                logger.debug(f"dumping json {encoded_data}")
 
-                self.write_raw_bytes(struct.pack(HAKCRequestHandler.size_fmt, len(encoded_data)))
-                self.write_raw_bytes(encoded_data)
+                bytes_written = self.write_raw_bytes(struct.pack(
+                    HAKCRequestHandler.size_fmt, len(encoded_data)))
+                bytes_written += self.write_raw_bytes(encoded_data)
+                logger.debug(f'dumped {bytes_written} bytes')
         # the 'raise' will call 'handle_error' in HAKCPolicyServer 
         except ConnectionAbortedError:
             logger.debug(f'Client Aborted Connection')
@@ -316,12 +312,13 @@ class HAKCRequestHandler(socketserver.StreamRequestHandler):
             return
         except ConnectionResetError:
             logger.debug(f'Client Reset Connection')
-            raise
+            return
         except TimeoutException:
             logger.debug(f'Timeout received')
             return
         except Exception as e:
             logger.error(f"Error handling request: {e}")
+            raise e
 
 
 class HAKCPolicyServer(socketserver.ThreadingUnixStreamServer):
