@@ -30,7 +30,7 @@ void HAKCFunctionAnalysis::UpdateHAKCFunctionParameters() {
   if (CommonHAKCAnalysis::IsUncompartmentalizedSymbol(CurrentFunction,
                                                       Policy)) {
     return;
-  }
+                                                      }
 
   if (DebugActive) {
     CommonHAKCAnalysis::getWriter(DebugActive)
@@ -94,7 +94,7 @@ Instruction *HAKCFunctionAnalysis::addCompartmentTransferCall(
         << " in function\n"
         << getFunction() << "\n";
     throw std::exception();
-  }
+          }
   auto HAKCPointer = PointerManager.GetManagedPointer(Operand);
   if (!HAKCPointer) {
     CommonHAKCAnalysis::getWriter(true)
@@ -407,29 +407,29 @@ bool HAKCFunctionAnalysis::IsCallInIntrinsicSet(CallBase *Call,
 
 bool HAKCFunctionAnalysis::IsIntrinsicNeedingAuthentication(CallBase *Call) {
   Intrinsic::ID IntrinsicsNeedingAuth[] = {
-      Intrinsic::IndependentIntrinsics::memcpy,
-      Intrinsic::IndependentIntrinsics::memmove,
-      Intrinsic::IndependentIntrinsics::memset};
+    Intrinsic::IndependentIntrinsics::memcpy,
+    Intrinsic::IndependentIntrinsics::memmove,
+    Intrinsic::IndependentIntrinsics::memset};
 
   return IsCallInIntrinsicSet(Call, IntrinsicsNeedingAuth);
 }
 
 bool HAKCFunctionAnalysis::IsIntrinsicNeedingCloning(CallBase *Call) {
   Intrinsic::ID IntrinsicsNeedingCloning[] = {
-      Intrinsic::IndependentIntrinsics::lifetime_start,
-      Intrinsic::IndependentIntrinsics::lifetime_end,
-  };
+    Intrinsic::IndependentIntrinsics::lifetime_start,
+    Intrinsic::IndependentIntrinsics::lifetime_end,
+};
   return IsCallInIntrinsicSet(Call, IntrinsicsNeedingCloning);
 }
 
 bool HAKCFunctionAnalysis::IsIntrinsicToSkip(CallBase *Call) {
   Intrinsic::ID IntrinsicsToSkip[] = {
-      Intrinsic::IndependentIntrinsics::dbg_declare,
-      /*Intrinsic::IndependentIntrinsics::dbg_addr,*/
-      Intrinsic::IndependentIntrinsics::dbg_label,
-      Intrinsic::IndependentIntrinsics::dbg_value,
-      Intrinsic::IndependentIntrinsics::read_register,
-  };
+    Intrinsic::IndependentIntrinsics::dbg_declare,
+    /*Intrinsic::IndependentIntrinsics::dbg_addr,*/
+    Intrinsic::IndependentIntrinsics::dbg_label,
+    Intrinsic::IndependentIntrinsics::dbg_value,
+    Intrinsic::IndependentIntrinsics::read_register,
+};
   return IsCallInIntrinsicSet(Call, IntrinsicsToSkip);
 }
 
@@ -463,6 +463,7 @@ bool HAKCFunctionAnalysis::phiNodeUsesValue(PHINode *PhiNode, Value *target,
  * @param I
  */
 void HAKCFunctionAnalysis::HandleInstruction(Instruction *I) {
+  // TODO: put permissions analysis here
   if (auto *call = dyn_cast<CallInst>(I)) {
     handleCall(call);
   } else if (auto *load = dyn_cast<LoadInst>(I)) {
@@ -586,7 +587,7 @@ void HAKCFunctionAnalysis::CheckCompareOperandForDirectFunctionUse(
           << "Adding comparison to directFunctionUsers for argument "
           << std::to_string(OpNo) << "\n";
       directFunctionUsers.insert(CmpI);
-    }
+            }
   }
 }
 
@@ -606,31 +607,31 @@ void HAKCFunctionAnalysis::handleComparison(CmpInst *compare) {
     CommonHAKCAnalysis::getWriter(DebugActive)
         << "\tComparisons with null do not need authentication\n";
     return;
-  } else if (isa<Operator>(compare->getOperand(0)) ||
-             isa<Operator>(compare->getOperand(1))) {
-    bool comparisonIsWithConstant = false;
-    auto *bitCastOperator0 = dyn_cast<Operator>(compare->getOperand(0));
-    if (bitCastOperator0) {
-      if (auto *ci = dyn_cast<ConstantInt>(bitCastOperator0->getOperand(0))) {
-        comparisonIsWithConstant = (ci->getZExtValue() < user_space_end);
-      }
-    }
-    if (!comparisonIsWithConstant) {
-      auto *bitCastOperator1 = dyn_cast<Operator>(compare->getOperand(1));
-      if (bitCastOperator1) {
-        if (auto *ci = dyn_cast<ConstantInt>(bitCastOperator1->getOperand(0))) {
-          comparisonIsWithConstant = (ci->getZExtValue() < user_space_end);
+      } else if (isa<Operator>(compare->getOperand(0)) ||
+                 isa<Operator>(compare->getOperand(1))) {
+        bool comparisonIsWithConstant = false;
+        auto *bitCastOperator0 = dyn_cast<Operator>(compare->getOperand(0));
+        if (bitCastOperator0) {
+          if (auto *ci = dyn_cast<ConstantInt>(bitCastOperator0->getOperand(0))) {
+            comparisonIsWithConstant = (ci->getZExtValue() < user_space_end);
+          }
         }
-      }
-    }
+        if (!comparisonIsWithConstant) {
+          auto *bitCastOperator1 = dyn_cast<Operator>(compare->getOperand(1));
+          if (bitCastOperator1) {
+            if (auto *ci = dyn_cast<ConstantInt>(bitCastOperator1->getOperand(0))) {
+              comparisonIsWithConstant = (ci->getZExtValue() < user_space_end);
+            }
+          }
+        }
 
-    if (comparisonIsWithConstant) {
-      CommonHAKCAnalysis::getWriter(DebugActive)
-          << "\tComparisons with constant integers do not need "
-             "authentications\n";
-      return;
-    }
-  }
+        if (comparisonIsWithConstant) {
+          CommonHAKCAnalysis::getWriter(DebugActive)
+              << "\tComparisons with constant integers do not need "
+                 "authentications\n";
+          return;
+        }
+                 }
 
   if (isCompartmentalizedFunction()) {
     bool arg0NeedsAuth =
@@ -699,7 +700,7 @@ void HAKCFunctionAnalysis::handleBinaryOperator(BinaryOperator *binOp) {
     CommonHAKCAnalysis::getWriter(DebugActive) << "Registering both operands\n";
     AddManagedPointer(binOp->getOperandUse(0));
     AddManagedPointer(binOp->getOperandUse(1));
-  }
+      }
 }
 
 /**
@@ -720,18 +721,18 @@ bool HAKCFunctionAnalysis::globalShouldBeTransferred(Use &globalValueArg) {
     if (globalValue->getValueType()->isArrayTy() &&
         globalValue->getValueType()->getArrayElementType()->isIntegerTy(8)) {
       return false;
-    }
+        }
 
     if (auto *call = dyn_cast<CallInst>(globalValueArg.getUser())) {
       if (!GetModuleAnalysis().GetCommonAnalysis().FunctionIsAnalysisCandidate(
               call->getCalledFunction())) {
         return false;
-      }
+              }
       return true;
     }
 
     return globalValue->getValueType()->isPointerTy();
-  }
+          }
 
   CommonHAKCAnalysis::getWriter(DebugActive)
       << "Arg " << globalValueArg.getOperandNo() << " (" << globalValueArg
@@ -756,7 +757,7 @@ void HAKCFunctionAnalysis::handleCall(CallInst *call) {
   if (GetModuleAnalysis().GetCommonAnalysis().IsHAKCFunction(
           call->getCalledFunction())) {
     HAKCFunctionCalls.insert(call);
-  }
+          }
 
   CommonHAKCAnalysis::getWriter(DebugActive)
       << "Handling call " << *call << "\n";
@@ -859,7 +860,7 @@ void HAKCFunctionAnalysis::handleCall(CallInst *call) {
               << "Function called by " << *call
               << " is not an analysis candidate\n";
           continue;
-        }
+                 }
       }
     }
     if (call->getCalledFunction()) {
@@ -868,9 +869,9 @@ void HAKCFunctionAnalysis::handleCall(CallInst *call) {
       if (!CommonHAKCAnalysis::IsUncompartmentalizedSymbol(
               call->getCalledFunction(), Policy)) {
         NonKernelDirectFunctionCallSet.insert(call);
-      }
+              }
     }
-  }
+                 }
 }
 
 /**
@@ -894,6 +895,14 @@ std::string HAKCFunctionAnalysis::getHAKCFunctionSectionName() {
   return sectionName;
 }
 
+// void hakc::HAKCFunctionAnalysis::FunctionTemporalAnalysis(){
+//   for (auto it = inst_begin(CurrentFunction); it != inst_end(CurrentFunction); ++it) {
+//     Instruction *inst = &*it;
+//     CommonHAKCAnalysis::getWriter(true) << "Temporal Analysis for Instruction " << *inst << "\n";
+//     // HandleInstruction(inst);
+//     }
+// }
+
 void HAKCFunctionAnalysis::setup() {
   if (!SetupHasRun) {
     auto Compartment = Policy.GetDivision(CurrentFunction).GetHAKCCompartment();
@@ -909,6 +918,14 @@ void HAKCFunctionAnalysis::setup() {
       Instruction *inst = &*it;
       HandleInstruction(inst);
     }
+    // TODO: put permission here (move from type identifier)
+    CommonHAKCAnalysis::getWriter(true)
+      << "!!!! Starting Temporal Analysis !!!!\n";
+
+    // FunctionTemporalAnalysis();
+
+    CommonHAKCAnalysis::getWriter(true)
+      << "!!!! Ending Temporal Analysis !!!!\n";
     SetupHasRun = true;
   }
   CommonHAKCAnalysis::getWriter(DebugActive)

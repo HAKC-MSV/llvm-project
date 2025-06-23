@@ -33,6 +33,7 @@ enum HAKCAllocationTypeEnum {
 enum HAKCPassModeTypeEnum {
   InvalidPassModeType,
   RunDataAccessGraphAnalysis,
+  RunDataAccessGraphAnalysisSingleSourceFile,
   RunPostDominatorAnalysis,
   RunCompartmentalization,
   RunConfigAndExit
@@ -194,6 +195,7 @@ struct HAKCYamlConfig {
   HAKCYAMLFunctionDefinition CodeValidationFunction;
   HAKCYAMLFunctionDefinition DataValidationFunction;
   HAKCPassModeTypeEnum PassMode;
+  HAKCYAMLStringType SingleSourceFile;
   HAKCYAMLSequence<HAKCYAMLSymbolDeclaration> SafeTransitionFunctions;
   HAKCYAMLSequence<HAKCYAMLSymbolDeclaration> IgnoredGlobals;
   HAKCYAMLStringSequenceType TransferFunctions;
@@ -273,6 +275,8 @@ template <> struct yaml::ScalarEnumerationTraits<hakc::HAKCPassModeTypeEnum> {
   static void enumeration(IO &io, hakc::HAKCPassModeTypeEnum &value) {
     io.enumCase(value, "RunDataAccessGraphAnalysis",
                 hakc::RunDataAccessGraphAnalysis);
+    io.enumCase(value, "RunDataAccessGraphAnalysisSingleSourceFile",
+                hakc::RunDataAccessGraphAnalysisSingleSourceFile);
     io.enumCase(value, "RunCompartmentalization",
                 hakc::RunCompartmentalization);
     io.enumCase(value, "RunPostDominatorAnalysis",
@@ -418,6 +422,12 @@ template <> struct yaml::MappingTraits<hakc::HAKCYamlConfig> {
         io.mapRequired("Database", YamlConfig.DatabaseConfig);
       } else {
         io.mapOptional("Database", YamlConfig.DatabaseConfig);
+      }
+      if (YamlConfig.PassMode == hakc::RunDataAccessGraphAnalysisSingleSourceFile) {
+        io.mapRequired("SingleSourceFile", YamlConfig.SingleSourceFile);
+      }
+      else {
+        io.mapOptional("SingleSourceFile", YamlConfig.SingleSourceFile);
       }
     } else if (YamlConfig.TestMode == hakc::TestModeDefault) {
       io.mapRequired("Arch", YamlConfig.Arch);

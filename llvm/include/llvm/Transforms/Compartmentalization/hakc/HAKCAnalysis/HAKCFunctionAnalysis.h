@@ -188,6 +188,8 @@ public:
   Value *AddEpochDataAuthCheckAtLocation(Value *signed_ptr, Instruction *location);
   Value *AddEpochCodeAuthCheckAtLocation(Value *SignedPtr, Instruction *Location);
 
+  void FunctionTemporalAnalysis();
+
 };
 } // namespace llvm::hakc
 

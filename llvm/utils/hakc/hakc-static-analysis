@@ -140,7 +140,7 @@ def create_dag_single_thread(files: set[str], conn: HAKCDatabase) -> HAKCCompart
     logger.info(f'Adding {dag_edges_added} DAG edges to compartmentalization')
     conn.persist_dag_edges(dag_edges)
     logger.info(f'Adding compartmentalization')
-    add_default_compartmentalization(conn, compartmentalization)
+    compartmentalization.add_default_compartmentalization(conn)
     return compartmentalization
 
 
@@ -157,7 +157,8 @@ def adjust_compartmentalization(db_dir: str, adjustment: HAKCCompartmentalizatio
         compartmentalization.add_division(kernel_division, kernel_compartment)
 
     for symbol in logger.progress_bar(iterable=symbols, desc='Adjusting Compartmentalization'):
-        compartmentalization.add_persistent_node(symbol, already_persisted=True)
+        # TODO: figure out if already_persisted is needed here
+        compartmentalization.add_symbol(symbol, already_persisted=True)
         adjusted_division = adjustment.get_adjusted_compartment(symbol.defining_file)
         if adjusted_division is None:
             adjusted_division = kernel_division
@@ -222,31 +223,10 @@ def temporal_analysis(db_dir: str):
     logger.info(f'      Global Count: {len(compartmentalization.get_global_variables())}')
     logger.info(f'    Function Count: {len(compartmentalization.get_functions())}')
     logger.info(f'  DB queries Count: {conn.count_executed_statements}')
-    compartmentalization.save_graph("loaded_dag.png")
+    compartmentalization.save_graph("loaded_dag.svg")
     conn.close()
 
-    """
-    node_degrees = sorted(G_ddg.degree, key=lambda x: x[1], reverse=True)
-    # prune graph to only have this graph
-    print(f"Nodes in DDG: {G_ddg.nodes()}")
-    MaxNodeDescendants = nx.descendants(G_ddg, MaxNodeName)
-    print(f"MaxNode Descendents {MaxNodeDescendants}")
-    G_ddg = G_ddg.subgraph(MaxNodeDescendants)
-    print(f"Max node {MaxNodeName} -> {MaxNodeAttrs} with found hash {MaxNodeHash}")
-    """
 
-
-def add_default_compartmentalization(conn: HAKCDatabase, compartmentalization: HAKCCompartmentalization,
-                                     create_schema: bool = False):
-    compartment_id = HAKCCompartmentalization.kernel_compartment_id + 1
-    division_id = HAKCCompartmentalization.default_division
-    symbols = list(compartmentalization.get_symbols())
-    for sym in logger.progress_bar(iterable=symbols, desc='Adding default compartmentalization'):
-        compartment = HAKCCompartment(compartment_id)
-        division = HAKCDivision(division_id, compartment_id)
-        compartmentalization.set_symbol_division(sym, division, compartment)
-        compartment_id += 1
-    compartmentalization.persist_to_database(conn, create_schema=create_schema)
 
 
 def create_dag_multithread(files: set[str], core_count: int, conn: HAKCDatabase) -> HAKCCompartmentalization:
@@ -268,6 +248,8 @@ def create_dag_multithread(files: set[str], core_count: int, conn: HAKCDatabase)
                     compartmentalization.add_symbols(functions, global_variables)
                 except Exception as e:
                     logger.error(f'Error parsing {file}: {str(e)}')
+    compartmentalization.save_graph("ipv6_sysctl_unregister.svg", symbol_name="ipv6_sysctl_unregister")
+    # compartmentalization.save_graph("kernel.svg")
 
     compartmentalization.persist_to_database(conn)
     logger.info(f'Total symbols {len(conn.get_symbols())}')
@@ -316,7 +298,7 @@ def create_dag_multithread(files: set[str], core_count: int, conn: HAKCDatabase)
     conn.open(max_num_threads=core_count)
     conn.persist_dag_edges(dag_edges)
     logger.info(f'Adding compartmentalization')
-    add_default_compartmentalization(conn, compartmentalization)
+    compartmentalization.add_default_compartmentalization(conn)
 
     return compartmentalization
 
@@ -423,7 +405,7 @@ def main():
         # print(f"pre save_g")
         if args.save_g:
             compartmentalization.save_graph(args.save_g)
-            compartmentalization.save_graph_alt("alt.png")
+            # compartmentalization.save_graph_alt("alt.png")
         # print(f"post save_g")
 
     if args.adjust:

@@ -204,20 +204,13 @@ std::string HAKCTypeInfo::GetYamlHeader(unsigned int Indents) const {
 
   return Yaml;
 }
-// - !HAKCTypePerm
-//   RWX: "001"
-//   Type:
-//     !HAKCType
-//     Name: "int (struct data_struct_a*)"
-//     DebugType: "int (struct data_struct_a*)"
-//     LLVMType: "i32 (ptr)"
 std::string HAKCTypeInfo::GetYamlHeader(unsigned int Indents, unsigned RWX) const {
   // function to generate HAKCTypePerm yaml
   std::string Yaml;
   llvm::raw_string_ostream sstream(Yaml);
 
   sstream << "!HAKCTypePerm\n";
-  sstream.indent(Indents + EntrySpaces()) << "RWX: \"" << std::bitset<3>(RWX).to_string() << "\"\n";
+  sstream.indent(Indents + EntrySpaces()) << "RWX: " << RWX << "\n";
   sstream.indent(Indents + EntrySpaces()) << "Type:\n";
 
   sstream.indent(Indents + EntrySpaces() + 4) << HAKCInfo::GetYamlHeader(Indents + 4);

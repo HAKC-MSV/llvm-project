@@ -135,6 +135,14 @@ void HAKCSystemInformation::operator<<(HAKCYamlConfig &YamlConfig) {
   }
   DebugOutput = YamlConfig.OutputAllDebugInfo;
   DatabaseInformation << YamlConfig.DatabaseConfig;
+  if (PassMode == RunDataAccessGraphAnalysisSingleSourceFile) {
+    SingleSourceFile = YamlConfig.SingleSourceFile;
+    DebugOutput = true;
+    if(GetModule().getSourceFileName() != SingleSourceFile){
+      errs () << "Source file " << GetModule().getSourceFileName() << " is not the target source file: " << SingleSourceFile;
+      return;
+    }
+  }
 
   // ProcessDebugInfo must happen before creating custom transfers
   // dag analysis actually happens here!
@@ -288,6 +296,10 @@ Module &HAKCSystemInformation::GetModule() const {
 
 hakc::HAKCPassModeTypeEnum HAKCSystemInformation::GetPassMode() const {
   return PassMode;
+}
+
+StringRef HAKCSystemInformation::GetSingleSourceFile() {
+  return SingleSourceFile;
 }
 
 StringRef HAKCSystemInformation::GetDagAnalysisRootPath() const {

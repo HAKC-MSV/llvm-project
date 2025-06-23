@@ -131,12 +131,15 @@ public:
 
   // symbol_epoch_map_t getEpochs();
 
+  StringRef GetSingleSourceFile();
+
 protected:
   CommonHAKCAnalysis &CommonAnalysis;
   HAKCTypeIdentifier TypeIdentifier;
   HAKCDatabaseInformation DatabaseInformation;
   bool DebugOutput;
   hakc::HAKCPassModeTypeEnum PassMode;
+  std::string SingleSourceFile;
   std::string Arch;
   std::string Platform;
   std::string DagAnalysisRootPath;

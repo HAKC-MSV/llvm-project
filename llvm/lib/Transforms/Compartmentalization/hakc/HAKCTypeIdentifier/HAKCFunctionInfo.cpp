@@ -14,7 +14,12 @@ HAKCFunctionInfo::HAKCFunctionInfo(CommonHAKCAnalysis &Analysis, StringRef Name,
 void HAKCFunctionInfo::SetFunction(Function *F) { SetGlobalObj(F); }
 
 Function *HAKCFunctionInfo::GetFunction() const {
-  return dyn_cast<Function>(GetGlobalObj());
+  auto glob = GetGlobalObj();
+  if (!glob) {
+    CommonHAKCAnalysis::getWriter(true) << "GetGlobalObj() is NULL!\n";
+    return nullptr;
+  }
+  return dyn_cast<Function>(glob);
 }
 
 void HAKCFunctionInfo::AddTypeUse(const std::shared_ptr<HAKCTypeInfo> &Ty) {

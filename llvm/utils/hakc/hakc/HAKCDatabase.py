@@ -479,7 +479,7 @@ class HAKCDatabase:
                 for data in info.to_dict(orient='records'):
                     # print(data)
                     ty = HAKCDatabase.__create_object_from_response(HAKCType, **data)
-                    ty_perm = HAKCTypePerm(Type=ty, RWX="".join([str(data["RWX.R"]), str(data["RWX.W"]), str(data["RWX.X"])]))
+                    ty_perm = HAKCTypePerm(Type=ty, RWX = (data["RWX.R"] << 2) + (data["RWX.W"] << 1) + data["RWX.X"])
                     types_used.add(ty_perm)
         except Exception as e:
             logger.error(f'get_types_used failed')

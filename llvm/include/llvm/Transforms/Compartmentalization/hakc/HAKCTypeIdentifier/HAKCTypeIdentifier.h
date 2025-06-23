@@ -139,6 +139,10 @@ protected:
 
   Type *FindAnonymousType(const DICompositeType *CompositeTy);
 
+  void TemporalAnalysisHandleCall(CallInst* Call, HAKCFunctionP FP);
+  void TemporalAnalysisHandleLoad(LoadInst* Load, HAKCFunctionP FP);
+  void TemporalAnalysisHandleStore(StoreInst* Store, HAKCFunctionP FP);
+
   CommonHAKCAnalysis &AnalysisHelper;
   DebugInfoFinder DbgInfoFinder;
   std::map<const DIType *, HAKCTypeP> types;
@@ -149,7 +153,12 @@ protected:
   std::set<HAKCTypeP> AllocaTypes;
   std::map<CallInst *, HAKCTypeP> IndirectCallsTypes;
   std::map<const DICompositeType *, Type *> AnonymousTypes;
+  std::map<Value*, HAKCTypeP> FindHAKCTypeMap;
   const DIScope *CompilationUnitScope;
+  int recursion_limit = 2;
+  int recursion_depth_di;
+  int recursion_depth_llvm;
+  int recursion_depth_other;
 };
 } // namespace llvm::hakc
 
