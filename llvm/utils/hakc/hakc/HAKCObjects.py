@@ -75,19 +75,20 @@ class HAKCDivision(HashedHAKCDBNode, yaml.YAMLObject):
     yaml_tag = "!HAKCDivision"
     relation_compartment = "has_compartment"
 
-    def __init__(self, DivisionID: int, AccessToken: Optional[int] = None, **kwargs):
+    def __init__(self, DivisionID: int, AccessToken: int = None, **kwargs):
         yaml.YAMLObject.__init__(self)
         HashedHAKCDBNode.__init__(self, **kwargs)
         self.division_id = DivisionID
         self.access_token = AccessToken
-        if "division_hash" in kwargs:
-            assert kwargs["division_hash"] == self.get_computed_hash(), f"division_hash ({kwargs['division_hash']}) =?= hash(self) ({self.get_computed_hash()})"
+        # print(self)
+        # if "division_hash" in kwargs:
+        #     assert kwargs["division_hash"] == self.get_computed_hash(), f"division_hash ({kwargs['division_hash']}) =?= hash(self) ({self.get_computed_hash()})"
 
     def pretty_print(self):
         return f"{self.get_table_name()}({self.division_id})"
 
     def __str__(self):
-        return f"{self.get_table_name()}(division_id={self.division_id}, access_token={self.access_token})"
+        return f"{self.get_table_name()}(division_id={self.division_id}, access_token={self.access_token}, hash={self.get_computed_hash()})"
 
     @classmethod
     def from_yaml(cls, loader: yaml.Loader, node):
@@ -96,7 +97,7 @@ class HAKCDivision(HashedHAKCDBNode, yaml.YAMLObject):
     def __eq__(self, other):
         if isinstance(other, HAKCDivision):
             # TODO: check equality
-            return self.division_id == other.division_id
+            return self.division_id == other.division_id and self.access_token == other.access_token
         return False
 
     def __hash__(self):
@@ -140,21 +141,21 @@ class HAKCDivision(HashedHAKCDBNode, yaml.YAMLObject):
 
 class HAKCCompartment(HAKCDBNode, yaml.YAMLObject):
     yaml_tag = "!HAKCCompartment"
-
     def __init__(self, CompartmentID: int, EntryToken: Optional[int] = None, **kwargs):
         yaml.YAMLObject.__init__(self)
-        kwargs["Name"] = kwargs.get("Name", str(CompartmentID))
+        # kwargs["Name"] = kwargs.get("Name", str(CompartmentID))
         HAKCDBNode.__init__(self, **kwargs)
         self.compartment_id = CompartmentID
         self.entry_token = EntryToken
-        if "compartment_hash" in kwargs:
-            assert kwargs["compartment_hash"] == self.get_computed_hash(), f"compartment_hash ({kwargs['compartment_hash']}) =?= hash(self) ({self.get_computed_hash()})"
+        # print(self)
+        # if "compartment_hash" in kwargs:
+        #     assert kwargs["compartment_hash"] == self.get_computed_hash(), f"compartment_hash ({kwargs['compartment_hash']}) =?= hash(self) ({self.get_computed_hash()}) [{self}]"
 
     def pretty_print(self):
         return f"{self.get_table_name()}({self.compartment_id})"
 
     def __str__(self):
-        return f"{self.get_table_name()}(compartment_id={self.compartment_id}, entry_token={self.entry_token})"
+        return f"{self.get_table_name()}(compartment_id={self.compartment_id}, entry_token={self.entry_token}, hash={self.get_computed_hash()})"
 
     @classmethod
     def from_yaml(cls, loader: yaml.Loader, node):
@@ -178,7 +179,7 @@ class HAKCCompartment(HAKCDBNode, yaml.YAMLObject):
         return hash(self) < hash(other)
 
     def get_hash_inputs(self) -> list[object]:
-        return [self.compartment_id]
+        return [self.compartment_id, self.entry_token]
 
     @staticmethod
     def get_primary_key() -> HAKCDBColumn:
@@ -349,7 +350,7 @@ class HAKCScope(HashedHAKCDBNode, yaml.YAMLObject):
     def __init__(self, Scope: str, LocalScopeName: Optional[str] = None, **kwargs):
         yaml.YAMLObject.__init__(self)
         self.scope = Scope
-        kwargs["Name"] = LocalScopeName if LocalScopeName is not None else self.scope
+        # kwargs["Name"] = LocalScopeName if LocalScopeName is not None else self.scope
         HashedHAKCDBNode.__init__(self, **kwargs)
         self.local_scope_name = LocalScopeName if LocalScopeName is not None else HAKCScope.global_scope
         self.is_global_scope = self.scope == HAKCScope.global_scope

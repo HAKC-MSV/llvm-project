@@ -990,9 +990,9 @@ std::shared_ptr<hakc::HAKCTypeInfo>
 hakc::HAKCTypeIdentifier::FindType(Type *Ty) const {
   // remove this functionality, because it would only work for non pointers and
   // is logically incorrect
-  recursion_depth_llvm++;
+  // recursion_depth_llvm++;
   if (isa<PointerType>(Ty)) {
-    recursion_depth_llvm = 0;
+    // recursion_depth_llvm = 0;
     return nullptr;
   }
   auto debug = AnalysisHelper.GetSystemInfo().OutputDebugInfo();
@@ -1005,11 +1005,11 @@ hakc::HAKCTypeIdentifier::FindType(Type *Ty) const {
           << "Comparing " << it.second->GetLLVMType() << " with " << Ty << "\n";
     }
     if (it.second->GetLLVMType() && it.second->GetLLVMType() == Ty) {
-      recursion_depth_llvm = 0;
+      // recursion_depth_llvm = 0;
       return it.second;
     }
   }
-  recursion_depth_llvm = 0;
+  // recursion_depth_llvm = 0;
   return nullptr;
 }
 
@@ -1603,10 +1603,8 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::HandleIndirectCall(CallInst *CallI) {
 
 hakc::HAKCTypeIdentifier::HAKCTypeIdentifier(CommonHAKCAnalysis &AnalysisHelper)
     : AnalysisHelper(AnalysisHelper), DbgInfoFinder(), types(), globals(),
-      functions(), AllocaTypes(), IndirectCallsTypes(), AnonymousTypes(),
+      functions(), IndirectCallsTypes(), AnonymousTypes(),
       CompilationUnitScope(nullptr), recursion_depth_di(0), recursion_depth_llvm(0), recursion_depth_other(0) {}
-      functions(), MissingPointerTypes(), IndirectCallsTypes(),
-      AnonymousTypes(), CompilationUnitScope(nullptr) {}
 
 Module &hakc::HAKCTypeIdentifier::GetModule() const {
   return AnalysisHelper.GetModule();

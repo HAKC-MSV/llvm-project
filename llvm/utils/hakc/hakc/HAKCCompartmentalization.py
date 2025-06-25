@@ -79,6 +79,12 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
 
     def load_from_db(self, conn: HAKCDatabase):
         assert(isinstance(conn, HAKCDatabase))
+
+        # TODO: by default, the allowable access is empty (as far as I can tell), so this shouldn't be needed to validate the token hashes yet
+        # get the divisions and compartments first
+        # find all divisions that a symbol can reach via dag edges that are in the same compartment
+        # create the compartments, then the divisions, then calculate the tokens
+
         functions = conn.get_functions()
         for function in functions:
             self.__add_function(function)
@@ -86,6 +92,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             for dag_edge in dag_edges:
                 self.add_dag_edge(dag_edge[0], function, dag_edge[1])
                 # print(f"Adding dag_edge: ({function})-[{dag_edge[1]}]->({dag_edge[0]})")
+
             division, compartment, = conn.get_division_compartment(function)
             self.__add_division_compartment(function, division, compartment)
 
@@ -191,14 +198,6 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             nodes.add((division, compartment))
         return nodes
 
-    def __compute_tokens(self):
-        pass
-        for division, compartment in self.get_divisions_compartments():
-            compartment.entry_token = self.compute_entry_token(compartment.compartment_id)
-            division.access_token = self.compute_access_token(division.division_id, compartment.compartment_id)
-            print(f"Computed access token and entry token for {division}, and {compartment}")
-
-
     def __add_division_compartment(self, symbol: HAKCSymbol, division: HAKCDivision, compartment: HAKCCompartment):
         assert(isinstance(symbol, HAKCSymbol))
         assert(isinstance(division, HAKCDivision))
@@ -212,19 +211,59 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         division_id = HAKCCompartmentalization.default_division
         symbols = list(self.get_symbols())
         # first construct all the compartments and divisions
+
         for symbol in logger.progress_bar(iterable=symbols, desc='Adding default compartmentalization'):
+            # TODO: update; setting some default value for now, will update with Derrick (current implementation is probably logically incorrect)
             compartment = HAKCCompartment(compartment_id)
-            # setting access_token to compartment_id temporarily so multiple HAKCDivision objects can be created (otherwise the hashes would be the same, and only one would be created)
-            division = HAKCDivision(division_id, compartment_id)
+            compartment.entry_token = self.compute_entry_token(compartment_id)
+            division = HAKCDivision(division_id)
+            division.access_token = self.compute_access_token(division_id, compartment_id)
+            print(f"adding div {division} -> comp {compartment} for symbol {symbol}")
             self.__add_division_compartment(symbol, division, compartment)
             compartment_id += 1
-        # then compute all the tokens
-        self.__compute_tokens()
+        #
+        # divs_comps = self.get_divisions_compartments()
+        # for div, comp in divs_comps:
+        #     # save original nodes
+        #     # comp = _comp
+        #     # div = _div
+        #     # self.remove_node(comp)
+        #     # self.remove_node(div)
+        #     # remove original nodes
+        #     # self.remove_node(_comp)
+        #     # self.remove_node(_div)
+        #     # Note: must compute tokens af
+        #     _comp = comp
+        #     _div = div
+        #     comp_attrs = self.nodes[comp]
+        #     div_attrs = self.nodes[div]
+        #     print("___________")
+        #     print(f"div {div} -> comp {comp}")
+        #     print(self[comp])
+        #
+        #     self.remove_node(_comp)
+        #     self.remove_node(_div)
+        #
+        #     _comp.entry_token = self.compute_entry_token(comp.compartment_id)
+        #     _div.access_token = self.compute_access_token(div.division_id, comp.compartment_id)
+        #
+        #     _comp.compute_hash()
+        #     _div.compute_hash()
+        #     # remove old node
+        #     self.add_node(comp, **comp_attrs)
+        #     self.add_node(div, **div_attrs)
+        #     # # force hash to be recomputed
+        #     # write back the updated nodes
+        #
+        #     # self.add_node(comp)
+        #     # self.add_node(div)
+
         self.persist_to_database(conn, create_schema=create_schema)
 
-    def compute_entry_token(self,compartment_id: int) -> int:
+    def compute_entry_token(self, compartment_id: int, divisions: list['HAKCDivision'] = []) -> int:
         token = compartment_id << self.max_division_count
-        for division in self.get_divisions():
+        # TODO: ask derrick - does this apply to all divisions, or just divisions in the same compartment?
+        for division in divisions:
             token |= (1 << division.division_id)
         return token
 
@@ -338,6 +377,19 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
 
     def get_symbol_by_name(self, symbol_name):
         return self.get_filtered_nodes(self, node_filter=lambda n: (isinstance(n, HAKCFunction) or isinstance(n, HAKCGlobalVariable)) and n.name == symbol_name)
+
+    @staticmethod
+    def convert_rwx(**rwx):
+        return int((rwx["R"] << 2) + (rwx["W"] << 1) + rwx["X"])
+
+    def get_types_used(self, func):
+        print(func)
+        types_used = set()
+        for n0, n1, data in self.edges(func, data=True):
+            if(n0 == func and isinstance(n1, HAKCType) and 'R' in data):
+                print(f"\tFound type {n1} with perm {self.convert_rwx(**data)}")
+                types_used.add(HAKCTypePerm(n1, self.convert_rwx(**data)))
+        return types_used
 
     def get_symbol_compartment_id(self, symbol: HAKCSymbol) -> int:
         for neighbor in self.neighbors(symbol):
@@ -543,16 +595,17 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         # node_filter = lambda n: (isinstance(n, HAKCFunction) or isinstance(n, HAKCGlobalVariable)) and n.name == symbol_name
         # _symbol = nx.subgraph_view(G, filter_node=node_filter).nodes()
         functions = self.get_functions()
-        print(functions)
-        symbol = [n for n in functions if n.name == symbol_name]
-        print(f"Found {symbol} of type {type(symbol)}")
-        # symbol = self.nodes[_symbol]
+        # print(functions)
+        if symbol_name:
+            symbol = [n for n in functions if n.name == symbol_name]
+            print(f"Found {symbol} of type {type(symbol)}")
+            # symbol = self.nodes[_symbol]
 
-        # symbol = self.get_symbol_by_name(symbol_name)
-        # print(f"Found symbol {symbol} in {len(symbol)}")
-        symbol_descendents = nx.descendants(G, symbol[0])
-        # print(f"{symbol} has {symbol_descendents} descendents!")
-        G = G.subgraph(symbol_descendents)
+            # symbol = self.get_symbol_by_name(symbol_name)
+            # print(f"Found symbol {symbol} in {len(symbol)}")
+            symbol_descendents = nx.descendants(G, symbol[0])
+            # print(f"{symbol} has {symbol_descendents} descendents!")
+            G = G.subgraph(symbol_descendents)
 
         if prune:
             top_n_node_ids = HAKCCompartmentalization.show_top_n_degrees(G, N)

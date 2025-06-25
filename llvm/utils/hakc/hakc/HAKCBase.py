@@ -101,9 +101,15 @@ class HAKCPrintableObj:
 
     def compute_hash(self):
         if self.computed_hash is None:
+            # print(f"Computing hash with [{self.get_hash_inputs()}]")
             self.computed_hash = HAKCHashValue(self.get_hash_inputs())
 
+    def recompute_hash(self):
+        self.computed_hash = HAKCHashValue(self.get_hash_inputs())
+
     def get_computed_hash(self) -> HAKCHashValue:
+        # note: moving none check here breaks the kuzu db for some reason
+        # if self.computed_hash is None:
         self.compute_hash()
         return self.computed_hash
 

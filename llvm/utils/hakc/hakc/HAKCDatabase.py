@@ -88,6 +88,7 @@ class HAKCDatabase:
         return ret
 
     def get_all_divisions_in_compartment(self, compartment_ids: set[int]) -> dict[int, list[HAKCDivision]]:
+        # TODO: ask derrick - is the arrow between comp1 and div1 backwards?
         cmd = f"""
         MATCH (comp1:{HAKCCompartment.get_table_name()})<-[:{HAKCDivision.InCompartmentTable}]-(div1:{HAKCDivision.get_table_name()})
         WHERE comp1.CompartmentID IN [{','.join([str(i) for i in compartment_ids])}]
@@ -186,6 +187,8 @@ class HAKCDatabase:
 
         return targets
 
+
+
     def persist_dag_edges(self, dag_edge_data):
         head_hashes = list()
         tail_hashes = list()
@@ -273,12 +276,8 @@ class HAKCDatabase:
                 divisions.add(HAKCDivision(**data))
         return divisions
 
-    def get_symbol_definition_location(self, symbol: HAKCSymbol) -> tuple[HAKCCompilationUnit, int] | None:
-        symbol = HAKCSymbol.get_table_name()
-        symbol_hash = HAKCSymbol.get_primary_key()
-        # symbol_hash = HAKCSymbol.get_primary_key().column_name
-        symbol_cu_edge = HAKCSymbol.relation_compilation_unit
-        cu = HAKCCompilationUnit.get_table_name()
+
+
     def get_all_compartments(self) -> list[HAKCCompartment]:
         cmd = f"""
         MATCH (c:{HAKCCompartment.get_table_name()})
@@ -308,8 +307,12 @@ class HAKCDatabase:
 
         return result
 
-    def get_symbol_definition_location(self, symbol: HAKCSymbol) -> Optional[
-        tuple[HAKCCompilationUnit, int]]:
+    def get_symbol_definition_location(self, symbol: HAKCSymbol) -> Optional[tuple[HAKCCompilationUnit, int]]:
+        symbol = HAKCSymbol.get_table_name()
+        symbol_hash = HAKCSymbol.get_primary_key()
+        # symbol_hash = HAKCSymbol.get_primary_key().column_name
+        symbol_cu_edge = HAKCSymbol.relation_compilation_unit
+        cu = HAKCCompilationUnit.get_table_name()
         cmd = f"""
         MATCH ({symbol})-[{symbol_cu_edge}]->({cu})
         WHERE {symbol}.{symbol_hash} = $symbol_hash
@@ -422,7 +425,7 @@ class HAKCDatabase:
             cmd.append(f'LIMIT {limit}')
         symbols = list()
         cmd_str = " ".join(cmd)
-        response = self.execute_prepared_stmt(prepared_stmt=cmd_str, **kwargs)
+        response = self.execute_prepared_stmt(cmd_str)
         if response.has_next():
             info = response.get_as_df()
             for data in info.to_dict(orient='records'):
@@ -541,6 +544,7 @@ class HAKCDatabase:
         RETURN DISTINCT {type_attrs}, {scope_attrs}, {symbol_attrs}, {cu_attrs};
         """
         try:
+            # print(f"final_hash: {int(_symbol.get_computed_hash().final_hash)}")
             response = self.execute_prepared_stmt(cmd, symbol_hash=int(_symbol.get_computed_hash().final_hash))
             used_symbols = set()
             if response.has_next():
@@ -614,12 +618,14 @@ class HAKCDatabase:
             cls_data = {key.removeprefix(f"{cls.get_table_name()}."): val for key, val in data.items()}
             return HAKCFunction(**cls_data)
         elif cls == HAKCDivision:
+            # data["HAKCDivision.CompartmentID"] = data["HAKCCompartment.CompartmentID"]
             compartment = HAKCDatabase.__create_object_from_response(HAKCCompartment, **data)
-            data["HAKCDivision.CompartmentID"] = data["HAKCCompartment.CompartmentID"]
+            # data["HAKCDivision.CompartmentID"] = data["HAKCCompartment.CompartmentID"]
             div_data = {key.removeprefix(f"{cls.get_table_name()}."): val for key, val in data.items() if key.startswith(cls.get_table_name())}
             return HAKCDivision(**div_data), compartment
         elif cls == HAKCCompartment:
             cls_data = {key.removeprefix(f"{cls.get_table_name()}."): val for key, val in data.items() if key.startswith(cls.get_table_name())}
+            # print(f"cls_data for compartment: {cls_data}")
             return HAKCCompartment(**cls_data)
 
         cls_data = {key.removeprefix(f"{cls.get_table_name()}."): val for key, val in data.items() if key.startswith(cls.get_table_name())}
@@ -700,7 +706,7 @@ class HAKCDatabase:
         scope_attrs = HAKCDatabase.get_object_attributes(HAKCScope)
         cmd = f"""
         MATCH ({scope})<-[:{symbol_scope_edge}]-({symbol})-[:{symbol_division_edge}]->({division})-[:{division_compartment_edge}]->({compartment})
-        WHERE {symbol}.{symbol_hash} = $symbol_hash AND {division}.division_hash IS NOT NULL AND {compartment}.compartment_hash IS NOT NULL AND {scope}.{scope_hash} IS NOT NULL 
+        WHERE {symbol}.{symbol_hash} = $symbol_hash  
         RETURN DISTINCT {scope_attrs}, {symbol_attrs}, {division_attrs}, {compartment_attrs};
         """
         # print(cmd)
@@ -712,10 +718,16 @@ class HAKCDatabase:
             # print(info)
             assert len(info) == 1, print(info)
             for data in info.to_dict(orient='records'):
+
                 # print(f"Division and Compartment data: {data}")
                 div, comp = HAKCDatabase.__create_object_from_response(HAKCDivision, **data)
+
                 # print(div)
                 # print(comp)
+        # for division, compartment in self.get_divisions_compartments():
+        #     compartment.entry_token = self.compute_entry_token(compartment.compartment_id)
+        #     division.access_token = self.compute_access_token(division.division_id, compartment.compartment_id)
+        #     print(f"Computed access token and entry token for {division}, and {compartment}")
         assert(div and comp)
         return div, comp
 

@@ -22,7 +22,7 @@ from hakc.HAKCCompartmentalization import HAKCCompartmentalization
 from hakc.HAKCDatabase import HAKCDatabase
 from hakc.HAKCLogger import LoggingLevelEnum, parse_log_level, setup_logging, HAKCLogger
 from hakc.HAKCObjects import HAKCSymbol, HAKCFunction, HAKCGlobalVariable, \
-    HAKCCompartment, HAKCDivision, HAKCCompilationUnit, HAKCCompartmentalizationAdjustment
+    HAKCCompartment, HAKCDivision, HAKCCompilationUnit, HAKCCompartmentalizationAdjustment, HAKCType
 
 import matplotlib.pyplot as plt
 from networkx.drawing.nx_agraph import graphviz_layout
@@ -196,6 +196,68 @@ def node_with_max_edges(graph):
     # print(graph.degree)
     return max(graph.degree, key=lambda item: item[1])[0]
 
+def temporal_coalesce(G: HAKCCompartmentalization):
+    # https://networkx.org/documentation/stable/reference/algorithms/traversal.html
+    epoch_map = {}
+
+    # use main node as source
+    src = list(G.get_symbol_by_name("main"))[0]
+    # print(src)
+    epoch = 0
+    # Note: use nx.edge_bfs because bfs_successors may miss some nodes on partially traversed trees
+    # Note: Also, don't rely on types in types_used to point to the same object because a copy is implicitly made
+
+    for n0, n1, key in nx.edge_bfs(G, src):
+        if isinstance(n0, HAKCFunction):
+            if n0 not in epoch_map:
+                epoch_map[n0] = epoch
+                epoch += 1
+
+    print(f"Created epoch map {epoch_map}")
+    lst = list()
+    for n0, n1, key in nx.edge_bfs(G, src):
+        if isinstance(n0, HAKCFunction) and isinstance(n1, HAKCFunction) and key == "has_dag":
+            # now, get the type perm data
+            type_perms0 = G.get_types_used(n0)
+            type_perms1 = G.get_types_used(n1)
+            common_perms = type_perms0.union(type_perms1)
+            # print(f"{n0} -[{key}-> {n1}")
+            # print(f"\tHave TypePerms in common: {common_perms}")
+            if(len(common_perms) > 0):
+                print(f"Could merge {n0} in epoch {epoch_map[n0]} with {n1} in epoch {epoch_map[n1]}")
+
+
+
+    # print(f"successors: {nx.bfs_successors(G, sym0)}")
+    # for success in nx.bfs_successors(G, src):
+    #     n = success[0]
+    #     e = success[1]
+    #     print(f"Found successor {n} -> {e}")
+    #     if(isinstance(n, HAKCFunction)):
+    #         print(f"\tTypesUsed: {n.types_used}")
+    #     # find edges between
+    #     # print(success)
+
+    # loop through all edges
+    # for e0 in G.edges(data=True):
+    #     sym0 = e0[0]
+    #     ty0 = e0[1]
+    #     rwx0 = e0[2]
+    #     # A is a symbol that uses type B, and the edge between them is an RWX permission
+    #     if isinstance(sym0, HAKCSymbol) and isinstance(ty0, HAKCType) and "R" in rwx0:
+            # Now find all the symbols that are connected to A, and their types and permissions
+            # for _sym1 in [e1[1] for e1 in G.edges(sym0, data=True)]:
+            #     for e2 in G.edges(_sym1, data=True):
+            #         sym1 = e2[0]
+            #         ty1 = e2[1]
+            #         rwx1 = e2[2]
+            #         if isinstance(sym1, HAKCSymbol) and isinstance(ty1, HAKCType) and ty0 == ty1 and sym0 != sym1 and "R" in rwx1:
+            #             # print(f"ty1 {ty1} <{rwx1}]- sym1 {sym1} - sym0 {sym0} -[{rwx0}]> ty0 {ty0}")
+            #             if rwx0 == rwx1:
+            #                 print(f"Can merge epochs at sym0 {sym0} and sym1 {sym1} with rwx {rwx0['R']}{rwx0['W']}{rwx0['X']} -> {rwx1['R']}{rwx1['W']}{rwx1['X']}")
+
+
+
 
 def temporal_analysis(db_dir: str):
 
@@ -213,7 +275,9 @@ def temporal_analysis(db_dir: str):
     hash_to_sym_map = conn.get_symbol_hashes_to_symbols()
     for child0, child1 in pair:
         print(f"Could merge {hash_to_sym_map[child0]} and {hash_to_sym_map[child1]}")
-    print(f"Found {len(pair)} pairs to merge")
+    print(f"Found {len(pair)} pairs to merge using Kuzu algorithm")
+
+    temporal_coalesce(compartmentalization)
 
     end = time.time()
 
