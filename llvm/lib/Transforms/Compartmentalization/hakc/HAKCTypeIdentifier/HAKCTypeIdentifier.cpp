@@ -1293,26 +1293,56 @@ hakc::HAKCTypeIdentifier::FindPointerType(const HAKCTypeInfo &BaseType) {
   return nullptr;
 }
 
+void hakc::HAKCTypeIdentifier::FindHAKCTypeMapDebug(Value*V, bool printall) {
+  // print out all the map values
+  // if (printall) {
+  //   for (auto &pair : FindHAKCTypeMap) {
+  //     if (pair.second) {
+  //       CommonHAKCAnalysis::getWriter(true) << "0000007 Found cached HAKCTypeP for Value* " << pair.first << ": " << *pair.second << "\n";
+  //     }
+  //     else {
+  //       CommonHAKCAnalysis::getWriter(true) << "0000007 Found cached HAKCTypeP for Value* " << pair.first << ": NULL \n";
+  //     }
+  //   }
+  // }
+  if (FindHAKCTypeMap.contains(V)) {
+    if (FindHAKCTypeMap[V]) {
+      CommonHAKCAnalysis::getWriter(true) << "0000005 Found cached HAKCTypeP for Value* " << *V << ": " << *FindHAKCTypeMap[V] << "\n";
+    }
+    else {
+      CommonHAKCAnalysis::getWriter(true) << "0000006 Found cached HAKCTypeP for Value* " << *V << ": NULL \n";
+    }
+  }
+  else {
+    CommonHAKCAnalysis::getWriter(true) << "0000004 unable to find cached HAKCTypeP for Value*" << *V << "\n";
+  }
+}
+
 hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
+  // TODO: this is called a lot, add caching
   HAKCTypeP FoundType = nullptr;
   Type *BaseType = nullptr;
 
+  FindHAKCTypeMapDebug(V, false);
   if (FindHAKCTypeMap.contains(V)) {
     FoundType = FindHAKCTypeMap[V];
-    CommonHAKCAnalysis::getWriter(true)
-      << "Found cached HAKCTypeP for Value* " << *V << ": " << *FoundType << "\n";
     return FoundType;
   }
 
   CommonHAKCAnalysis::getWriter(
       AnalysisHelper.GetSystemInfo().OutputDebugInfo())
-      << "Attempting to find HAKCTypeInfo for " << *V << "\n";
+      << "Attempting to find HAKCTypeInfo for aoeu" << *V << "\n";
 
   auto Declarations = llvm::findDVRDeclares(V);
   for (auto *Declaration : Declarations) {
     if (auto *DbgLocalVar = Declaration->getVariable()) {
       if (auto *DbgType = DbgLocalVar->getType()) {
         if (auto HAKCTy = FindType(DbgType)) {
+          FindHAKCTypeMap[V] = HAKCTy;
+          if (FindHAKCTypeMap[V]) {
+            CommonHAKCAnalysis::getWriter(true) << "0000000 Adding cached HAKCTypeP for Value* " << *V << ": " << *FindHAKCTypeMap[V] << "\n";
+          }
+          FindHAKCTypeMapDebug(V, true);
           return HAKCTy;
         }
       }
@@ -1324,9 +1354,6 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
   } else if (isa<GetElementPtrInst>(V)) {
     BaseType = dyn_cast<GetElementPtrInst>(V)->getSourceElementType();
   } else if (auto *Arg = dyn_cast<Argument>(V)) {
-    CommonHAKCAnalysis::getWriter(true) <<
-    "0000000002 Trying to get type of arg: " << *V << "\n";
-
     FoundType = GetArgumentHAKCType(Arg);
   } else if (auto *AllocaI = dyn_cast<AllocaInst>(V)) {
     BaseType = AllocaI->getAllocatedType();
@@ -1346,6 +1373,11 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
       if (!Result) {
         Result = AddMissingPointerType(FuncTy);
       }
+      FindHAKCTypeMap[V] = Result;
+      if (FindHAKCTypeMap[V]) {
+        CommonHAKCAnalysis::getWriter(true) << "0000001 Adding cached HAKCTypeP for Value* " << *V << ": " << *FindHAKCTypeMap[V] << "\n";
+      }
+      FindHAKCTypeMapDebug(V, true);
       return Result;
     }
     BaseType = Func->getFunctionType();
@@ -1356,6 +1388,11 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
           CallI->getCalledFunction()->getSubprogram()->getType();
       const auto *ReturnTy = SubprogramTy->getTypeArray()[0];
       if (auto Result = FindType(ReturnTy)) {
+        FindHAKCTypeMap[V] = Result;
+        if (FindHAKCTypeMap[V]) {
+          CommonHAKCAnalysis::getWriter(true) << "0000002 Adding cached HAKCTypeP for Value* " << *V << ": " << *FindHAKCTypeMap[V] << "\n";
+        }
+        FindHAKCTypeMapDebug(V, true);
         return Result;
       }
     }
@@ -1367,9 +1404,9 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
     CommonHAKCAnalysis::getWriter(
         AnalysisHelper.GetSystemInfo().OutputDebugInfo())
         << "Using BaseType " << *BaseType << "\n";
-    // if (!isa<PointerType>(BaseType)) {
-    //   FoundType = FindType(BaseType);
-    // } else {
+    if (!isa<PointerType>(BaseType)) {
+      FoundType = FindType(BaseType);
+    } else {
       for (auto &U : V->uses()) {
         if (!U) {
           CommonHAKCAnalysis::getWriter(true) << "Trying to find Type of U, but U is NULL!\n";
@@ -1392,7 +1429,7 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
         }
       }
     }
-  // }
+  }
 
   if (FoundType) {
     if (FoundType->IsPointerType() && FoundType->GetPointeeType() == nullptr) {
@@ -1410,6 +1447,10 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
         << "Cound not find HAKCTypeInfo for " << V << "\n";
   }
   FindHAKCTypeMap[V] = FoundType;
+  if (FindHAKCTypeMap[V]) {
+    CommonHAKCAnalysis::getWriter(true) << "0000003 Adding cached HAKCTypeP for Value* " << *V << ": " << *FindHAKCTypeMap[V] << "\n";
+  }
+  FindHAKCTypeMapDebug(V, true);
   return FoundType;
 }
 
@@ -1603,7 +1644,7 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::HandleIndirectCall(CallInst *CallI) {
 
 hakc::HAKCTypeIdentifier::HAKCTypeIdentifier(CommonHAKCAnalysis &AnalysisHelper)
     : AnalysisHelper(AnalysisHelper), DbgInfoFinder(), types(), globals(),
-      functions(), IndirectCallsTypes(), AnonymousTypes(),
+      functions(), IndirectCallsTypes(), AnonymousTypes(), FindHAKCTypeMap(),
       CompilationUnitScope(nullptr), recursion_depth_di(0), recursion_depth_llvm(0), recursion_depth_other(0) {}
 
 Module &hakc::HAKCTypeIdentifier::GetModule() const {

@@ -80,6 +80,11 @@ class HAKCPrintableObj:
             print("Found it")
         self.computed_hash = None
 
+    def __repr__(self):
+        cls = self.__class__.__name__
+        inside_strings = [f'{key}={str(value)}' for key, value in self.get_info_tokens(convert_hash=False).items()]
+        return f'{cls}({", ".join(sorted(inside_strings))})'
+
     def __str__(self):
         cls = self.__class__.__name__
         inside_strings = [f'{key}={str(value)}' for key, value in self.get_info_tokens(convert_hash=False).items()]

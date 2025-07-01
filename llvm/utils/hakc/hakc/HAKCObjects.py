@@ -320,8 +320,14 @@ class HAKCTypePerm(yaml.YAMLObject):
         assert (0 <= self.RWX <= 7) # RWX should be between 000 and 111
         assert (isinstance(self.perm_type, HAKCType))
 
+    def __repr__(self):
+        return self.__str__()
+
+    def __str__(self):
+        return f"{self.yaml_tag[1:]}(RWX({self.RWX}) of {self.perm_type.debug_type})"
+
     def pretty_print(self):
-        return f"{self.yaml_tag[1:]}(RWX({self.RWX} of {self.perm_type.debug_type}))"
+        return f"{self.yaml_tag[1:]}(RWX({self.RWX}) of {self.perm_type.debug_type})"
 
     def debug_print(self):
         return f"""\t{self.yaml_tag} [:- {self.RWX} -> {self.perm_type.debug_print()}\n"""
@@ -468,6 +474,9 @@ class HAKCSymbol(HashedHAKCDBNode, yaml.YAMLObject):
         if isinstance(other, HAKCSymbol):
             return hash(self) == hash(other)
         return False
+
+    def __lt__(self, other):
+        return hash(self) < hash(other)
 
     def __hash__(self):
         return HAKCDBNode.__hash__(self)

@@ -213,19 +213,20 @@ def temporal_coalesce(G: HAKCCompartmentalization):
                 epoch_map[n0] = epoch
                 epoch += 1
 
-    print(f"Created epoch map {epoch_map}")
-    lst = list()
-    for n0, n1, key in nx.edge_bfs(G, src):
-        if isinstance(n0, HAKCFunction) and isinstance(n1, HAKCFunction) and key == "has_dag":
+    G.temporal_coalesce_parent_child(src, epoch_map)
+    G.temporal_coalesce_parent_children(src, epoch_map)
+    G.save_graph("temporal_coalesce.svg", filter_symbols=True)
+    # print(f"Created epoch map {epoch_map}")
+    # lst = list()
+    # for n0, n1, key in nx.edge_bfs(G, src):
+    #     #  and key == "has_dag"
+    #     if isinstance(n0, HAKCFunction) and isinstance(n1, HAKCFunction):
+            # print(n0)
             # now, get the type perm data
-            type_perms0 = G.get_types_used(n0)
-            type_perms1 = G.get_types_used(n1)
-            common_perms = type_perms0.union(type_perms1)
-            # print(f"{n0} -[{key}-> {n1}")
-            # print(f"\tHave TypePerms in common: {common_perms}")
-            if(len(common_perms) > 0):
-                print(f"Could merge {n0} in epoch {epoch_map[n0]} with {n1} in epoch {epoch_map[n1]}")
 
+            # common_perms = G.get_common_type_perms(n0, n1, debug=True)
+            # if(len(common_perms) > 0):
+            #     print(f"Could merge {n0} in epoch {epoch_map[n0]} with {n1} in epoch {epoch_map[n1]} with common permissions {common_perms}")
 
 
     # print(f"successors: {nx.bfs_successors(G, sym0)}")
@@ -255,8 +256,6 @@ def temporal_coalesce(G: HAKCCompartmentalization):
             #             # print(f"ty1 {ty1} <{rwx1}]- sym1 {sym1} - sym0 {sym0} -[{rwx0}]> ty0 {ty0}")
             #             if rwx0 == rwx1:
             #                 print(f"Can merge epochs at sym0 {sym0} and sym1 {sym1} with rwx {rwx0['R']}{rwx0['W']}{rwx0['X']} -> {rwx1['R']}{rwx1['W']}{rwx1['X']}")
-
-
 
 
 def temporal_analysis(db_dir: str):

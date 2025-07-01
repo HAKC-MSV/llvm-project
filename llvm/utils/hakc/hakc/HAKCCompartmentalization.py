@@ -382,14 +382,109 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
     def convert_rwx(**rwx):
         return int((rwx["R"] << 2) + (rwx["W"] << 1) + rwx["X"])
 
-    def get_types_used(self, func):
-        print(func)
+    def get_types_used(self, func, debug=False):
+        if debug:
+            print(f"Function {func} has types used:")
         types_used = set()
-        for n0, n1, data in self.edges(func, data=True):
-            if(n0 == func and isinstance(n1, HAKCType) and 'R' in data):
-                print(f"\tFound type {n1} with perm {self.convert_rwx(**data)}")
-                types_used.add(HAKCTypePerm(n1, self.convert_rwx(**data)))
+        for n0, ty0, data in self.edges(func, data=True):
+            if(n0 == func and isinstance(ty0, HAKCType) and 'R' in data):
+                type_perm = HAKCTypePerm(ty0, self.convert_rwx(**data))
+                types_used.add(type_perm)
+                if debug:
+                    print(f"\t{type_perm}")
         return types_used
+
+    def get_common_type_perms(self, sym0, sym1, debug=False):
+        # return the intersection of the types used / permissions for two symbols
+        type_perms0 = self.get_types_used(sym0)
+        type_perms1 = self.get_types_used(sym1)
+        common_perms = type_perms0.intersection(type_perms1)
+        if debug and len(common_perms) > 0:
+            print(f"symbol {sym0} and {sym1}:")
+            print(f"{type_perms0} ∩ {type_perms1} \n\t= {common_perms}")
+        return common_perms
+
+    def temporal_coalesce_parent_child(self, parent, epoch_map):
+        # coalesce vertically (parent -> child)
+        # print(f"Parent {parent} has children:")
+        print(f"Starting temporal coalesce parent child")
+        for successor in nx.bfs_successors(self, parent, depth_limit=1):
+            assert(successor[0] == parent)
+            children = successor[1]
+            # print(f"\t{successor[0]}, {successor[1]}")
+            for child in children:
+                common_perms = self.get_common_type_perms(parent, child, debug=True)
+                if(len(common_perms) > 0):
+                    print(f"Could merge {parent} in epoch {epoch_map[parent]} with {child} in epoch {epoch_map[child]} with common permissions {common_perms}")
+        print(f"End temporal coalesce parent child")
+
+    @staticmethod
+    def init_map(_map, ns, value):
+        if not _map:
+            # initialize first level
+            for n0 in ns:
+                _map[n0] = dict()
+            # construct pairs
+            for n0 in ns:
+                for n1 in ns:
+                    if hash(n0) < hash(n1):
+                        n0, n1 = n1, n0
+                    _map[n0][n1] = value
+
+    @staticmethod
+    def insert_map(_map, n0, n1, value):
+        if hash(n0) < hash(n1):
+            n0, n1 = n1, n0
+        # only insert value if it does not exist
+        # if n0 not in _map:
+        #     _map[n0] = dict()
+        # if n1 not in _map[n0]:
+        if not(_map[n0][n1]):
+            _map[n0][n1] = value
+
+    @staticmethod
+    def get_map(_map, n0, n1):
+        if hash(n0) < hash(n1):
+            n0, n1 = n1, n0
+        return _map[n0][n1]
+
+    def temporal_coalesce_parent_children(self, parent, epoch_map):
+        # coalesce horizontally (parent -> child0, parent -> child1)
+        # for n0, n1, key in nx.edge_bfs(self, parent):
+
+        # construct a map which contains every function node
+
+        # funcs = filter(lambda x: isinstance(x, HAKCFunction), self.get_functions())
+        print(f"Starting temporal coalesce parent children")
+        for successor in nx.bfs_successors(self, parent, depth_limit=1):
+            assert(successor[0] == parent)
+
+            child0_child1_merge_map = dict()
+            children = sorted(list(filter(lambda x: isinstance(x, HAKCFunction), successor[1])))
+            print(f"children: {children}")
+            HAKCCompartmentalization.init_map(child0_child1_merge_map, children, None)
+
+            print("\t\t" + ",\t\t".join(list(map(lambda x: f"{x.name}", children))))
+            for child0 in children:
+                print(f"{child0.name}\t\t", end="")
+                for child1 in children:
+
+                    if child0 != child1:
+                        common_perms = self.get_common_type_perms(child0, child1, debug=False)
+                        if len(common_perms) > 0:
+                            HAKCCompartmentalization.insert_map(child0_child1_merge_map, child0, child1, True)
+                            # print(f"Could merge {child0} in epoch {epoch_map[child0]} with {child1} in epoch {epoch_map[child1]} with common permissions {common_perms}")
+                        else:
+                            HAKCCompartmentalization.insert_map(child0_child1_merge_map, child0, child1, False)
+                    print(f"{HAKCCompartmentalization.get_map(child0_child1_merge_map, child0, child1)}\t\t", end="")
+                print()
+            # print(f"child0_child1_merge_map: {child0_child1_merge_map}")
+
+            for a in child0_child1_merge_map.items():
+                print(f"{a[0]} \n\t-> {a[1]}")
+
+        print(f"End temporal coalesce parent children")
+
 
     def get_symbol_compartment_id(self, symbol: HAKCSymbol) -> int:
         for neighbor in self.neighbors(symbol):
@@ -588,10 +683,17 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         return [node for node, degree in sorted_degrees[:n]]
 
 
-    def save_graph(self, fname, symbol_name = None, prune = False, N = 50):
+    def save_graph(self, fname, symbol_name = None, prune = False, N = 50, filter_symbols = False):
         from networkx.drawing.nx_pydot import to_pydot
         print(f"Trying to save {self} to {fname}")
-        G = self.subgraph(self.nodes)
+
+        if filter_symbols:
+            # sorted(list(filter(lambda x: isinstance(x, HAKCFunction), successor[1])))
+            G = self.subgraph(list(filter(lambda x: isinstance(x, HAKCSymbol) or isinstance(x, HAKCType), self.nodes)))
+        else:
+            G = self.subgraph(self.nodes)
+
+
         # node_filter = lambda n: (isinstance(n, HAKCFunction) or isinstance(n, HAKCGlobalVariable)) and n.name == symbol_name
         # _symbol = nx.subgraph_view(G, filter_node=node_filter).nodes()
         functions = self.get_functions()

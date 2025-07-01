@@ -142,6 +142,7 @@ protected:
   void TemporalAnalysisHandleCall(CallInst* Call, HAKCFunctionP FP);
   void TemporalAnalysisHandleLoad(LoadInst* Load, HAKCFunctionP FP);
   void TemporalAnalysisHandleStore(StoreInst* Store, HAKCFunctionP FP);
+  void FindHAKCTypeMapDebug(Value*V, bool printall);
 
   CommonHAKCAnalysis &AnalysisHelper;
   DebugInfoFinder DbgInfoFinder;
