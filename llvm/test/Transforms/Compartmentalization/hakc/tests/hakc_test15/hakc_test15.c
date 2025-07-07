@@ -8,6 +8,7 @@
 // RUN: %HAKC_EVALUATE
 
 // Adapted from init/main.c in the Linux kernel and related sources
+// Tests transfer of void*
 #define __cold
 #ifndef __latent_entropy
 # define __latent_entropy
@@ -134,11 +135,15 @@ static int __init ignore_unknown_bootoption(char *param, char *val,
   return 0;
 }
 
+// CHECK-LABEL: HAKC_XFER_ignore_unknown_bootoption
+
 // CHECK-LABEL: HAKC_ORIG_do_initcall_level
 void __init do_initcall_level(int level, char *command_line)
 {
   initcall_entry_t *fn;
 
+  // CHECK: call ptr @hakc_sign_pointer_with_color(ptr @__start___param, i64 {{[0-9]+}}, i1 false)
+  // CHECK: call ptr @hakc_sign_pointer_with_color(ptr @HAKC_XFER_ignore_unknown_bootoption, i64 {{[0-9]+}}, i1 true)
   parse_args(initcall_level_names[level],
              command_line, __start___param,
              __stop___param - __start___param,
@@ -149,3 +154,9 @@ void __init do_initcall_level(int level, char *command_line)
   for (fn = initcall_levels[level]; fn < initcall_levels[level+1]; fn++)
     do_one_initcall(initcall_from_entry(fn));
 }
+
+// CHECK-LABEL: initcall_from_entry
+
+// CHECK-LABEL: HAKC_XFER_ignore_unknown_bootoption
+// CHECK: call ptr @hakc_transfer_to_clique(ptr %3, i64 1, i64 4, i64 13, i1 false)
+// CHECK: call void @hakc_color_address(ptr %3, i32 %10, i64 1)
