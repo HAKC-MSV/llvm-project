@@ -17,20 +17,32 @@ HAKCTypeInfo::HAKCTypeInfo(CommonHAKCAnalysis &Analysis, StringRef Name,
       IsIgnored(false) {}
 
 unsigned HAKCTypeInfo::GetSizeInBits() const {
+  unsigned SizeInBits = 0;
   if (DbgType) {
-    return DbgType->getSizeInBits();
+    SizeInBits = DbgType->getSizeInBits();
   }
-  return 0;
+
+  return SizeInBits > 0 ? SizeInBits : BITS_PER_BYTE;
 }
 
 bool HAKCTypeInfo::IsIgnoredType() const {
   bool Result = IsIgnored;
-  if (!Result && PointeeType) {
+  if (!Result && PointeeType && !IsVoidPtrType()) {
     Result = PointeeType->IsIgnoredType();
   }
   return Result;
 }
-void HAKCTypeInfo::SetIsIgnoredType(bool isIgnored) { IsIgnored = isIgnored; }
+void HAKCTypeInfo::SetIsIgnoredType(bool IsIgnored) {
+  this->IsIgnored = IsIgnored;
+}
+
+bool HAKCTypeInfo::IsVoidPtrType() const {
+  auto *StrippedDbgTy = StripTypeModifiers(DbgType);
+  if (isa_and_nonnull<DIDerivedType>(StrippedDbgTy)) {
+    return dyn_cast<DIDerivedType>(StrippedDbgTy)->getBaseType() == nullptr;
+  }
+  return false;
+}
 
 ConstantInt *HAKCTypeInfo::GetSizeInBytes() const {
   unsigned SizeInBits = GetSizeInBits();
@@ -75,8 +87,9 @@ bool HAKCTypeInfo::IsIntegerType() const {
 
 bool HAKCTypeInfo::IsPointerType() const {
   if (DbgType) {
-    return DbgType->getTag() == dwarf::DW_TAG_pointer_type ||
-           DbgType->getTag() == dwarf::DW_TAG_array_type;
+    auto *StrippedDbgTy = StripTypeModifiers(DbgType);
+    return StrippedDbgTy->getTag() == dwarf::DW_TAG_pointer_type ||
+           StrippedDbgTy->getTag() == dwarf::DW_TAG_array_type;
   } else if (LLVMType) {
     return LLVMType->isPointerTy() || LLVMType->isArrayTy();
   }
@@ -98,15 +111,20 @@ std::shared_ptr<HAKCTypeInfo> HAKCTypeInfo::GetPointeeType() const {
 
 const DIType *HAKCTypeInfo::StripTypeModifiers(const DIType *DiType) {
   auto *Result = DiType;
+  if (!Result) {
+    return nullptr;
+  }
 
   if (auto *DiDerivedType = dyn_cast<DIDerivedType>(DiType)) {
     auto TagToFind = DiDerivedType->getTag();
 
-    auto Search = [TagToFind](dwarf::Tag Tag) { return Tag == TagToFind; };
+    auto Search = [TagToFind](const dwarf::Tag Tag) {
+      return Tag == TagToFind;
+    };
 
-    SmallVector<dwarf::Tag> TagsToRemove = {dwarf::DW_TAG_volatile_type,
-                                            dwarf::DW_TAG_const_type,
-                                            dwarf::DW_TAG_restrict_type};
+    SmallVector<dwarf::Tag> TagsToRemove = {
+        dwarf::DW_TAG_volatile_type, dwarf::DW_TAG_const_type,
+        dwarf::DW_TAG_restrict_type, dwarf::DW_TAG_typedef};
     if (llvm::any_of(TagsToRemove, Search)) {
       if (DiDerivedType->getBaseType()) {
         Result = StripTypeModifiers(DiDerivedType->getBaseType());
@@ -131,7 +149,7 @@ bool HAKCTypeInfo::IsPointerToPointer(const DIType *DiType) {
   return false;
 }
 
-bool HAKCTypeInfo::IsPointerToPointer() {
+bool HAKCTypeInfo::IsPointerToPointer() const {
   if (DbgType) {
     return IsPointerToPointer(DbgType);
   }

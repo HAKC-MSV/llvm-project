@@ -6,7 +6,6 @@
 #define PMC_HAKC_DEFS_H
 
 #include "llvm/IR/IRBuilder.h"
-#include "llvm/IR/Instructions.h"
 
 /* Macro value defined in CheriBSD sys/module.h */
 #define HAKC_CHERIBSD_COMPARTMENT_METADATA_TYPE 5
@@ -66,10 +65,7 @@ typedef enum {
 } sym_color_t;
 
 typedef enum { hakc_global_scope, hakc_local_scope } hakc_scope_t;
-typedef enum {
-  READ_ONLY = 0,
-  READ_WRITE = 1
-} epoch_perms_options_t;
+typedef enum { READ_ONLY = 0, READ_WRITE = 1 } epoch_perms_options_t;
 
 const hakc_compartment_id_t KERNEL_COMPARTMENT = 0;
 const tictac_epoch_id_t KERNEL_EPOCH = 0;

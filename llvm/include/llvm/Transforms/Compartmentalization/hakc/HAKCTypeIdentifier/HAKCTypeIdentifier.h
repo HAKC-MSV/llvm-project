@@ -59,7 +59,7 @@ protected:
 
   HAKCTypeP FindPointeeType(HAKCPointerBase &HAKCPointer);
 
-  HAKCTypeP FindPointeeType(const HAKCTypeInfo &BaseType);
+  HAKCTypeP FindPointeeType(HAKCTypeP BaseType);
 
   HAKCTypeP FindPointerType(const HAKCTypeInfo &BaseType);
 
@@ -107,7 +107,7 @@ protected:
   HAKCGlobalP FindGlobal(const GlobalVariable *GV,
                          bool SearchUnmapped = false) const;
 
-  HAKCTypeP FindCalledFunctionType(FunctionType *FunctionTy);
+  HAKCTypeP FindCalledFunctionType(FunctionType *FunctionTy) const;
 
   HAKCTypeP CreateNoDebugType(Type *Ty) const;
 

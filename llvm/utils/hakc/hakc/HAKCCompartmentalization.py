@@ -137,13 +137,8 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         if symbol not in self.nodes:
             for existing_symbol in self.get_symbols():
                 if existing_symbol.name == symbol.name:
-                    symbol_hash_inputs = symbol.get_hash_inputs()
-                    existing_hash_inputs = symbol.get_hash_inputs()
-                    for symbol_hash_input, existing_hash_input in zip(symbol_hash_inputs, existing_hash_inputs):
-                        print(f'{hash(symbol_hash_input)} ? {hash(existing_hash_input)}')
                     symbol.computed_hash = None
                     existing_symbol.computed_hash = None
-                    print(f'{hash(symbol)} ? {hash(existing_symbol)}')
                     break
             raise RuntimeError(f'Symbol {symbol} could not be found')
         for nbr, edges in self.adj[symbol].items():

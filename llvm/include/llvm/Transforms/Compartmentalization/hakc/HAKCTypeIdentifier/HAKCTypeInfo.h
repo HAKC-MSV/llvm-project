@@ -47,7 +47,7 @@ public:
 
   static StringRef UnknownType;
 
-  bool IsPointerToPointer();
+  bool IsPointerToPointer() const;
 
   HAKCTypeP GetPointeeType() const;
 
@@ -61,7 +61,11 @@ public:
 
   bool IsIgnoredType() const;
 
-  void SetIsIgnoredType(bool isIgnored);
+  bool IsVoidPtrType() const;
+
+  void SetIsIgnoredType(bool IsIgnored);
+
+  static const DIType *StripTypeModifiers(const DIType *DiType);
 
 protected:
   std::map<unsigned, std::set<std::shared_ptr<HAKCTypeInfo>>> Members;
@@ -72,9 +76,7 @@ protected:
   HAKCTypeP PointeeType;
   bool IsIgnored;
 
-  bool IsPointerToPointer(const DIType *DiType);
-
-  const DIType *StripTypeModifiers(const DIType *DiType);
+  static bool IsPointerToPointer(const DIType *DiType);
 
 public:
   friend bool operator==(const HAKCTypeInfo &Lhs, const HAKCTypeInfo &Rhs) {
