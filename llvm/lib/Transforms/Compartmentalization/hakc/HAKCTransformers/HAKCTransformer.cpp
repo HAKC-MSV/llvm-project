@@ -314,8 +314,9 @@ GlobalVariable *hakc::HAKCTransformer::GetValidTargetCompartments(
 
   for (auto *Token : EntryTokenValues) {
     if (Token->getType() != EntryTokenTy) {
-      CommonHAKCAnalysis::getWriter(true) << "Token Type of " << *Token << " (" << *Token->getType()
-             << ") does not match " << *EntryTokenTy << "\n";
+      CommonHAKCAnalysis::getWriter(true)
+          << "Token Type of " << *Token << " (" << *Token->getType()
+          << ") does not match " << *EntryTokenTy << "\n";
       throw std::exception();
     }
   }
@@ -610,7 +611,8 @@ Instruction *hakc::HAKCTransformer::CreateVoidCastCompartmentTransfer(
   auto *size = TypeToUse->GetPointeeType()->GetSizeInBytes();
 
   if (size->equalsInt(0)) {
-    CommonHAKCAnalysis::getWriter(true) << "Zero size for HAKCType " << *TypeToUse->GetPointeeType() << "\n";
+    CommonHAKCAnalysis::getWriter(true)
+        << "Zero size for HAKCType " << *TypeToUse->GetPointeeType() << "\n";
     throw std::exception();
   }
 

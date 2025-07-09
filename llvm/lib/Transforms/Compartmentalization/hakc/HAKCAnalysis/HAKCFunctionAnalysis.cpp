@@ -26,7 +26,7 @@ HAKCFunctionAnalysis::HAKCFunctionAnalysis(
       DTree(*F), CurrentFunction(F), SetupHasRun(false),
       CompartmentTransferCount(0) {}
 
-void HAKCFunctionAnalysis::UpdateHAKCFunctionParameters() {
+void HAKCFunctionAnalysis::UpdateHAKCFunctionParameters() const {
   if (CommonHAKCAnalysis::IsUncompartmentalizedSymbol(CurrentFunction,
                                                       Policy)) {
     return;
@@ -134,7 +134,7 @@ Instruction *HAKCFunctionAnalysis::addCompartmentTransferCall(
  * @param user
  * @return True if the user is in the current function
  */
-bool HAKCFunctionAnalysis::userInFunction(Value *User) {
+bool HAKCFunctionAnalysis::userInFunction(Value *User) const {
   Function &F = GetFunction();
   if (auto *I = dyn_cast<Instruction>(User)) {
     return &F == I->getFunction();
@@ -150,9 +150,8 @@ bool HAKCFunctionAnalysis::userInFunction(Value *User) {
  * @param users
  * @return
  */
-BasicBlock *
-HAKCFunctionAnalysis::findDominatorUseBlock(Value *Ptr,
-                                            std::set<Instruction *> &Users) {
+BasicBlock *HAKCFunctionAnalysis::findDominatorUseBlock(
+    Value *Ptr, std::set<Instruction *> &Users) const {
   Function &F = GetFunction();
   BasicBlock *Dominator = nullptr;
   if (auto *I = dyn_cast<Instruction>(Ptr)) {
@@ -204,9 +203,8 @@ HAKCFunctionAnalysis::findDominatorUseBlock(Value *Ptr,
  * @param users The users of v
  * @return The location at which to insert a new Instruction
  */
-Instruction *
-HAKCFunctionAnalysis::FindUseInsertionPoint(Value *V,
-                                            std::set<Instruction *> &users) {
+Instruction *HAKCFunctionAnalysis::FindUseInsertionPoint(
+    Value *V, std::set<Instruction *> &users) const {
   if (auto phi = dyn_cast<PHINode>(V)) {
     return phi->getParent()->getFirstNonPHIOrDbgOrLifetime();
   }
@@ -232,7 +230,7 @@ HAKCFunctionAnalysis::FindUseInsertionPoint(Value *V,
   for (Instruction &I : *DominatorBlock) {
     if (&I == V) {
       return I.getNextNonDebugInstruction();
-    } else if (!isa<PHINode>(&I) && users.find(&I) != users.end()) {
+    } else if (!isa<PHINode>(&I) && users.contains(&I)) {
       return &I;
     }
   }
@@ -244,7 +242,7 @@ HAKCFunctionAnalysis::FindUseInsertionPoint(Value *V,
  * @brief Returns the current Function
  * @return
  */
-Function &HAKCFunctionAnalysis::GetFunction() { return *CurrentFunction; }
+Function &HAKCFunctionAnalysis::GetFunction() const { return *CurrentFunction; }
 
 /**
  * @brief Adds a check of a signed pointer which checks for valid data access
@@ -352,7 +350,7 @@ HAKCFunctionAnalysis::AddSafePointerCreationAtLocation(Value *SignedPtr,
  * @param arg The function argument to check
  * @return
  */
-bool HAKCFunctionAnalysis::argNeedsAuthentication(Use &arg) {
+bool HAKCFunctionAnalysis::argNeedsAuthentication(Use &arg) const {
   if (auto *call = dyn_cast<CallInst>(arg.getUser())) {
     if (auto *inlineAsm = dyn_cast<InlineAsm>(call->getCalledOperand())) {
       CommonHAKCAnalysis::getWriter(DebugActive)
@@ -385,8 +383,8 @@ bool HAKCFunctionAnalysis::argNeedsAuthentication(Use &arg) {
           PointerManager.PointerIsEligibleForManagement(arg));
 }
 
-bool HAKCFunctionAnalysis::IsCallInIntrinsicSet(CallBase *Call,
-                                                ArrayRef<Intrinsic::ID> IDs) {
+bool HAKCFunctionAnalysis::IsCallInIntrinsicSet(
+    CallBase *Call, ArrayRef<Intrinsic::ID> IDs) const {
   bool result = false;
   if (auto *intrinsic = dyn_cast<IntrinsicInst>(Call)) {
     auto IDToFind = intrinsic->getIntrinsicID();
@@ -411,7 +409,8 @@ bool HAKCFunctionAnalysis::IsCallInIntrinsicSet(CallBase *Call,
   return result;
 }
 
-bool HAKCFunctionAnalysis::IsIntrinsicNeedingAuthentication(CallBase *Call) {
+bool HAKCFunctionAnalysis::IsIntrinsicNeedingAuthentication(
+    CallBase *Call) const {
   Intrinsic::ID IntrinsicsNeedingAuth[] = {
       Intrinsic::IndependentIntrinsics::memcpy,
       Intrinsic::IndependentIntrinsics::memmove,
@@ -420,7 +419,7 @@ bool HAKCFunctionAnalysis::IsIntrinsicNeedingAuthentication(CallBase *Call) {
   return IsCallInIntrinsicSet(Call, IntrinsicsNeedingAuth);
 }
 
-bool HAKCFunctionAnalysis::IsIntrinsicNeedingCloning(CallBase *Call) {
+bool HAKCFunctionAnalysis::IsIntrinsicNeedingCloning(CallBase *Call) const {
   Intrinsic::ID IntrinsicsNeedingCloning[] = {
       Intrinsic::IndependentIntrinsics::lifetime_start,
       Intrinsic::IndependentIntrinsics::lifetime_end,
@@ -428,7 +427,7 @@ bool HAKCFunctionAnalysis::IsIntrinsicNeedingCloning(CallBase *Call) {
   return IsCallInIntrinsicSet(Call, IntrinsicsNeedingCloning);
 }
 
-bool HAKCFunctionAnalysis::IsIntrinsicToSkip(CallBase *Call) {
+bool HAKCFunctionAnalysis::IsIntrinsicToSkip(CallBase *Call) const {
   Intrinsic::ID IntrinsicsToSkip[] = {
       Intrinsic::IndependentIntrinsics::dbg_declare,
       /*Intrinsic::IndependentIntrinsics::dbg_addr,*/
@@ -453,7 +452,7 @@ bool HAKCFunctionAnalysis::phiNodeUsesValue(PHINode *PhiNode, Value *target,
     if (Val.get() == target || def == target) {
       return true;
     } else if (auto *phi = dyn_cast<PHINode>(def)) {
-      if (visited.find(phi) != visited.end()) {
+      if (visited.contains(phi)) {
         continue;
       }
       if (phiNodeUsesValue(phi, target, visited)) {
@@ -512,7 +511,7 @@ bool HAKCFunctionAnalysis::IsPHIOfGlobalsOnly(Value *V) {
 bool HAKCFunctionAnalysis::isPHIofGlobalsOnly(Value *ptr,
                                               std::set<PHINode *> &nodes) {
   if (auto *phiNode = dyn_cast<PHINode>(ptr)) {
-    if (nodes.find(phiNode) != nodes.end()) {
+    if (nodes.contains(phiNode)) {
       return true;
     }
     CommonHAKCAnalysis::getWriter(DebugActive)
@@ -541,7 +540,7 @@ Instruction *HAKCFunctionAnalysis::GetFinalAllocaDef(AllocaInst *Alloca) {
   return Alloca;
 }
 
-Value *HAKCFunctionAnalysis::getDef(Value *V, bool followLoad) {
+Value *HAKCFunctionAnalysis::getDef(Value *V, bool followLoad) const {
   auto *def = GetModuleAnalysis().GetCommonAnalysis().getDef(V, followLoad);
   if (!def) {
     CommonHAKCAnalysis::getWriter(true)
@@ -713,7 +712,8 @@ void HAKCFunctionAnalysis::handleBinaryOperator(BinaryOperator *binOp) {
  * @param globalValue
  * @return
  */
-bool HAKCFunctionAnalysis::globalShouldBeTransferred(Use &globalValueArg) {
+bool HAKCFunctionAnalysis::globalShouldBeTransferred(
+    Use &globalValueArg) const {
   /* Don't transfer to printk */
   if (auto *globalValue =
           dyn_cast<GlobalValue>(getDef(globalValueArg.get(), false))) {
@@ -745,7 +745,7 @@ bool HAKCFunctionAnalysis::globalShouldBeTransferred(Use &globalValueArg) {
   return false;
 }
 
-bool HAKCFunctionAnalysis::isCompartmentalizedFunction() {
+bool HAKCFunctionAnalysis::isCompartmentalizedFunction() const {
   return CommonHAKCAnalysis::IsCompartmentalizedFunction(CurrentFunction,
                                                          Policy);
 }
@@ -955,9 +955,9 @@ void HAKCFunctionAnalysis::
            CurrentDivision.GetHAKCCompartment().GetValidTargets()) {
         CommonHAKCAnalysis::getWriter(DebugActive)
             << "Testing Target Compartment "
-            << (unsigned int)Target->getSExtValue() << " == "
-            << (unsigned int)TargetCompartment.GetCompartmentID()
-                   ->getSExtValue()
+            << static_cast<unsigned int>(Target->getSExtValue()) << " == "
+            << static_cast<unsigned int>(
+                   TargetCompartment.GetCompartmentID()->getSExtValue())
             << " -> "
             << (Target->getSExtValue() ==
                 TargetCompartment.GetCompartmentID()->getSExtValue())
@@ -1203,7 +1203,7 @@ void HAKCFunctionAnalysis::InstrumentCode() {
 
 void HAKCFunctionAnalysis::UpdateHAKCFunctionParameters(
     CallInst *CallI, const HAKCCompartment &TargetCompartment,
-    const hakc::function_def_t &HAKCTransferFunction) {
+    const hakc::function_def_t &HAKCTransferFunction) const {
   CommonHAKCAnalysis::getWriter(DebugActive)
       << "Setting "
       << *CallI->getArgOperand(
