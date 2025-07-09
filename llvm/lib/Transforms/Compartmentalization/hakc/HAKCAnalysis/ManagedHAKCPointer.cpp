@@ -170,7 +170,7 @@ void ManagedHAKCPointer::RegisterManualHAKCTransfer(CallBase *CallI) {
     if (TransferTypeCast != ProtectedPointer) {
       CommonHAKCAnalysis::getWriter(true)
           << "Pointer already has a protected pointer: " << ProtectedPointer
-             << "\n";
+          << "\n";
       throw std::exception();
     }
     CommonHAKCAnalysis::getWriter(DebugActive)
