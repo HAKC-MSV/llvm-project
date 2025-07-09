@@ -69,7 +69,7 @@ protected:
 
   void AddTypeMapping(const DIType *type, const HAKCTypeP &HAKCType);
 
-  std::string GetTypeName(const DIType *type) const;
+  static std::string GetTypeName(const DIType *type);
 
   HAKCGlobalP HandleGlobal(const DIGlobalVariable *DIGV);
 
@@ -101,6 +101,11 @@ protected:
   HAKCTypeP HandleIndirectCall(CallInst *CallI);
 
   static FunctionType *GetIndirectCallFunctionType(const CallInst *CallI);
+
+  static bool IsStructTypeThatStartsWithPointer(const DIType *DiType);
+
+  static const DIType *
+  GetFirstStructMemberType(const DICompositeType *DICompositeTy);
 
   HAKCFunctionP FindFunction(const Function *F, bool SearchUnmapped = false);
 

@@ -101,7 +101,7 @@ protected:
 
   void handleCall(CallInst *call);
 
-  void handleStore(StoreInst *store);
+  void handleStore(StoreInst *Store);
 
   void handleBinaryOperator(BinaryOperator *binOp);
 
@@ -163,7 +163,7 @@ public:
 
   bool isCompartmentalizedFunction();
 
-  Function &getFunction();
+  Function &GetFunction();
 
   Instruction *CreateMissingTransfer(Instruction *PointerNeedingTransfer);
 

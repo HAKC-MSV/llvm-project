@@ -197,11 +197,11 @@ bool HAKCPointerManager::ManageNewPointer(Use &U) {
 
   if ((isa<StoreInst>(U.getUser()) && isa<IntToPtrInst>(U.get())) ||
       (BaseDefinition->getType()->isIntegerTy(64))) {
-    bool registerUse = false;
+    bool RegisterUse = false;
     if (auto *call = dyn_cast<CallInst>(BaseDefinition)) {
-      registerUse = CommonHAKCAnalysis::isRegisterRead(call);
+      RegisterUse = CommonHAKCAnalysis::isRegisterRead(call);
     }
-    if (!registerUse) {
+    if (!RegisterUse) {
       CommonHAKCAnalysis::getWriter(DebugActive)
           << "Using " << U << " instead of " << *BaseDefinition << "\n";
       BaseDefinition = U.get();
@@ -250,7 +250,7 @@ bool HAKCPointerManager::IsConstantExprUsedInKernelCall(User *U) const {
   if (isa<ConstantExpr>(U)) {
     for (auto *ConstUser : U->users()) {
       if (auto *Call = dyn_cast<CallBase>(ConstUser)) {
-        if (Call->getFunction() == &GetFunctionAnalysis().getFunction() &&
+        if (Call->getFunction() == &GetFunctionAnalysis().GetFunction() &&
             CommonHAKCAnalysis::IsUncompartmentalizedSymbol(
                 Call->getCalledFunction(), Policy)) {
           Result = true;
@@ -280,7 +280,7 @@ bool HAKCPointerManager::UseShouldBeIgnored(Use &U) {
   } else if (auto *Op = dyn_cast<Operator>(UserP)) {
     auto *Def = GetDef(Op);
     if (auto *I = dyn_cast<Instruction>(Def)) {
-      if (I->getFunction() != &GetFunctionAnalysis().getFunction()) {
+      if (I->getFunction() != &GetFunctionAnalysis().GetFunction()) {
         UseShouldBeIgnored = true;
       }
     } else {
@@ -291,10 +291,10 @@ bool HAKCPointerManager::UseShouldBeIgnored(Use &U) {
   if (!UseShouldBeIgnored) {
     if (auto *I = dyn_cast<Instruction>(UserP)) {
       UseShouldBeIgnored =
-          (I->getFunction() != &GetFunctionAnalysis().getFunction());
+          (I->getFunction() != &GetFunctionAnalysis().GetFunction());
     } else if (auto *A = dyn_cast<Argument>(UserP)) {
       UseShouldBeIgnored =
-          (A->getParent() != &GetFunctionAnalysis().getFunction());
+          (A->getParent() != &GetFunctionAnalysis().GetFunction());
     }
   }
 
@@ -446,7 +446,7 @@ void HAKCPointerManager::ClassifyAllUsesOfDefinition(
   for (auto &U : Definition->uses()) {
     auto *User = U.getUser();
     if (auto *I = dyn_cast<Instruction>(User)) {
-      if (I->getFunction() != &GetFunctionAnalysis().getFunction()) {
+      if (I->getFunction() != &GetFunctionAnalysis().GetFunction()) {
         continue;
       }
     }
@@ -500,10 +500,10 @@ void HAKCPointerManager::ClassifyAllUsesOfDefinition(
       if (!isa<Argument>(UPtr->getUser()) &&
           !isa<Instruction>(UPtr->getUser())) {
         CommonHAKCAnalysis::getWriter(true)
-            << "here0 " << GetFunctionAnalysis().getFunction().getParent();
+            << "here0 " << GetFunctionAnalysis().GetFunction().getParent();
       } else {
         CommonHAKCAnalysis::getWriter(true)
-            << "here1 " << GetFunctionAnalysis().getFunction();
+            << "here1 " << GetFunctionAnalysis().GetFunction();
       }
       CommonHAKCAnalysis::getWriter(true) << "\n";
       throw std::exception();
@@ -853,7 +853,7 @@ void HAKCPointerManager::AddHAKCPointerReplacement(
             << StorageName << " replacement " << Replacement << " for "
             << *PtrUse << " matches " << OtherStorageName
             << " replacement in function\n"
-            << GetFunctionAnalysis().getFunction() << "\n";
+            << GetFunctionAnalysis().GetFunction() << "\n";
         throw std::exception();
       }
     }
@@ -870,7 +870,7 @@ void HAKCPointerManager::AddHAKCPointerReplacement(
           << "Trying to replace existing " << StorageName << " Replacement "
           << ExistingPointer << " with " << Replacement << " for " << *PtrUse
           << "\n"
-          << GetFunctionAnalysis().getFunction() << "\n";
+          << GetFunctionAnalysis().GetFunction() << "\n";
       throw std::exception();
     }
     if (Replacement) {

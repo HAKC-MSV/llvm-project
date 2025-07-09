@@ -69,10 +69,10 @@ bool CommonHAKCAnalysis::FunctionIsAnalysisCandidate(Function *F) {
 
 void CommonHAKCAnalysis::InitConfig(StringRef ConfigPath) {
   if (!sys::fs::exists(ConfigPath)) {
-    errs() << "Could not find YAML file " << ConfigPath << "\n";
+    getWriter(true) << "Could not find YAML file " << ConfigPath << "\n";
     throw std::exception();
   } else if (!sys::fs::is_regular_file(ConfigPath)) {
-    errs() << ConfigPath << " is not a regular file\n";
+    getWriter(true) << ConfigPath << " is not a regular file\n";
     throw std::exception();
   }
 
@@ -83,7 +83,7 @@ void CommonHAKCAnalysis::InitConfig(StringRef ConfigPath) {
   // yaml parsed here
   yin >> SystemConfig;
   if (yin.error()) {
-    errs() << "Error parsing config file " << ConfigPath << "\n";
+    CommonHAKCAnalysis::getWriter(true) << "Error parsing config file " << ConfigPath << "\n";
     throw std::exception();
   }
 
@@ -332,7 +332,7 @@ Value *CommonHAKCAnalysis::getDef(Value *V, bool followLoad) {
   SmallVector<Value *> Chain;
   findDefChain(V, followLoad, Chain);
   if (Chain.empty()) {
-    errs() << "Def Chain for " << V << " is empty!\n";
+    getWriter(true) << "Def Chain for " << V << " is empty!\n";
     throw std::exception();
   }
   return Chain.back();
@@ -698,7 +698,7 @@ void CommonHAKCAnalysis::GetModuleFullPath(Module &M,
 
   auto err = sys::fs::real_path(SourceFileName, Result, true);
   if (err) {
-    errs() << "Could not get real path to " << M.getSourceFileName() << "\n";
+    CommonHAKCAnalysis::getWriter(true) << "Could not get real path to " << M.getSourceFileName() << "\n";
     throw std::exception();
   }
 }
