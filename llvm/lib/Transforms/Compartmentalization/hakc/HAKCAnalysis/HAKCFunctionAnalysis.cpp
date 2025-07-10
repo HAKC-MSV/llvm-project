@@ -289,7 +289,6 @@ bool HAKCFunctionAnalysis::AddManagedPointer(Use &PointerUse) {
     if (!ManagedPointer) {
       CommonHAKCAnalysis::getWriter(true)
           << "Could not find ManagedPointer for " << PointerUse << "\n";
-      PointerManager.ManagePointer(PointerUse);
       throw std::exception();
     }
     // if (auto *PHII = dyn_cast<PHINode>(ManagedPointer->GetBaseDefinition()))

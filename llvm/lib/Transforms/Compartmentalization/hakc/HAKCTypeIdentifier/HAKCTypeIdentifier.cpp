@@ -412,6 +412,9 @@ hakc::HAKCTypeIdentifier::HandleType(const DIType *type) {
           }
         }
         AddTypeMapping(type, TypeP);
+        if (DerivedTy->getBaseType()) {
+          HandleType(DerivedTy->getBaseType());
+        }
       } else {
         CommonHAKCAnalysis::getWriter(debug)
             << "Not handling DITYpe " << type << "\n";
@@ -1162,7 +1165,70 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
       AnalysisHelper.GetSystemInfo().OutputDebugInfo())
       << "Attempting to find HAKCTypeInfo for " << *V << "\n";
 
+  if (auto *I = dyn_cast<LoadInst>(V)) {
+    if (I->getFunction()->getName() == "kernel_init_freeable") {
+      errs() << "Found " << *I << "\n";
+    }
+  }
+
+  llvm::findDbgUsers(DbgUsers, V, &DVRUsers);
+  for (const auto *DVI : DbgUsers) {
+    if (const auto *DIVar = DVI->getVariable()) {
+      FoundType = FindType(DIVar->getType());
+      if (FoundType) {
+        goto exit;
+      }
+    }
+  }
+  for (auto *DVR : DVRUsers) {
+    if (const auto *DbgVar = dyn_cast<DbgVariableRecord>(DVR)) {
+      if (const auto *DIVar = DbgVar->getVariable()) {
+        FoundType = FindType(DIVar->getType());
+        if (FoundType) {
+          goto exit;
+        }
+      }
+    }
+  }
+
   if (auto *LoadI = dyn_cast<LoadInst>(V)) {
+    for (auto &U : LoadI->uses()) {
+      if (auto *Call = dyn_cast<CallInst>(U.getUser())) {
+        if (U.getOperandNo() == Call->getCalledOperandUse().getOperandNo()) {
+          if (auto PointeeTy = FindType(Call->getFunctionType())) {
+            FoundType = FindPointerType(*PointeeTy);
+            if (!FoundType) {
+              FoundType = AddMissingPointerType(PointeeTy);
+            }
+            if (FoundType) {
+              goto exit;
+            }
+          }
+        }
+      }
+    }
+
+    if (FoundType) {
+      goto exit;
+    }
+
+    // We have no debug information for V here, so try our best to deduce
+    if (auto *GEP = dyn_cast<GetElementPtrInst>(V)) {
+      if (auto ElementType = FindType(GEP->getSourceElementType())) {
+        FoundType = FindPointerType(*ElementType);
+        if (!FoundType) {
+          FoundType = AddMissingPointerType(ElementType);
+        }
+      }
+    } else if (auto *PHI = dyn_cast<PHINode>(V)) {
+      for (auto &IncomingV : PHI->incoming_values()) {
+        FoundType = FindHAKCType(IncomingV);
+        if (FoundType) {
+          goto exit;
+        }
+      }
+    }
+
     if (const auto PointeeTy = FindHAKCType(LoadI->getPointerOperand())) {
       FoundType = FindPointeeType(PointeeTy);
       if (!FoundType) {
@@ -1191,47 +1257,6 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
           CallI->getCalledFunction()->getSubprogram()->getType();
       const auto *ReturnTy = SubprogramTy->getTypeArray()[0];
       FoundType = FindType(ReturnTy);
-    }
-  }
-
-  if (FoundType) {
-    goto exit;
-  }
-
-  llvm::findDbgUsers(DbgUsers, V, &DVRUsers);
-  for (const auto *DVI : DbgUsers) {
-    if (const auto *DIVar = DVI->getVariable()) {
-      FoundType = FindType(DIVar->getType());
-      if (FoundType) {
-        goto exit;
-      }
-    }
-  }
-  for (auto *DVR : DVRUsers) {
-    if (const auto *DbgVar = dyn_cast<DbgVariableRecord>(DVR)) {
-      if (const auto *DIVar = DbgVar->getVariable()) {
-        FoundType = FindType(DIVar->getType());
-        if (FoundType) {
-          goto exit;
-        }
-      }
-    }
-  }
-
-  // We have no debug information for V here, so try our best to deduce
-  if (auto *GEP = dyn_cast<GetElementPtrInst>(V)) {
-    if (auto ElementType = FindType(GEP->getSourceElementType())) {
-      FoundType = FindPointerType(*ElementType);
-      if (!FoundType) {
-        FoundType = AddMissingPointerType(ElementType);
-      }
-    }
-  } else if (auto *PHI = dyn_cast<PHINode>(V)) {
-    for (auto &IncomingV : PHI->incoming_values()) {
-      FoundType = FindHAKCType(IncomingV);
-      if (FoundType) {
-        goto exit;
-      }
     }
   }
 

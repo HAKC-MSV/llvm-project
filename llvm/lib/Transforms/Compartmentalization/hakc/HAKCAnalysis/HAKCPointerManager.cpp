@@ -195,18 +195,18 @@ bool HAKCPointerManager::ManageNewPointer(Use &U) {
     }
   }
 
-  if ((isa<StoreInst>(U.getUser()) && isa<IntToPtrInst>(U.get())) ||
-      (BaseDefinition->getType()->isIntegerTy(64))) {
-    bool RegisterUse = false;
-    if (auto *call = dyn_cast<CallInst>(BaseDefinition)) {
-      RegisterUse = CommonHAKCAnalysis::isRegisterRead(call);
-    }
-    if (!RegisterUse) {
-      CommonHAKCAnalysis::getWriter(DebugActive)
-          << "Using " << U << " instead of " << *BaseDefinition << "\n";
-      BaseDefinition = U.get();
-    }
-  }
+  // if ((isa<StoreInst>(U.getUser()) && isa<IntToPtrInst>(U.get())) ||
+  //     (BaseDefinition->getType()->isIntegerTy(64))) {
+  //   bool RegisterUse = false;
+  //   if (auto *call = dyn_cast<CallInst>(BaseDefinition)) {
+  //     RegisterUse = CommonHAKCAnalysis::isRegisterRead(call);
+  //   }
+  //   if (!RegisterUse) {
+  //     CommonHAKCAnalysis::getWriter(DebugActive)
+  //         << "Using " << U << " instead of " << *BaseDefinition << "\n";
+  //     BaseDefinition = U.get();
+  //   }
+  // }
 
   auto NextID = CurrentPointerID + 1;
 
