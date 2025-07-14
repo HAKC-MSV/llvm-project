@@ -44,6 +44,8 @@ public:
 
   HAKCTypeP FindHAKCTypeForUse(Use &U);
 
+  HAKCTypeP GetVoidPointerPointeeType() const;
+
   void ProcessDebugInfo();
 
   Module &GetModule() const;
