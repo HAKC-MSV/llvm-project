@@ -196,6 +196,10 @@ bool HAKCPointerManager::ManageNewPointer(Use &U) {
   }
 
   auto NextID = CurrentPointerID + 1;
+  if (NextID == 23 &&
+      GetFunctionAnalysis().GetFunction().getName() == "amd_core_pmu_init") {
+    CommonHAKCAnalysis::getWriter(true) << "Found " << U << "\n";
+  }
 
   auto ManagedPointer =
       std::make_shared<ManagedHAKCPointer>(BaseDefinition, *this, NextID);

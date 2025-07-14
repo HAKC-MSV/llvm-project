@@ -1167,14 +1167,24 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
     auto HAKCGlob = FindGlobal(GlobalVar, true);
     if (HAKCGlob && HAKCGlob->GetType()) {
       /* In LLVM, Globals are always pointers */
+      if (GlobalVar->getName() == "x86_pmu") {
+        CommonHAKCAnalysis::getWriter(true)
+            << HAKCGlob->GetType()->GetDbgType() << "\n";
+      }
       auto GlobalTy = HAKCGlob->GetType();
       FoundType = FindPointerType(*GlobalTy);
+      if (!FoundType) {
+        FoundType = AddMissingPointerType(GlobalTy);
+      }
     }
   } else if (const auto *Func = dyn_cast<Function>(V)) {
     auto HAKCFunc = FindFunction(Func, true);
     if (HAKCFunc && HAKCFunc->GetType()) {
       auto FuncTy = HAKCFunc->GetType();
       FoundType = FindPointerType(*FuncTy);
+      if (!FoundType) {
+        FoundType = AddMissingPointerType(FuncTy);
+      }
     }
   } else {
     llvm::findDbgUsers(DbgUsers, V, &DVRUsers);
@@ -1217,8 +1227,51 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
     }
 
     // We have no debug information for V here, so try our best to deduce
-    if (auto *GEP = dyn_cast<GetElementPtrInst>(V)) {
-      if (auto ElementType = FindType(GEP->getSourceElementType())) {
+    if (isa<GetElementPtrInst>(V) || isa<GEPOperator>(V)) {
+      Type *SourceType;
+      Value *SourceValue;
+      APInt ByteOffset(64, 0);
+      bool FoundOffset = false;
+      if (isa<GetElementPtrInst>(V)) {
+        auto *GEPI = dyn_cast<GetElementPtrInst>(V);
+        SourceType = GEPI->getSourceElementType();
+        SourceValue = GEPI->getPointerOperand();
+        FoundOffset = GEPI->accumulateConstantOffset(
+            GetModule().getDataLayout(), ByteOffset);
+      } else {
+        auto *GEPO = dyn_cast<GEPOperator>(V);
+        SourceType = GEPO->getSourceElementType();
+        SourceValue = GEPO->getPointerOperand();
+        FoundOffset = GEPO->accumulateConstantOffset(
+            GetModule().getDataLayout(), ByteOffset);
+      }
+      if (FoundOffset) {
+        auto SourceHAKCTy = FindHAKCType(SourceValue);
+        if (SourceHAKCTy && SourceHAKCTy->GetPointeeType()) {
+          if (isa_and_nonnull<DICompositeType>(
+                  SourceHAKCTy->GetPointeeType()->GetDbgType())) {
+            auto *DICompositeTy = dyn_cast<DICompositeType>(
+                SourceHAKCTy->GetPointeeType()->GetDbgType());
+            for (auto *Element : DICompositeTy->getElements()) {
+              if (Element->getTag() == dwarf::DW_TAG_member) {
+                CommonHAKCAnalysis::getWriter(true) << *Element << "\n";
+                auto *Member = dyn_cast<DIDerivedType>(Element);
+                if (Member->getOffsetInBits() / BITS_PER_BYTE ==
+                    ByteOffset.getZExtValue()) {
+                  auto PointeeType = FindType(Member->getBaseType());
+                  FoundType = FindPointerType(*PointeeType);
+                  if (!FoundType) {
+                    FoundType = AddMissingPointerType(PointeeType);
+                  }
+                  goto exit;
+                }
+              }
+            }
+          }
+        }
+      }
+
+      if (auto ElementType = FindType(SourceType)) {
         FoundType = FindPointerType(*ElementType);
         if (!FoundType) {
           FoundType = AddMissingPointerType(ElementType);

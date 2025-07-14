@@ -249,7 +249,7 @@ void HAKCModuleAnalysis::performTransformations() {
       << GetModule() << "\n";
 }
 
-bool HAKCModuleAnalysis::functionEscapes(Function *F) {
+bool HAKCModuleAnalysis::functionEscapes(Function *F) const {
   if (F->isIntrinsic()) {
     return false;
   }
@@ -271,7 +271,7 @@ bool HAKCModuleAnalysis::functionEscapes(Function *F) {
   return !CommonHAKCAnalysis::FunctionIsStatic(F);
 }
 
-CommonHAKCAnalysis &HAKCModuleAnalysis::GetCommonAnalysis() {
+CommonHAKCAnalysis &HAKCModuleAnalysis::GetCommonAnalysis() const {
   return CommonAnalysis;
 }
 

@@ -24,7 +24,7 @@ protected:
 
   void emitModParamGetCtx(GlobalValue *kernparam);
 
-  bool functionEscapes(Function *F);
+  bool functionEscapes(Function *F) const;
 
   void RegisterUsedCompartment(HAKCCompartment &compartment);
 
@@ -79,7 +79,7 @@ public:
 
   bool FunctionDefinedInAssembly(Function *F);
 
-  CommonHAKCAnalysis &GetCommonAnalysis();
+  CommonHAKCAnalysis &GetCommonAnalysis() const;
 
   Function *GetFunctionByName(StringRef Name, FunctionType *FuncTy);
 
