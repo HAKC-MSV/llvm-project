@@ -6,8 +6,7 @@
 #define HAKC_HAKCMODULEANALYSIS_H
 
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/CommonHAKCAnalysis.h"
-// #include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCTransformer.h"
-// #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCSystemInformation.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCTransformer.h"
 
 namespace llvm::hakc {
 class HAKCModuleAnalysis {
@@ -44,7 +43,7 @@ public:
 
   bool FunctionDefinedInAssembly(Function *F);
 
-  CommonHAKCAnalysis &GetCommonAnalysis();
+  CommonHAKCAnalysis &GetCommonAnalysis() const;
 
   Function *GetFunctionByName(StringRef Name, FunctionType *FuncTy);
 

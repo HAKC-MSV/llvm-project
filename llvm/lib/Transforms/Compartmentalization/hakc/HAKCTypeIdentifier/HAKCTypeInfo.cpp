@@ -72,15 +72,19 @@ void HAKCTypeInfo::SetPointeeType(const HAKCTypeP &PointeeType) {
 
 bool HAKCTypeInfo::IsIntegerType() const {
   if (DbgType) {
-    if (auto *DiBasicTy = dyn_cast<DIBasicType>(DbgType)) {
-      ArrayRef<unsigned> IntegerEncodings = {
-          dwarf::DW_ATE_address, dwarf::DW_ATE_signed, dwarf::DW_ATE_unsigned};
-      auto Encoding = DiBasicTy->getEncoding();
-      auto Search = [Encoding](unsigned E) { return Encoding == E; };
-      return llvm::any_of(IntegerEncodings, Search);
+    auto *StrippedTy = StripTypeModifiers(DbgType);
+    if (auto *DiBasicTy = dyn_cast<DIBasicType>(StrippedTy)) {
+      auto IntegerEncodings = {dwarf::DW_ATE_address, dwarf::DW_ATE_signed,
+                               dwarf::DW_ATE_unsigned,
+                               dwarf::DW_ATE_unsigned_char};
+      for (const auto Encoding : IntegerEncodings) {
+        if (Encoding == DiBasicTy->getEncoding()) {
+          return true;
+        }
+      }
     }
   } else if (LLVMType) {
-    return LLVMType->isPointerTy();
+    return LLVMType->isIntegerTy();
   }
   return false;
 }

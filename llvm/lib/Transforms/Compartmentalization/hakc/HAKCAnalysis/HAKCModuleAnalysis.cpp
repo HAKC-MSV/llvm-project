@@ -177,7 +177,7 @@ bool HAKCModuleAnalysis::functionEscapes(Function *F) {
   return !CommonHAKCAnalysis::FunctionIsStatic(F);
 }
 
-CommonHAKCAnalysis &HAKCModuleAnalysis::GetCommonAnalysis() {
+CommonHAKCAnalysis &HAKCModuleAnalysis::GetCommonAnalysis() const {
   return CommonAnalysis;
 }
 

@@ -76,9 +76,9 @@ protected:
                                           const DebugLoc &debugLoc,
                                           Instruction *I, ConstantInt *Size);
 
-  bool userInFunction(Value *user);
+  bool userInFunction(Value *user) const;
 
-  BasicBlock *findDominatorUseBlock(Value *ptr, std::set<Instruction *> &users);
+  BasicBlock *findDominatorUseBlock(Value *ptr, std::set<Instruction *> &users) const;
 
   void createAllAuthenticatedPointers();
 
@@ -86,7 +86,7 @@ protected:
 
   void transformPointerDereferences();
 
-  bool argNeedsAuthentication(Use &arg);
+  bool argNeedsAuthentication(Use &arg) const;
 
   bool phiNodeUsesValue(PHINode *phiNode, Value *target,
                         std::set<PHINode *> &visited);
@@ -103,11 +103,11 @@ protected:
 
   void handleCall(CallInst *call);
 
-  void handleStore(StoreInst *store);
+  void handleStore(StoreInst *Store);
 
   void handleBinaryOperator(BinaryOperator *binOp);
 
-  bool globalShouldBeTransferred(Use &globalValueArg);
+  bool globalShouldBeTransferred(Use &globalValueArg) const;
 
   void relocateFunctionSection();
 
@@ -128,17 +128,17 @@ protected:
 
   void MaybeAddCompareToDirectUsers(CmpInst *CmpI);
 
-  void UpdateHAKCFunctionParameters();
+  void UpdateHAKCFunctionParameters() const;
 
   void AddInstrumentation(bool RelocateSection);
 
   void CheckAndReplaceArgument(Value *V, Instruction *I, unsigned ArgNo);
 
-  bool IsCallInIntrinsicSet(CallBase *Call, ArrayRef<Intrinsic::ID> IDs);
+  bool IsCallInIntrinsicSet(CallBase *Call, ArrayRef<Intrinsic::ID> IDs) const;
 
   void UpdateHAKCFunctionParameters(
       CallInst *CallI, const HAKCCompartment &TargetCompartment,
-      const hakc::function_def_t &HAKCTransferFunction);
+      const hakc::function_def_t &HAKCTransferFunction) const;
 
 public:
   virtual ~HAKCFunctionAnalysis() = default;
@@ -152,9 +152,9 @@ public:
 
   void setup();
 
-  Value *getDef(Value *, bool);
+  Value *getDef(Value *, bool) const;
 
-  Instruction *FindUseInsertionPoint(Value *v, std::set<Instruction *> &users);
+  Instruction *FindUseInsertionPoint(Value *v, std::set<Instruction *> &users) const;
 
   Value *AddDataAuthCheckAtLocation(Value *signed_ptr, Instruction *location);
 
@@ -163,9 +163,9 @@ public:
   Value *AddSafePointerCreationAtLocation(Value *SignedPtr,
                                           Instruction *Location);
 
-  bool isCompartmentalizedFunction();
+  bool isCompartmentalizedFunction() const;
 
-  Function &getFunction();
+  Function &GetFunction() const;
 
   Instruction *CreateMissingTransfer(Instruction *PointerNeedingTransfer);
 
@@ -177,11 +177,11 @@ public:
 
   HAKCModuleAnalysis &GetModuleAnalysis() const;
 
-  bool IsIntrinsicNeedingAuthentication(CallBase *Call);
+  bool IsIntrinsicNeedingAuthentication(CallBase *Call) const;
 
-  bool IsIntrinsicNeedingCloning(CallBase *Call);
+  bool IsIntrinsicNeedingCloning(CallBase *Call) const;
 
-  bool IsIntrinsicToSkip(CallBase *Call);
+  bool IsIntrinsicToSkip(CallBase *Call) const;
   // TicTac code
   void AssignFunctionEpochs();
 
