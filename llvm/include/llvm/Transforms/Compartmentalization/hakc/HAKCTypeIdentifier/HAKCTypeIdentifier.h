@@ -70,8 +70,6 @@ public:
 
   HAKCTypeP FindCalledFunctionType(FunctionType *FunctionTy);
 
-  static FunctionType *GetIndirectCallFunctionType(const CallInst *CallI);
-
   HAKCTypeP FindType(Type *Ty) const;
 
   HAKCTypeP FindType(const DIType *type);
@@ -83,7 +81,6 @@ public:
   HAKCTypeP FindPointerType(const HAKCTypeInfo &BaseType);
 
   HAKCTypeP HandleType(const DIType *type);
-
 
   void AddTypeMapping(const DIType *type, const HAKCTypeP &HAKCType);
 
@@ -124,11 +121,6 @@ public:
 
   static FunctionType *GetIndirectCallFunctionType(const CallInst *CallI);
 
-  static bool IsStructTypeThatStartsWithPointer(const DIType *DiType);
-
-  static const DIType *
-  GetFirstStructMemberType(const DICompositeType *DICompositeTy);
-
   HAKCFunctionP FindFunction(const Function *F, bool SearchUnmapped = false);
 
   HAKCGlobalP FindGlobal(const GlobalVariable *GV,
@@ -158,11 +150,10 @@ public:
 
   Type *FindAnonymousType(const DICompositeType *CompositeTy);
 
-  void TemporalAnalysisHandleCall(CallInst* Call, HAKCFunctionP FP);
-  void TemporalAnalysisHandleLoad(LoadInst* Load, HAKCFunctionP FP);
-  void TemporalAnalysisHandleStore(StoreInst* Store, HAKCFunctionP FP);
-  // void TemporalAnalysis(HAKCModuleAnalysis &ModuleAnalysis);
-  void FindHAKCTypeMapDebug(Value*V, bool printall);
+  void FindHAKCTypeMapDebug(Value *V, bool printall);
+
+  bool IsStructTypeThatStartsWithPointer(const DIType *DiType);
+  const DIType *GetFirstStructMemberType(const DICompositeType *DICompositeTy);
 
   CommonHAKCAnalysis &AnalysisHelper;
   DebugInfoFinder DbgInfoFinder;
@@ -174,7 +165,7 @@ public:
   std::set<HAKCTypeP> MissingPointerTypes;
   std::map<CallInst *, HAKCTypeP> IndirectCallsTypes;
   std::map<const DICompositeType *, Type *> AnonymousTypes;
-  std::map<Value*, HAKCTypeP> FindHAKCTypeMap;
+  std::map<Value *, HAKCTypeP> FindHAKCTypeMap;
   const DIScope *CompilationUnitScope;
   int recursion_limit = 2;
   int recursion_depth_di;
