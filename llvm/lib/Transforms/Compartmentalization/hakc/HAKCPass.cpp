@@ -5,19 +5,19 @@
 
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCPass.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/HAKCModuleAnalysis.h"
-#include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCTransformer.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCSystemInformation.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCTransformer.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTypeIdentifier/HAKCTypeIdentifier.h"
 
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "llvm/Analysis/CallGraph.h"
+#include "llvm/Analysis/CallPrinter.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Analysis/CallGraph.h"
-#include "llvm/Analysis/CallPrinter.h"
 
 // critical reference guide for cl:
 // https://llvm.org/docs/CommandLine.html#internal-vs-external-storage
@@ -65,8 +65,8 @@ static bool runDataAccessGraphAnalysis(CommonHAKCAnalysis &HAKCAnalysis) {
   SmallString<256> Path;
   SmallString<256> ModulePath;
   CommonHAKCAnalysis::GetModuleFullPath(M, ModulePath);
-  sys::path::append(
-      Path, HAKCAnalysis.GetSystemInfo().GetDagAnalysisRootPath());
+  sys::path::append(Path,
+                    HAKCAnalysis.GetSystemInfo().GetDagAnalysisRootPath());
   sys::path::append(Path, ModulePath);
   sys::path::replace_extension(Path, ".dag.yml");
   sys::path::make_preferred(Path);
@@ -100,7 +100,8 @@ static bool runDataAccessGraphAnalysis(CommonHAKCAnalysis &HAKCAnalysis) {
   // for (auto &path : HAKCAnalysis.GetSystemInfo().SeparateNamespacePaths()) {
   //   if (CurrentSourceName.contains(path)) {
   //     CommonHAKCAnalysis::getWriter(true)
-  //         << "Skipping separate namespace source " << CurrentSourceName << "\n";
+  //         << "Skipping separate namespace source " << CurrentSourceName <<
+  //         "\n";
   //     PerformTransformations = false;
   //   }
   // }
@@ -115,13 +116,14 @@ static bool RunHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM) {
   }
   CommonHAKCAnalysis HAKCAnalysis(M, MAM, HAKC_CONFIG_PATH);
 
-  // llvm::writeCallGraphDOT(M, MAM, std::string(HAKCAnalysis.GetSystemInfo().GetDagAnalysisRootPath()));
+  // llvm::writeCallGraphDOT(M, MAM,
+  // std::string(HAKCAnalysis.GetSystemInfo().GetDagAnalysisRootPath()));
 
   switch (HAKCAnalysis.GetSystemInfo().GetPassMode()) {
   case RunDataAccessGraphAnalysis:
     return runDataAccessGraphAnalysis(HAKCAnalysis);
   case RunDataAccessGraphAnalysisSingleSourceFile:
-    errs () << "Analyzing target source file: " << M.getSourceFileName() << "\n";
+    errs() << "Analyzing target source file: " << M.getSourceFileName() << "\n";
     return runDataAccessGraphAnalysis(HAKCAnalysis);
   case RunCompartmentalization:
     return runCompartmentalization(HAKCAnalysis);
@@ -136,6 +138,6 @@ static bool RunHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM) {
 
 PreservedAnalyses HAKCPass::run(Module &M, ModuleAnalysisManager &MAM) {
   return RunHAKCAnalysis(M, MAM) ? PreservedAnalyses::none()
-                            : PreservedAnalyses::all();
+                                 : PreservedAnalyses::all();
 }
 } // namespace llvm

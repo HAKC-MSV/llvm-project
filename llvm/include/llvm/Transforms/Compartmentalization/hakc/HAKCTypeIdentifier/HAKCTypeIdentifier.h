@@ -153,6 +153,7 @@ public:
   void FindHAKCTypeMapDebug(Value *V, bool printall);
 
   bool IsStructTypeThatStartsWithPointer(const DIType *DiType);
+
   const DIType *GetFirstStructMemberType(const DICompositeType *DICompositeTy);
 
   CommonHAKCAnalysis &AnalysisHelper;

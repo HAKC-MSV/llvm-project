@@ -61,7 +61,6 @@ public:
   void FunctionTemporalAnalysis(const DISubprogram *SubProg);
 
   void TemporalAnalysis(HAKCModuleAnalysis &ModuleAnalysis);
-
 };
 
 } // namespace llvm::hakc

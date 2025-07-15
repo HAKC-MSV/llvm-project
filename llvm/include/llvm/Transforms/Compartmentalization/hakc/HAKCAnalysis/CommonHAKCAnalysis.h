@@ -34,7 +34,8 @@ protected:
 public:
   virtual ~CommonHAKCAnalysis() = default;
 
-  explicit CommonHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM, StringRef ConfigPath);
+  explicit CommonHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM,
+                              StringRef ConfigPath);
 
   HAKCSystemInformation &GetSystemInfo();
 

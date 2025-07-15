@@ -8,14 +8,14 @@
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/HAKCModuleAnalysis.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCSystemInformation.h"
 
-
 // remove policy and transformer, make it just module analysis
 
-// then, make new subclass that does what the current module analysis does, and call it module transformation
+// then, make new subclass that does what the current module analysis does, and
+// call it module transformation
 namespace llvm::hakc {
 HAKCModuleAnalysis::HAKCModuleAnalysis(CommonHAKCAnalysis &CommonAnalysis)
     : UsedCompartments(), CommonAnalysis(CommonAnalysis), AnalysisFunctions(),
-      TypeIdentifier(CommonAnalysis.GetSystemInfo().GetTypeIdentifier()){};
+      TypeIdentifier(CommonAnalysis.GetSystemInfo().GetTypeIdentifier()) {};
 //
 // void HAKCModuleAnalysis::InitAnalysis() {
 //   for (auto &F : GetModule().functions()) {
@@ -53,16 +53,16 @@ bool HAKCModuleAnalysis::FunctionNeedsAnalysis(Function *F) const {
     }
   }
 
-  out:
-    if (CommonAnalysis.GetSystemInfo().OutputDebugInfo(F)) {
-      CommonHAKCAnalysis::getWriter(true) << F->getName();
-      if (!needsAnalysis) {
-        CommonHAKCAnalysis::getWriter(true) << " does not need ";
-      } else {
-        CommonHAKCAnalysis::getWriter(true) << " needs ";
-      }
-      CommonHAKCAnalysis::getWriter(true) << "analysis\n";
+out:
+  if (CommonAnalysis.GetSystemInfo().OutputDebugInfo(F)) {
+    CommonHAKCAnalysis::getWriter(true) << F->getName();
+    if (!needsAnalysis) {
+      CommonHAKCAnalysis::getWriter(true) << " does not need ";
+    } else {
+      CommonHAKCAnalysis::getWriter(true) << " needs ";
     }
+    CommonHAKCAnalysis::getWriter(true) << "analysis\n";
+  }
 
   return needsAnalysis;
 }
@@ -136,8 +136,8 @@ bool _useEscapes(Use &U, std::set<Value *> &expected) {
     }
   }
 
-    return false;
-  }
+  return false;
+}
 
 bool in_debug = false;
 bool HAKCModuleAnalysis::useEscapes(Use &U) {
@@ -298,7 +298,8 @@ void HAKCModuleAnalysis::TemporalAnalysisHandleCall(CallInst *Call,
   // some other call)
 
   if (Call->getCalledFunction()) {
-    auto FoundFunction = TypeIdentifier.FindFunction(Call->getCalledFunction(), true);
+    auto FoundFunction =
+        TypeIdentifier.FindFunction(Call->getCalledFunction(), true);
     if (!FoundFunction) {
       CommonHAKCAnalysis::getWriter(true)
           << "Could not find HAKC Symbol for Function "
@@ -315,7 +316,7 @@ void HAKCModuleAnalysis::TemporalAnalysisHandleCall(CallInst *Call,
     CommonHAKCAnalysis::getWriter(debug)
         << "Source of indirect call operand in Function "
         << Call->getParent()->getName() << ": "
-        <<  CommonAnalysis.getDef(Call->getCalledOperand(), true) << "\n";
+        << CommonAnalysis.getDef(Call->getCalledOperand(), true) << "\n";
     auto HAKCType = TypeIdentifier.FindCalledFunctionType(FunctionTy);
     if (!HAKCType) {
       CommonHAKCAnalysis::getWriter(true)
@@ -338,7 +339,8 @@ void HAKCModuleAnalysis::TemporalAnalysisHandleCall(CallInst *Call,
   }
 }
 
-void HAKCModuleAnalysis::TemporalAnalysisHandleLoad(LoadInst *Load, HAKCFunctionP FP) {
+void HAKCModuleAnalysis::TemporalAnalysisHandleLoad(LoadInst *Load,
+                                                    HAKCFunctionP FP) {
   auto debug = true;
   auto op = getLoadStorePointerOperand(Load);
   auto HAKCTy = TypeIdentifier.FindHAKCType(op);
@@ -350,7 +352,8 @@ void HAKCModuleAnalysis::TemporalAnalysisHandleLoad(LoadInst *Load, HAKCFunction
   }
 }
 
-void HAKCModuleAnalysis::TemporalAnalysisHandleStore(StoreInst *Store, HAKCFunctionP FP) {
+void HAKCModuleAnalysis::TemporalAnalysisHandleStore(StoreInst *Store,
+                                                     HAKCFunctionP FP) {
   auto debug = true;
   auto op = getLoadStorePointerOperand(Store);
   // need to find the type of the operand for the store
@@ -363,8 +366,7 @@ void HAKCModuleAnalysis::TemporalAnalysisHandleStore(StoreInst *Store, HAKCFunct
   }
 }
 
-void HAKCModuleAnalysis::TemporalAnalysis(HAKCModuleAnalysis &ModuleAnalysis)
-{
+void HAKCModuleAnalysis::TemporalAnalysis(HAKCModuleAnalysis &ModuleAnalysis) {
   // FunctionTemporalAnalysis
   CommonHAKCAnalysis::getWriter(true)
       << "!!!! Starting Temporal Analysis !!!!\n";
@@ -373,7 +375,6 @@ void HAKCModuleAnalysis::TemporalAnalysis(HAKCModuleAnalysis &ModuleAnalysis)
   }
   CommonHAKCAnalysis::getWriter(true)
       << "!!!! Finished Temporal Analysis !!!!\n";
-
 }
 
 void HAKCModuleAnalysis::FunctionTemporalAnalysis(const DISubprogram *SubProg) {
@@ -418,7 +419,7 @@ void HAKCModuleAnalysis::FunctionTemporalAnalysis(const DISubprogram *SubProg) {
     if (I->isDebugOrPseudoInst() || isa<IntrinsicInst>(I) ||
         isa<BranchInst>(I)) {
       continue;
-        }
+    }
     CommonHAKCAnalysis::getWriter(true)
         << "Looking at instruction " << *I << "\n";
     if (auto *Call = dyn_cast<CallInst>(I)) {
@@ -482,7 +483,6 @@ bool HAKCModuleAnalysis::FunctionIsInAnalysisSet(Function *F) {
       F, make_range(AnalysisFunctions.begin(), AnalysisFunctions.end()));
 }
 
-
 void HAKCModuleAnalysis::OutputYAML(raw_ostream &out) const {
   // move from type identifier to module analysis
   SmallString<256> RealPath;
@@ -493,8 +493,8 @@ void HAKCModuleAnalysis::OutputYAML(raw_ostream &out) const {
   // out << RealPath;
   // out << "\n";
 
-
-  auto GlobalCount = TypeIdentifier.GetGlobals().size() + TypeIdentifier.GetUnmappedGlobals().size();
+  auto GlobalCount = TypeIdentifier.GetGlobals().size() +
+                     TypeIdentifier.GetUnmappedGlobals().size();
   if (GlobalCount > 0) {
     out << "globals:\n";
     std::vector<std::shared_ptr<HAKCGlobalInfo>> SortedGlobals;
@@ -516,7 +516,8 @@ void HAKCModuleAnalysis::OutputYAML(raw_ostream &out) const {
     }
   }
 
-  auto FunctionCount = TypeIdentifier.GetFunctions().size() + TypeIdentifier.GetUnmappedFunctions().size();
+  auto FunctionCount = TypeIdentifier.GetFunctions().size() +
+                       TypeIdentifier.GetUnmappedFunctions().size();
   if (FunctionCount > 0) {
     out << "functions:\n";
     std::vector<std::shared_ptr<HAKCFunctionInfo>> SortedFunctions;

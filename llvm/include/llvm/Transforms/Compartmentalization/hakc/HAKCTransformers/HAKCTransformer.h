@@ -19,8 +19,6 @@
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCFunctionDefinition/HAKCCustomTransfer.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCFunctionDefinition/HAKCFunctionDefinition.h"
 
-
-
 #include <llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCSystemInformation.h>
 
 using namespace llvm;
@@ -73,9 +71,10 @@ public:
    * @param IsData
    * @return
    */
-  virtual Instruction *
-  CreateCompartmentTransfer(HAKCPointerBase &HAKCPointer, Instruction *I,
-                            GlobalValue *Target, bool IsData);
+  virtual Instruction *CreateCompartmentTransfer(HAKCPointerBase &HAKCPointer,
+                                                 Instruction *I,
+                                                 GlobalValue *Target,
+                                                 bool IsData);
 
   /**
    * Creates a Compartment Transfer of ManagedHAKCPointer at I. The arguments to
@@ -97,9 +96,9 @@ public:
    * @return
    */
   virtual Instruction *
-  CreateSizedCompartmentTransfer(HAKCPointerBase &HAKCPointer,
-                                 Instruction *I, GlobalValue *Target,
-                                 bool IsData, ConstantInt *Size);
+  CreateSizedCompartmentTransfer(HAKCPointerBase &HAKCPointer, Instruction *I,
+                                 GlobalValue *Target, bool IsData,
+                                 ConstantInt *Size);
 
   /**
    * Creates a BitCastInst of Operand to TargetType at I
@@ -108,8 +107,8 @@ public:
    * @param I
    * @return
    */
-  virtual Value *CreateBitCast(HAKCPointerBase &HAKCPointer,
-                               Type *TargetType, Instruction *I);
+  virtual Value *CreateBitCast(HAKCPointerBase &HAKCPointer, Type *TargetType,
+                               Instruction *I);
 
   /**
    * Create a signed pointer using the color of HAKCPointer
@@ -119,9 +118,9 @@ public:
    * @param IsData
    * @return
    */
-  virtual Instruction *
-  CreateSignWithDivision(HAKCPointerBase &HAKCPointer, Instruction *I,
-                         GlobalValue *Target, bool IsData);
+  virtual Instruction *CreateSignWithDivision(HAKCPointerBase &HAKCPointer,
+                                              Instruction *I,
+                                              GlobalValue *Target, bool IsData);
 
   /**
    * Create a Outside Transfer Function
@@ -266,8 +265,7 @@ protected:
    */
   CallInst *CreateCall(StringRef name, Type *RetTy, ArrayRef<Value *> Args);
 
-  CallInst *CreateCall(const function_def_t &Callee,
-                       ArrayRef<Value *> Args);
+  CallInst *CreateCall(const function_def_t &Callee, ArrayRef<Value *> Args);
 
   CallInst *CreateCall(Function *Callee, ArrayRef<Value *> Args);
 
