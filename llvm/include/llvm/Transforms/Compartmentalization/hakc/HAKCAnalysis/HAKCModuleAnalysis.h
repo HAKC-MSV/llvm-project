@@ -6,74 +6,39 @@
 #define HAKC_HAKCMODULEANALYSIS_H
 
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/CommonHAKCAnalysis.h"
-#include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCTransformer.h"
+// #include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCTransformer.h"
+// #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCSystemInformation.h"
 
 namespace llvm::hakc {
 class HAKCModuleAnalysis {
-protected:
+// protected:
+public:
   SmallVector<HAKCCompartment, 8> UsedCompartments;
   CommonHAKCAnalysis &CommonAnalysis;
   FunctionList AnalysisFunctions;
   HAKCTypeIdentifier &TypeIdentifier;
-  HAKCCompartmentalizationPolicy &Policy;
-  HAKCTransformer Transformer;
-
-  void InitAnalysis();
 
   GlobalValue *ExtractGlobalFromKernelParam(GlobalVariable *GV);
 
-  void emitModParamGetCtx(GlobalValue *kernparam);
-
   bool functionEscapes(Function *F);
 
-  void RegisterUsedCompartment(HAKCCompartment &compartment);
-
-  std::string getGlobalHAKCSectionName(GlobalVariable *GV) const;
-
-  void TransformModule();
-
-  void TransformFunctions();
-
   bool FunctionNeedsAnalysis(Function *F) const;
-
-  Function *CreateInitTransfer(GlobalVariable *GlobalVar);
-
-  static StringRef GlobalInitTransferPrefix();
-
-  StringRef GlobalInitTransferSectionName() const;
-
-  StringRef GlobalInitTransferPointerSectionName() const;
-
-  std::string GlobalVariableROSectionName(GlobalVariable *GlobalVar);
-
-  void PopulateGlobalInitTransferFunc(Function *GlobTransfer,
-                                      GlobalVariable *GlobalVar);
-
-  bool TransferIsNeeded(GlobalVariable *GlobalVar);
 
   bool ConstantStructTransferIsNeeded(ConstantStruct *ConstStruct);
 
   bool AliasShouldBeCreated(Function *F);
 
-  bool isModuleCompartmentalized();
+  bool useEscapes(Use &U);
 
-  void MoveGlobalsToHAKCSection();
+  StringRef GlobalInitTransferSectionName() const;
 
-  void AddTransferFunctions();
+  StringRef GlobalInitTransferPointerSectionName() const;
 
-public:
-  HAKCModuleAnalysis(CommonHAKCAnalysis &CommonAnalysis,
-                     HAKCCompartmentalizationPolicy &Policy);
+  static StringRef GlobalInitTransferPrefix();
 
-  void performTransformations();
-
-  void AddCompartmentMetadata();
-
-  bool TransferFunctionShouldBeCreated(Function *F);
+  HAKCModuleAnalysis(CommonHAKCAnalysis &CommonAnalysis);
 
   StructType *GetKernelParamType();
-
-  void CreateInitGlobalMemberTransfers();
 
   Module &GetModule() const;
 
@@ -85,10 +50,69 @@ public:
 
   HAKCTypeIdentifier &GetTypeIdentifier() const;
 
-  HAKCTransformer &GetTransformer();
-
   bool FunctionIsInAnalysisSet(Function *F);
+
+  void OutputYAML(raw_ostream &out) const;
 };
+
+// class HAKCModuleTransform : public HAKCModuleAnalysis {
+// protected:
+//
+//   HAKCCompartmentalizationPolicy &Policy;
+//   HAKCTransformer Transformer;
+//
+//   void InitAnalysis();
+//
+//   void TransformModule();
+//
+//   void TransformFunctions();
+//
+//   void emitModParamGetCtx(GlobalValue *kernparam);
+//
+//   std::string getGlobalHAKCSectionName(GlobalVariable *GV) const;
+//
+//   Function *CreateInitTransfer(GlobalVariable *GlobalVar);
+//
+//   void RegisterUsedCompartment(HAKCCompartment &compartment);
+//
+//   std::string GlobalVariableROSectionName(GlobalVariable *GlobalVar);
+//
+//   void PopulateGlobalInitTransferFunc(Function *GlobTransfer,
+//                                       GlobalVariable *GlobalVar);
+//
+//   bool TransferIsNeeded(GlobalVariable *GlobalVar);
+//
+//   bool ConstantStructTransferIsNeeded(ConstantStruct *ConstStruct);
+//
+//   bool AliasShouldBeCreated(Function *F);
+//
+//   bool isModuleCompartmentalized();
+//
+//   void MoveGlobalsToHAKCSection();
+//
+//   void AddTransferFunctions();
+//
+// public:
+//   HAKCModuleTransform(CommonHAKCAnalysis &CommonAnalysis, HAKCCompartmentalizationPolicy &Policy);
+//
+//   void performTransformations();
+//
+//   void AddCompartmentMetadata();
+//
+//   bool TransferFunctionShouldBeCreated(Function *F);
+//
+//   StructType *GetKernelParamType();
+//
+//   void CreateInitGlobalMemberTransfers();
+//
+//   bool FunctionDefinedInAssembly(Function *F);
+//
+//   Function *GetFunctionByName(StringRef Name, FunctionType *FuncTy);
+//
+//   HAKCTransformer &GetTransformer();
+//
+//   bool FunctionIsInAnalysisSet(Function *F);
+// };
 } // namespace llvm::hakc
 
 #endif // HAKC_HAKCMODULEANALYSIS_H

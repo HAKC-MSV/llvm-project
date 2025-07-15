@@ -14,6 +14,7 @@
 #include "HAKCFunctionInfo.h"
 #include "HAKCGlobalInfo.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/ManagedHAKCPointer.h"
+// #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/HAKCModuleAnalysis.h"
 
 #include <map>
 #include <set>
@@ -55,6 +56,14 @@ public:
   Type *GetTypeFromString(StringRef TypeStr) const;
 
   void AddIgnoredType(StringRef TypeName) const;
+
+  std::map<const DIGlobalVariable *, HAKCGlobalP> GetGlobals();
+
+  std::set<HAKCGlobalP> GetUnmappedGlobals();
+
+  std::map<const DISubprogram *, HAKCFunctionP> GetFunctions();
+
+  std::set<HAKCFunctionP> GetUnmappedFunctions();
 
 protected:
   HAKCTypeP FindType(Type *Ty) const;
@@ -113,7 +122,7 @@ protected:
   HAKCGlobalP FindGlobal(const GlobalVariable *GV,
                          bool SearchUnmapped = false) const;
 
-  HAKCTypeP FindCalledFunctionType(FunctionType *FunctionTy) const;
+  HAKCTypeP FindCalledFunctionType(FunctionType *FunctionTy);
 
   HAKCTypeP CreateNoDebugType(Type *Ty) const;
 
@@ -142,6 +151,7 @@ protected:
   void TemporalAnalysisHandleCall(CallInst* Call, HAKCFunctionP FP);
   void TemporalAnalysisHandleLoad(LoadInst* Load, HAKCFunctionP FP);
   void TemporalAnalysisHandleStore(StoreInst* Store, HAKCFunctionP FP);
+  // void TemporalAnalysis(HAKCModuleAnalysis &ModuleAnalysis);
   void FindHAKCTypeMapDebug(Value*V, bool printall);
 
   CommonHAKCAnalysis &AnalysisHelper;

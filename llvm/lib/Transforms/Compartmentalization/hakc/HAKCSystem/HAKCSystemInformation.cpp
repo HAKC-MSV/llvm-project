@@ -149,10 +149,6 @@ void HAKCSystemInformation::operator<<(HAKCYamlConfig &YamlConfig) {
   if (PassMode == RunDataAccessGraphAnalysis){
     TypeIdentifier.ProcessDebugInfo();
   }
-  else if (PassMode == RunPostDominatorAnalysis){
-    TypeIdentifier.ProcessDebugInfo();
-    return;
-  }
   else {
     TypeIdentifier.ProcessDebugInfo();
   }

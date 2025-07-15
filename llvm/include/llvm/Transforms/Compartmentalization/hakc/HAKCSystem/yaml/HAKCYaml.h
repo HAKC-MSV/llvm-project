@@ -34,7 +34,6 @@ enum HAKCPassModeTypeEnum {
   InvalidPassModeType,
   RunDataAccessGraphAnalysis,
   RunDataAccessGraphAnalysisSingleSourceFile,
-  RunPostDominatorAnalysis,
   RunCompartmentalization,
   RunConfigAndExit
 };
@@ -279,8 +278,6 @@ template <> struct yaml::ScalarEnumerationTraits<hakc::HAKCPassModeTypeEnum> {
                 hakc::RunDataAccessGraphAnalysisSingleSourceFile);
     io.enumCase(value, "RunCompartmentalization",
                 hakc::RunCompartmentalization);
-    io.enumCase(value, "RunPostDominatorAnalysis",
-                hakc::RunPostDominatorAnalysis);
     io.enumCase(value, "RunConfigAndExit", hakc::RunConfigAndExit);
   }
 };

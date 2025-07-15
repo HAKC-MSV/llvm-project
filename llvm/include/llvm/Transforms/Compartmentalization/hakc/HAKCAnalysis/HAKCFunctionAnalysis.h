@@ -13,6 +13,7 @@
 
 namespace llvm::hakc {
 class HAKCModuleAnalysis;
+class HAKCModuleTransform;
 
 class CommonHAKCAnalysis;
 
@@ -41,6 +42,7 @@ class HAKCPointerManager;
 class HAKCFunctionAnalysis {
 protected:
   HAKCModuleAnalysis &ModuleAnalysis;
+  HAKCTransformer &Transformer;
   HAKCCompartmentalizationPolicy &Policy;
   HAKCPointerManager PointerManager;
   bool DebugActive;
@@ -141,7 +143,7 @@ protected:
 public:
   virtual ~HAKCFunctionAnalysis() = default;
 
-  HAKCFunctionAnalysis(Function *F, HAKCModuleAnalysis &ModuleAnalysis,
+  HAKCFunctionAnalysis(Function *F, HAKCModuleAnalysis &ModuleAnalysis, HAKCTransformer &Transformer,
                        HAKCCompartmentalizationPolicy &Policy);
 
   bool modifiedFunction() const;

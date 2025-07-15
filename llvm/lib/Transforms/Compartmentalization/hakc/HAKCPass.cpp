@@ -5,6 +5,7 @@
 
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCPass.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/HAKCModuleAnalysis.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCTransformer.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCSystemInformation.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTypeIdentifier/HAKCTypeIdentifier.h"
 
@@ -51,8 +52,9 @@ static bool runCompartmentalization(CommonHAKCAnalysis &HAKCAnalysis) {
 
   if (PerformTransformations) {
     HAKCCompartmentalizationPolicy Policy(HAKCAnalysis.GetSystemInfo());
-    HAKCModuleAnalysis ModuleTransformation(HAKCAnalysis, Policy);
-    ModuleTransformation.performTransformations();
+    HAKCModuleAnalysis ModuleAnalysis(HAKCAnalysis);
+    HAKCTransformer Transformer(ModuleAnalysis, Policy);
+    Transformer.performTransformations();
   }
 
   return true;
@@ -78,42 +80,39 @@ static bool runDataAccessGraphAnalysis(CommonHAKCAnalysis &HAKCAnalysis) {
   }
   raw_fd_ostream out(Path, err);
   if (!err) {
-    HAKCAnalysis.GetSystemInfo().GetTypeIdentifier().OutputYAML(out);
+    HAKCModuleAnalysis ModuleAnalysis(HAKCAnalysis);
+    // auto type_identifier = ModuleAnalysis.GetTypeIdentifier();
+    // auto HAKCTransformer Transformer(ModuleAnalysis, Policy);
+    // Need managed pointers, which are a part of module analysis, to do temporal analysis in the type identifier
+    // ModuleAnalysis.TemporalAnalysis();
+    // add function new that creates a policy
+    // then subclass of the policy that is dag analysis, that is a dummy version
+
+    // type_identifier.TemporalAnalysis();
+    // type_identifier.OutputYAML(out);
+    ModuleAnalysis.OutputYAML(out);
     out.close();
   } else {
     CommonHAKCAnalysis::getWriter(true) << "Failed to open " << Path << "\n";
     throw std::exception();
   }
-
-  return false;
-}
-
-static bool runPostDominatorAnalysis(CommonHAKCAnalysis &HAKCAnalysis, ModuleAnalysisManager &MAM) {
-  Module &M = HAKCAnalysis.GetModule();
-  SmallString<256> Path;
-  SmallString<256> ModulePath;
-  CommonHAKCAnalysis::GetModuleFullPath(M, ModulePath);
-  llvm::sys::path::append(
-      Path, HAKCAnalysis.GetSystemInfo().GetDagAnalysisRootPath());
-  llvm::sys::path::append(Path, ModulePath);
-  llvm::sys::path::replace_extension(Path, ".dag.yml");
-  llvm::sys::path::make_preferred(Path);
-
-  std::error_code err;
-  err = sys::fs::create_directories(sys::path::parent_path(Path));
-  if (err) {
-    CommonHAKCAnalysis::getWriter(true)
-        << "Failed to create " << sys::path::parent_path(Path) << "\n";
-    throw std::exception();
-  }
-  raw_fd_ostream out(Path, err);
-  if (!err) {
-    HAKCAnalysis.GetSystemInfo().GetTypeIdentifier().OutputYAML(out);
-    out.close();
-  } else {
-    CommonHAKCAnalysis::getWriter(true) << "Failed to open " << Path << "\n";
-    throw std::exception();
-  }
+  //
+  // StringRef CurrentSourceName(M.getSourceFileName());
+  // for (auto &path : HAKCAnalysis.GetSystemInfo().HAKCSourcePaths()) {
+  //   if (CurrentSourceName.contains(path)) {
+  //     CommonHAKCAnalysis::getWriter(true)
+  //         << "Skipping hakc source " << CurrentSourceName << "\n";
+  //     PerformTransformations = false;
+  //   }
+  // }
+  //
+  // for (auto &path : HAKCAnalysis.GetSystemInfo().SeparateNamespacePaths()) {
+  //   if (CurrentSourceName.contains(path)) {
+  //     CommonHAKCAnalysis::getWriter(true)
+  //         << "Skipping separate namespace source " << CurrentSourceName << "\n";
+  //     PerformTransformations = false;
+  //   }
+  // }
 
   return false;
 }
@@ -131,15 +130,8 @@ static bool RunHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM) {
   case RunDataAccessGraphAnalysis:
     return runDataAccessGraphAnalysis(HAKCAnalysis);
   case RunDataAccessGraphAnalysisSingleSourceFile:
-    // if(M.getSourceFileName() != HAKCAnalysis.GetSystemInfo().GetSingleSourceFile()){
-    //   errs () << "Source file " << M.getSourceFileName() << " is not the target source file: " << HAKCAnalysis.GetSystemInfo().GetSingleSourceFile();
-    //   return false;
-    // }
     errs () << "Analyzing target source file: " << M.getSourceFileName() << "\n";
     return runDataAccessGraphAnalysis(HAKCAnalysis);
-  case RunPostDominatorAnalysis:
-    errs() << "Running RunPostDominatorAnalysis!!!\n";
-    return runPostDominatorAnalysis(HAKCAnalysis, MAM);
   case RunCompartmentalization:
     return runCompartmentalization(HAKCAnalysis);
   case RunConfigAndExit:

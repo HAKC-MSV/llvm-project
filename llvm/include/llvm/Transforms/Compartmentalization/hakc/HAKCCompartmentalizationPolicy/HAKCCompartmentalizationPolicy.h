@@ -15,6 +15,7 @@
 
 namespace llvm::hakc {
 class HAKCModuleAnalysis;
+class HAKCModuleTransform;
 class HAKCSystemInformation;
 
 typedef std::shared_ptr<HAKCCompartment> HAKCCompartmentP;

@@ -13,9 +13,9 @@
 
 namespace llvm::hakc {
 HAKCFunctionAnalysis::HAKCFunctionAnalysis(
-    Function *F, HAKCModuleAnalysis &ModuleAnalysis,
+    Function *F, HAKCModuleAnalysis &ModuleAnalysis, HAKCTransformer &Transformer,
     HAKCCompartmentalizationPolicy &Policy)
-    : ModuleAnalysis(ModuleAnalysis), Policy(Policy),
+    : ModuleAnalysis(ModuleAnalysis), Transformer(Transformer), Policy(Policy),
       PointerManager(
           *this, Policy,
           ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().OutputDebugInfo(
@@ -1005,7 +1005,7 @@ void HAKCFunctionAnalysis::
 }
 
 HAKCTransformer &HAKCFunctionAnalysis::getTransformer() const {
-  return GetModuleAnalysis().GetTransformer();
+  return Transformer;
 }
 
 HAKCModuleAnalysis &HAKCFunctionAnalysis::GetModuleAnalysis() const {
