@@ -63,6 +63,8 @@ public:
 
   bool IsVoidPtrType() const;
 
+  bool IsStructType() const;
+
   void SetIsIgnoredType(bool IsIgnored);
 
   static const DIType *StripTypeModifiers(const DIType *DiType);

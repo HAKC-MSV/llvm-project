@@ -34,14 +34,36 @@ hakc::HAKCTypeIdentifier::FindType(const DIType *type) {
   return it->second;
 }
 
-bool hakc::HAKCTypeIdentifier::IsStructTypeThatStartsWithPointer(
-    const DIType *DiType) {
-  if (!DiType) {
+bool hakc::HAKCTypeIdentifier::IsStructTypeThatStartsWithPointerLikeType(
+    const HAKCTypeInfo &HAKCTy) {
+  if (HAKCTy.GetDbgType()) {
+    auto *StrippedTy = HAKCTypeInfo::StripTypeModifiers(HAKCTy.GetDbgType());
+    if (auto *CompositeTy = dyn_cast<DICompositeType>(StrippedTy)) {
+      auto *FirstMemberTy = GetFirstStructMemberType(CompositeTy);
+      return IsPointerLikeType(FirstMemberTy);
+    }
+  }
+
+  return false;
+}
+
+bool hakc::HAKCTypeIdentifier::IsPointerLikeType(const DIType *DIType) {
+  std::set<unsigned> PointerLike_Tags = {dwarf::DW_TAG_pointer_type,
+                                         dwarf::DW_TAG_array_type};
+  auto *StrippedTy = HAKCTypeInfo::StripTypeModifiers(DIType);
+  if (!StrippedTy) {
     return false;
   }
-  if (auto *CompositeTy = dyn_cast<DICompositeType>(DiType)) {
-    auto *FirstMember = GetFirstStructMemberType(CompositeTy);
-    return FirstMember && FirstMember->getTag() == dwarf::DW_TAG_pointer_type;
+
+  if (PointerLike_Tags.contains(StrippedTy->getTag())) {
+    return true;
+  }
+
+  if (auto *BasicTy = dyn_cast<DIBasicType>(StrippedTy)) {
+    std::set<unsigned> PointerLike_Encodings = {dwarf::DW_ATE_unsigned,
+                                                dwarf::DW_ATE_address};
+    return PointerLike_Encodings.contains(BasicTy->getTag()) &&
+           BasicTy->getSizeInBits() == 64;
   }
 
   return false;
@@ -49,11 +71,12 @@ bool hakc::HAKCTypeIdentifier::IsStructTypeThatStartsWithPointer(
 
 const DIType *hakc::HAKCTypeIdentifier::GetFirstStructMemberType(
     const DICompositeType *DICompositeTy) {
-  if (!DICompositeTy ||
-      DICompositeTy->getTag() != dwarf::DW_TAG_structure_type) {
+  auto *StrippedTy = dyn_cast<DICompositeType>(
+      HAKCTypeInfo::StripTypeModifiers(DICompositeTy));
+  if (!StrippedTy || StrippedTy->getTag() != dwarf::DW_TAG_structure_type) {
     return nullptr;
   }
-  const auto MemberTypes = DICompositeTy->getElements();
+  const auto MemberTypes = StrippedTy->getElements();
   if (MemberTypes.empty()) {
     return nullptr;
   }
@@ -1167,10 +1190,6 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
     auto HAKCGlob = FindGlobal(GlobalVar, true);
     if (HAKCGlob && HAKCGlob->GetType()) {
       /* In LLVM, Globals are always pointers */
-      if (GlobalVar->getName() == "x86_pmu") {
-        CommonHAKCAnalysis::getWriter(true)
-            << HAKCGlob->GetType()->GetDbgType() << "\n";
-      }
       auto GlobalTy = HAKCGlob->GetType();
       FoundType = FindPointerType(*GlobalTy);
       if (!FoundType) {
@@ -1254,7 +1273,6 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
                 SourceHAKCTy->GetPointeeType()->GetDbgType());
             for (auto *Element : DICompositeTy->getElements()) {
               if (Element->getTag() == dwarf::DW_TAG_member) {
-                CommonHAKCAnalysis::getWriter(true) << *Element << "\n";
                 auto *Member = dyn_cast<DIDerivedType>(Element);
                 if (Member->getOffsetInBits() / BITS_PER_BYTE ==
                     ByteOffset.getZExtValue()) {
@@ -1308,10 +1326,18 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
   }
 
 exit:
-  if (FoundType && FoundType->IsPointerType() &&
-      FoundType->GetPointeeType() == nullptr) {
-    if (auto PointeeType = FindPointeeType(FoundType)) {
-      FoundType->SetPointeeType(PointeeType);
+  if (FoundType && FoundType->GetPointeeType() == nullptr) {
+    if (FoundType->IsPointerType()) {
+      if (auto PointeeType = FindPointeeType(FoundType)) {
+        FoundType->SetPointeeType(PointeeType);
+      }
+    } else if (IsStructTypeThatStartsWithPointerLikeType(*FoundType)) {
+      if (IsStructTypeThatStartsWithPointerLikeType(*FoundType)) {
+        auto *FirstMemberType = GetFirstStructMemberType(
+            dyn_cast<DICompositeType>(FoundType->GetDbgType()));
+        auto PointeeType = FindType(FirstMemberType);
+        FoundType->SetPointeeType(PointeeType);
+      }
     }
   }
 
@@ -1591,9 +1617,13 @@ void hakc::HAKCTypeIdentifier::ProcessDebugInfo() {
     if (HAKCType->IsPointerType()) {
       PointeeType = FindPointeeType(HAKCType);
     }
-    if (IsStructTypeThatStartsWithPointer(HAKCType->GetDbgType())) {
-      auto *FirstMemberType = GetFirstStructMemberType(
-          dyn_cast<DICompositeType>(HAKCType->GetDbgType()));
+    if (IsStructTypeThatStartsWithPointerLikeType(*HAKCType)) {
+      CommonHAKCAnalysis::getWriter(Debug)
+          << HAKCType->GetDbgType()
+          << " is a struct type that starts with a pointer like type\n";
+      auto *FirstMemberType =
+          GetFirstStructMemberType(dyn_cast<DICompositeType>(
+              HAKCTypeInfo::StripTypeModifiers(HAKCType->GetDbgType())));
       PointeeType = FindType(FirstMemberType);
     }
 

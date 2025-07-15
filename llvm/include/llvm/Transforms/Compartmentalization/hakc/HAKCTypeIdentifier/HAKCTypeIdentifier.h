@@ -104,7 +104,10 @@ protected:
 
   static FunctionType *GetIndirectCallFunctionType(const CallInst *CallI);
 
-  static bool IsStructTypeThatStartsWithPointer(const DIType *DiType);
+  static bool
+  IsStructTypeThatStartsWithPointerLikeType(const HAKCTypeInfo &HAKCTy);
+
+  static bool IsPointerLikeType(const DIType *DIType);
 
   static const DIType *
   GetFirstStructMemberType(const DICompositeType *DICompositeTy);
