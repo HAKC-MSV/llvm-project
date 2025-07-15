@@ -65,8 +65,15 @@ public:
 
   std::set<HAKCFunctionP> GetUnmappedFunctions();
 
-protected:
+  DebugInfoFinder GetDbgInfoFinder();
+
+  HAKCTypeP FindCalledFunctionType(FunctionType *FunctionTy);
+
+  static FunctionType *GetIndirectCallFunctionType(const CallInst *CallI);
+
   HAKCTypeP FindType(Type *Ty) const;
+
+  HAKCTypeP FindType(const DIType *type);
 
   HAKCTypeP FindPointeeType(HAKCPointerBase &HAKCPointer);
 
@@ -76,7 +83,6 @@ protected:
 
   HAKCTypeP HandleType(const DIType *type);
 
-  HAKCTypeP FindType(const DIType *type);
 
   void AddTypeMapping(const DIType *type, const HAKCTypeP &HAKCType);
 
@@ -115,14 +121,10 @@ protected:
 
   HAKCTypeP HandleIndirectCall(CallInst *CallI);
 
-  static FunctionType *GetIndirectCallFunctionType(const CallInst *CallI);
-
   HAKCFunctionP FindFunction(const Function *F, bool SearchUnmapped = false);
 
   HAKCGlobalP FindGlobal(const GlobalVariable *GV,
                          bool SearchUnmapped = false) const;
-
-  HAKCTypeP FindCalledFunctionType(FunctionType *FunctionTy);
 
   HAKCTypeP CreateNoDebugType(Type *Ty) const;
 

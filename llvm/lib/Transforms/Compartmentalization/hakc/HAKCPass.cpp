@@ -65,11 +65,11 @@ static bool runDataAccessGraphAnalysis(CommonHAKCAnalysis &HAKCAnalysis) {
   SmallString<256> Path;
   SmallString<256> ModulePath;
   CommonHAKCAnalysis::GetModuleFullPath(M, ModulePath);
-  llvm::sys::path::append(
+  sys::path::append(
       Path, HAKCAnalysis.GetSystemInfo().GetDagAnalysisRootPath());
-  llvm::sys::path::append(Path, ModulePath);
-  llvm::sys::path::replace_extension(Path, ".dag.yml");
-  llvm::sys::path::make_preferred(Path);
+  sys::path::append(Path, ModulePath);
+  sys::path::replace_extension(Path, ".dag.yml");
+  sys::path::make_preferred(Path);
 
   std::error_code err;
   err = sys::fs::create_directories(sys::path::parent_path(Path));
@@ -81,15 +81,6 @@ static bool runDataAccessGraphAnalysis(CommonHAKCAnalysis &HAKCAnalysis) {
   raw_fd_ostream out(Path, err);
   if (!err) {
     HAKCModuleAnalysis ModuleAnalysis(HAKCAnalysis);
-    // auto type_identifier = ModuleAnalysis.GetTypeIdentifier();
-    // auto HAKCTransformer Transformer(ModuleAnalysis, Policy);
-    // Need managed pointers, which are a part of module analysis, to do temporal analysis in the type identifier
-    // ModuleAnalysis.TemporalAnalysis();
-    // add function new that creates a policy
-    // then subclass of the policy that is dag analysis, that is a dummy version
-
-    // type_identifier.TemporalAnalysis();
-    // type_identifier.OutputYAML(out);
     ModuleAnalysis.OutputYAML(out);
     out.close();
   } else {
