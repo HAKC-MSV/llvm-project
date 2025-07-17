@@ -214,6 +214,12 @@ class HAKCDatabase:
             where_clause=f'WHERE sym.symbol_hash in [{", ".join([str(sh) for sh in symbol_hashes])}]')
         return result
 
+    def get_symbols_by_name_list(self, symbol_list: list[str]) -> list[HAKCSymbol]:
+        result = self._get_symbols(
+            where_clause=f'WHERE sym.Name in [{", ".join(["\"" + str(symbol_name) + "\"" for symbol_name in symbol_list])}]'
+        )
+        return result
+
     def get_symbols_by_name(self, symbol_name: str) -> list[HAKCSymbol]:
         result = self._get_symbols(
             where_clause=f'WHERE sym.Name = $symbol_name',
