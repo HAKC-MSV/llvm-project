@@ -81,6 +81,7 @@ static bool runDataAccessGraphAnalysis(CommonHAKCAnalysis &HAKCAnalysis) {
   raw_fd_ostream out(Path, err);
   if (!err) {
     HAKCModuleAnalysis ModuleAnalysis(HAKCAnalysis);
+    ModuleAnalysis.TemporalAnalysis();
     ModuleAnalysis.OutputYAML(out);
     out.close();
   } else {

@@ -70,20 +70,20 @@ protected:
   bool CheckConnection() const;
 };
 
-class HAKCCompartmentalizationPolicy {
+class HAKCCompartmentalizationPolicy{
 public:
   explicit HAKCCompartmentalizationPolicy(
       HAKCSystemInformation &SystemInformation);
 
-  ~HAKCCompartmentalizationPolicy();
+  virtual ~HAKCCompartmentalizationPolicy();
 
-  hakc::HAKCCompartmentDivision &GetDivision(GlobalValue *GV);
+  virtual HAKCCompartmentDivision &GetDivision(GlobalValue *GV);
 
   HAKCCompartmentP GetCompartment(hakc_compartment_id_t CompartmentID);
 
   void GetValidTargets(HAKCCompartment &Compartment) const;
 
-  hakc::HAKCCompartmentDivision &GetDefaultDivision();
+  HAKCCompartmentDivision &GetDefaultDivision();
 
 protected:
   HAKCSystemInformation &SystemInformation;
@@ -111,6 +111,17 @@ protected:
                                      hakc_access_token_t AccessToken,
                                      bool CheckForExisting);
 };
+
+class HAKCCompartmentalizationPolicyDAG : HAKCCompartmentalizationPolicy {
+public:
+  explicit HAKCCompartmentalizationPolicyDAG(HAKCSystemInformation &SystemInformation);
+
+  HAKCCompartmentDivision &GetDivision(GlobalValue *GV) override;
+  // std::map<GlobalValue *, HAKCCompartmentDivision*> GV_to_divs;
+  std::map<GlobalValue *, std::shared_ptr<HAKCCompartmentDivision>> GV_to_divs;
+  unsigned GV_to_div_incr;
+};
+
 } // namespace llvm::hakc
 
 #endif // HAKC_HAKCCOMPARTMENTALIZATIONPOLICY_H

@@ -15,22 +15,22 @@
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCPreTransferAction.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTypeIdentifier/HAKCTypeIdentifier.h"
 
-typedef std::shared_ptr<llvm::hakc::HAKCAllocationSize> HAKCCustomAllocation;
+typedef std::shared_ptr<hakc::HAKCAllocationSize> HAKCCustomAllocation;
 
-typedef SmallVector<llvm::hakc::function_def_t> HAKCFunctionList;
-typedef SmallVector<llvm::hakc::function_def_t> HAKCTransferList;
-typedef SmallVector<llvm::hakc::HAKCTypeP> HAKCStructList;
-typedef SmallVector<llvm::hakc::custom_transfer_def_t> HAKCCustomTransferList;
+typedef SmallVector<hakc::function_def_t> HAKCFunctionList;
+typedef SmallVector<hakc::function_def_t> HAKCTransferList;
+typedef SmallVector<hakc::HAKCTypeP> HAKCStructList;
+typedef SmallVector<hakc::custom_transfer_def_t> HAKCCustomTransferList;
 typedef SmallVector<GlobalVariable *> HAKCGlobalVariableList;
 typedef SmallVector<GlobalValue *> HAKCSymbolList;
 typedef SmallVector<Function *> FunctionList;
 typedef SmallVector<std::string, 16> HAKCStringList;
 typedef SmallVector<HAKCCustomAllocation> HAKCCustomAllocationList;
-typedef SmallVector<llvm::hakc::arg_def_t> HAKCArgumentsList;
-typedef SmallVector<llvm::hakc::transfer_action_def_t> HAKCTransferActionList;
-typedef SmallVector<llvm::hakc::pre_transfer_action_def_t>
+typedef SmallVector<hakc::arg_def_t> HAKCArgumentsList;
+typedef SmallVector<hakc::transfer_action_def_t> HAKCTransferActionList;
+typedef SmallVector<hakc::pre_transfer_action_def_t>
     HAKCPreTransferActionList;
-typedef SmallVector<llvm::hakc::post_target_action_def_t>
+typedef SmallVector<hakc::post_target_action_def_t>
     HAKCPostTargetActionList;
 
 namespace llvm::hakc {

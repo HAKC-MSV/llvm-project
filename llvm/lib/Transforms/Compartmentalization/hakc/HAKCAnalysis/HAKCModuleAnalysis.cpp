@@ -366,74 +366,93 @@ void HAKCModuleAnalysis::TemporalAnalysisHandleStore(StoreInst *Store,
   }
 }
 
-void HAKCModuleAnalysis::TemporalAnalysis(HAKCModuleAnalysis &ModuleAnalysis) {
+void HAKCModuleAnalysis::TemporalAnalysis() {
   // FunctionTemporalAnalysis
   CommonHAKCAnalysis::getWriter(true)
       << "!!!! Starting Temporal Analysis !!!!\n";
-  for (auto *DISubProg : TypeIdentifier.GetDbgInfoFinder().subprograms()) {
-    FunctionTemporalAnalysis(DISubProg);
+  // create managed pointers (essentially what is being done at the beginning of the compartmentalization code)
+  HAKCCompartmentalizationPolicyDAG Policy(GetCommonAnalysis().GetSystemInfo());
+  for (auto *F : AnalysisFunctions) {
+    HAKCFunctionAnalysis FunctionAnalysis(F, (*this), (*this), Policy);
+    FunctionAnalysis.InstrumentCode();
   }
+
+  // for (auto *DISubProg : TypeIdentifier.GetDbgInfoFinder().subprograms()) {
+  //   FunctionTemporalAnalysis(DISubProg);
+  // }
   CommonHAKCAnalysis::getWriter(true)
       << "!!!! Finished Temporal Analysis !!!!\n";
 }
 
 void HAKCModuleAnalysis::FunctionTemporalAnalysis(const DISubprogram *SubProg) {
 
-  // TODO: in type identifier, track the types we want to analyze later, but
-  // don't do the permission checking here
-  auto debug = true;
+
+
+  //
+  // // TODO: in type identifier, track the types we want to analyze later, but
+  // // don't do the permission checking here
+  // auto debug = true;
+  //
+  // // AnalysisHelper.GetSystemInfo()
+  //
+  // // ModuleTransformation
+  //
+  // if (!SubProg) {
+  //   CommonHAKCAnalysis::getWriter(true)
+  //       << "Temporal Analysis for function NULL!\n";
+  // }
+  // CommonHAKCAnalysis::getWriter(true)
+  //     << "Temporal Analysis for function " << *SubProg << "\n";
+  // // check for null dereference
+  // if (!TypeIdentifier.GetFunctions().contains(SubProg)) {
+  //   CommonHAKCAnalysis::getWriter(true)
+  //       << "Temporal Analysis unable to find functions[SubProg] for SubProg "
+  //       << *SubProg << "\n";
+  //   return;
+  // }
+  //
+  // HAKCFunctionP FP = TypeIdentifier.GetFunctions()[SubProg];
+  // // FindFunction
+  //
+  // Function *F = FP->GetFunction();
+  // if (!F) {
+  //   CommonHAKCAnalysis::getWriter(true)
+  //       << "Could not find Function from FP " << *FP << "\n";
+  // }
+
+  // create managed pointers (essentially what is being done at the beginning of the compartmentalization code)
+  // HAKCCompartmentalizationPolicyDAG Policy()
+  // for (auto *F : AnalysisFunctions) {
+  //   HAKCFunctionAnalysis FunctionAnalysis(F, ModuleAnalysis, (*this), Policy);
+  //   FunctionAnalysis.InstrumentCode();
+  // }
 
   // loop through all the managed pointers (get from function analysis, which is
   // in analysis manager) then, FunctionTransformation
-  // AnalysisHelper.GetSystemInfo()
 
-  // ModuleTransformation
 
-  if (!SubProg) {
-    CommonHAKCAnalysis::getWriter(true)
-        << "Temporal Analysis for function NULL!\n";
-  }
-  CommonHAKCAnalysis::getWriter(true)
-      << "Temporal Analysis for function " << *SubProg << "\n";
-  // check for null dereference
-  if (!TypeIdentifier.GetFunctions().contains(SubProg)) {
-    CommonHAKCAnalysis::getWriter(true)
-        << "Temporal Analysis unable to find functions[SubProg] for SubProg "
-        << *SubProg << "\n";
-    return;
-  }
-
-  HAKCFunctionP FP = TypeIdentifier.GetFunctions()[SubProg];
-  // FindFunction
-
-  Function *F = FP->GetFunction();
-  if (!F) {
-    CommonHAKCAnalysis::getWriter(true)
-        << "Could not find Function from FP " << *FP << "\n";
-  }
-
-  // loop through the managed pointers
-
-  for (auto InstIt = inst_begin(F); InstIt != inst_end(F); ++InstIt) {
-    auto *I = &(*InstIt);
-    if (I->isDebugOrPseudoInst() || isa<IntrinsicInst>(I) ||
-        isa<BranchInst>(I)) {
-      continue;
-    }
-    CommonHAKCAnalysis::getWriter(true)
-        << "Looking at instruction " << *I << "\n";
-    if (auto *Call = dyn_cast<CallInst>(I)) {
-      TemporalAnalysisHandleCall(Call, FP);
-    } else if (auto *Load = dyn_cast<LoadInst>(I)) {
-      TemporalAnalysisHandleLoad(Load, FP);
-    } else if (auto *Store = dyn_cast<StoreInst>(I)) {
-      TemporalAnalysisHandleStore(Store, FP);
-    }
-  }
-  for (auto &it : FP->TypesUsed) {
-    CommonHAKCAnalysis::getWriter(true)
-        << "Found Type use " << *it.first << " with RWX " << it.second << "\n";
-  }
+  // // loop through the managed pointers
+  //
+  // for (auto InstIt = inst_begin(F); InstIt != inst_end(F); ++InstIt) {
+  //   auto *I = &(*InstIt);
+  //   if (I->isDebugOrPseudoInst() || isa<IntrinsicInst>(I) ||
+  //       isa<BranchInst>(I)) {
+  //     continue;
+  //   }
+  //   CommonHAKCAnalysis::getWriter(true)
+  //       << "Looking at instruction " << *I << "\n";
+  //   if (auto *Call = dyn_cast<CallInst>(I)) {
+  //     TemporalAnalysisHandleCall(Call, FP);
+  //   } else if (auto *Load = dyn_cast<LoadInst>(I)) {
+  //     TemporalAnalysisHandleLoad(Load, FP);
+  //   } else if (auto *Store = dyn_cast<StoreInst>(I)) {
+  //     TemporalAnalysisHandleStore(Store, FP);
+  //   }
+  // }
+  // for (auto &it : FP->TypesUsed) {
+  //   CommonHAKCAnalysis::getWriter(true)
+  //       << "Found Type use " << *it.first << " with RWX " << it.second << "\n";
+  // }
 }
 
 // we generate these for all kernel params, some may go unused by the actual
