@@ -923,6 +923,10 @@ void HAKCPointerManager::PrintAuthenticatedValues() const {
   PrintManagedValues(AuthenticatedValues);
 }
 
+ManagedHAKCPointerListType HAKCPointerManager::GetManagedPointersList() {
+  return ManagedPointersList;
+}
+
 unsigned HAKCPointerManager::GetDataAuthenticationsAdded() const {
   return DataAuthenticationsAdded;
 }

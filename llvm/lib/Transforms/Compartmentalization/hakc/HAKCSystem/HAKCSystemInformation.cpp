@@ -130,6 +130,7 @@ void HAKCSystemInformation::operator<<(HAKCYamlConfig &YamlConfig) {
   Platform = YamlConfig.Platform;
   DagAnalysisRootPath = YamlConfig.DagAnalysisRootPath;
   PassMode = YamlConfig.PassMode;
+  TemporalAnalysisEnabled = YamlConfig.TemporalAnalysisEnabled;
   if (PassMode == RunConfigAndExit) {
     return;
   }
@@ -290,8 +291,12 @@ Module &HAKCSystemInformation::GetModule() const {
   return CommonAnalysis.GetModule();
 }
 
-hakc::HAKCPassModeTypeEnum HAKCSystemInformation::GetPassMode() const {
+HAKCPassModeTypeEnum HAKCSystemInformation::GetPassMode() const {
   return PassMode;
+}
+
+bool HAKCSystemInformation::GetTemporalAnalysisEnabled() const {
+  return TemporalAnalysisEnabled;
 }
 
 StringRef HAKCSystemInformation::GetSingleSourceFile() {
@@ -306,15 +311,15 @@ HAKCStructList HAKCSystemInformation::GetStructList() const {
   return StructList;
 }
 
-llvm::hakc::function_def_t HAKCSystemInformation::CodeValidation() const {
+function_def_t HAKCSystemInformation::CodeValidation() const {
   return CodeValidationFunction;
 }
 
-llvm::hakc::function_def_t HAKCSystemInformation::DataValidation() const {
+function_def_t HAKCSystemInformation::DataValidation() const {
   return DataValidationFunction;
 }
 
-llvm::hakc::function_def_t HAKCSystemInformation::SignWithDivision() const {
+function_def_t HAKCSystemInformation::SignWithDivision() const {
   return SignWithDivisionFunction;
 }
 
@@ -322,7 +327,7 @@ HAKCTypeIdentifier &HAKCSystemInformation::GetTypeIdentifier() {
   return TypeIdentifier;
 }
 
-hakc::function_def_t
+function_def_t
 HAKCSystemInformation::CompartmentTransfer(bool PerCPU) const {
   if (PerCPU) {
     return PerCPUCompartmentTransfer;

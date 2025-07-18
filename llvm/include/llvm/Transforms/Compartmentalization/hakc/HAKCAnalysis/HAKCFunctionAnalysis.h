@@ -146,6 +146,10 @@ public:
   HAKCFunctionAnalysis(Function *F, HAKCModuleAnalysis &ModuleAnalysis, HAKCTransformer &Transformer,
                        HAKCCompartmentalizationPolicy &Policy);
 
+  HAKCTypeIdentifier& GetTypeIdentifier();
+
+  void TemporalAnalysis();
+
   bool modifiedFunction() const;
 
   void InstrumentCode();

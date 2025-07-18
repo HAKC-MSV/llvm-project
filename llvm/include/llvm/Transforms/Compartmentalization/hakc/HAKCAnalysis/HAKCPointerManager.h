@@ -123,6 +123,10 @@ public:
 
   bool DebugIsActive() const;
 
+  ManagedHAKCPointerListType GetManagedPointersList();
+
+
+
 protected:
   /**
    * The set of pointers under management

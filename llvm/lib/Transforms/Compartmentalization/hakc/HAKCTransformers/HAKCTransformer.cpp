@@ -20,10 +20,20 @@ HAKCTransformer::HAKCTransformer(HAKCModuleAnalysis &ModuleAnalysis,
     : ModuleAnalysis(ModuleAnalysis), Policy(Policy),
       HAKCIRBuilder(ModuleAnalysis.GetModule().getContext()),
       CompartmentalizationPolicy(Policy), VariadicTransferFunctions() {
+    InitAnalysis();
+};
+
+// if (!ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().GetTemporalAnalysisEnabled()) {
+HAKCTransformer::HAKCTransformer(HAKCModuleAnalysis &ModuleAnalysis,
+                                 HAKCCompartmentalizationPolicyDAG &Policy)
+    : ModuleAnalysis(ModuleAnalysis), Policy(Policy),
+      HAKCIRBuilder(ModuleAnalysis.GetModule().getContext()),
+      CompartmentalizationPolicy(Policy), VariadicTransferFunctions() {
   InitAnalysis();
 };
 
 void HAKCTransformer::InitAnalysis() {
+  // TODO: fix this error here
   for (auto &F : getModule().functions()) {
     if (ModuleAnalysis.FunctionNeedsAnalysis(&F)) {
       auto &Division = Policy.GetDivision(&F);

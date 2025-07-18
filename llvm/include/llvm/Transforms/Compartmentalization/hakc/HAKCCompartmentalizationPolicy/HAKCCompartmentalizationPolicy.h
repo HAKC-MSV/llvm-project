@@ -83,7 +83,7 @@ public:
 
   void GetValidTargets(HAKCCompartment &Compartment) const;
 
-  HAKCCompartmentDivision &GetDefaultDivision();
+  virtual HAKCCompartmentDivision &GetDefaultDivision();
 
 protected:
   HAKCSystemInformation &SystemInformation;
@@ -112,11 +112,12 @@ protected:
                                      bool CheckForExisting);
 };
 
-class HAKCCompartmentalizationPolicyDAG : HAKCCompartmentalizationPolicy {
+class HAKCCompartmentalizationPolicyDAG : public HAKCCompartmentalizationPolicy {
 public:
   explicit HAKCCompartmentalizationPolicyDAG(HAKCSystemInformation &SystemInformation);
 
   HAKCCompartmentDivision &GetDivision(GlobalValue *GV) override;
+  HAKCCompartmentDivision &GetDefaultDivision() override;
   // std::map<GlobalValue *, HAKCCompartmentDivision*> GV_to_divs;
   std::map<GlobalValue *, std::shared_ptr<HAKCCompartmentDivision>> GV_to_divs;
   unsigned GV_to_div_incr;

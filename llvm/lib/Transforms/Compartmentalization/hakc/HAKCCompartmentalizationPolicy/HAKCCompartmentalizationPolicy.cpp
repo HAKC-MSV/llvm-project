@@ -25,6 +25,13 @@ HAKCCompartmentDivision &HAKCCompartmentalizationPolicyDAG::GetDivision(GlobalVa
   return *GV_to_divs[GV];
 }
 
+
+HAKCCompartmentDivision & HAKCCompartmentalizationPolicyDAG::GetDefaultDivision() {
+  LLVMContext &ctx = SystemInformation.GetModule().getContext();
+  std::shared_ptr<HAKCCompartmentDivision> Division = std::make_shared<HAKCCompartmentDivision>(HAKCCompartment(0, 0, ctx), 0, 0, ctx);
+  return *Division;
+}
+
 HAKCDatabaseRequest::HAKCDatabaseRequest(StringRef Endpoint,
                                          json::Object &Parameters)
     : Request(nullptr) {
@@ -157,7 +164,10 @@ HAKCCompartmentalizationPolicy::HAKCCompartmentalizationPolicy(
     : SystemInformation(SystemInformation), Compartments(), Divisions(),
       Client(SystemInformation.GetDatabaseInformation(),
              SystemInformation.OutputDebugInfo()) {
-  ConnectToDatabase();
+  // do not want to connect to database for temporal analysis (database is not needed)
+  if (!SystemInformation.GetTemporalAnalysisEnabled()) {
+    ConnectToDatabase();
+  }
 }
 
 HAKCCompartmentalizationPolicy::~HAKCCompartmentalizationPolicy() {
@@ -194,7 +204,7 @@ HAKCCompartmentalizationPolicy::GetDivision(GlobalValue *GV) {
   }
 
   std::string ObjectYaml;
-  llvm::raw_string_ostream os(ObjectYaml);
+  raw_string_ostream os(ObjectYaml);
   os << *HAKCSymbol;
   json::Object Parameters({{"object", ObjectYaml}});
   auto ResponseData = Execute(
@@ -248,7 +258,7 @@ HAKCCompartmentalizationPolicy::GetDivision(GlobalValue *GV) {
   return *Division;
 }
 
-hakc::HAKCCompartmentDivision &
+HAKCCompartmentDivision &
 HAKCCompartmentalizationPolicy::GetDefaultDivision() {
   return *GetDivision(0, 0);
 }

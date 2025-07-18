@@ -104,17 +104,19 @@ public:
 
   iterator_range<HAKCStringList::iterator> IncludePaths();
 
-  llvm::hakc::function_def_t CodeValidation() const;
+  function_def_t CodeValidation() const;
 
-  llvm::hakc::function_def_t DataValidation() const;
+  function_def_t DataValidation() const;
 
-  llvm::hakc::function_def_t SignWithDivision() const;
+  function_def_t SignWithDivision() const;
 
-  llvm::hakc::function_def_t CompartmentTransfer(bool PerCPU) const;
+  function_def_t CompartmentTransfer(bool PerCPU) const;
 
   HAKCTypeIdentifier &GetTypeIdentifier();
 
-  hakc::HAKCPassModeTypeEnum GetPassMode() const;
+  HAKCPassModeTypeEnum GetPassMode() const;
+
+  bool GetTemporalAnalysisEnabled() const;
 
   StringRef GetArch() const;
 
@@ -137,8 +139,9 @@ protected:
   CommonHAKCAnalysis &CommonAnalysis;
   HAKCTypeIdentifier TypeIdentifier;
   HAKCDatabaseInformation DatabaseInformation;
+  bool TemporalAnalysisEnabled;
   bool DebugOutput;
-  hakc::HAKCPassModeTypeEnum PassMode;
+  HAKCPassModeTypeEnum PassMode;
   std::string SingleSourceFile;
   std::string Arch;
   std::string Platform;
@@ -146,11 +149,11 @@ protected:
   HAKCStringList IncludePathsList;
   FunctionList NoTransferFunctionList;
   HAKCTransferList CompartmentTransferFunctionList;
-  hakc::function_def_t CodeValidationFunction;
-  hakc::function_def_t DataValidationFunction;
-  hakc::function_def_t SignWithDivisionFunction;
-  hakc::function_def_t DefaultCompartmentTransfer;
-  hakc::function_def_t PerCPUCompartmentTransfer;
+  function_def_t CodeValidationFunction;
+  function_def_t DataValidationFunction;
+  function_def_t SignWithDivisionFunction;
+  function_def_t DefaultCompartmentTransfer;
+  function_def_t PerCPUCompartmentTransfer;
   HAKCFunctionList CompartmentalizationSupportFunctionList;
   HAKCSymbolList SymbolsToOutputDebugInfo;
   HAKCStringList SeparateNamespacePathList;
@@ -162,6 +165,7 @@ protected:
   HAKCPreTransferActionList PreTransferActionList;
   HAKCPostTargetActionList PostTargetActionList;
   HAKCStructList StructList;
+
 
   void
   GetAllDefinedHAKCFunctions(SmallVectorImpl<hakc::function_def_t> &Results);

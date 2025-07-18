@@ -33,6 +33,9 @@ public:
   HAKCTransformer(HAKCModuleAnalysis &ModuleAnalysis,
                   HAKCCompartmentalizationPolicy &Policy);
 
+  HAKCTransformer(HAKCModuleAnalysis &ModuleAnalysis,
+                  HAKCCompartmentalizationPolicyDAG &Policy);
+
   virtual ~HAKCTransformer() = default;
 
   /**

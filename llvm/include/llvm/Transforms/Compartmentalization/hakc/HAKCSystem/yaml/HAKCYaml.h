@@ -204,6 +204,7 @@ struct HAKCYamlConfig {
   HAKCYAMLStringSequenceType TransferFunctionCandidates;
   bool OutputAllDebugInfo;
   HAKCYamlDatabaseConfig DatabaseConfig;
+  bool TemporalAnalysisEnabled;
 
   HAKCYAMLSequence<HAKCYAMLSymbolDeclaration> NoTransferFunctions;
   HAKCYAMLSequence<HAKCYAMLCustomTransferType> CustomTransferFunctions;
@@ -415,6 +416,7 @@ template <> struct yaml::MappingTraits<hakc::HAKCYamlConfig> {
       io.mapOptional("PostTargetActions", YamlConfig.PostTargetActions);
       io.mapOptional("TransferFunctionCandidates",
                      YamlConfig.TransferFunctionCandidates);
+      io.mapRequired("TemporalAnalysisEnabled", YamlConfig.TemporalAnalysisEnabled);
       if (YamlConfig.PassMode == hakc::RunCompartmentalization) {
         io.mapRequired("Database", YamlConfig.DatabaseConfig);
       } else {
