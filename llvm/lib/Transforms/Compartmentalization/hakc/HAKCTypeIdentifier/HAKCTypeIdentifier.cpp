@@ -1332,12 +1332,10 @@ exit:
         FoundType->SetPointeeType(PointeeType);
       }
     } else if (IsStructTypeThatStartsWithPointerLikeType(*FoundType)) {
-      if (IsStructTypeThatStartsWithPointerLikeType(*FoundType)) {
-        auto *FirstMemberType = GetFirstStructMemberType(
-            dyn_cast<DICompositeType>(FoundType->GetDbgType()));
-        auto PointeeType = FindType(FirstMemberType);
-        FoundType->SetPointeeType(PointeeType);
-      }
+      auto *FirstMemberType = GetFirstStructMemberType(
+          dyn_cast<DICompositeType>(FoundType->GetDbgType()));
+      auto PointeeType = FindType(FirstMemberType);
+      FoundType->SetPointeeType(PointeeType);
     }
   }
 
