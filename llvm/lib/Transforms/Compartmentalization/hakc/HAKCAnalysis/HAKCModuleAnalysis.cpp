@@ -15,7 +15,7 @@
 namespace llvm::hakc {
 HAKCModuleAnalysis::HAKCModuleAnalysis(CommonHAKCAnalysis &CommonAnalysis)
     : UsedCompartments(), CommonAnalysis(CommonAnalysis), AnalysisFunctions(),
-      TypeIdentifier(CommonAnalysis.GetSystemInfo().GetTypeIdentifier()) {};
+      TypeIdentifier(CommonAnalysis.GetSystemInfo().GetTypeIdentifier()) {}
 //
 // void HAKCModuleAnalysis::InitAnalysis() {
 //   for (auto &F : GetModule().functions()) {
@@ -288,21 +288,23 @@ HAKCModuleAnalysis::ExtractGlobalFromKernelParam(GlobalVariable *GV) {
 void HAKCModuleAnalysis::TemporalAnalysis() {
   // FunctionTemporalAnalysis
   CommonHAKCAnalysis::getWriter(true)
-      << "!!!! Starting Temporal Analysis !!!!\n";
+      << "!!!! Starting Module Temporal Analysis !!!!\n";
   // create managed pointers (essentially what is being done at the beginning of the compartmentalization code)
   HAKCCompartmentalizationPolicyDAG Policy(GetCommonAnalysis().GetSystemInfo());
   HAKCTransformer Transformer((*this), Policy);
   for (auto *F : AnalysisFunctions) {
+    // TODO: may need to run all analysis for all functions, then do the temporal analysis
     HAKCFunctionAnalysis FunctionAnalysis(F, (*this), Transformer, Policy);
     FunctionAnalysis.TemporalAnalysis();
     // FunctionAnalysis.InstrumentCode();
   }
 
+
   // for (auto *DISubProg : TypeIdentifier.GetDbgInfoFinder().subprograms()) {
   //   FunctionTemporalAnalysis(DISubProg);
   // }
   CommonHAKCAnalysis::getWriter(true)
-      << "!!!! Finished Temporal Analysis !!!!\n";
+      << "!!!! Finished Module Temporal Analysis !!!!\n";
 }
 
 // we generate these for all kernel params, some may go unused by the actual

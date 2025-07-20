@@ -12,6 +12,13 @@
 using namespace llvm;
 
 namespace llvm::hakc {
+
+    enum RWX_MASK {
+        Read = 0b100,
+        Write = 0b010,
+        Execute = 0b001
+    };
+
     class HAKCFunctionInfo : public HAKCSymbolInfo {
     public:
         HAKCFunctionInfo(CommonHAKCAnalysis &Analysis, StringRef Name, bool DebugActive);
@@ -24,11 +31,7 @@ namespace llvm::hakc {
 
         unsigned GetTypeUse(const std::shared_ptr<HAKCTypeInfo> &Ty);
 
-        void ModifyTypeUseR(const std::shared_ptr<HAKCTypeInfo> &Ty);
-
-        void ModifyTypeUseW(const std::shared_ptr<HAKCTypeInfo> &Ty);
-
-        void ModifyTypeUseX(const std::shared_ptr<HAKCTypeInfo> &Ty);
+        void ModifyTypeUse(const std::shared_ptr<HAKCTypeInfo> &Ty, RWX_MASK mask);
 
         void AddDirectCall(const std::shared_ptr<HAKCFunctionInfo> &DirectCall);
 
@@ -42,7 +45,6 @@ namespace llvm::hakc {
     protected:
         std::set<std::shared_ptr<HAKCFunctionInfo> > DirectCalls;
         std::set<std::shared_ptr<HAKCIndirectCallSource> > IndirectCalls;
-        void ModifyTypeUse(const std::shared_ptr<HAKCTypeInfo> &Ty, unsigned);
     };
 } // hakc
 

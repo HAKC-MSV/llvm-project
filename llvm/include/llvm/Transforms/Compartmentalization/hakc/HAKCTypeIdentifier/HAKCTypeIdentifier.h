@@ -161,6 +161,7 @@ public:
   std::map<const DIType *, HAKCTypeP> types;
   std::map<const DIGlobalVariable *, HAKCGlobalP> globals;
   std::map<const DISubprogram *, HAKCFunctionP> functions;
+  // std::map<Function *, HAKCFunctionP> FindHAKCFunctionMap;
   std::set<HAKCGlobalP> UnmappedGlobals;
   std::set<HAKCFunctionP> UnmappedFunctions;
   std::set<HAKCTypeP> MissingPointerTypes;

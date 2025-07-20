@@ -568,6 +568,9 @@ void HAKCTypeIdentifier::AddFunctionMapping(
       AnalysisHelper.GetSystemInfo().OutputDebugInfo(SubProg->getName()))
       << "Adding mapping " << *SubProg << " -> " << *HAKCFunction << "\n";
   functions[SubProg] = HAKCFunction;
+  // creating map to find HAKCFunctionInfo from Function* (needed for temporal analysis, while looping through managed pointers)
+  // GetModule().getFunction(SubProg->getName())
+  // FindHAKCFunctionMap[HAKCFunction->GetFunction()] = HAKCFunction;
 }
 
 void HAKCTypeIdentifier::FindAllGlobalsUsed(
@@ -1257,7 +1260,7 @@ HAKCTypeP HAKCTypeIdentifier::FindHAKCType(Value *V) {
 
   CommonHAKCAnalysis::getWriter(
       AnalysisHelper.GetSystemInfo().OutputDebugInfo())
-      << "Attempting to find HAKCTypeInfo for aoeu" << *V << "\n";
+      << "Attempting to find HAKCTypeInfo for " << *V << "\n";
 
   if (const auto *GlobalVar = dyn_cast<GlobalVariable>(V)) {
     auto HAKCGlob = FindGlobal(GlobalVar, true);
@@ -1424,10 +1427,10 @@ exit:
   FindHAKCTypeMap[V] = FoundType;
   if (FindHAKCTypeMap[V]) {
     CommonHAKCAnalysis::getWriter(true)
-        << "0000003 Adding cached HAKCTypeP for Value* " << *V << ": "
+        << "Adding cached HAKCTypeP for Value* " << *V << ": "
         << *FindHAKCTypeMap[V] << "\n";
   }
-  FindHAKCTypeMapDebug(V, true);
+  // FindHAKCTypeMapDebug(V, true);
   return FoundType;
 }
 
@@ -1779,4 +1782,4 @@ void HAKCTypeIdentifier::AddIgnoredType(StringRef TypeName) const {
 HAKCTypeP HAKCTypeIdentifier::GetVoidPointerPointeeType() const {
   return FindType(IntegerType::get(GetModule().getContext(), BITS_PER_BYTE));
 }
-}; // namespace llvm::hakc
+} // namespace llvm::hakc

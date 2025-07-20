@@ -21,7 +21,7 @@ HAKCTransformer::HAKCTransformer(HAKCModuleAnalysis &ModuleAnalysis,
       HAKCIRBuilder(ModuleAnalysis.GetModule().getContext()),
       CompartmentalizationPolicy(Policy), VariadicTransferFunctions() {
     InitAnalysis();
-};
+}
 
 // if (!ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().GetTemporalAnalysisEnabled()) {
 HAKCTransformer::HAKCTransformer(HAKCModuleAnalysis &ModuleAnalysis,
@@ -30,7 +30,7 @@ HAKCTransformer::HAKCTransformer(HAKCModuleAnalysis &ModuleAnalysis,
       HAKCIRBuilder(ModuleAnalysis.GetModule().getContext()),
       CompartmentalizationPolicy(Policy), VariadicTransferFunctions() {
   InitAnalysis();
-};
+}
 
 void HAKCTransformer::InitAnalysis() {
   // TODO: fix this error here

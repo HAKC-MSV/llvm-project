@@ -29,9 +29,9 @@ void HAKCFunctionInfo::AddTypeUse(const std::shared_ptr<HAKCTypeInfo> &Ty) {
     throw std::exception();
   }
   if (!TypesUsed.contains(Ty)) {
-    TypesUsed[Ty] = 0;
+    TypesUsed[Ty] = 0b0;
   }
-  CommonHAKCAnalysis::getWriter(true) << "Adding type " << *Ty << "\n";
+  CommonHAKCAnalysis::getWriter(true) << "Adding type use " << *Ty << "\n";
 }
 
 unsigned HAKCFunctionInfo::GetTypeUse(const std::shared_ptr<HAKCTypeInfo> &Ty) {
@@ -48,7 +48,7 @@ unsigned HAKCFunctionInfo::GetTypeUse(const std::shared_ptr<HAKCTypeInfo> &Ty) {
   return TypesUsed[Ty];
 }
 
-void HAKCFunctionInfo::ModifyTypeUseR(const std::shared_ptr<HAKCTypeInfo> &Ty) {
+void HAKCFunctionInfo::ModifyTypeUse(const std::shared_ptr<HAKCTypeInfo> &Ty, RWX_MASK mask) {
   if (!Ty) {
     CommonHAKCAnalysis::getWriter(true)
         << "Trying to modify type use of type null\n";
@@ -58,38 +58,10 @@ void HAKCFunctionInfo::ModifyTypeUseR(const std::shared_ptr<HAKCTypeInfo> &Ty) {
   if (!TypesUsed.contains(Ty)) {
     AddTypeUse(Ty);
   }
-  ModifyTypeUse(Ty, 0b100);
-}
-
-void HAKCFunctionInfo::ModifyTypeUseW(const std::shared_ptr<HAKCTypeInfo> &Ty) {
-  if (!Ty) {
-    CommonHAKCAnalysis::getWriter(true)
-        << "Trying to modify type use of type null\n";
-    throw std::exception();
-  }
-  // if not in TypesUsed
-  if (!TypesUsed.contains(Ty)) {
-    AddTypeUse(Ty);
-  }
-  ModifyTypeUse(Ty, 0b010);
-}
-
-void HAKCFunctionInfo::ModifyTypeUseX(const std::shared_ptr<HAKCTypeInfo> &Ty) {
-  if (!Ty) {
-    CommonHAKCAnalysis::getWriter(true)
-        << "Trying to modify type use of type null\n";
-    throw std::exception();
-  }
-  // if not in TypesUsed
-  if (!TypesUsed.contains(Ty)) {
-    AddTypeUse(Ty);
-  }
-  ModifyTypeUse(Ty, 0b001);
-}
-
-void HAKCFunctionInfo::ModifyTypeUse(const std::shared_ptr<HAKCTypeInfo> &Ty, unsigned perm) {
   // Note: Only to be used internally, and only to add uses, not remove them
-  TypesUsed[Ty] |= perm;
+  CommonHAKCAnalysis::getWriter(true) << "Modifying TypeUse with mask " << static_cast<unsigned>(mask) << " perm from " << TypesUsed[Ty] << " -> ";
+  TypesUsed[Ty] |= mask;
+  CommonHAKCAnalysis::getWriter(true) << TypesUsed[Ty] << " for type " << *Ty << "\n";
 }
 
 StringRef HAKCFunctionInfo::GetYamlIdentifier() const {

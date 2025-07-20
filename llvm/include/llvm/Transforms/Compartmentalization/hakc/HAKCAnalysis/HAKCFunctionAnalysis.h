@@ -12,6 +12,7 @@
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCTransformer.h"
 
 namespace llvm::hakc {
+
 class HAKCModuleAnalysis;
 class HAKCModuleTransform;
 
@@ -150,6 +151,12 @@ public:
 
   void TemporalAnalysis();
 
+  void TemporalAnalysisHandleCall(ManagedHAKCPointerUseP Use);
+
+  void TemporalAnalysisHandleLoad(ManagedHAKCPointerUseP Use);
+
+  void TemporalAnalysisHandleStore(ManagedHAKCPointerUseP Use);
+
   bool modifiedFunction() const;
 
   void InstrumentCode();
@@ -193,8 +200,6 @@ public:
   // std::map<Type*, std::shared_ptr<TICTACEpoch>> function_epochs;
   Value *AddEpochDataAuthCheckAtLocation(Value *signed_ptr, Instruction *location);
   Value *AddEpochCodeAuthCheckAtLocation(Value *SignedPtr, Instruction *Location);
-
-  void FunctionTemporalAnalysis();
 
 };
 } // namespace llvm::hakc
