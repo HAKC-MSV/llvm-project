@@ -143,6 +143,8 @@ protected:
 
   Type *FindAnonymousType(const DICompositeType *CompositeTy);
 
+  HAKCTypeP FindTypeFromDebug(const DILocalVariable &DLV, Value *V);
+
   CommonHAKCAnalysis &AnalysisHelper;
   DebugInfoFinder DbgInfoFinder;
   std::map<const DIType *, HAKCTypeP> types;

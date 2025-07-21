@@ -1191,6 +1191,23 @@ hakc::HAKCTypeIdentifier::FindPointerType(const HAKCTypeInfo &BaseType) {
   return nullptr;
 }
 
+hakc::HAKCTypeP
+hakc::HAKCTypeIdentifier::FindTypeFromDebug(const DILocalVariable &DLV,
+                                            Value *V) {
+  auto FoundType = FindType(DLV.getType());
+  if (FoundType) {
+    if (isa<AllocaInst>(V)) {
+      auto PointerType = FindPointerType(*FoundType);
+      if (!PointerType) {
+        FoundType = AddMissingPointerType(FoundType);
+      } else {
+        FoundType = PointerType;
+      }
+    }
+  }
+  return FoundType;
+}
+
 hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
   HAKCTypeP FoundType = nullptr;
   SmallVector<DbgVariableIntrinsic *> DbgUsers;
@@ -1223,7 +1240,7 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
     llvm::findDbgUsers(DbgUsers, V, &DVRUsers);
     for (const auto *DVI : DbgUsers) {
       if (const auto *DIVar = DVI->getVariable()) {
-        FoundType = FindType(DIVar->getType());
+        FoundType = FindTypeFromDebug(*DIVar, V);
         if (FoundType) {
           goto exit;
         }
@@ -1231,7 +1248,7 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
     }
     for (auto *DVR : DVRUsers) {
       if (const auto *DIVar = DVR->getVariable()) {
-        FoundType = FindType(DIVar->getType());
+        FoundType = FindTypeFromDebug(*DIVar, V);
         if (FoundType) {
           goto exit;
         }
