@@ -154,6 +154,7 @@ protected:
   std::map<CallInst *, HAKCTypeP> IndirectCallsTypes;
   std::map<const DICompositeType *, Type *> AnonymousTypes;
   const DIScope *CompilationUnitScope;
+  const std::vector<StructType *> IdentifiedStructTypes;
 };
 } // namespace llvm::hakc
 

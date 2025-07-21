@@ -201,9 +201,9 @@ std::string hakc::HAKCTypeIdentifier::GetTypeName(const DIType *type) {
 }
 
 Type *hakc::HAKCTypeIdentifier::FindNamedType(StringRef TypeName) const {
-  auto UnionName = "union." + TypeName;
-  auto StructName = "struct." + TypeName;
-  for (auto *StructTy : GetModule().getIdentifiedStructTypes()) {
+  const auto UnionName = "union." + TypeName;
+  const auto StructName = "struct." + TypeName;
+  for (auto *StructTy : IdentifiedStructTypes) {
     auto LLVMName = StructTy->getName();
     if (LLVMName.ends_with(UnionName.str()) ||
         LLVMName.ends_with(StructName.str())) {
@@ -223,7 +223,7 @@ Type *hakc::HAKCTypeIdentifier::FindAnonymousType(
   }
 
   SmallVector<StructType *> FoundTypes;
-  for (auto *StructTy : GetModule().getIdentifiedStructTypes()) {
+  for (auto *StructTy : IdentifiedStructTypes) {
     if (StructTy->getName().contains(".anon")) {
       bool TypesMatch = true;
       unsigned i;
@@ -369,7 +369,7 @@ hakc::HAKCTypeIdentifier::HandleType(const DIType *type) {
           CompositeTy->getTag() == dwarf::DW_TAG_union_type) {
         std::string SearchName = ".";
         SearchName += CompositeTy->getName();
-        for (auto *StructTy : GetModule().getIdentifiedStructTypes()) {
+        for (auto *StructTy : IdentifiedStructTypes) {
           if (StructTy->getName().ends_with(SearchName)) {
             LLVMTy = StructTy;
             break;
@@ -428,10 +428,12 @@ hakc::HAKCTypeIdentifier::HandleType(const DIType *type) {
               << "Found LLVM Type " << *LLVMTy << "\n";
           TypeP->SetLLVMType(LLVMTy);
         } else {
-          CommonHAKCAnalysis::getWriter(debug)
-              << "Could not find LLVM Type for " << type << "\n";
-          for (auto *STy : GetModule().getIdentifiedStructTypes()) {
-            CommonHAKCAnalysis::getWriter(debug) << STy << "\n";
+          if (debug) {
+            CommonHAKCAnalysis::getWriter(debug)
+                << "Could not find LLVM Type for " << type << "\n";
+            for (auto *STy : IdentifiedStructTypes) {
+              CommonHAKCAnalysis::getWriter(debug) << STy << "\n";
+            }
           }
         }
         AddTypeMapping(type, TypeP);
@@ -1547,7 +1549,9 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::HandleIndirectCall(CallInst *CallI) {
 hakc::HAKCTypeIdentifier::HAKCTypeIdentifier(CommonHAKCAnalysis &AnalysisHelper)
     : AnalysisHelper(AnalysisHelper), DbgInfoFinder(), types(), globals(),
       functions(), MissingPointerTypes(), IndirectCallsTypes(),
-      AnonymousTypes(), CompilationUnitScope(nullptr) {}
+      AnonymousTypes(), CompilationUnitScope(nullptr),
+      IdentifiedStructTypes(
+          AnalysisHelper.GetModule().getIdentifiedStructTypes()) {}
 
 Module &hakc::HAKCTypeIdentifier::GetModule() const {
   return AnalysisHelper.GetModule();
