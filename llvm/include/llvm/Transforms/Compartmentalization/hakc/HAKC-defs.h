@@ -64,6 +64,12 @@ typedef enum {
   GOLD_CLIQUE,
 } sym_color_t;
 
+enum TypePerms {
+  Read = 0b100,
+  Write = 0b010,
+  Execute = 0b001
+};
+
 typedef enum { hakc_global_scope, hakc_local_scope } hakc_scope_t;
 typedef enum { READ_ONLY = 0, READ_WRITE = 1 } epoch_perms_options_t;
 

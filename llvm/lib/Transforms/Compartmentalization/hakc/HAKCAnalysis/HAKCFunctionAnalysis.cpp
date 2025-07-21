@@ -900,7 +900,7 @@ std::string HAKCFunctionAnalysis::getHAKCFunctionSectionName() {
   return sectionName;
 }
 
-HAKCTypeIdentifier& HAKCFunctionAnalysis::GetTypeIdentifier() {
+HAKCTypeIdentifier& HAKCFunctionAnalysis::GetTypeIdentifier() const {
   return ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().GetTypeIdentifier();
 }
 
@@ -910,7 +910,7 @@ void HAKCFunctionAnalysis::TemporalAnalysis() {
     << "!!!! Starting Function Temporal Analysis !!!!\n";
 
   // loop through all managed pointers and their uses
-  for (auto ptr: PointerManager.GetManagedPointersList()) {
+  for (auto ptr: PointerManager.ManagedPointers()) {
     SmallVector<ManagedHAKCPointerUseP> Uses;
     ptr->GetAllUses(Uses);
     CommonHAKCAnalysis::getWriter(true) << *ptr << "\n";
@@ -933,53 +933,24 @@ void HAKCFunctionAnalysis::TemporalAnalysis() {
     << "!!!! Ending Function Temporal Analysis !!!!\n";
 }
 
+void HAKCFunctionAnalysis::AddPermissionUse(const ManagedHAKCPointer &ManagedPointer, TypePerms perm) const {
+  auto HAKCTy = ManagedPointer.GetType()->GetPointeeType();
+  GetTypeIdentifier().ModifyTypeUse(CurrentFunction, HAKCTy, perm);
+}
+
 void HAKCFunctionAnalysis::TemporalAnalysisHandleCall(ManagedHAKCPointerUseP CallUse) {
-  auto debug = true;
-  // get the type of the function called
-  // if direct call, we immediately know the correct type
-  // if indirect call, we need to deference the type
-  // Call->getFunctionType();
-  // for store, check the MP is the stored operand (not the value being stored
-  // in some other value) for load, we're always loading the value for call,
-  // check the MP is the function being called (not the function argument to
-  // some other call)
-
-  if (isa<CallInst>(CallUse->getUser())) {
-    auto* CallUser = dyn_cast<CallInst>(CallUse->getUser());
-
-    if (CallUse->get() == CallUser->getCalledFunction()) {
-    // TODO: will this work with indirect calls?
-      auto HAKCTy = GetTypeIdentifier().FindHAKCType(CallUse->get());
-      auto FunctionP = GetTypeIdentifier().functions[CurrentFunction->getSubprogram()];
-      if (HAKCTy) {
-        FunctionP->ModifyTypeUse(HAKCTy, RWX_MASK::Execute);
-      } else {
-        CommonHAKCAnalysis::getWriter(debug)
-            << "Could not find HAKC Symbol for CallUse " << *FunctionP << "\n";
-      }
+  if (auto* CallUser = dyn_cast<CallInst>(CallUse->getUser())) {
+    // works for both direct and indirect calls
+    if (CallUse->getOperandNo() == CallUser->getCalledOperandUse().getOperandNo()) {
+      AddPermissionUse(CallUse->getManagedPtr(), Execute);
     }
   }
 }
 
 void HAKCFunctionAnalysis::TemporalAnalysisHandleLoad(ManagedHAKCPointerUseP LoadUse) {
-// %ptr = alloca i32                               ; yields ptr
-// store i32 3, ptr %ptr                           ; yields void
-// %val = load i32, ptr %ptr                       ; yields i32:val = i32 3
-
   auto debug = true;
-  // check that the use is the second operand (not the temporary value that is being loaded, though I'm not sure if that is possible)
-  // TODO: Q: Derrick, remind me of the operand indexing scheme (seems to be shifted by one sometimes?)
-  if (LoadUse->getOperandNo() == 0) {
-    // auto op = getLoadStorePointerOperand(LoadUse->);
-    auto HAKCTy = GetTypeIdentifier().FindHAKCType(LoadUse->get());
-    // now need to get the function info pointer to save this type information
-    auto FunctionP = GetTypeIdentifier().functions[CurrentFunction->getSubprogram()];
-    if (HAKCTy) {
-      FunctionP->ModifyTypeUse(HAKCTy, RWX_MASK::Read);
-    } else {
-      CommonHAKCAnalysis::getWriter(debug)
-          << "Could not find HAKC Symbol for Load " << *FunctionP << "\n";
-    }
+  if (LoadUse->getOperandNo() == LoadInst::getPointerOperandIndex()) {
+    AddPermissionUse(LoadUse->getManagedPtr(), Read);
   }
   else {
     CommonHAKCAnalysis::getWriter(debug) << "LoadUse was not operand 0! (Is this even possible?)" << *LoadUse << "\n";
@@ -993,17 +964,8 @@ void HAKCFunctionAnalysis::TemporalAnalysisHandleStore(ManagedHAKCPointerUseP St
 
   auto debug = true;
   // check that the use is the thing that is being written to
-  if (StoreUse->getOperandNo() == 1) {
-    // auto op = getLoadStorePointerOperand(StoreUse->);
-    auto HAKCTy = GetTypeIdentifier().FindHAKCType(StoreUse->get());
-    // now need to get the function info pointer to save this type information
-    auto FunctionP = GetTypeIdentifier().functions[CurrentFunction->getSubprogram()];
-    if (HAKCTy) {
-      FunctionP->ModifyTypeUse(HAKCTy, RWX_MASK::Write);
-    } else {
-      CommonHAKCAnalysis::getWriter(debug)
-          << "Could not find HAKC Symbol for Load " << *FunctionP << "\n";
-    }
+  if (StoreUse->getOperandNo() == StoreInst::getPointerOperandIndex()) {
+    AddPermissionUse(StoreUse->getManagedPtr(), Write);
   }
   else {
     CommonHAKCAnalysis::getWriter(debug) << "StoreUse was not operand 1! (Is this even possible?)" << *StoreUse << "\n";

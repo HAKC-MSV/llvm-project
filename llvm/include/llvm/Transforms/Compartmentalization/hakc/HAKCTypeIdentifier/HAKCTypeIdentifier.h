@@ -62,6 +62,10 @@ public:
 
   std::set<HAKCGlobalP> GetUnmappedGlobals();
 
+  // TODO: add modify type perms functions here
+
+  void ModifyTypeUse(Function* F, const std::shared_ptr<HAKCTypeInfo> &HAKCTy, TypePerms perm);
+
   std::map<const DISubprogram *, HAKCFunctionP> GetFunctions();
 
   std::set<HAKCFunctionP> GetUnmappedFunctions();
@@ -155,6 +159,8 @@ public:
   bool IsStructTypeThatStartsWithPointer(const DIType *DiType);
 
   const DIType *GetFirstStructMemberType(const DICompositeType *DICompositeTy);
+
+  // TODO: add method for adding perm types, pass in the disubprogram, type, and permission
 
   CommonHAKCAnalysis &AnalysisHelper;
   DebugInfoFinder DbgInfoFinder;

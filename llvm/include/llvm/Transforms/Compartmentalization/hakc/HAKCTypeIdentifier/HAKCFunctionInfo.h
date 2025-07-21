@@ -7,17 +7,12 @@
 
 #include "HAKCSymbolInfo.h"
 #include "HAKCIndirectCallSource.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKC-defs.h"
 #include <bitset>
 
 using namespace llvm;
 
 namespace llvm::hakc {
-
-    enum RWX_MASK {
-        Read = 0b100,
-        Write = 0b010,
-        Execute = 0b001
-    };
 
     class HAKCFunctionInfo : public HAKCSymbolInfo {
     public:
@@ -31,7 +26,7 @@ namespace llvm::hakc {
 
         unsigned GetTypeUse(const std::shared_ptr<HAKCTypeInfo> &Ty);
 
-        void ModifyTypeUse(const std::shared_ptr<HAKCTypeInfo> &Ty, RWX_MASK mask);
+        void ModifyTypeUse(const std::shared_ptr<HAKCTypeInfo> &Ty, TypePerms perm);
 
         void AddDirectCall(const std::shared_ptr<HAKCFunctionInfo> &DirectCall);
 

@@ -147,7 +147,7 @@ public:
   HAKCFunctionAnalysis(Function *F, HAKCModuleAnalysis &ModuleAnalysis, HAKCTransformer &Transformer,
                        HAKCCompartmentalizationPolicy &Policy);
 
-  HAKCTypeIdentifier& GetTypeIdentifier();
+  HAKCTypeIdentifier& GetTypeIdentifier() const;
 
   void TemporalAnalysis();
 
@@ -191,6 +191,8 @@ public:
   bool IsIntrinsicNeedingAuthentication(CallBase *Call) const;
 
   bool IsIntrinsicNeedingCloning(CallBase *Call) const;
+
+  void AddPermissionUse(const ManagedHAKCPointer &ManagedPointer, TypePerms perm) const;
 
   bool IsIntrinsicToSkip(CallBase *Call) const;
   // TicTac code

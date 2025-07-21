@@ -1434,6 +1434,30 @@ exit:
   return FoundType;
 }
 
+void HAKCTypeIdentifier::ModifyTypeUse(Function* F, const std::shared_ptr<HAKCTypeInfo> &HAKCTy, TypePerms perm) {
+  auto debug = AnalysisHelper.GetSystemInfo().OutputDebugInfo(F);
+  if (!F) {
+    CommonHAKCAnalysis::getWriter(true) << "Function is NULL!\n";
+    throw std::exception();
+  }
+  auto subprog = F->getSubprogram();
+  if (!subprog) {
+    CommonHAKCAnalysis::getWriter(true) << "Subprog is null for " << *F << "\n";
+    throw std::exception();
+  }
+  if (!functions.contains(subprog)) {
+    CommonHAKCAnalysis::getWriter(true) << "functions does not contain " << *F << "\n";
+    throw std::exception();
+  }
+  auto FunctionP = functions[subprog];
+
+  if (!HAKCTy){
+    CommonHAKCAnalysis::getWriter(true) << "Trying to set permission of NULL HAKCTy\n";
+    throw std::exception();
+  }
+  FunctionP->ModifyTypeUse(HAKCTy, perm);
+}
+
 std::shared_ptr<HAKCTypeInfo>
 HAKCTypeIdentifier::FindCalledFunctionType(FunctionType *FunctionTy) {
 

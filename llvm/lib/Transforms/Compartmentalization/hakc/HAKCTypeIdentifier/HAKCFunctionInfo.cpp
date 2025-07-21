@@ -48,7 +48,7 @@ unsigned HAKCFunctionInfo::GetTypeUse(const std::shared_ptr<HAKCTypeInfo> &Ty) {
   return TypesUsed[Ty];
 }
 
-void HAKCFunctionInfo::ModifyTypeUse(const std::shared_ptr<HAKCTypeInfo> &Ty, RWX_MASK mask) {
+void HAKCFunctionInfo::ModifyTypeUse(const std::shared_ptr<HAKCTypeInfo> &Ty, TypePerms perm){
   if (!Ty) {
     CommonHAKCAnalysis::getWriter(true)
         << "Trying to modify type use of type null\n";
@@ -59,8 +59,8 @@ void HAKCFunctionInfo::ModifyTypeUse(const std::shared_ptr<HAKCTypeInfo> &Ty, RW
     AddTypeUse(Ty);
   }
   // Note: Only to be used internally, and only to add uses, not remove them
-  CommonHAKCAnalysis::getWriter(true) << "Modifying TypeUse with mask " << static_cast<unsigned>(mask) << " perm from " << TypesUsed[Ty] << " -> ";
-  TypesUsed[Ty] |= mask;
+  CommonHAKCAnalysis::getWriter(true) << "Modifying TypeUse with mask " << static_cast<unsigned>(perm) << " perm from " << TypesUsed[Ty] << " -> ";
+  TypesUsed[Ty] |= perm;
   CommonHAKCAnalysis::getWriter(true) << TypesUsed[Ty] << " for type " << *Ty << "\n";
 }
 
