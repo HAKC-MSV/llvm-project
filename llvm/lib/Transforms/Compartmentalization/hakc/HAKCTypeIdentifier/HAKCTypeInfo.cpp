@@ -27,7 +27,7 @@ unsigned HAKCTypeInfo::GetSizeInBits() const {
 
 bool HAKCTypeInfo::IsIgnoredType() const {
   bool Result = IsIgnored;
-  if (!Result && PointeeType && !IsVoidPtrType()) {
+  if (!Result && IsPointerType() && PointeeType && !IsVoidPtrType()) {
     Result = PointeeType->IsIgnoredType();
   }
   return Result;
@@ -94,7 +94,8 @@ bool HAKCTypeInfo::IsPointerType() const {
     auto *StrippedDbgTy = StripTypeModifiers(DbgType);
     return StrippedDbgTy->getTag() == dwarf::DW_TAG_pointer_type ||
            StrippedDbgTy->getTag() == dwarf::DW_TAG_array_type;
-  } else if (LLVMType) {
+  }
+  if (LLVMType) {
     return LLVMType->isPointerTy() || LLVMType->isArrayTy();
   }
   return false;
@@ -102,10 +103,25 @@ bool HAKCTypeInfo::IsPointerType() const {
 
 bool HAKCTypeInfo::IsFunctionType() const {
   if (DbgType) {
-    return isa<DISubroutineType>(DbgType);
-  } else if (LLVMType) {
+    return isa<DISubroutineType>(StripTypeModifiers(DbgType));
+  }
+
+  if (LLVMType) {
     return isa<FunctionType>(LLVMType);
   }
+  return false;
+}
+
+bool HAKCTypeInfo::IsStructType() const {
+  if (DbgType) {
+    auto *StrippedDbgTy = StripTypeModifiers(DbgType);
+    return StrippedDbgTy->getTag() == dwarf::DW_TAG_structure_type;
+  }
+
+  if (LLVMType) {
+    return isa<StructType>(LLVMType);
+  }
+
   return false;
 }
 

@@ -62,8 +62,6 @@ public:
 
   std::set<HAKCGlobalP> GetUnmappedGlobals();
 
-  // TODO: add modify type perms functions here
-
   void ModifyTypeUse(Function* F, const std::shared_ptr<HAKCTypeInfo> &HAKCTy, TypePerms perm);
 
   std::map<const DISubprogram *, HAKCFunctionP> GetFunctions();
@@ -72,11 +70,7 @@ public:
 
   DebugInfoFinder GetDbgInfoFinder();
 
-  HAKCTypeP FindCalledFunctionType(FunctionType *FunctionTy);
-
   HAKCTypeP FindType(Type *Ty) const;
-
-  HAKCTypeP FindType(const DIType *type);
 
   HAKCTypeP FindPointeeType(HAKCPointerBase &HAKCPointer);
 
@@ -85,6 +79,8 @@ public:
   HAKCTypeP FindPointerType(const HAKCTypeInfo &BaseType);
 
   HAKCTypeP HandleType(const DIType *type);
+
+  HAKCTypeP FindType(const DIType *type);
 
   void AddTypeMapping(const DIType *type, const HAKCTypeP &HAKCType);
 
@@ -99,9 +95,7 @@ public:
 
   HAKCFunctionP HandleFunction(const DISubprogram *SubProg);
 
-  void FunctionTemporalAnalysis(const DISubprogram *SubProg);
-
-  // HAKCFunctionP HandleFunctionTemporalAnalysis(const DISubprogram *SubProg);
+  // void FunctionTemporalAnalysis(const DISubprogram *SubProg);
 
   void AddFunctionMapping(const DISubprogram *SubProg,
                           const HAKCFunctionP &HAKCFunction);
@@ -125,10 +119,20 @@ public:
 
   static FunctionType *GetIndirectCallFunctionType(const CallInst *CallI);
 
+  static bool
+  IsStructTypeThatStartsWithPointerLikeType(const HAKCTypeInfo &HAKCTy);
+
+  static bool IsPointerLikeType(const DIType *DIType);
+
+  static const DIType *
+  GetFirstStructMemberType(const DICompositeType *DICompositeTy);
+
   HAKCFunctionP FindFunction(const Function *F, bool SearchUnmapped = false);
 
   HAKCGlobalP FindGlobal(const GlobalVariable *GV,
                          bool SearchUnmapped = false) const;
+
+  HAKCTypeP FindCalledFunctionType(FunctionType *FunctionTy) const;
 
   HAKCTypeP CreateNoDebugType(Type *Ty) const;
 
@@ -154,13 +158,7 @@ public:
 
   Type *FindAnonymousType(const DICompositeType *CompositeTy);
 
-  void FindHAKCTypeMapDebug(Value *V, bool printall);
-
-  bool IsStructTypeThatStartsWithPointer(const DIType *DiType);
-
-  const DIType *GetFirstStructMemberType(const DICompositeType *DICompositeTy);
-
-  // TODO: add method for adding perm types, pass in the disubprogram, type, and permission
+  HAKCTypeP FindTypeFromDebug(const DILocalVariable &DLV, Value *V);
 
   CommonHAKCAnalysis &AnalysisHelper;
   DebugInfoFinder DbgInfoFinder;
@@ -175,10 +173,7 @@ public:
   std::map<const DICompositeType *, Type *> AnonymousTypes;
   std::map<Value *, HAKCTypeP> FindHAKCTypeMap;
   const DIScope *CompilationUnitScope;
-  int recursion_limit = 2;
-  int recursion_depth_di;
-  int recursion_depth_llvm;
-  int recursion_depth_other;
+  const std::vector<StructType *> IdentifiedStructTypes;
 };
 } // namespace llvm::hakc
 
