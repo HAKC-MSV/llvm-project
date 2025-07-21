@@ -931,13 +931,13 @@ std::shared_ptr<HAKCTypeInfo> HAKCTypeIdentifier::FindType(Type *Ty) const {
 }
 
 HAKCTypeP HAKCTypeIdentifier::FindType(HAKCPointerBase &HAKCPointer) {
-  recursion_depth_other++;
-  errs() << "recursion_depth_other0: " << recursion_depth_other << "\n";
-  if (recursion_depth_other >= recursion_limit) {
-    errs() << "ERROR recursion_depth_other0 reached maximum recursion depth of "
-           << recursion_limit << "\n";
-    return nullptr;
-  }
+  // recursion_depth_other++;
+  // errs() << "recursion_depth_other0: " << recursion_depth_other << "\n";
+  // if (recursion_depth_other >= recursion_limit) {
+  //   errs() << "ERROR recursion_depth_other0 reached maximum recursion depth of "
+  //          << recursion_limit << "\n";
+  //   return nullptr;
+  // }
   HAKCTypeP ReturnTy = nullptr;
   if (HAKCPointer.GetType()) {
     ReturnTy = HAKCPointer.GetType();
@@ -955,18 +955,18 @@ HAKCTypeP HAKCTypeIdentifier::FindType(HAKCPointerBase &HAKCPointer) {
     }
     HAKCPointer.SetType(ReturnTy);
   }
-  recursion_depth_other = 0;
+  // recursion_depth_other = 0;
   return ReturnTy;
 }
 
 HAKCTypeP HAKCTypeIdentifier::FindPointeeType(HAKCPointerBase &HAKCPointer) {
-  recursion_depth_other++;
-  errs() << "recursion_depth_other1: " << recursion_depth_other << "\n";
-  if (recursion_depth_other >= recursion_limit) {
-    errs() << "ERROR recursion_depth_other1 reached maximum recursion depth of "
-           << recursion_limit << "\n";
-    return nullptr;
-  }
+  // recursion_depth_other++;
+  // errs() << "recursion_depth_other1: " << recursion_depth_other << "\n";
+  // if (recursion_depth_other >= recursion_limit) {
+  //   errs() << "ERROR recursion_depth_other1 reached maximum recursion depth of "
+  //          << recursion_limit << "\n";
+  //   return nullptr;
+  // }
   if (HAKCPointer.GetType() && HAKCPointer.GetType()->GetPointeeType()) {
     recursion_depth_other = 0;
     return HAKCPointer.GetType()->GetPointeeType();
@@ -982,7 +982,7 @@ HAKCTypeP HAKCTypeIdentifier::FindPointeeType(HAKCPointerBase &HAKCPointer) {
     PointeeType = FindPointeeType(BaseType);
     BaseType->SetPointeeType(PointeeType);
   }
-  recursion_depth_other = 0;
+  // recursion_depth_other = 0;
   return PointeeType;
 }
 

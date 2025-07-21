@@ -1724,8 +1724,8 @@ hakc::HAKCTransformer::CreateNewManagedPointer(Value *BaseDefinition) const {
   auto ManagedPtr = std::make_shared<HAKCPointerBase>(BaseDefinition, 0);
   auto HAKCTy = ModuleAnalysis.GetTypeIdentifier().FindType(*ManagedPtr);
   if (!HAKCTy) {
-    CommonHAKCAnalysis::getWriter(DebugIsActive())
-        << "Could not find valid HAKCTy for value: " << *BaseDefinition << "\n";
+    CommonHAKCAnalysis::getWriter(DebugIsActive()) << "Could not find valid HAKCTy for value: " << *BaseDefinition << "\n";
+    throw std::exception();
   } else {
     ManagedPtr->SetType(HAKCTy);
   }

@@ -124,6 +124,10 @@ static bool RunHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM) {
   case RunDataAccessGraphAnalysis:
     return runDataAccessGraphAnalysis(HAKCAnalysis);
   case RunDataAccessGraphAnalysisSingleSourceFile:
+    if(M.getSourceFileName() != HAKCAnalysis.GetSystemInfo().GetSingleSourceFile()) {
+      errs () << "Source file " << M.getSourceFileName() << " is not the target source file: " << HAKCAnalysis.GetSystemInfo().GetSingleSourceFile();
+      return false;
+    }
     errs() << "Analyzing target source file: " << M.getSourceFileName() << "\n";
     return runDataAccessGraphAnalysis(HAKCAnalysis);
   case RunCompartmentalization:
