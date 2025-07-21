@@ -64,6 +64,18 @@ bool hakc::HAKCTypeIdentifier::IsPointerLikeType(const DIType *DIType) {
                                                 dwarf::DW_ATE_address};
     return PointerLike_Encodings.contains(BasicTy->getTag()) &&
            BasicTy->getSizeInBits() == 64;
+  } else if (auto *CompositeTy = dyn_cast<DICompositeType>(StrippedTy)) {
+    if (CompositeTy->getTag() == dwarf::DW_TAG_union_type) {
+      for (auto *UnionMember : CompositeTy->getElements()) {
+        auto *MemberTy = dyn_cast<DIDerivedType>(UnionMember);
+        if (IsPointerLikeType(MemberTy->getBaseType())) {
+          return true;
+        }
+      }
+    } else {
+      auto *FirstMemberTy = GetFirstStructMemberType(CompositeTy);
+      return IsPointerLikeType(FirstMemberTy);
+    }
   }
 
   return false;
@@ -348,6 +360,16 @@ hakc::HAKCTypeIdentifier::HandleType(const DIType *type) {
   auto debug = AnalysisHelper.GetSystemInfo().OutputDebugInfo();
 
   CommonHAKCAnalysis::getWriter(debug) << "Analyzing DIType " << *type << "\n";
+  if (type->getName().contains("vm_area_struct") &&
+      type->getTag() == dwarf::DW_TAG_structure_type) {
+    CommonHAKCAnalysis::getWriter(true) << "Found " << *type << "\n";
+    for (auto *Member : dyn_cast<DICompositeType>(type)->getElements()) {
+      CommonHAKCAnalysis::getWriter(true)
+          << HAKCTypeInfo::StripTypeModifiers(
+                 dyn_cast<DIDerivedType>(Member)->getBaseType())
+          << "\n";
+    }
+  }
   auto TypeP = FindType(type);
   if (TypeP) {
     CommonHAKCAnalysis::getWriter(debug) << "Already created " << *type << "\n";
