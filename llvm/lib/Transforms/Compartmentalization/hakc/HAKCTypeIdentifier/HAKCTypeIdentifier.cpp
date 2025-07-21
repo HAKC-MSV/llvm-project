@@ -1094,11 +1094,15 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCTypeForUse(Use &U) {
   } else if (isa<LoadInst>(U.getUser())) {
     Result = FindHAKCType(U.getUser());
     if (Result) {
-      auto PointerTy = FindPointerType(*Result);
-      if (!PointerTy && isa<AllocaInst>(U.get())) {
-        Result = AddMissingPointerType(Result);
+      if (isa<AllocaInst>(U.get())) {
+        if (!Result->IsPointerToPointer()) {
+          auto PointerType = FindPointerType(*Result);
+          if (!PointerType) {
+            Result = AddMissingPointerType(Result);
+          }
+        }
       } else {
-        Result = PointerTy;
+        Result = FindPointerType(*Result);
       }
     }
   } else if (auto *GEPI = dyn_cast<GetElementPtrInst>(U.getUser())) {
@@ -1119,11 +1123,15 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCTypeForUse(Use &U) {
         StoreI->getOperand((U.getOperandNo() + 1) % StoreI->getNumOperands()));
     if (Result) {
       if (U.getOperandNo() == StoreInst::getPointerOperandIndex()) {
-        auto PointerType = FindPointerType(*Result);
-        if (!PointerType && isa<AllocaInst>(U.get())) {
-          Result = AddMissingPointerType(Result);
+        if (isa<AllocaInst>(U.get())) {
+          if (!Result->IsPointerToPointer()) {
+            auto PointerType = FindPointerType(*Result);
+            if (!PointerType) {
+              Result = AddMissingPointerType(Result);
+            }
+          }
         } else {
-          Result = PointerType;
+          Result = FindPointerType(*Result);
         }
       } else {
         Result = FindPointeeType(Result);
@@ -1328,6 +1336,9 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
       }
     } else if (auto *PHI = dyn_cast<PHINode>(V)) {
       for (auto &IncomingV : PHI->incoming_values()) {
+        if (AnalysisHelper.getDef(IncomingV, false) == PHI) {
+          continue;
+        }
         FoundType = FindHAKCType(IncomingV);
         if (FoundType) {
           goto exit;
