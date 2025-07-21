@@ -199,9 +199,6 @@ bool HAKCPointerManager::ManageNewPointer(Use &U) {
 
   auto ManagedPointer =
       std::make_shared<ManagedHAKCPointer>(BaseDefinition, *this, NextID);
-  if (HAKCAnalysis.GetFunction().getName() == "in_gate_area" && NextID == 4) {
-    CommonHAKCAnalysis::getWriter(true) << "Found " << *ManagedPointer << "\n";
-  }
   HAKCAnalysis.GetModuleAnalysis().GetTypeIdentifier().FindType(
       *ManagedPointer);
   if (ManagedPointer->GetType() && ManagedPointer->GetType()->IsIgnoredType()) {

@@ -360,16 +360,6 @@ hakc::HAKCTypeIdentifier::HandleType(const DIType *type) {
   auto debug = AnalysisHelper.GetSystemInfo().OutputDebugInfo();
 
   CommonHAKCAnalysis::getWriter(debug) << "Analyzing DIType " << *type << "\n";
-  if (type->getName().contains("vm_area_struct") &&
-      type->getTag() == dwarf::DW_TAG_structure_type) {
-    CommonHAKCAnalysis::getWriter(true) << "Found " << *type << "\n";
-    for (auto *Member : dyn_cast<DICompositeType>(type)->getElements()) {
-      CommonHAKCAnalysis::getWriter(true)
-          << HAKCTypeInfo::StripTypeModifiers(
-                 dyn_cast<DIDerivedType>(Member)->getBaseType())
-          << "\n";
-    }
-  }
   auto TypeP = FindType(type);
   if (TypeP) {
     CommonHAKCAnalysis::getWriter(debug) << "Already created " << *type << "\n";
