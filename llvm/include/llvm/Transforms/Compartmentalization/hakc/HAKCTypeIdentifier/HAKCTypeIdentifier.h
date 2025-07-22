@@ -72,6 +72,8 @@ public:
 
   HAKCTypeP FindType(Type *Ty) const;
 
+  void FindAllTypes(Type *Ty, SmallVectorImpl<HAKCTypeP> &Results) const;
+
   HAKCTypeP FindPointeeType(HAKCPointerBase &HAKCPointer);
 
   HAKCTypeP FindPointeeType(HAKCTypeP BaseType);
@@ -85,6 +87,8 @@ public:
   void AddTypeMapping(const DIType *type, const HAKCTypeP &HAKCType);
 
   static std::string GetTypeName(const DIType *type);
+  static std::string GetTypeName(Type *Ty);
+  static std::string GetDbgName(const HAKCTypeInfo &HAKCTy);
 
   HAKCGlobalP HandleGlobal(const DIGlobalVariable *DIGV);
 
@@ -162,13 +166,13 @@ public:
 
   CommonHAKCAnalysis &AnalysisHelper;
   DebugInfoFinder DbgInfoFinder;
-  std::map<const DIType *, HAKCTypeP> types;
+  std::map<const DIType *, HAKCTypeP> TypesWithDebugInfo;
   std::map<const DIGlobalVariable *, HAKCGlobalP> globals;
   std::map<const DISubprogram *, HAKCFunctionP> functions;
   // std::map<Function *, HAKCFunctionP> FindHAKCFunctionMap;
   std::set<HAKCGlobalP> UnmappedGlobals;
   std::set<HAKCFunctionP> UnmappedFunctions;
-  std::set<HAKCTypeP> MissingPointerTypes;
+  std::set<HAKCTypeP> TypesMissingDebugInfo;
   std::map<CallInst *, HAKCTypeP> IndirectCallsTypes;
   std::map<const DICompositeType *, Type *> AnonymousTypes;
   std::map<Value *, HAKCTypeP> FindHAKCTypeMap;
