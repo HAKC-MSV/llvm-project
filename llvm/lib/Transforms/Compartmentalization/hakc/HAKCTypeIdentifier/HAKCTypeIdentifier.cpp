@@ -85,7 +85,8 @@ const DIType *hakc::HAKCTypeIdentifier::GetFirstStructMemberType(
     const DICompositeType *DICompositeTy) {
   auto *StrippedTy = dyn_cast<DICompositeType>(
       HAKCTypeInfo::StripTypeModifiers(DICompositeTy));
-  if (!StrippedTy || StrippedTy->getTag() != dwarf::DW_TAG_structure_type) {
+  if (!StrippedTy || (StrippedTy->getTag() != dwarf::DW_TAG_structure_type &&
+                      StrippedTy->getTag() != dwarf::DW_TAG_union_type)) {
     return nullptr;
   }
   const auto MemberTypes = StrippedTy->getElements();
