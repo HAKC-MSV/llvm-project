@@ -147,12 +147,12 @@ protected:
 
   CommonHAKCAnalysis &AnalysisHelper;
   DebugInfoFinder DbgInfoFinder;
-  std::map<const DIType *, HAKCTypeP> types;
+  std::map<const DIType *, HAKCTypeP> TypesWithDebugInfo;
   std::map<const DIGlobalVariable *, HAKCGlobalP> globals;
   std::map<const DISubprogram *, HAKCFunctionP> functions;
   std::set<HAKCGlobalP> UnmappedGlobals;
   std::set<HAKCFunctionP> UnmappedFunctions;
-  std::set<HAKCTypeP> MissingPointerTypes;
+  std::set<HAKCTypeP> TypesMissingDebugInfo;
   std::map<CallInst *, HAKCTypeP> IndirectCallsTypes;
   std::map<const DICompositeType *, Type *> AnonymousTypes;
   const DIScope *CompilationUnitScope;
