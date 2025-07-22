@@ -62,7 +62,7 @@ bool hakc::HAKCTypeIdentifier::IsPointerLikeType(const DIType *DIType) {
   if (auto *BasicTy = dyn_cast<DIBasicType>(StrippedTy)) {
     std::set<unsigned> PointerLike_Encodings = {dwarf::DW_ATE_unsigned,
                                                 dwarf::DW_ATE_address};
-    return PointerLike_Encodings.contains(BasicTy->getTag()) &&
+    return PointerLike_Encodings.contains(BasicTy->getEncoding()) &&
            BasicTy->getSizeInBits() == 64;
   } else if (auto *CompositeTy = dyn_cast<DICompositeType>(StrippedTy)) {
     if (CompositeTy->getTag() == dwarf::DW_TAG_union_type) {
@@ -954,6 +954,25 @@ void hakc::HAKCTypeIdentifier::FindUsesInFunctions() {
   }
 }
 
+void hakc::HAKCTypeIdentifier::FindAllTypes(
+    Type *Ty, SmallVectorImpl<HAKCTypeP> &Results) const {
+  if (isa<PointerType>(Ty)) {
+    return;
+  }
+
+  for (auto &it : TypesWithDebugInfo) {
+    if (it.second->GetLLVMType() == Ty) {
+      Results.push_back(it.second);
+    }
+  }
+
+  for (auto HAKCTy : TypesMissingDebugInfo) {
+    if (HAKCTy->GetLLVMType() == Ty) {
+      Results.push_back(HAKCTy);
+    }
+  }
+}
+
 std::shared_ptr<hakc::HAKCTypeInfo>
 hakc::HAKCTypeIdentifier::FindType(Type *Ty) const {
   // remove this functionality, because it would only work for non pointers and
@@ -1291,7 +1310,7 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
       }
     }
   } else {
-    llvm::findDbgUsers(DbgUsers, V, &DVRUsers);
+    findDbgUsers(DbgUsers, V, &DVRUsers);
     for (const auto *DVI : DbgUsers) {
       if (const auto *DIVar = DVI->getVariable()) {
         FoundType = FindTypeFromDebug(*DIVar, V);
@@ -1323,6 +1342,27 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
               }
             }
           }
+        }
+      }
+      if (!getLoadStoreType(LoadI)->isPointerTy()) {
+        SmallVector<HAKCTypeP> Types;
+        FindAllTypes(getLoadStoreType(LoadI), Types);
+        for (auto HAKCTy : Types) {
+          CommonHAKCAnalysis::getWriter(
+              AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+              << "Testing Load Type " << *HAKCTy << "\n";
+          if (HAKCTy->GetDbgType()) {
+            CommonHAKCAnalysis::getWriter(
+                AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+                << " with DIType " << *HAKCTy->GetDbgType() << "\n";
+          }
+          if (IsPointerLikeType(HAKCTy->GetDbgType())) {
+            FoundType = HAKCTy;
+            break;
+          }
+        }
+        if (FoundType) {
+          goto exit;
         }
       }
       if (auto PointeeType = FindHAKCType(LoadI->getPointerOperand())) {

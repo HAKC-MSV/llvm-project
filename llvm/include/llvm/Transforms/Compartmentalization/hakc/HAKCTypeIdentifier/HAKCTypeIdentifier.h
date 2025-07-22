@@ -59,6 +59,8 @@ public:
 protected:
   HAKCTypeP FindType(Type *Ty) const;
 
+  void FindAllTypes(Type *Ty, SmallVectorImpl<HAKCTypeP> &Results) const;
+
   HAKCTypeP FindPointeeType(HAKCPointerBase &HAKCPointer);
 
   HAKCTypeP FindPointeeType(HAKCTypeP BaseType);
