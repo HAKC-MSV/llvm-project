@@ -108,6 +108,23 @@ void hakc::HAKCTypeIdentifier::AddTypeMapping(
   TypesWithDebugInfo[type] = HAKCType;
 }
 
+std::string hakc::HAKCTypeIdentifier::GetDbgName(const HAKCTypeInfo &HAKCTy) {
+  std::string Name = "";
+  if (HAKCTy.GetDbgType()) {
+    Name = GetTypeName(HAKCTy.GetDbgType());
+  } else if (HAKCTy.GetLLVMType()) {
+    Name = GetTypeName(HAKCTy.GetLLVMType());
+  }
+  return Name;
+}
+
+std::string hakc::HAKCTypeIdentifier::GetTypeName(Type *Ty) {
+  std::string Name;
+  raw_string_ostream NameStream(Name);
+  Ty->print(NameStream);
+  return Name;
+}
+
 std::string hakc::HAKCTypeIdentifier::GetTypeName(const DIType *type) {
   std::string Name;
   llvm::raw_string_ostream out(Name);
@@ -1160,14 +1177,13 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCTypeForUse(Use &U) {
 hakc::HAKCTypeP
 hakc::HAKCTypeIdentifier::AddMissingPointerType(const HAKCTypeP &BaseType) {
   if (BaseType->GetDbgTypeName().empty()) {
-    CommonHAKCAnalysis::getWriter(true)
-        << "GetDbgTypeName for " << *BaseType << " is empty!\n";
-    throw std::exception();
+    auto Name = GetDbgName(*BaseType);
+    BaseType->SetDbgTypeName(Name);
   }
   std::string AllocaName = BaseType->GetDbgTypeName().str();
   AllocaName += "*";
   for (auto MissingTy : TypesMissingDebugInfo) {
-    if (MissingTy->GetName() == AllocaName) {
+    if (MissingTy->GetDbgTypeName() == AllocaName) {
       return MissingTy;
     }
   }
@@ -1176,6 +1192,7 @@ hakc::HAKCTypeIdentifier::AddMissingPointerType(const HAKCTypeP &BaseType) {
       AnalysisHelper, AllocaName,
       AnalysisHelper.GetSystemInfo().OutputDebugInfo());
   HAKCType->SetPointeeType(BaseType);
+  HAKCType->SetDbgTypeName(AllocaName);
   HAKCType->SetLLVMType(
       PointerType::get(GetModule().getContext(),
                        HAKCType->GetLLVMType()

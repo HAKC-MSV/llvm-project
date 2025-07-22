@@ -72,6 +72,8 @@ protected:
   void AddTypeMapping(const DIType *type, const HAKCTypeP &HAKCType);
 
   static std::string GetTypeName(const DIType *type);
+  static std::string GetTypeName(Type *Ty);
+  static std::string GetDbgName(const HAKCTypeInfo &HAKCTy);
 
   HAKCGlobalP HandleGlobal(const DIGlobalVariable *DIGV);
 
