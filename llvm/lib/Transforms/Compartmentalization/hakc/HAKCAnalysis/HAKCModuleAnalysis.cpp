@@ -55,13 +55,13 @@ bool HAKCModuleAnalysis::FunctionNeedsAnalysis(Function *F) const {
 
 out:
   if (CommonAnalysis.GetSystemInfo().OutputDebugInfo(F)) {
-    CommonHAKCAnalysis::getWriter(true) << F->getName();
+    CommonHAKCAnalysis::getWriter(Error) << F->getName();
     if (!needsAnalysis) {
-      CommonHAKCAnalysis::getWriter(true) << " does not need ";
+      CommonHAKCAnalysis::getWriter(Error) << " does not need ";
     } else {
-      CommonHAKCAnalysis::getWriter(true) << " needs ";
+      CommonHAKCAnalysis::getWriter(Error) << " needs ";
     }
-    CommonHAKCAnalysis::getWriter(true) << "analysis\n";
+    CommonHAKCAnalysis::getWriter(Error) << "analysis\n";
   }
 
   return needsAnalysis;
@@ -139,19 +139,18 @@ bool _useEscapes(Use &U, std::set<Value *> &expected) {
   return false;
 }
 
-bool in_debug = false;
 bool HAKCModuleAnalysis::useEscapes(Use &U) {
   std::set<Value *> examined;
   bool escapes = _useEscapes(U, examined);
-  if (in_debug) {
-    CommonHAKCAnalysis::getWriter(in_debug)
-        << "Use " << U.get() << " in " << U.getUser();
-    if (escapes) {
-      CommonHAKCAnalysis::getWriter(in_debug) << " escapes\n";
-    } else {
-      CommonHAKCAnalysis::getWriter(in_debug) << " does not escape\n";
-    }
+
+  CommonHAKCAnalysis::getWriter()
+      << "Use " << U.get() << " in " << U.getUser();
+  if (escapes) {
+    CommonHAKCAnalysis::getWriter() << " escapes\n";
+  } else {
+    CommonHAKCAnalysis::getWriter() << " does not escape\n";
   }
+
   return escapes;
 }
 
@@ -287,7 +286,7 @@ HAKCModuleAnalysis::ExtractGlobalFromKernelParam(GlobalVariable *GV) {
 
 void HAKCModuleAnalysis::TemporalAnalysis() {
   // FunctionTemporalAnalysis
-  CommonHAKCAnalysis::getWriter(true)
+  CommonHAKCAnalysis::getWriter(Error)
       << "!!!! Starting Module Temporal Analysis !!!!\n";
   // create managed pointers (essentially what is being done at the beginning of the compartmentalization code)
   HAKCCompartmentalizationPolicyDAG Policy(GetCommonAnalysis().GetSystemInfo());
@@ -303,7 +302,7 @@ void HAKCModuleAnalysis::TemporalAnalysis() {
   // for (auto *DISubProg : TypeIdentifier.GetDbgInfoFinder().subprograms()) {
   //   FunctionTemporalAnalysis(DISubProg);
   // }
-  CommonHAKCAnalysis::getWriter(true)
+  CommonHAKCAnalysis::getWriter(Error)
       << "!!!! Finished Module Temporal Analysis !!!!\n";
 }
 

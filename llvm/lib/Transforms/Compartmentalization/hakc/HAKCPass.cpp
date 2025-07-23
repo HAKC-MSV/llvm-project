@@ -7,14 +7,11 @@
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/HAKCModuleAnalysis.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCSystemInformation.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCTransformer.h"
-#include "llvm/Transforms/Compartmentalization/hakc/HAKCTypeIdentifier/HAKCTypeIdentifier.h"
 
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include "llvm/Analysis/CallGraph.h"
-#include "llvm/Analysis/CallPrinter.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Support/CommandLine.h"
@@ -36,7 +33,7 @@ static bool runCompartmentalization(CommonHAKCAnalysis &HAKCAnalysis) {
   StringRef CurrentSourceName(M.getSourceFileName());
   for (auto &path : HAKCAnalysis.GetSystemInfo().HAKCSourcePaths()) {
     if (CurrentSourceName.contains(path)) {
-      CommonHAKCAnalysis::getWriter(true)
+      CommonHAKCAnalysis::getWriter(Error)
           << "Skipping hakc source " << CurrentSourceName << "\n";
       PerformTransformations = false;
     }
@@ -44,7 +41,7 @@ static bool runCompartmentalization(CommonHAKCAnalysis &HAKCAnalysis) {
 
   for (auto &path : HAKCAnalysis.GetSystemInfo().SeparateNamespacePaths()) {
     if (CurrentSourceName.contains(path)) {
-      CommonHAKCAnalysis::getWriter(true)
+      CommonHAKCAnalysis::getWriter(Error)
           << "Skipping separate namespace source " << CurrentSourceName << "\n";
       PerformTransformations = false;
     }
@@ -71,10 +68,29 @@ static bool runDataAccessGraphAnalysis(CommonHAKCAnalysis &HAKCAnalysis) {
   sys::path::replace_extension(Path, ".dag.yml");
   sys::path::make_preferred(Path);
 
+
+  StringRef CurrentSourceName(M.getSourceFileName());
+  for (auto &path : HAKCAnalysis.GetSystemInfo().HAKCSourcePaths()) {
+    if (CurrentSourceName.contains(path)) {
+      CommonHAKCAnalysis::getWriter(Error)
+          << "Skipping hakc source " << CurrentSourceName << "\n";
+      return false;
+    }
+  }
+
+  for (auto &path : HAKCAnalysis.GetSystemInfo().SeparateNamespacePaths()) {
+    if (CurrentSourceName.contains(path)) {
+      CommonHAKCAnalysis::getWriter(Error)
+          << "Skipping separate namespace source " << CurrentSourceName <<
+          "\n";
+      return false;
+    }
+  }
+
   std::error_code err;
   err = sys::fs::create_directories(sys::path::parent_path(Path));
   if (err) {
-    CommonHAKCAnalysis::getWriter(true)
+    CommonHAKCAnalysis::getWriter(Error)
         << "Failed to create " << sys::path::parent_path(Path) << "\n";
     throw std::exception();
   }
@@ -85,40 +101,24 @@ static bool runDataAccessGraphAnalysis(CommonHAKCAnalysis &HAKCAnalysis) {
     ModuleAnalysis.OutputYAML(out);
     out.close();
   } else {
-    CommonHAKCAnalysis::getWriter(true) << "Failed to open " << Path << "\n";
+    CommonHAKCAnalysis::getWriter(Error) << "Failed to open " << Path << "\n";
     throw std::exception();
   }
-  //
-  // StringRef CurrentSourceName(M.getSourceFileName());
-  // for (auto &path : HAKCAnalysis.GetSystemInfo().HAKCSourcePaths()) {
-  //   if (CurrentSourceName.contains(path)) {
-  //     CommonHAKCAnalysis::getWriter(true)
-  //         << "Skipping hakc source " << CurrentSourceName << "\n";
-  //     PerformTransformations = false;
-  //   }
-  // }
-  //
-  // for (auto &path : HAKCAnalysis.GetSystemInfo().SeparateNamespacePaths()) {
-  //   if (CurrentSourceName.contains(path)) {
-  //     CommonHAKCAnalysis::getWriter(true)
-  //         << "Skipping separate namespace source " << CurrentSourceName <<
-  //         "\n";
-  //     PerformTransformations = false;
-  //   }
-  // }
-
   return false;
 }
 
 static bool RunHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM) {
+  HAKCWriter::SetLogPath(M.getSourceFileName() + ".log");
+  HAKCWriter::CreateLog();
+
   if (HAKC_CONFIG_PATH.empty()) {
-    CommonHAKCAnalysis::getWriter(true) << "no hakc-config pass specified\n";
+    CommonHAKCAnalysis::getWriter(Error) << "no hakc-config pass specified\n";
     throw std::exception();
   }
+
   CommonHAKCAnalysis HAKCAnalysis(M, MAM, HAKC_CONFIG_PATH);
 
-  // llvm::writeCallGraphDOT(M, MAM,
-  // std::string(HAKCAnalysis.GetSystemInfo().GetDagAnalysisRootPath()));
+  CommonHAKCAnalysis::getWriter() << "abc\n";
 
   switch (HAKCAnalysis.GetSystemInfo().GetPassMode()) {
   case RunDataAccessGraphAnalysis:
@@ -135,7 +135,7 @@ static bool RunHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM) {
   case RunConfigAndExit:
     return false;
   default:
-    CommonHAKCAnalysis::getWriter(true) << "Invalid HAKC pass mode\n";
+    CommonHAKCAnalysis::getWriter(Error) << "Invalid HAKC pass mode\n";
     throw std::exception();
   }
 }

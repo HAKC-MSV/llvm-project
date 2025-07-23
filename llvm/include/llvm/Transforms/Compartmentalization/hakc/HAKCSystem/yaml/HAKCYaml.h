@@ -21,6 +21,17 @@ template <typename Ty> using HAKCYAMLSequence = std::vector<Ty>;
 typedef HAKCYAMLSequence<HAKCYAMLStringType> HAKCYAMLStringSequenceType;
 
 namespace llvm::hakc {
+
+enum HAKCLogLevel {
+  Disabled = 0,
+  Verbose = 1,
+  Debug = 2,
+  Info = 3,
+  Warning = 4,
+  Error = 5,
+  Fatal = 10,
+};
+
 enum HAKCAllocationTypeEnum {
   InvalidAllocationType,
   SimpleArgumentSize,
@@ -202,9 +213,10 @@ struct HAKCYamlConfig {
   HAKCYAMLStringSequenceType SeparateNamespacePathsList;
   HAKCYAMLStringSequenceType HAKCSourcePathsList;
   HAKCYAMLStringSequenceType TransferFunctionCandidates;
-  bool OutputAllDebugInfo;
+  HAKCLogLevel LogLevel;
   HAKCYamlDatabaseConfig DatabaseConfig;
   bool TemporalAnalysisEnabled;
+  bool DebugDatabase;
 
   HAKCYAMLSequence<HAKCYAMLSymbolDeclaration> NoTransferFunctions;
   HAKCYAMLSequence<HAKCYAMLCustomTransferType> CustomTransferFunctions;
@@ -259,6 +271,18 @@ template <> struct yaml::ScalarEnumerationTraits<hakc::HAKCAllocationTypeEnum> {
     io.enumCase(value, "StaticPlusArgument", hakc::StaticPlusArgument);
     io.enumCase(value, "MultiplyTwoArguments", hakc::MultiplyTwoArguments);
     io.enumCase(value, "ArgumentGEP", hakc::ArgumentGEP);
+  }
+};
+
+template <> struct yaml::ScalarEnumerationTraits<hakc::HAKCLogLevel> {
+  static void enumeration(IO &io, hakc::HAKCLogLevel &value) {
+    io.enumCase(value, "Disabled", hakc::Disabled);
+    io.enumCase(value, "Verbose", hakc::Verbose);
+    io.enumCase(value, "Debug", hakc::Debug);
+    io.enumCase(value, "Info", hakc::Info);
+    io.enumCase(value, "Warning", hakc::Warning);
+    io.enumCase(value, "Error", hakc::Error);
+    io.enumCase(value, "Fatal", hakc::Fatal);
   }
 };
 
@@ -406,7 +430,8 @@ template <> struct yaml::MappingTraits<hakc::HAKCYamlConfig> {
       io.mapOptional("IgnoredTypes", YamlConfig.IgnoredTypes);
       io.mapOptional("IgnoredGlobals", YamlConfig.IgnoredGlobals);
       io.mapOptional("AllocationFunctions", YamlConfig.AllocationFunctions);
-      io.mapOptional("OutputDebugInfo", YamlConfig.OutputAllDebugInfo, false);
+      io.mapOptional("LogLevel", YamlConfig.LogLevel, hakc::HAKCLogLevel::Debug);
+      io.mapOptional("DebugDatabase", YamlConfig.DebugDatabase, false);
       io.mapOptional("DebugOutputSymbols", YamlConfig.PassDebugSymbols);
       io.mapOptional("PerCPUCompartmentTransferFunction",
                      YamlConfig.PerCPUCompartmentTransfer);
@@ -452,7 +477,8 @@ template <> struct yaml::MappingTraits<hakc::HAKCYamlConfig> {
       io.mapOptional("IgnoredTypes", YamlConfig.IgnoredTypes);
       io.mapOptional("IgnoredGlobals", YamlConfig.IgnoredGlobals);
       io.mapOptional("AllocationFunctions", YamlConfig.AllocationFunctions);
-      io.mapOptional("OutputDebugInfo", YamlConfig.OutputAllDebugInfo, false);
+      io.mapOptional("LogLevel", YamlConfig.LogLevel, hakc::HAKCLogLevel::Debug);
+      io.mapOptional("DebugDatabase", YamlConfig.DebugDatabase, false);
       io.mapOptional("DebugOutputSymbols", YamlConfig.PassDebugSymbols);
       io.mapOptional("PerCPUCompartmentTransferFunction",
                      YamlConfig.PerCPUCompartmentTransfer);

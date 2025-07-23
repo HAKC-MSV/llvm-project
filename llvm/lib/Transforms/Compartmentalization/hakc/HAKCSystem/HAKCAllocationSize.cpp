@@ -11,7 +11,7 @@ namespace llvm::hakc {
 HAKCSimpleArgumentSize::HAKCSimpleArgumentSize(Function *AllocationFunction, StringRef ArgNoString)
     : HAKCAllocationSize(AllocationFunction), ArgNo(0) {
   if (ArgNoString.empty()) {
-    CommonHAKCAnalysis::getWriter(true)
+    CommonHAKCAnalysis::getWriter(Error)
         << "Invalid HAKCSimpleArgumentSize Argument\n";
     throw std::exception();
   }
@@ -31,7 +31,7 @@ ConstantInt *HAKCSimpleArgumentSize::GetSize(CallInst *Val) {
 HAKCSimpleStaticSize::HAKCSimpleStaticSize(Function *AllocationFunction, StringRef StaticSizeString)
     : HAKCAllocationSize(AllocationFunction), StaticSize(0) {
   if (StaticSizeString.empty()) {
-    CommonHAKCAnalysis::getWriter(true)
+    CommonHAKCAnalysis::getWriter(Error)
         << "Invalid HAKCSimpleStaticSize Argument\n";
     throw std::exception();
   }
@@ -48,7 +48,7 @@ ConstantInt *HAKCSimpleStaticSize::GetSize(CallInst *Val) {
 HAKCStaticPlusArgument::HAKCStaticPlusArgument(Function *AllocationFunction, StringRef StaticSizeString, StringRef ArgNoString)
     : HAKCAllocationSize(AllocationFunction), StaticSize(0) {
   if (StaticSizeString.empty() || ArgNoString.empty()) {
-    CommonHAKCAnalysis::getWriter(true)
+    CommonHAKCAnalysis::getWriter(Error)
         << "Invalid HAKCStaticPlusArgument arguments\n";
     throw std::exception();
   }
@@ -68,7 +68,7 @@ ConstantInt *HAKCStaticPlusArgument::GetSize(CallInst *Val) {
 HAKCMultiplyArgumentSize::HAKCMultiplyArgumentSize(Function *AllocationFunction, StringRef NObjsString, StringRef ArgSizePerObjString)
     : HAKCAllocationSize(AllocationFunction), NObjs(0), ArgSizePerObj(0) {
   if (NObjsString.empty() || ArgSizePerObjString.empty()) {
-    CommonHAKCAnalysis::getWriter(true)
+    CommonHAKCAnalysis::getWriter(Error)
         << "Invalid HAKCMultiplyArgumentSize arguments!\n";
     throw std::exception();
   }
@@ -102,7 +102,7 @@ ConstantInt *HAKCMultiplyArgumentSize::GetSize(CallInst *Val) {
 HAKCArgumentGEP::HAKCArgumentGEP(Function *AllocationFunction, StringRef ArgAccessNoString, ArrayRef<StringRef> IndicesString)
     : HAKCAllocationSize(AllocationFunction) {
   if (ArgAccessNoString.empty() || IndicesString.empty()) {
-    CommonHAKCAnalysis::getWriter(true)
+    CommonHAKCAnalysis::getWriter(Error)
         << "Invalid HAKCArgumentGEP arguments!\n";
     throw std::exception();
   }
@@ -136,7 +136,7 @@ HAKCAllocationSize::FromYaml(const hakc::HAKCYAMLAllocationType &YamlAllocation,
   }
   switch (YamlAllocation.AllocationType) {
   default:
-    CommonHAKCAnalysis::getWriter(true)
+    CommonHAKCAnalysis::getWriter(Error)
         << "HAKCAllocation Type " << YamlAllocation.AllocationType
         << " is not supported\n";
     throw std::exception();

@@ -203,6 +203,10 @@ public:
   Value *AddEpochDataAuthCheckAtLocation(Value *signed_ptr, Instruction *location);
   Value *AddEpochCodeAuthCheckAtLocation(Value *SignedPtr, Instruction *Location);
 
+  HAKCWriter &getWriter();
+
+  HAKCWriter &getWriter(HAKCLogLevel log_level);
+
 };
 } // namespace llvm::hakc
 

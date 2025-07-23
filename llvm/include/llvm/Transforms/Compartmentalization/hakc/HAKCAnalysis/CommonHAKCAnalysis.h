@@ -14,7 +14,7 @@
 namespace llvm::hakc {
 class HAKCTransformer;
 
-typedef std::function<llvm::Value *(llvm::Value *)> hakc_allocation_size_map_t;
+typedef std::function<Value *(Value *)> hakc_allocation_size_map_t;
 
 class CommonHAKCAnalysis {
 protected:
@@ -26,6 +26,8 @@ protected:
 
   HAKCSystemInformation SystemInfo;
 
+  // HAKCWriter &HAKC_Writer;
+
   static bool IsFunctionInHAKCTransferFunctionList(
       Function *F, iterator_range<HAKCTransferList::iterator> Range);
 
@@ -34,8 +36,9 @@ protected:
 public:
   virtual ~CommonHAKCAnalysis() = default;
 
-  explicit CommonHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM,
-                              StringRef ConfigPath);
+  // explicit CommonHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM,
+  //                             StringRef ConfigPath, HAKCWriter &HAKC_Writer);
+  explicit CommonHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM, StringRef ConfigPath);
 
   HAKCSystemInformation &GetSystemInfo();
 
@@ -93,7 +96,9 @@ public:
   bool functionIsTransferCandidate(Function *F,
                                    HAKCCompartmentalizationPolicy &Policy);
 
-  static hakc::HAKCWriter &getWriter(bool DebugActive);
+  static HAKCWriter &getWriter();
+
+  static HAKCWriter &getWriter(HAKCLogLevel log_level);
 
   FunctionType *GetDataAuthenticationFunctionType(Module &M,
                                                   unsigned AddrSpace = 0);
@@ -152,7 +157,7 @@ public:
 
   bool ValueIsUsedAsPointer(Value *V);
 
-  hakc::function_def_t GetHAKCTransferDefinition(Function *F);
+  function_def_t GetHAKCTransferDefinition(Function *F);
 
   HAKCCustomAllocation GetAllocationDefinition(Function *F);
 

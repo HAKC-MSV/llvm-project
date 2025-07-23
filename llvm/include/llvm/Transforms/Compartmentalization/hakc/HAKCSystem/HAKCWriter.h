@@ -19,29 +19,46 @@
 
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/yaml/HAKCYaml.h"
 
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/raw_ostream.h"
+
 using namespace llvm;
 
 namespace llvm::hakc {
 class HAKCWriter {
 public:
   HAKCWriter();
+  ~HAKCWriter();
 
   raw_ostream &ostream() const;
 
 protected:
   raw_ostream &os;
-  bool debug;
+  static raw_fd_ostream *fd_os;
+  // static std::error_code EC;
+  static HAKCLogLevel ConfiguredLogLevel;
+  static HAKCLogLevel TempLogLevel;
+  static std::string log_path;
 
   void printDIType(const DIType *type, unsigned indents) const;
 
 public:
-  void SetDebug(bool Debug);
+  static void SetLogPath(std::string);
+  static std::string GetLogPath();
+  static HAKCLogLevel GetConfiguredLogLevel();
+  static HAKCLogLevel GetTempLogLevel();
 
-  HAKCWriter &operator<<(llvm::Value *V);
+  static void SetConfiguredLogLevel(HAKCLogLevel log_level);
+  static void SetTempLogLevel(HAKCLogLevel log_level);
+  static raw_fd_ostream &GetFdOstream();
 
-  HAKCWriter &operator<<(llvm::Value &V);
+  static void CreateLog();
 
-  HAKCWriter &operator<<(llvm::Use &U);
+  HAKCWriter &operator<<(Value *V);
+
+  HAKCWriter &operator<<(Value &V);
+
+  HAKCWriter &operator<<(Use &U);
 
   HAKCWriter &operator<<(StringRef str);
 

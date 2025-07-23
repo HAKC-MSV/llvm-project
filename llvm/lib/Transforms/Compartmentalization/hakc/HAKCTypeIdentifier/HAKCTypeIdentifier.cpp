@@ -24,11 +24,10 @@
 namespace llvm::hakc {
 std::shared_ptr<HAKCTypeInfo> HAKCTypeIdentifier::FindType(const DIType *type) {
   if (!type) {
-    CommonHAKCAnalysis::getWriter(true) << "Trying to find null type\n";
+    CommonHAKCAnalysis::getWriter(Error) << "Trying to find null type\n";
     throw std::exception();
   }
-  CommonHAKCAnalysis::getWriter(
-      AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+  CommonHAKCAnalysis::getWriter(Debug)
       << "Finding HAKCTypeInfo for " << *type << "\n";
   auto it = TypesWithDebugInfo.find(type);
   if (it == TypesWithDebugInfo.end()) {
@@ -104,7 +103,7 @@ const DIType *hakc::HAKCTypeIdentifier::GetFirstStructMemberType(
 void hakc::HAKCTypeIdentifier::AddTypeMapping(
     const DIType *type, const std::shared_ptr<HAKCTypeInfo> &HAKCType) {
   CommonHAKCAnalysis::getWriter(
-      AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+      Debug)
       << "Adding mapping " << *type << " -> " << HAKCType->GetName() << "\n";
   HAKCType->SetDbgType(type);
   auto DbgTypeName = GetTypeName(type);
@@ -143,7 +142,7 @@ std::string hakc::HAKCTypeIdentifier::GetTypeName(const DIType *type) {
         } else if (i == SubroutineTy->getTypeArray()->getNumOperands() - 1) {
           out << "...";
         } else {
-          CommonHAKCAnalysis::getWriter(true)
+          CommonHAKCAnalysis::getWriter(Error)
               << "Null operand at " << i << " for " << *type << "\n"
               << "Current type: " << Name << "\n";
           throw std::exception();
@@ -191,7 +190,7 @@ std::string hakc::HAKCTypeIdentifier::GetTypeName(const DIType *type) {
         out << GetTypeName(DerivedTy->getBaseType());
       }
     } else {
-      CommonHAKCAnalysis::getWriter(true) << "Unhandled DIDerivedType tag\n"
+      CommonHAKCAnalysis::getWriter(Error) << "Unhandled DIDerivedType tag\n"
                                           << DerivedTy << "\n";
       throw std::exception();
     }
@@ -215,7 +214,7 @@ std::string hakc::HAKCTypeIdentifier::GetTypeName(const DIType *type) {
     } else if (CompositeTy->getTag() == dwarf::DW_TAG_enumeration_type) {
       out << "enum " << CompositeTy->getName();
     } else {
-      CommonHAKCAnalysis::getWriter(true) << "Unhandled DICompositeType tag\n"
+      CommonHAKCAnalysis::getWriter(Error) << "Unhandled DICompositeType tag\n"
                                           << CompositeTy << "\n";
       throw std::exception();
     }
@@ -226,7 +225,7 @@ std::string hakc::HAKCTypeIdentifier::GetTypeName(const DIType *type) {
       out << BaseTy->getName();
     }
   } else {
-    CommonHAKCAnalysis::getWriter(true) << "Unhandled DIType\n" << type << "\n";
+    CommonHAKCAnalysis::getWriter(Error) << "Unhandled DIType\n" << type << "\n";
     throw std::exception();
   }
 
@@ -248,7 +247,7 @@ Type *HAKCTypeIdentifier::FindNamedType(StringRef TypeName) const {
 
 Type *
 HAKCTypeIdentifier::FindAnonymousType(const DICompositeType *CompositeTy) {
-  auto debug = AnalysisHelper.GetSystemInfo().OutputDebugInfo();
+  auto debug = Debug;
 
   auto Cached = AnonymousTypes.find(CompositeTy);
   if (Cached != AnonymousTypes.end()) {
@@ -294,7 +293,7 @@ HAKCTypeIdentifier::FindAnonymousType(const DICompositeType *CompositeTy) {
 
 Type *HAKCTypeIdentifier::GetLLVMType(const DIType *Ty) {
   CommonHAKCAnalysis::getWriter(
-      AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+      Debug)
       << "Finding LLVM Type for " << Ty << "\n";
   auto &Ctx = GetModule().getContext();
   if (!Ty) {
@@ -332,7 +331,7 @@ HAKCTypeIdentifier::GetLLVMFunctionTy(const DISubroutineType *FunctionTy) {
   auto &Ctx = GetModule().getContext();
   auto *ReturnTy = Type::getVoidTy(Ctx);
   auto TyArray = FunctionTy->getTypeArray();
-  auto debug = AnalysisHelper.GetSystemInfo().OutputDebugInfo();
+  auto debug = Debug;
   if (TyArray[0]) {
     ReturnTy = GetLLVMType(TyArray[0]);
     if (!ReturnTy) {
@@ -361,7 +360,7 @@ HAKCTypeIdentifier::GetLLVMFunctionTy(const DISubroutineType *FunctionTy) {
       return nullptr;
     }
     if (!FunctionType::isValidArgumentType(Ty)) {
-      CommonHAKCAnalysis::getWriter(true)
+      CommonHAKCAnalysis::getWriter(Error)
           << "Type " << Ty << " for DIType " << TyArray[i]
           << " is not a valid argument type\n";
       return nullptr;
@@ -378,9 +377,9 @@ HAKCTypeIdentifier::GetLLVMFunctionTy(const DISubroutineType *FunctionTy) {
 
 std::shared_ptr<HAKCTypeInfo>
 HAKCTypeIdentifier::HandleType(const DIType *type) {
-  auto debug = AnalysisHelper.GetSystemInfo().OutputDebugInfo();
+  auto debug = Debug;
   if (!type) {
-    CommonHAKCAnalysis::getWriter(true) << "Trying to find null type\n";
+    CommonHAKCAnalysis::getWriter(Error) << "Trying to find null type\n";
     throw std::exception();
   }
   CommonHAKCAnalysis::getWriter(debug) << "Analyzing DIType " << *type << "\n";
@@ -517,7 +516,7 @@ HAKCTypeIdentifier::HandleGlobal(const DIGlobalVariable *DIGV) {
   if (!DIGVTy) {
     DIGVTy = HandleType(DIGV->getType());
     if (!DIGVTy) {
-      CommonHAKCAnalysis::getWriter(true)
+      CommonHAKCAnalysis::getWriter(Error)
           << "Unable to handle DIType " << *DIGV->getType() << " for Global "
           << *DIGV << "\n";
       throw std::exception();
@@ -600,7 +599,7 @@ HAKCTypeIdentifier::HandleFunction(const DISubprogram *SubProg) {
   }
   auto DIGVTy = FindType(SubProg->getType());
   if (!DIGVTy) {
-    CommonHAKCAnalysis::getWriter(true)
+    CommonHAKCAnalysis::getWriter(Error)
         << GetModule() << "Could not find HAKCType of " << F->getName()
         << " with DIType " << *SubProg->getType() << "\n";
     throw std::exception();
@@ -728,7 +727,7 @@ HAKCTypeIdentifier::AddNoDebugGlobal(GlobalObject *GlobalObj) {
     UnmappedGlobals.insert(GlobalInfo);
     return GlobalInfo;
   } else {
-    CommonHAKCAnalysis::getWriter(true)
+    CommonHAKCAnalysis::getWriter(Error)
         << "Unsupported GlobalObj: " << *GlobalObj << "\n";
     throw std::exception();
   }
@@ -862,7 +861,7 @@ void HAKCTypeIdentifier::CreateIndirectCallSourceLink(
     CreateIndirectCallSourceLink(CallI->getCalledOperand(), Path);
   } else {
     CommonHAKCAnalysis::getWriter(
-        AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+        Debug)
         << "Unhandled Link type: " << V << "\n";
   }
 }
@@ -871,7 +870,7 @@ void HAKCTypeIdentifier::FindIndirectCallSource(
     CallInst *CallI,
     std::vector<std::shared_ptr<HAKCIndirectCallSourceLink>> &Path) {
   if (!CallI->isIndirectCall()) {
-    CommonHAKCAnalysis::getWriter(true)
+    CommonHAKCAnalysis::getWriter(Error)
         << *CallI << " is not an indirect call\n";
     throw std::exception();
   }
@@ -886,7 +885,7 @@ void HAKCTypeIdentifier::FindIndirectCallSource(
 FunctionType *
 HAKCTypeIdentifier::GetIndirectCallFunctionType(const CallInst *CallI) {
   if (!CallI->isIndirectCall()) {
-    CommonHAKCAnalysis::getWriter(true)
+    CommonHAKCAnalysis::getWriter(Error)
         << "Trying to get type from a Call that is not an indirect call\n";
     throw std::exception();
   }
@@ -935,13 +934,13 @@ void HAKCTypeIdentifier::FindUsesInFunctions() {
               << "\n";
           auto HAKCType = FindCalledFunctionType(FunctionTy);
           if (!HAKCType) {
-            CommonHAKCAnalysis::getWriter(true)
+            CommonHAKCAnalysis::getWriter(Error)
                 << "Could not find called HAKCType for " << *Call
                 << " with Searched Type " << *FunctionTy << " in Function "
                 << F->getName() << "\n";
             HAKCType = FindType(Call->getCalledOperand()->getType());
             if (HAKCType) {
-              CommonHAKCAnalysis::getWriter(true)
+              CommonHAKCAnalysis::getWriter(Error)
                   << "But the Pointer HAKCType exists: " << HAKCType->GetName()
                   << "\n";
             }
@@ -987,7 +986,7 @@ HAKCTypeIdentifier::FindType(Type *Ty) const {
   if (isa<PointerType>(Ty)) {
     return nullptr;
   }
-  auto debug = AnalysisHelper.GetSystemInfo().OutputDebugInfo();
+  auto debug = Debug;
   CommonHAKCAnalysis::getWriter(debug)
       << "Trying to find HAKCTypeInfo for " << *Ty << "\n";
 
@@ -1014,7 +1013,7 @@ HAKCTypeIdentifier::FindType(HAKCPointerBase &HAKCPointer) {
   }
   if (ReturnTy) {
     CommonHAKCAnalysis::getWriter(
-        AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+        Debug)
         << "Found ReturnTy: " << *ReturnTy << "\n";
     if (ReturnTy->IsPointerType() && !ReturnTy->GetPointeeType()) {
       if (auto PointeeType = FindPointeeType(ReturnTy)) {
@@ -1055,7 +1054,6 @@ HAKCTypeP HAKCTypeIdentifier::FindPointeeType(HAKCTypeP BaseType) {
     return BaseType->GetPointeeType();
   }
 
-  auto Debug = AnalysisHelper.GetSystemInfo().OutputDebugInfo();
   CommonHAKCAnalysis::getWriter(Debug)
       << "Finding Pointee Type for " << *BaseType << "\n";
   DIType *TypeToFind = nullptr;
@@ -1135,7 +1133,7 @@ HAKCTypeIdentifier::GetArgumentHAKCType(const DISubroutineType *FunctionTy,
 
 HAKCTypeP HAKCTypeIdentifier::FindHAKCTypeForUse(Use &U) {
   CommonHAKCAnalysis::getWriter(
-      AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+      Debug)
       << "Attempting to find HAKCTypeInfo for Use " << U << "\n";
   HAKCTypeP Result = nullptr;
   if (auto *CallI = dyn_cast<CallInst>(U.getUser())) {
@@ -1169,7 +1167,7 @@ HAKCTypeP HAKCTypeIdentifier::FindHAKCTypeForUse(Use &U) {
       auto BaseType = FindType(GEPI->getSourceElementType());
       if (BaseType) {
         CommonHAKCAnalysis::getWriter(
-            AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+            Debug)
             << "Found BaseType " << *BaseType << " for "
             << *GEPI->getSourceElementType() << "\n";
         Result = FindPointerType(*BaseType);
@@ -1196,7 +1194,7 @@ HAKCTypeP HAKCTypeIdentifier::FindHAKCTypeForUse(Use &U) {
         Result = FindPointeeType(Result);
       }
       CommonHAKCAnalysis::getWriter(
-          AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+          Debug)
           << "Found " << *Result << " for " << U.get() << "\n";
     }
   }
@@ -1205,8 +1203,6 @@ HAKCTypeP HAKCTypeIdentifier::FindHAKCTypeForUse(Use &U) {
 }
 
 HAKCTypeP HAKCTypeIdentifier::AddMissingPointerType(const HAKCTypeP &BaseType) {
-hakc::HAKCTypeP
-hakc::HAKCTypeIdentifier::AddMissingPointerType(const HAKCTypeP &BaseType) {
   if (BaseType->GetDbgTypeName().empty()) {
     auto Name = GetDbgName(*BaseType);
     BaseType->SetDbgTypeName(Name);
@@ -1221,7 +1217,7 @@ hakc::HAKCTypeIdentifier::AddMissingPointerType(const HAKCTypeP &BaseType) {
 
   auto HAKCType = std::make_shared<HAKCTypeInfo>(
       AnalysisHelper, AllocaName,
-      AnalysisHelper.GetSystemInfo().OutputDebugInfo());
+      Debug);
   HAKCType->SetPointeeType(BaseType);
   HAKCType->SetDbgTypeName(AllocaName);
   HAKCType->SetLLVMType(
@@ -1238,7 +1234,7 @@ HAKCTypeP HAKCTypeIdentifier::FindPointerType(const HAKCTypeInfo &BaseType) {
   std::set<dwarf::Tag> TagsToRecurseInto = {dwarf::DW_TAG_typedef,
                                             dwarf::DW_TAG_const_type};
   CommonHAKCAnalysis::getWriter(
-      AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+      Debug)
       << "Trying to find a pointer type to " << BaseType << "\n";
 
   for (auto &It : TypesWithDebugInfo) {
@@ -1248,7 +1244,7 @@ HAKCTypeP HAKCTypeIdentifier::FindPointerType(const HAKCTypeInfo &BaseType) {
       while (true) {
         if (DbgBaseTy && DbgBaseTy == BaseType.GetDbgType()) {
           CommonHAKCAnalysis::getWriter(
-              AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+              Debug)
               << "DbgBaseTy " << *DbgBaseTy << " equals "
               << BaseType.GetDbgType() << "\n";
           return It.second;
@@ -1303,7 +1299,7 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
   SmallVector<DbgVariableRecord *> DVRUsers;
 
   CommonHAKCAnalysis::getWriter(
-      AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+      Debug)
       << "Attempting to find HAKCTypeInfo for " << *V << "\n";
 
   if (const auto *GlobalVar = dyn_cast<GlobalVariable>(V)) {
@@ -1360,11 +1356,11 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
         FindAllTypes(getLoadStoreType(LoadI), Types);
         for (auto HAKCTy : Types) {
           CommonHAKCAnalysis::getWriter(
-              AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+              Debug)
               << "Testing Load Type " << *HAKCTy << "\n";
           if (HAKCTy->GetDbgType()) {
             CommonHAKCAnalysis::getWriter(
-                AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+                Debug)
                 << " with DIType " << *HAKCTy->GetDbgType() << "\n";
           }
           if (IsPointerLikeType(HAKCTy->GetDbgType())) {
@@ -1482,12 +1478,12 @@ exit:
 
   if (FoundType) {
     CommonHAKCAnalysis::getWriter(
-        AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+        Debug)
         << "Found HAKCTypeInfo\n"
         << *FoundType << "\nfor " << V << "\n";
   } else {
     CommonHAKCAnalysis::getWriter(
-        AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+        Debug)
         << "Cound not find HAKCTypeInfo for " << V << "\n";
   }
 
@@ -1496,22 +1492,22 @@ exit:
 
 void HAKCTypeIdentifier::ModifyTypeUse(Function* F, const std::shared_ptr<HAKCTypeInfo> &HAKCTy, TypePerms perm) {
   if (!F) {
-    CommonHAKCAnalysis::getWriter(true) << "Function is NULL!\n";
+    CommonHAKCAnalysis::getWriter(Error) << "Function is NULL!\n";
     throw std::exception();
   }
   auto subprog = F->getSubprogram();
   if (!subprog) {
-    CommonHAKCAnalysis::getWriter(true) << "Subprog is null for " << *F << "\n";
+    CommonHAKCAnalysis::getWriter(Error) << "Subprog is null for " << *F << "\n";
     throw std::exception();
   }
   if (!functions.contains(subprog)) {
-    CommonHAKCAnalysis::getWriter(true) << "functions does not contain " << *F << "\n";
+    CommonHAKCAnalysis::getWriter(Error) << "functions does not contain " << *F << "\n";
     throw std::exception();
   }
   auto FunctionP = functions[subprog];
 
   if (!HAKCTy){
-    CommonHAKCAnalysis::getWriter(true) << "Trying to set permission of NULL HAKCTy\n";
+    CommonHAKCAnalysis::getWriter(Error) << "Trying to set permission of NULL HAKCTy\n";
     throw std::exception();
   }
   FunctionP->ModifyTypeUse(HAKCTy, perm);
@@ -1521,7 +1517,7 @@ std::shared_ptr<HAKCTypeInfo>
 HAKCTypeIdentifier::FindCalledFunctionType(FunctionType *FunctionTy) const {
 
   if (!FunctionTy) {
-    CommonHAKCAnalysis::getWriter(true) << "Trying to find null FunctionTy\n";
+    CommonHAKCAnalysis::getWriter(Error) << "Trying to find null FunctionTy\n";
     throw std::exception();
   }
 
@@ -1630,7 +1626,7 @@ void HAKCTypeIdentifier::FindTypesInFunctions() {
             << " mapping from Instruction " << *I << "\n";
         const auto HAKCType = FindType(DebugV->getType());
         if (!HAKCType) {
-          CommonHAKCAnalysis::getWriter(true)
+          CommonHAKCAnalysis::getWriter(Error)
               << "Could not find HAKCType for DIType " << *DebugV->getType()
               << "\n";
           throw std::exception();
@@ -1672,7 +1668,7 @@ HAKCTypeIdentifier::CreateNoDebugType(Type *Ty) const {
   }
 
   auto HAKCType = std::make_shared<HAKCTypeInfo>(
-      AnalysisHelper, Name, AnalysisHelper.GetSystemInfo().OutputDebugInfo());
+      AnalysisHelper, Name, Debug);
   HAKCType->SetLLVMType(Ty);
   HAKCTypeP PointeeTy = nullptr;
   if (auto *ArrayTy = dyn_cast<ArrayType>(Ty)) {
@@ -1724,7 +1720,6 @@ ModuleAnalysisManager &HAKCTypeIdentifier::GetMAM() const {
 void HAKCTypeIdentifier::ProcessDebugInfo() {
   // this is where the dag analysis actually happens!
   DbgInfoFinder.processModule(GetModule());
-  auto Debug = AnalysisHelper.GetSystemInfo().OutputDebugInfo();
 
   CommonHAKCAnalysis::getWriter(Debug) << GetModule() << "\n";
 

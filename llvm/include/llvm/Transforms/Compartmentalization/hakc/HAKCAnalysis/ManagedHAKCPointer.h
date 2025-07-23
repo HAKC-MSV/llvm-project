@@ -149,7 +149,6 @@ protected:
    */
   Value *ProtectedPointer;
 
-  bool DebugActive;
   HAKCPointerManager &Manager;
 
   bool BaseIsAuthenticated;

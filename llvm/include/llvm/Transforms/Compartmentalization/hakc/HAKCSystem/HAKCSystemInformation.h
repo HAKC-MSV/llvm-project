@@ -71,11 +71,13 @@ class HAKCSystemInformation {
 public:
   explicit HAKCSystemInformation(CommonHAKCAnalysis &CommonAnalysis);
 
-  bool OutputDebugInfo() const;
+  HAKCLogLevel GetLogLevel() const;
 
-  bool OutputDebugInfo(GlobalValue *GV) const;
+  bool GetDebugDatabase() const;
 
-  bool OutputDebugInfo(StringRef SymbolName) const;
+  HAKCLogLevel OutputDebugInfo(GlobalValue *GV) const;
+
+  HAKCLogLevel OutputDebugInfo(StringRef SymbolName) const;
 
   Module &GetModule() const;
 
@@ -140,7 +142,8 @@ protected:
   HAKCTypeIdentifier TypeIdentifier;
   HAKCDatabaseInformation DatabaseInformation;
   bool TemporalAnalysisEnabled;
-  bool DebugOutput;
+  HAKCLogLevel LogLevel;
+  bool DebugDatabase;
   HAKCPassModeTypeEnum PassMode;
   std::string SingleSourceFile;
   std::string Arch;

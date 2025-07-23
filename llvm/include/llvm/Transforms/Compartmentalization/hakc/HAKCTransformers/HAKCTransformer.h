@@ -181,8 +181,7 @@ public:
   AddCompartmentMetadataEntry(HAKCCompartment &Compartment);
 
   virtual Function *PopulateGlobalTransfer(Function *GlobalTransfer,
-                                           GlobalVariable *GlobalVar,
-                                           bool Debug);
+                                           GlobalVariable *GlobalVar);
 
   void performTransformations();
 
@@ -389,11 +388,9 @@ protected:
 
   virtual void TransferStructMembers(ConstantStruct *ConstStruct,
                                      Function *GlobalTransfer,
-                                     GlobalValue *GlobalVar, bool Debug);
+                                     GlobalValue *GlobalVar);
 
   virtual bool TransferShouldBeCreated(Value *V, GlobalValue *Target);
-
-  bool DebugIsActive() const;
 
   virtual custom_transfer_def_t
   GetCustomTransferFunctionForType(HAKCTypeP HAKCType);

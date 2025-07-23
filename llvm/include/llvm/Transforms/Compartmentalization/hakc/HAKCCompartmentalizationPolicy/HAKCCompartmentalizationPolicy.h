@@ -52,7 +52,7 @@ protected:
 class HAKCDatabaseConnection {
 public:
   HAKCDatabaseConnection(const HAKCDatabaseInformation &DatabaseInformation,
-                         bool Debug);
+                         bool debug);
 
   HAKCDatabaseResponse HandleRequest(const HAKCDatabaseRequest &Request) const;
 
@@ -65,7 +65,7 @@ public:
 protected:
   std::unique_ptr<raw_socket_stream> Socket;
   const HAKCDatabaseInformation &DatabaseInformation;
-  bool Debug;
+  bool debug;
 
   bool CheckConnection() const;
 };

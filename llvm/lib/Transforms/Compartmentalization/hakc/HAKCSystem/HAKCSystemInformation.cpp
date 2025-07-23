@@ -54,7 +54,7 @@ void HAKCDatabaseInformation::operator<<(
 
 HAKCSystemInformation::HAKCSystemInformation(CommonHAKCAnalysis &CommonAnalysis)
     : CommonAnalysis(CommonAnalysis), TypeIdentifier(CommonAnalysis),
-      DatabaseInformation(), DebugOutput(false), PassMode(InvalidPassModeType),
+      DatabaseInformation(), LogLevel(Verbose), DebugDatabase(), PassMode(InvalidPassModeType),
       Arch(), Platform(), DagAnalysisRootPath(), IncludePathsList(),
       NoTransferFunctionList(), CompartmentTransferFunctionList(),
       CodeValidationFunction(nullptr), DataValidationFunction(nullptr),
@@ -71,11 +71,11 @@ hakc::function_def_t HAKCSystemInformation::CreateHAKCFunction(
     const HAKCTypeIdentifier &TypeIdentifier) const {
   auto *TransferFunc = YAMLFunctionDef.GetFunction(TypeIdentifier);
   if (!TransferFunc) {
-    CommonHAKCAnalysis::getWriter(true)
+    CommonHAKCAnalysis::getWriter(Error)
         << "Could not find function " << YAMLFunctionDef.SymbolName << "\n";
     throw std::exception();
   } else {
-    CommonHAKCAnalysis::getWriter(OutputDebugInfo())
+    CommonHAKCAnalysis::getWriter(Debug)
         << "Found HAKCFunction " << TransferFunc << " with Type "
         << TransferFunc->getFunctionType() << "\n";
   }
@@ -89,7 +89,7 @@ hakc::custom_transfer_def_t HAKCSystemInformation::CreateCustomTransferFunction(
     const HAKCTypeIdentifier &TypeIdentifier) {
   auto *TransferFunc = YAMLCustomTransfer.GetFunction(TypeIdentifier);
   if (!TransferFunc) {
-    CommonHAKCAnalysis::getWriter(true)
+    CommonHAKCAnalysis::getWriter(Error)
         << "Could not find function " << YAMLCustomTransfer.SymbolName << "\n";
     throw std::exception();
   }
@@ -105,7 +105,7 @@ void HAKCSystemInformation::PopulateHAKCFunctionArgs(
   for (auto &YAMLArg : YAMLFunctionDef.Arguments) {
     auto *ArgTy = YAMLArg.GetType(TypeIdentifier);
     if (!ArgTy) {
-      CommonHAKCAnalysis::getWriter(true)
+      CommonHAKCAnalysis::getWriter(Error)
           << "Could not determine type for argument " << YAMLArg.Idx
           << " in definition for " << YAMLFunctionDef.SymbolName << "\n";
       throw std::exception();
@@ -134,11 +134,10 @@ void HAKCSystemInformation::operator<<(HAKCYamlConfig &YamlConfig) {
   if (PassMode == RunConfigAndExit) {
     return;
   }
-  DebugOutput = YamlConfig.OutputAllDebugInfo;
+  LogLevel = YamlConfig.LogLevel;
   DatabaseInformation << YamlConfig.DatabaseConfig;
   if (PassMode == RunDataAccessGraphAnalysisSingleSourceFile) {
     SingleSourceFile = YamlConfig.SingleSourceFile;
-    DebugOutput = true;
     if(GetModule().getSourceFileName() != SingleSourceFile){
       errs () << "Source file " << GetModule().getSourceFileName() << " is not the target source file: " << SingleSourceFile;
       return;
@@ -173,7 +172,7 @@ void HAKCSystemInformation::operator<<(HAKCYamlConfig &YamlConfig) {
   CodeValidationFunction =
       CreateHAKCFunction(YamlConfig.CodeValidationFunction, TypeIdentifier);
   if (!CodeValidationFunction) {
-    CommonHAKCAnalysis::getWriter(true)
+    CommonHAKCAnalysis::getWriter(Error)
         << "Could not get CodeValidationFunction "
         << YamlConfig.CodeValidationFunction.SymbolName << "\n";
     throw std::exception();
@@ -181,7 +180,7 @@ void HAKCSystemInformation::operator<<(HAKCYamlConfig &YamlConfig) {
   DataValidationFunction =
       CreateHAKCFunction(YamlConfig.DataValidationFunction, TypeIdentifier);
   if (!DataValidationFunction) {
-    CommonHAKCAnalysis::getWriter(true)
+    CommonHAKCAnalysis::getWriter(Error)
         << "Could not get DataValidationFunction "
         << YamlConfig.DataValidationFunction.SymbolName << "\n";
     throw std::exception();
@@ -279,12 +278,17 @@ void HAKCSystemInformation::operator<<(HAKCYamlConfig &YamlConfig) {
   }
 }
 
-bool HAKCSystemInformation::OutputDebugInfo() const { return DebugOutput; }
+HAKCLogLevel HAKCSystemInformation::GetLogLevel() const { return LogLevel; }
 
-bool HAKCSystemInformation::OutputDebugInfo(GlobalValue *GV) const {
+bool HAKCSystemInformation::GetDebugDatabase() const { return DebugDatabase; }
+
+HAKCLogLevel HAKCSystemInformation::OutputDebugInfo(GlobalValue *GV) const {
   auto Search = [GV](const GlobalValue *Symbol) { return Symbol == GV; };
 
-  return OutputDebugInfo() || llvm::any_of(SymbolsToOutputDebugInfo, Search);
+  if (llvm::any_of(SymbolsToOutputDebugInfo, Search)) {
+    return Debug;
+  }
+  return Disabled;
 }
 
 Module &HAKCSystemInformation::GetModule() const {
@@ -336,12 +340,15 @@ HAKCSystemInformation::CompartmentTransfer(bool PerCPU) const {
   }
 }
 
-bool HAKCSystemInformation::OutputDebugInfo(StringRef SymbolName) const {
+HAKCLogLevel HAKCSystemInformation::OutputDebugInfo(StringRef SymbolName) const {
   auto Search = [SymbolName](const GlobalValue *Symbol) {
     return Symbol->getName() == SymbolName;
   };
 
-  return OutputDebugInfo() || llvm::any_of(SymbolsToOutputDebugInfo, Search);
+  if (llvm::any_of(SymbolsToOutputDebugInfo, Search)) {
+    return Debug;
+  }
+  return Disabled;
 }
 
 iterator_range<FunctionList::iterator>
