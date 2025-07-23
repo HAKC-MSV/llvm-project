@@ -46,6 +46,8 @@ public:
 
   HAKCTypeP GetVoidPointerPointeeType() const;
 
+  HAKCTypeP GetVoidPointerType();
+
   void ProcessDebugInfo();
 
   Module &GetModule() const;

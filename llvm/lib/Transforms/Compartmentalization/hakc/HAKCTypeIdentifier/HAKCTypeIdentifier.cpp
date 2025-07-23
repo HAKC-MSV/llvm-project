@@ -1347,7 +1347,8 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
       }
       if (!getLoadStoreType(LoadI)->isPointerTy()) {
         SmallVector<HAKCTypeP> Types;
-        FindAllTypes(getLoadStoreType(LoadI), Types);
+        auto *LoadTy = getLoadStoreType(LoadI);
+        FindAllTypes(LoadTy, Types);
         for (auto HAKCTy : Types) {
           CommonHAKCAnalysis::getWriter(
               AnalysisHelper.GetSystemInfo().OutputDebugInfo())
@@ -1357,9 +1358,15 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
                 AnalysisHelper.GetSystemInfo().OutputDebugInfo())
                 << " with DIType " << *HAKCTy->GetDbgType() << "\n";
           }
-          if (IsPointerLikeType(HAKCTy->GetDbgType())) {
+          if (LoadTy->isIntegerTy()) {
+            auto UsedAsPointer = AnalysisHelper.ValueIsUsedAsPointer(LoadI);
+            if (UsedAsPointer && IsPointerLikeType(HAKCTy->GetDbgType())) {
+              FoundType = HAKCTy;
+            } else {
+              FoundType = HAKCTy;
+            }
+          } else {
             FoundType = HAKCTy;
-            break;
           }
         }
         if (FoundType) {
@@ -1373,13 +1380,14 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
 
     // We have no debug information for V here, so try our best to deduce
     if (isa<GetElementPtrInst>(V) || isa<GEPOperator>(V)) {
-      Type *SourceType;
+      Type *SourceType, *DestTy;
       Value *SourceValue;
       APInt ByteOffset(64, 0);
       bool FoundOffset = false;
       if (isa<GetElementPtrInst>(V)) {
         auto *GEPI = dyn_cast<GetElementPtrInst>(V);
         SourceType = GEPI->getSourceElementType();
+        DestTy = GEPI->getResultElementType();
         SourceValue = GEPI->getPointerOperand();
         FoundOffset = GEPI->accumulateConstantOffset(
             GetModule().getDataLayout(), ByteOffset);
@@ -1387,6 +1395,7 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
         auto *GEPO = dyn_cast<GEPOperator>(V);
         SourceType = GEPO->getSourceElementType();
         SourceValue = GEPO->getPointerOperand();
+        DestTy = GEPO->getResultElementType();
         FoundOffset = GEPO->accumulateConstantOffset(
             GetModule().getDataLayout(), ByteOffset);
       }
@@ -1413,6 +1422,12 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
             }
           }
         }
+      } else if (DestTy->isPointerTy()) {
+        CommonHAKCAnalysis::getWriter(
+            AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+            << "Could not determine type for GEP " << *V << "\n";
+        FoundType = GetVoidPointerType();
+        goto exit;
       }
 
       if (auto ElementType = FindType(SourceType)) {
@@ -1423,7 +1438,8 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
       }
     } else if (auto *PHI = dyn_cast<PHINode>(V)) {
       for (auto &IncomingV : PHI->incoming_values()) {
-        if (AnalysisHelper.getDef(IncomingV, false) == PHI) {
+        auto *Def = AnalysisHelper.getDef(IncomingV, false);
+        if (isa<PHINode>(Def)) {
           continue;
         }
         FoundType = FindHAKCType(IncomingV);
@@ -1855,4 +1871,11 @@ void hakc::HAKCTypeIdentifier::AddIgnoredType(StringRef TypeName) const {
 }
 hakc::HAKCTypeP hakc::HAKCTypeIdentifier::GetVoidPointerPointeeType() const {
   return FindType(IntegerType::get(GetModule().getContext(), BITS_PER_BYTE));
+}
+hakc::HAKCTypeP hakc::HAKCTypeIdentifier::GetVoidPointerType() {
+  auto VoidPointerTy = FindPointerType(*GetVoidPointerPointeeType());
+  if (!VoidPointerTy) {
+    VoidPointerTy = AddMissingPointerType(GetVoidPointerPointeeType());
+  }
+  return VoidPointerTy;
 }
