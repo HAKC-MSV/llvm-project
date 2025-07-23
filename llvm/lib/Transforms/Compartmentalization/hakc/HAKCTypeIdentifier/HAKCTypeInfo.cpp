@@ -27,7 +27,7 @@ unsigned HAKCTypeInfo::GetSizeInBits() const {
 
 bool HAKCTypeInfo::IsIgnoredType() const {
   bool Result = IsIgnored;
-  if (!Result && PointeeType && !IsVoidPtrType()) {
+  if (!Result && IsPointerType() && PointeeType && !IsVoidPtrType()) {
     Result = PointeeType->IsIgnoredType();
   }
   return Result;

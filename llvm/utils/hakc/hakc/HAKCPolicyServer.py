@@ -142,7 +142,7 @@ class HAKCPolicyDataSource:
             raise Exception("ERROR: get_valid_targets_from_compartment_id did not receive a compartment_id")
         logger.debug(f'Calling _get_valid_targets_from_compartment_id with {compartment_id}')
         payload = self._get_valid_targets_from_compartment_id(int(compartment_id))
-        if (payload is None):
+        if payload is None:
             return HAKCPayload({"ValidTargets": None})
         return payload
 
@@ -167,8 +167,8 @@ class NullHAKCPolicyDataStore(HAKCPolicyDataSource):
         return HAKCDivisionCompartmentPayload(division=self._get_default_division(),
                                               compartment=self._get_default_compartment())
 
-    def _get_valid_targets_from_compartment_id(self, compartment_id: int) -> list[int]:
-        return list()
+    def _get_valid_targets_from_compartment_id(self, compartment_id: int) -> Optional[HAKCPayload]:
+        return HAKCPayload({'ValidTargets': [self._get_default_compartment().compartment_id]})
 
 
 class YAMLHAKCPolicyDataStore(HAKCPolicyDataSource):
