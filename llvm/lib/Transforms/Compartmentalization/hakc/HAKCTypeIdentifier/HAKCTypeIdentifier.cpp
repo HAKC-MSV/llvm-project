@@ -390,8 +390,11 @@ hakc::HAKCTypeIdentifier::HandleType(const DIType *type) {
     auto TypeName = GetTypeName(type);
     TypeP = std::make_shared<HAKCTypeInfo>(AnalysisHelper, TypeName, debug);
     if (auto *BasicType = dyn_cast<DIBasicType>(type)) {
-      auto *IntTy = IntegerType::get(GetModule().getContext(),
-                                     BasicType->getSizeInBits());
+      auto BitSize = BasicType->getSizeInBits();
+      if (BasicType->getEncoding() == dwarf::DW_ATE_boolean) {
+        BitSize = 1;
+      }
+      auto *IntTy = IntegerType::get(GetModule().getContext(), BitSize);
       TypeP->SetLLVMType(IntTy);
     } else if (auto *CompositeTy = dyn_cast<DICompositeType>(type)) {
       Type *LLVMTy = nullptr;
