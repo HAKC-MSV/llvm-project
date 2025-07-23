@@ -65,7 +65,8 @@ bool HAKCPointerManager::PointerIsEligibleForManagement(Use &U) const {
 
     bool IsInline = call->isInlineAsm();
     if (IsInline) {
-      HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getWriter() << "Call is Inline Assembly\n";
+      HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getWriter()
+          << "Call is Inline Assembly\n";
       /* These are usually the result of reading a register value */
       return GetFunctionAnalysis()
           .GetModuleAnalysis()
@@ -222,7 +223,8 @@ bool HAKCPointerManager::ManageNewPointer(Use &U) {
   AnalyzedUses.clear();
   ClassifyAllUsesOfDefinition(ManagedPointer->GetBaseDefinition(),
                               *ManagedPointer);
-  HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getWriter() << "Managing " << ManagedPointer;
+  HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getWriter()
+      << "Managing " << ManagedPointer;
   if (ManagedPointer->GetType()) {
     HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getWriter()
         << " with HAKCType " << *ManagedPointer->GetType();
@@ -379,7 +381,8 @@ bool HAKCPointerManager::UseShouldUtilizeSignedBasePointer(Use &U) const {
     }
   } else if (isa<AtomicCmpXchgInst>(UserP)) {
     if (U.getOperandNo() != AtomicCmpXchgInst::getPointerOperandIndex()) {
-      HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getWriter() << "Signed 2\n";
+      HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getWriter()
+          << "Signed 2\n";
       UseSignedPointer = true;
     }
   } else if (auto *Call = dyn_cast<CallInst>(UserP)) {
@@ -725,11 +728,14 @@ Value *HAKCPointerManager::FindManagedPointerReplacement(
         ManagedPtr->GetAuthenticatedPointer() == Target ||
         ManagedPtr->GetProtectedPointer() == Target) {
       if (DebugActive) {
-        HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getWriter() << "Returning ";
+        HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getWriter()
+            << "Returning ";
         if (ReturnAuthenticatedPointer) {
-          HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getWriter() << "authenticated";
+          HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getWriter()
+              << "authenticated";
         } else {
-          HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getWriter() << "protected";
+          HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getWriter()
+              << "protected";
         }
         HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getWriter()
             << " pointer for " << *Target << "\n";

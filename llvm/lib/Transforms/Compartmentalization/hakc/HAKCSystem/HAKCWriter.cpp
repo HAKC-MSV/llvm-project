@@ -17,34 +17,32 @@ HAKCWriter::~HAKCWriter() { fd_os->close(); }
 
 raw_ostream &HAKCWriter::ostream() const { return os; }
 
-void HAKCWriter::SetConfiguredLogLevel(HAKCLogLevel log_level) {ConfiguredLogLevel = log_level;}
+void HAKCWriter::SetConfiguredLogLevel(HAKCLogLevel log_level) {
+  ConfiguredLogLevel = log_level;
+}
 
-void HAKCWriter::SetTempLogLevel(HAKCLogLevel log_level) {TempLogLevel = log_level;}
+void HAKCWriter::SetTempLogLevel(HAKCLogLevel log_level) {
+  TempLogLevel = log_level;
+}
 
 HAKCLogLevel HAKCWriter::GetConfiguredLogLevel() { return ConfiguredLogLevel; }
 
 HAKCLogLevel HAKCWriter::GetTempLogLevel() { return TempLogLevel; }
 
-void HAKCWriter::SetLogPath(std::string fname) {
-  log_path=fname;
-}
+void HAKCWriter::SetLogPath(std::string fname) { log_path = fname; }
 
 void HAKCWriter::CreateLog() {
   std::error_code EC;
   fd_os = new raw_fd_ostream(log_path, EC);
 }
 
-std::string HAKCWriter::GetLogPath() {
-  return log_path;
-}
+std::string HAKCWriter::GetLogPath() { return log_path; }
 
-raw_fd_ostream &HAKCWriter::GetFdOstream() {
-  return *fd_os;
-}
+raw_fd_ostream &HAKCWriter::GetFdOstream() { return *fd_os; }
 
 HAKCWriter &HAKCWriter::operator<<(const char *s) {
   // Pretty sure that all print statements call this eventually
-  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel) ) {
+  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel)) {
     return *this;
   }
 
@@ -54,7 +52,7 @@ HAKCWriter &HAKCWriter::operator<<(const char *s) {
 }
 
 void HAKCWriter::printDIType(const DIType *type, unsigned indents) const {
-  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel) ) {
+  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel)) {
     return;
   }
 
@@ -84,7 +82,7 @@ void HAKCWriter::printDIType(const DIType *type, unsigned indents) const {
 }
 
 HAKCWriter &HAKCWriter::operator<<(llvm::Value *V) {
-  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel) ) {
+  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel)) {
     return *this;
   }
   if (V == nullptr) {
@@ -94,8 +92,10 @@ HAKCWriter &HAKCWriter::operator<<(llvm::Value *V) {
   } else if (const auto *GV = dyn_cast<GlobalVariable>(V)) {
     *this << "Global " << GV->getName();
   } else if (auto *Arg = dyn_cast<Argument>(V)) {
-    os << "Argument " << Arg->getArgNo() << " of " << Arg->getParent()->getName();
-    (*fd_os) << "Argument " << Arg->getArgNo() << " of " << Arg->getParent()->getName();
+    os << "Argument " << Arg->getArgNo() << " of "
+       << Arg->getParent()->getName();
+    (*fd_os) << "Argument " << Arg->getArgNo() << " of "
+             << Arg->getParent()->getName();
   } else {
     os << *V;
     *fd_os << *V;
@@ -105,7 +105,7 @@ HAKCWriter &HAKCWriter::operator<<(llvm::Value *V) {
 }
 
 HAKCWriter &HAKCWriter::operator<<(llvm::Use &U) {
-  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel) ) {
+  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel)) {
     return *this;
   }
 
@@ -119,7 +119,7 @@ HAKCWriter &HAKCWriter::operator<<(llvm::Value &V) {
 }
 
 HAKCWriter &HAKCWriter::operator<<(StringRef str) {
-  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel) ) {
+  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel)) {
     return *this;
   }
   os << str;
@@ -128,7 +128,7 @@ HAKCWriter &HAKCWriter::operator<<(StringRef str) {
 }
 
 HAKCWriter &HAKCWriter::operator<<(unsigned int i) {
-  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel) ) {
+  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel)) {
     return *this;
   }
   os << i;
@@ -137,7 +137,7 @@ HAKCWriter &HAKCWriter::operator<<(unsigned int i) {
 }
 
 HAKCWriter &HAKCWriter::operator<<(unsigned long i) {
-  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel) ) {
+  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel)) {
     return *this;
   }
   os << i;
@@ -146,7 +146,7 @@ HAKCWriter &HAKCWriter::operator<<(unsigned long i) {
 }
 
 HAKCWriter &HAKCWriter::operator<<(ssize_t i) {
-  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel) ) {
+  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel)) {
     return *this;
   }
   os << i;
@@ -155,7 +155,7 @@ HAKCWriter &HAKCWriter::operator<<(ssize_t i) {
 }
 
 HAKCWriter &HAKCWriter::operator<<(bool b) {
-  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel) ) {
+  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel)) {
     return *this;
   }
   os << (b ? "True" : "False");
@@ -164,7 +164,7 @@ HAKCWriter &HAKCWriter::operator<<(bool b) {
 }
 
 HAKCWriter &HAKCWriter::operator<<(const std::string &str) {
-  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel) ) {
+  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel)) {
     return *this;
   }
   os << str;
@@ -172,9 +172,8 @@ HAKCWriter &HAKCWriter::operator<<(const std::string &str) {
   return *this;
 }
 
-
 HAKCWriter &HAKCWriter::operator<<(const Function &F) {
-  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel) ) {
+  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel)) {
     return *this;
   }
   F.print(os, nullptr);
@@ -183,7 +182,7 @@ HAKCWriter &HAKCWriter::operator<<(const Function &F) {
 }
 
 HAKCWriter &HAKCWriter::operator<<(const Module &M) {
-  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel) ) {
+  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel)) {
     return *this;
   }
   M.print(os, nullptr);
@@ -202,7 +201,7 @@ HAKCWriter &HAKCWriter::operator<<(const Type *Ty) {
 }
 
 HAKCWriter &HAKCWriter::operator<<(const Type &Ty) {
-  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel) ) {
+  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel)) {
     return *this;
   }
   os << Ty;
@@ -216,7 +215,7 @@ HAKCWriter &HAKCWriter::operator<<(const DINode *DiNode) {
 }
 
 HAKCWriter &HAKCWriter::operator<<(const DINode &DiNode) {
-  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel) ) {
+  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel)) {
     return *this;
   }
   os << DiNode;
@@ -230,7 +229,7 @@ HAKCWriter &HAKCWriter::operator<<(const DIType *DiType) {
 }
 
 HAKCWriter &HAKCWriter::operator<<(const hakc::HAKCCompartment &Compartment) {
-  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel) ) {
+  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel)) {
     return *this;
   }
   os << "Compartment " << Compartment.GetCompartmentIDValue();
@@ -240,7 +239,7 @@ HAKCWriter &HAKCWriter::operator<<(const hakc::HAKCCompartment &Compartment) {
 
 HAKCWriter &
 HAKCWriter::operator<<(const hakc::HAKCCompartmentDivision &Division) {
-  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel) ) {
+  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel)) {
     return *this;
   }
   *this << Division.GetHAKCCompartment();
@@ -250,7 +249,7 @@ HAKCWriter::operator<<(const hakc::HAKCCompartmentDivision &Division) {
 }
 
 HAKCWriter &HAKCWriter::operator<<(const hakc::HAKCTypeInfo &TypeInfo) {
-  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel) ) {
+  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel)) {
     return *this;
   }
   TypeInfo >> os;
@@ -260,7 +259,7 @@ HAKCWriter &HAKCWriter::operator<<(const hakc::HAKCTypeInfo &TypeInfo) {
 
 HAKCWriter &
 HAKCWriter::operator<<(const enum HAKCAllocationTypeEnum AllocationType) {
-  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel) ) {
+  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel)) {
     return *this;
   }
   switch (AllocationType) {
@@ -294,18 +293,20 @@ HAKCWriter::operator<<(const enum HAKCAllocationTypeEnum AllocationType) {
 
 HAKCWriter &
 HAKCWriter::operator<<(const ManagedHAKCPointerUse &HAKCPointerUse) {
-  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel) ) {
+  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel)) {
     return *this;
   }
-  os << "[" << HAKCPointerUse.getID() << "] Argument " << HAKCPointerUse.getOperandNo() << " of ";
-  *fd_os << "[" << HAKCPointerUse.getID() << "] Argument " << HAKCPointerUse.getOperandNo() << " of ";
+  os << "[" << HAKCPointerUse.getID() << "] Argument "
+     << HAKCPointerUse.getOperandNo() << " of ";
+  *fd_os << "[" << HAKCPointerUse.getID() << "] Argument "
+         << HAKCPointerUse.getOperandNo() << " of ";
   *this << HAKCPointerUse.getUser() << " for ";
   *this << HAKCPointerUse.getManagedPtr();
   return *this;
 }
 
 HAKCWriter &HAKCWriter::operator<<(const HAKCPointerBase &ManagedPointer) {
-  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel) ) {
+  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel)) {
     return *this;
   }
   os << "Managed Pointer " << ManagedPointer.GetID();
@@ -329,7 +330,7 @@ HAKCWriter &HAKCWriter::operator<<(const HAKCPointerBaseP &ManagedPointer) {
 }
 
 HAKCWriter &HAKCWriter::operator<<(const HAKCFunctionInfo &HAKCFuncInfo) {
-  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel) ) {
+  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel)) {
     return *this;
   }
   HAKCFuncInfo >> os;

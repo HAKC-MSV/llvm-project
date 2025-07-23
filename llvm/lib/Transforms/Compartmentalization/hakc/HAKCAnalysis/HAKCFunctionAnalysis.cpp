@@ -13,8 +13,8 @@
 
 namespace llvm::hakc {
 HAKCFunctionAnalysis::HAKCFunctionAnalysis(
-    Function *F, HAKCModuleAnalysis &ModuleAnalysis, HAKCTransformer &Transformer,
-    HAKCCompartmentalizationPolicy &Policy)
+    Function *F, HAKCModuleAnalysis &ModuleAnalysis,
+    HAKCTransformer &Transformer, HAKCCompartmentalizationPolicy &Policy)
     : ModuleAnalysis(ModuleAnalysis), Transformer(Transformer), Policy(Policy),
       PointerManager(
           *this, Policy,
@@ -38,9 +38,10 @@ void HAKCFunctionAnalysis::UpdateHAKCFunctionParameters() const {
   if (CommonHAKCAnalysis::IsUncompartmentalizedSymbol(CurrentFunction,
                                                       Policy)) {
     return;
-                                                      }
+  }
 
-  CommonHAKCAnalysis::CommonHAKCAnalysis::getWriter() << "Updating parameters for the following HAKC functions:\n";
+  CommonHAKCAnalysis::CommonHAKCAnalysis::getWriter()
+      << "Updating parameters for the following HAKC functions:\n";
   for (auto *CallI : HAKCFunctionCalls) {
     CommonHAKCAnalysis::CommonHAKCAnalysis::getWriter() << CallI << "\n";
   }
@@ -99,7 +100,7 @@ Instruction *HAKCFunctionAnalysis::addCompartmentTransferCall(
         << " in function\n"
         << GetFunction() << "\n";
     throw std::exception();
-          }
+  }
   auto HAKCPointer = PointerManager.GetManagedPointer(Operand);
   if (!HAKCPointer) {
     CommonHAKCAnalysis::getWriter(Error)
@@ -145,7 +146,8 @@ bool HAKCFunctionAnalysis::userInFunction(Value *User) const {
     return &F == I->getFunction();
   }
 
-  CommonHAKCAnalysis::CommonHAKCAnalysis::getWriter(Error) << "Unexpected user: " << User << "\n";
+  CommonHAKCAnalysis::CommonHAKCAnalysis::getWriter(Error)
+      << "Unexpected user: " << User << "\n";
   throw std::exception();
 }
 
@@ -214,8 +216,7 @@ Instruction *HAKCFunctionAnalysis::FindUseInsertionPoint(
     return phi->getParent()->getFirstNonPHIOrDbgOrLifetime();
   }
   if (DebugActive) {
-    CommonHAKCAnalysis::getWriter()
-        << "Finding insertion point for ";
+    CommonHAKCAnalysis::getWriter() << "Finding insertion point for ";
     if (V->getName().empty()) {
       CommonHAKCAnalysis::getWriter() << V;
     } else {
@@ -416,29 +417,29 @@ bool HAKCFunctionAnalysis::IsCallInIntrinsicSet(
 bool HAKCFunctionAnalysis::IsIntrinsicNeedingAuthentication(
     CallBase *Call) const {
   Intrinsic::ID IntrinsicsNeedingAuth[] = {
-    Intrinsic::IndependentIntrinsics::memcpy,
-    Intrinsic::IndependentIntrinsics::memmove,
-    Intrinsic::IndependentIntrinsics::memset};
+      Intrinsic::IndependentIntrinsics::memcpy,
+      Intrinsic::IndependentIntrinsics::memmove,
+      Intrinsic::IndependentIntrinsics::memset};
 
   return IsCallInIntrinsicSet(Call, IntrinsicsNeedingAuth);
 }
 
 bool HAKCFunctionAnalysis::IsIntrinsicNeedingCloning(CallBase *Call) const {
   Intrinsic::ID IntrinsicsNeedingCloning[] = {
-    Intrinsic::IndependentIntrinsics::lifetime_start,
-    Intrinsic::IndependentIntrinsics::lifetime_end,
-};
+      Intrinsic::IndependentIntrinsics::lifetime_start,
+      Intrinsic::IndependentIntrinsics::lifetime_end,
+  };
   return IsCallInIntrinsicSet(Call, IntrinsicsNeedingCloning);
 }
 
 bool HAKCFunctionAnalysis::IsIntrinsicToSkip(CallBase *Call) const {
   Intrinsic::ID IntrinsicsToSkip[] = {
-    Intrinsic::IndependentIntrinsics::dbg_declare,
-    /*Intrinsic::IndependentIntrinsics::dbg_addr,*/
-    Intrinsic::IndependentIntrinsics::dbg_label,
-    Intrinsic::IndependentIntrinsics::dbg_value,
-    Intrinsic::IndependentIntrinsics::read_register,
-};
+      Intrinsic::IndependentIntrinsics::dbg_declare,
+      /*Intrinsic::IndependentIntrinsics::dbg_addr,*/
+      Intrinsic::IndependentIntrinsics::dbg_label,
+      Intrinsic::IndependentIntrinsics::dbg_value,
+      Intrinsic::IndependentIntrinsics::read_register,
+  };
   return IsCallInIntrinsicSet(Call, IntrinsicsToSkip);
 }
 
@@ -596,7 +597,7 @@ void HAKCFunctionAnalysis::CheckCompareOperandForDirectFunctionUse(
           << "Adding comparison to directFunctionUsers for argument "
           << std::to_string(OpNo) << "\n";
       directFunctionUsers.insert(CmpI);
-            }
+    }
   }
 }
 
@@ -606,8 +607,7 @@ void HAKCFunctionAnalysis::CheckCompareOperandForDirectFunctionUse(
  * @param compare
  */
 void HAKCFunctionAnalysis::handleComparison(CmpInst *compare) {
-  CommonHAKCAnalysis::getWriter()
-      << "Checking comparison " << *compare << "\n";
+  CommonHAKCAnalysis::getWriter() << "Checking comparison " << *compare << "\n";
 
   MaybeAddCompareToDirectUsers(compare);
 
@@ -616,31 +616,31 @@ void HAKCFunctionAnalysis::handleComparison(CmpInst *compare) {
     CommonHAKCAnalysis::getWriter()
         << "\tComparisons with null do not need authentication\n";
     return;
-      } else if (isa<Operator>(compare->getOperand(0)) ||
-                 isa<Operator>(compare->getOperand(1))) {
-        bool comparisonIsWithConstant = false;
-        auto *bitCastOperator0 = dyn_cast<Operator>(compare->getOperand(0));
-        if (bitCastOperator0) {
-          if (auto *ci = dyn_cast<ConstantInt>(bitCastOperator0->getOperand(0))) {
-            comparisonIsWithConstant = (ci->getZExtValue() < user_space_end);
-          }
+  } else if (isa<Operator>(compare->getOperand(0)) ||
+             isa<Operator>(compare->getOperand(1))) {
+    bool comparisonIsWithConstant = false;
+    auto *bitCastOperator0 = dyn_cast<Operator>(compare->getOperand(0));
+    if (bitCastOperator0) {
+      if (auto *ci = dyn_cast<ConstantInt>(bitCastOperator0->getOperand(0))) {
+        comparisonIsWithConstant = (ci->getZExtValue() < user_space_end);
+      }
+    }
+    if (!comparisonIsWithConstant) {
+      auto *bitCastOperator1 = dyn_cast<Operator>(compare->getOperand(1));
+      if (bitCastOperator1) {
+        if (auto *ci = dyn_cast<ConstantInt>(bitCastOperator1->getOperand(0))) {
+          comparisonIsWithConstant = (ci->getZExtValue() < user_space_end);
         }
-        if (!comparisonIsWithConstant) {
-          auto *bitCastOperator1 = dyn_cast<Operator>(compare->getOperand(1));
-          if (bitCastOperator1) {
-            if (auto *ci = dyn_cast<ConstantInt>(bitCastOperator1->getOperand(0))) {
-              comparisonIsWithConstant = (ci->getZExtValue() < user_space_end);
-            }
-          }
-        }
+      }
+    }
 
-        if (comparisonIsWithConstant) {
-          CommonHAKCAnalysis::getWriter()
-              << "\tComparisons with constant integers do not need "
-                 "authentications\n";
-          return;
-        }
-                 }
+    if (comparisonIsWithConstant) {
+      CommonHAKCAnalysis::getWriter()
+          << "\tComparisons with constant integers do not need "
+             "authentications\n";
+      return;
+    }
+  }
 
   if (isCompartmentalizedFunction()) {
     bool arg0NeedsAuth =
@@ -653,25 +653,21 @@ void HAKCFunctionAnalysis::handleComparison(CmpInst *compare) {
       if (arg0NeedsAuth) {
         CommonHAKCAnalysis::getWriter() << "Argument 0 needs auth\n";
       } else {
-        CommonHAKCAnalysis::getWriter()
-            << "Argument 0 does not need auth\n";
+        CommonHAKCAnalysis::getWriter() << "Argument 0 does not need auth\n";
       }
       if (arg1NeedsAuth) {
         CommonHAKCAnalysis::getWriter() << "Argument 1 needs auth\n";
       } else {
-        CommonHAKCAnalysis::getWriter()
-            << "Argument 1 does not need auth\n";
+        CommonHAKCAnalysis::getWriter() << "Argument 1 does not need auth\n";
       }
     }
     if (arg0NeedsAuth && arg1NeedsAuth) {
-      CommonHAKCAnalysis::getWriter()
-          << "Both operands should be checked\n";
+      CommonHAKCAnalysis::getWriter() << "Both operands should be checked\n";
       AddManagedPointer(compare->getOperandUse(0));
       AddManagedPointer(compare->getOperandUse(1));
     } else {
       if (arg0NeedsAuth) {
-        CommonHAKCAnalysis::getWriter()
-            << "Registering argument 0\n";
+        CommonHAKCAnalysis::getWriter() << "Registering argument 0\n";
         AddManagedPointer(compare->getOperandUse(0));
       } else {
         CommonHAKCAnalysis::getWriter()
@@ -679,8 +675,7 @@ void HAKCFunctionAnalysis::handleComparison(CmpInst *compare) {
             << " ) already authenticated\n";
       }
       if (arg1NeedsAuth) {
-        CommonHAKCAnalysis::getWriter()
-            << "Registering argument 1\n";
+        CommonHAKCAnalysis::getWriter() << "Registering argument 1\n";
         AddManagedPointer(compare->getOperandUse(1));
       }
     }
@@ -699,8 +694,7 @@ void HAKCFunctionAnalysis::handleComparison(CmpInst *compare) {
  * @param binOp
  */
 void HAKCFunctionAnalysis::handleBinaryOperator(BinaryOperator *binOp) {
-  CommonHAKCAnalysis::getWriter()
-      << "Checking binary op " << binOp << "\n";
+  CommonHAKCAnalysis::getWriter() << "Checking binary op " << binOp << "\n";
   /* Both operators need to be pointers to skip operations like
    * ptr | 0xFFFF
    */
@@ -709,7 +703,7 @@ void HAKCFunctionAnalysis::handleBinaryOperator(BinaryOperator *binOp) {
     CommonHAKCAnalysis::getWriter() << "Registering both operands\n";
     AddManagedPointer(binOp->getOperandUse(0));
     AddManagedPointer(binOp->getOperandUse(1));
-      }
+  }
 }
 
 /**
@@ -731,18 +725,18 @@ bool HAKCFunctionAnalysis::globalShouldBeTransferred(
     if (globalValue->getValueType()->isArrayTy() &&
         globalValue->getValueType()->getArrayElementType()->isIntegerTy(8)) {
       return false;
-        }
+    }
 
     if (auto *call = dyn_cast<CallInst>(globalValueArg.getUser())) {
       if (!GetModuleAnalysis().GetCommonAnalysis().FunctionIsAnalysisCandidate(
               call->getCalledFunction())) {
         return false;
-              }
+      }
       return true;
     }
 
     return globalValue->getValueType()->isPointerTy();
-          }
+  }
 
   CommonHAKCAnalysis::getWriter()
       << "Arg " << globalValueArg.getOperandNo() << " (" << globalValueArg
@@ -767,10 +761,9 @@ void HAKCFunctionAnalysis::handleCall(CallInst *call) {
   if (GetModuleAnalysis().GetCommonAnalysis().IsHAKCFunction(
           call->getCalledFunction())) {
     HAKCFunctionCalls.insert(call);
-          }
+  }
 
-  CommonHAKCAnalysis::getWriter()
-      << "Handling call " << *call << "\n";
+  CommonHAKCAnalysis::getWriter() << "Handling call " << *call << "\n";
 
   if (GetModuleAnalysis().GetCommonAnalysis().ValueIsUsedAsPointer(call)) {
     for (auto &U : call->uses()) {
@@ -792,8 +785,7 @@ void HAKCFunctionAnalysis::handleCall(CallInst *call) {
 
   if (DebugActive) {
     if (needsAuthenticatedArgs) {
-      CommonHAKCAnalysis::getWriter()
-          << *call << " needs authenticated args\n";
+      CommonHAKCAnalysis::getWriter() << *call << " needs authenticated args\n";
     } else {
       CommonHAKCAnalysis::getWriter()
           << *call << " does not need authenticated args\n";
@@ -801,8 +793,7 @@ void HAKCFunctionAnalysis::handleCall(CallInst *call) {
   }
 
   if (call->isIndirectCall()) {
-    CommonHAKCAnalysis::getWriter()
-        << "Indirect call: " << *call << "\n";
+    CommonHAKCAnalysis::getWriter() << "Indirect call: " << *call << "\n";
     AddManagedPointer(call->getCalledOperandUse());
     /* Using checked pointers for indirect calls because the indirect call
      * can be an assembly function, which currently requires valid pointers.
@@ -814,18 +805,16 @@ void HAKCFunctionAnalysis::handleCall(CallInst *call) {
       if (argNeedsAuthentication(arg)) {
         AddManagedPointer(arg);
       }
-      CommonHAKCAnalysis::getWriter()
-          << "Argument " << *arg << " for " << *call
-          << " does not need authentication\n";
+      CommonHAKCAnalysis::getWriter() << "Argument " << *arg << " for " << *call
+                                      << " does not need authentication\n";
     }
   } else if (needsAuthenticatedArgs) {
     for (auto &arg : call->args()) {
       if (argNeedsAuthentication(arg)) {
         AddManagedPointer(arg);
       }
-      CommonHAKCAnalysis::getWriter()
-          << "Argument " << *arg << " for " << *call
-          << " does not need authentication\n";
+      CommonHAKCAnalysis::getWriter() << "Argument " << *arg << " for " << *call
+                                      << " does not need authentication\n";
     }
   } else if (!GetModuleAnalysis().GetCommonAnalysis().IsSafeTransitionCall(
                  call)) {
@@ -852,9 +841,8 @@ void HAKCFunctionAnalysis::handleCall(CallInst *call) {
           Value *valDef = getDef(val.get(), false);
           if (auto *globVal = dyn_cast<GlobalValue>(valDef)) {
             if (globalShouldBeTransferred(val)) {
-              CommonHAKCAnalysis::getWriter()
-                  << "Global " << globVal->getName() << " used by " << *call
-                  << "\n";
+              CommonHAKCAnalysis::getWriter() << "Global " << globVal->getName()
+                                              << " used by " << *call << "\n";
               GlobalArgumentUses[globVal].insert(call);
             }
             CommonHAKCAnalysis::getWriter()
@@ -866,11 +854,10 @@ void HAKCFunctionAnalysis::handleCall(CallInst *call) {
         if (!GetModuleAnalysis()
                  .GetCommonAnalysis()
                  .FunctionIsAnalysisCandidate(call->getCalledFunction())) {
-          CommonHAKCAnalysis::getWriter()
-              << "Function called by " << *call
-              << " is not an analysis candidate\n";
+          CommonHAKCAnalysis::getWriter() << "Function called by " << *call
+                                          << " is not an analysis candidate\n";
           continue;
-                 }
+        }
       }
     }
     if (call->getCalledFunction()) {
@@ -879,9 +866,9 @@ void HAKCFunctionAnalysis::handleCall(CallInst *call) {
       if (!CommonHAKCAnalysis::IsUncompartmentalizedSymbol(
               call->getCalledFunction(), Policy)) {
         NonKernelDirectFunctionCallSet.insert(call);
-              }
+      }
     }
-                 }
+  }
 }
 
 /**
@@ -905,64 +892,70 @@ std::string HAKCFunctionAnalysis::getHAKCFunctionSectionName() {
   return sectionName;
 }
 
-HAKCTypeIdentifier& HAKCFunctionAnalysis::GetTypeIdentifier() const {
+HAKCTypeIdentifier &HAKCFunctionAnalysis::GetTypeIdentifier() const {
   return ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().GetTypeIdentifier();
 }
 
 void HAKCFunctionAnalysis::TemporalAnalysis() {
   setup();
   CommonHAKCAnalysis::getWriter(Error)
-    << "!!!! Starting Function Temporal Analysis !!!!\n";
+      << "!!!! Starting Function Temporal Analysis !!!!\n";
 
   // loop through all managed pointers and their uses
-  for (auto ptr: PointerManager.ManagedPointers()) {
+  for (auto ptr : PointerManager.ManagedPointers()) {
     SmallVector<ManagedHAKCPointerUseP> Uses;
     ptr->GetAllUses(Uses);
     CommonHAKCAnalysis::getWriter(Error) << *ptr << "\n";
-    for (auto Use: Uses) {
+    for (auto Use : Uses) {
       CommonHAKCAnalysis::getWriter(Error) << "\tAnalyzing Use" << *Use << "\n";
-      auto* I = Use->getUser();
+      auto *I = Use->getUser();
       if (auto *Call = dyn_cast<CallInst>(I)) {
         TemporalAnalysisHandleCall(Use);
       } else if (auto *Load = dyn_cast<LoadInst>(I)) {
         TemporalAnalysisHandleLoad(Use);
       } else if (auto *Store = dyn_cast<StoreInst>(I)) {
         TemporalAnalysisHandleStore(Use);
-      }
-      else {
-        CommonHAKCAnalysis::getWriter(Error) << "\t\tSkipping Use because it is not a call, load, or store!\n";
+      } else {
+        CommonHAKCAnalysis::getWriter(Error)
+            << "\t\tSkipping Use because it is not a call, load, or store!\n";
       }
     }
   }
   CommonHAKCAnalysis::getWriter(Error)
-    << "!!!! Ending Function Temporal Analysis !!!!\n";
+      << "!!!! Ending Function Temporal Analysis !!!!\n";
 }
 
-void HAKCFunctionAnalysis::AddPermissionUse(const ManagedHAKCPointer &ManagedPointer, TypePerms perm) const {
+void HAKCFunctionAnalysis::AddPermissionUse(
+    const ManagedHAKCPointer &ManagedPointer, TypePerms perm) const {
   auto HAKCTy = ManagedPointer.GetType()->GetPointeeType();
   GetTypeIdentifier().ModifyTypeUse(CurrentFunction, HAKCTy, perm);
 }
 
-void HAKCFunctionAnalysis::TemporalAnalysisHandleCall(ManagedHAKCPointerUseP CallUse) {
-  if (auto* CallUser = dyn_cast<CallInst>(CallUse->getUser())) {
+void HAKCFunctionAnalysis::TemporalAnalysisHandleCall(
+    ManagedHAKCPointerUseP CallUse) {
+  if (auto *CallUser = dyn_cast<CallInst>(CallUse->getUser())) {
     // works for both direct and indirect calls
-    if (CallUse->getOperandNo() == CallUser->getCalledOperandUse().getOperandNo()) {
+    if (CallUse->getOperandNo() ==
+        CallUser->getCalledOperandUse().getOperandNo()) {
       AddPermissionUse(CallUse->getManagedPtr(), Execute);
     }
   }
 }
 
-void HAKCFunctionAnalysis::TemporalAnalysisHandleLoad(ManagedHAKCPointerUseP LoadUse) {
+void HAKCFunctionAnalysis::TemporalAnalysisHandleLoad(
+    ManagedHAKCPointerUseP LoadUse) {
 
   if (LoadUse->getOperandNo() == LoadInst::getPointerOperandIndex()) {
     AddPermissionUse(LoadUse->getManagedPtr(), Read);
-  }
-  else {
-    CommonHAKCAnalysis::getWriter(Debug) << "LoadUse was not operand 0! (Is this even possible?)" << *LoadUse << "\n";
+  } else {
+    CommonHAKCAnalysis::getWriter(Debug)
+        << "LoadUse was not operand 0! (Is this even possible?)" << *LoadUse
+        << "\n";
   }
 }
 
-void HAKCFunctionAnalysis::TemporalAnalysisHandleStore(ManagedHAKCPointerUseP StoreUse) {
+void HAKCFunctionAnalysis::TemporalAnalysisHandleStore(
+    ManagedHAKCPointerUseP StoreUse) {
   // %ptr = alloca i32                               ; yields ptr
   // store i32 3, ptr %ptr                           ; yields void
   // %val = load i32, ptr %ptr                       ; yields i32:val = i32 3
@@ -970,9 +963,10 @@ void HAKCFunctionAnalysis::TemporalAnalysisHandleStore(ManagedHAKCPointerUseP St
   // check that the use is the thing that is being written to
   if (StoreUse->getOperandNo() == StoreInst::getPointerOperandIndex()) {
     AddPermissionUse(StoreUse->getManagedPtr(), Write);
-  }
-  else {
-    CommonHAKCAnalysis::getWriter(Debug) << "StoreUse was not operand 1! (Is this even possible?)" << *StoreUse << "\n";
+  } else {
+    CommonHAKCAnalysis::getWriter(Debug)
+        << "StoreUse was not operand 1! (Is this even possible?)" << *StoreUse
+        << "\n";
   }
 }
 
@@ -1084,9 +1078,8 @@ void HAKCFunctionAnalysis::AddInstrumentation(bool RelocateSection) {
   }
 
   if (!SetupHasRun) {
-    CommonHAKCAnalysis::getWriter()
-        << __FUNCTION__ << " calling setup for " << GetFunction().getName()
-        << "\n";
+    CommonHAKCAnalysis::getWriter() << __FUNCTION__ << " calling setup for "
+                                    << GetFunction().getName() << "\n";
     setup();
   }
   CommonHAKCAnalysis::getWriter()
@@ -1103,8 +1096,7 @@ void HAKCFunctionAnalysis::AddInstrumentation(bool RelocateSection) {
     if (RelocateSection) {
       relocateFunctionSection();
     }
-    CommonHAKCAnalysis::getWriter()
-        << "---- createMissingTransfers ----\n";
+    CommonHAKCAnalysis::getWriter() << "---- createMissingTransfers ----\n";
     createMissingTransfers();
     CommonHAKCAnalysis::getWriter()
         << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n";
@@ -1198,9 +1190,8 @@ void HAKCFunctionAnalysis::createMissingTransfers() {
                                                       Policy)) {
     return;
   }
-  CommonHAKCAnalysis::getWriter()
-      << "Function prior to making transfers:\n"
-      << GetFunction() << "\n";
+  CommonHAKCAnalysis::getWriter() << "Function prior to making transfers:\n"
+                                  << GetFunction() << "\n";
   PointerManager.CreateAllTransfers();
 }
 

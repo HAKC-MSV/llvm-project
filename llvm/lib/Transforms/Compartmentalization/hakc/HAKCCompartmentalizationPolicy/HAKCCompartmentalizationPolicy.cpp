@@ -10,14 +10,21 @@
 
 namespace llvm::hakc {
 
-HAKCCompartmentalizationPolicyDAG::HAKCCompartmentalizationPolicyDAG(HAKCSystemInformation &SystemInformation) : HAKCCompartmentalizationPolicy(SystemInformation), GV_to_divs({}), GV_to_div_incr(0) {}
+HAKCCompartmentalizationPolicyDAG::HAKCCompartmentalizationPolicyDAG(
+    HAKCSystemInformation &SystemInformation)
+    : HAKCCompartmentalizationPolicy(SystemInformation), GV_to_divs({}),
+      GV_to_div_incr(0) {}
 
-HAKCCompartmentDivision &HAKCCompartmentalizationPolicyDAG::GetDivision(GlobalValue *GV) {
-  // used in dag analysis; always put each symbol in its own compartment (but all in the same division)
+HAKCCompartmentDivision &
+HAKCCompartmentalizationPolicyDAG::GetDivision(GlobalValue *GV) {
+  // used in dag analysis; always put each symbol in its own compartment (but
+  // all in the same division)
   if (!GV_to_divs.contains(GV)) {
     LLVMContext &ctx = SystemInformation.GetModule().getContext();
     unsigned CompartmentID = GV_to_div_incr;
-    std::shared_ptr<HAKCCompartmentDivision> Division = std::make_shared<HAKCCompartmentDivision>(HAKCCompartment(CompartmentID, 0, ctx), 0, 0, ctx);
+    std::shared_ptr<HAKCCompartmentDivision> Division =
+        std::make_shared<HAKCCompartmentDivision>(
+            HAKCCompartment(CompartmentID, 0, ctx), 0, 0, ctx);
     GV_to_divs[GV] = Division;
     GV_to_div_incr++;
   }
@@ -25,10 +32,12 @@ HAKCCompartmentDivision &HAKCCompartmentalizationPolicyDAG::GetDivision(GlobalVa
   return *GV_to_divs[GV];
 }
 
-
-HAKCCompartmentDivision & HAKCCompartmentalizationPolicyDAG::GetDefaultDivision() {
+HAKCCompartmentDivision &
+HAKCCompartmentalizationPolicyDAG::GetDefaultDivision() {
   LLVMContext &ctx = SystemInformation.GetModule().getContext();
-  std::shared_ptr<HAKCCompartmentDivision> Division = std::make_shared<HAKCCompartmentDivision>(HAKCCompartment(0, 0, ctx), 0, 0, ctx);
+  std::shared_ptr<HAKCCompartmentDivision> Division =
+      std::make_shared<HAKCCompartmentDivision>(HAKCCompartment(0, 0, ctx), 0,
+                                                0, ctx);
   return *Division;
 }
 
@@ -164,7 +173,8 @@ HAKCCompartmentalizationPolicy::HAKCCompartmentalizationPolicy(
     : SystemInformation(SystemInformation), Compartments(), Divisions(),
       Client(SystemInformation.GetDatabaseInformation(),
              SystemInformation.GetDebugDatabase()) {
-  // do not want to connect to database for temporal analysis (database is not needed)
+  // do not want to connect to database for temporal analysis (database is not
+  // needed)
   if (!SystemInformation.GetTemporalAnalysisEnabled()) {
     ConnectToDatabase();
   }
@@ -258,8 +268,7 @@ HAKCCompartmentalizationPolicy::GetDivision(GlobalValue *GV) {
   return *Division;
 }
 
-HAKCCompartmentDivision &
-HAKCCompartmentalizationPolicy::GetDefaultDivision() {
+HAKCCompartmentDivision &HAKCCompartmentalizationPolicy::GetDefaultDivision() {
   return *GetDivision(0, 0);
 }
 

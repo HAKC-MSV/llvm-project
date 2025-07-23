@@ -38,7 +38,8 @@ public:
 
   // explicit CommonHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM,
   //                             StringRef ConfigPath, HAKCWriter &HAKC_Writer);
-  explicit CommonHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM, StringRef ConfigPath);
+  explicit CommonHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM,
+                              StringRef ConfigPath);
 
   HAKCSystemInformation &GetSystemInfo();
 

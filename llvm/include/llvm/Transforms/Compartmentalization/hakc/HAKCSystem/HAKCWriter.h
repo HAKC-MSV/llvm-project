@@ -35,7 +35,6 @@ public:
 protected:
   raw_ostream &os;
   static raw_fd_ostream *fd_os;
-  // static std::error_code EC;
   static HAKCLogLevel ConfiguredLogLevel;
   static HAKCLogLevel TempLogLevel;
   static std::string log_path;

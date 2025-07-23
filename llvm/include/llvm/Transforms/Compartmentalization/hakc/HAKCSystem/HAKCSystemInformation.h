@@ -28,10 +28,8 @@ typedef SmallVector<std::string, 16> HAKCStringList;
 typedef SmallVector<HAKCCustomAllocation> HAKCCustomAllocationList;
 typedef SmallVector<hakc::arg_def_t> HAKCArgumentsList;
 typedef SmallVector<hakc::transfer_action_def_t> HAKCTransferActionList;
-typedef SmallVector<hakc::pre_transfer_action_def_t>
-    HAKCPreTransferActionList;
-typedef SmallVector<hakc::post_target_action_def_t>
-    HAKCPostTargetActionList;
+typedef SmallVector<hakc::pre_transfer_action_def_t> HAKCPreTransferActionList;
+typedef SmallVector<hakc::post_target_action_def_t> HAKCPostTargetActionList;
 
 namespace llvm::hakc {
 class CommonHAKCAnalysis;
@@ -168,7 +166,6 @@ protected:
   HAKCPreTransferActionList PreTransferActionList;
   HAKCPostTargetActionList PostTargetActionList;
   HAKCStructList StructList;
-
 
   void
   GetAllDefinedHAKCFunctions(SmallVectorImpl<hakc::function_def_t> &Results);

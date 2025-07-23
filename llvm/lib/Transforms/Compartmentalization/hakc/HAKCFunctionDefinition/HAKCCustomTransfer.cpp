@@ -46,14 +46,14 @@ Instruction *hakc::HAKCCustomTransfer::CreateTransfer(
 
 Instruction *hakc::HAKCCustomTransfer::CreateTransfer(
     IRBuilder<> &HAKCIRBuilder, HAKCCompartmentDivision &CompartmentDivision,
-    hakc::HAKCPointerBase &HAKCPointer, Value *Size, bool IsData) {
+    HAKCPointerBase &HAKCPointer, Value *Size, bool IsData) {
   return CreateTransfer(HAKCIRBuilder, CompartmentDivision,
                         HAKCPointer.GetBaseDefinition(), Size, IsData);
 }
 
 Instruction *hakc::HAKCCustomTransfer::CreateTransferWithCasts(
     IRBuilder<> &HAKCIRBuilder, HAKCCompartmentDivision &CompartmentDivision,
-    hakc::HAKCPointerBase &HAKCPointer, Value *Size, HAKCTypeP srcTy,
+    HAKCPointerBase &HAKCPointer, Value *Size, HAKCTypeP srcTy,
     HAKCTypeP dstTy, bool IsData) {
   auto *BitcastArgForTransferCall = HAKCIRBuilder.CreateBitCast(
       HAKCPointer.GetBaseDefinition(), dstTy->GetLLVMType());

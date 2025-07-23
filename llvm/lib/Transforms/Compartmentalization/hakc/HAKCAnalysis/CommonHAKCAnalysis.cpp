@@ -11,10 +11,10 @@
 namespace llvm::hakc {
 std::error_code EC;
 HAKCWriter HAKC_Writer;
-std::string HAKCWriter::log_path=""; // to be overwritten when pass is called
+std::string HAKCWriter::log_path = ""; // to be overwritten when pass is called
 raw_fd_ostream *HAKCWriter::fd_os = nullptr;
-HAKCLogLevel HAKCWriter::ConfiguredLogLevel=Debug;
-HAKCLogLevel HAKCWriter::TempLogLevel=Debug;
+HAKCLogLevel HAKCWriter::ConfiguredLogLevel = Debug;
+HAKCLogLevel HAKCWriter::TempLogLevel = Debug;
 
 bool CommonHAKCAnalysis::IsNoTransferFunction(Function *F) {
   return IsFunctionInFunctionList(F, SystemInfo.NoTransferFunctions());
@@ -96,14 +96,15 @@ void CommonHAKCAnalysis::InitConfig(StringRef ConfigPath) {
   HAKCWriter::SetConfiguredLogLevel(SystemInfo.GetLogLevel());
 }
 
-CommonHAKCAnalysis::CommonHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM, StringRef ConfigPath)
+CommonHAKCAnalysis::CommonHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM,
+                                       StringRef ConfigPath)
     : M(M), MAM(MAM), SystemInfo(*this) {
   InitConfig(ConfigPath);
 }
 
 Module &CommonHAKCAnalysis::GetModule() const { return M; }
 
-ModuleAnalysisManager &CommonHAKCAnalysis::GetMAM() const {return MAM;}
+ModuleAnalysisManager &CommonHAKCAnalysis::GetMAM() const { return MAM; }
 
 bool CommonHAKCAnalysis::IsHAKCTransferFunction(Function *F) {
   return IsFunctionInHAKCTransferFunctionList(
@@ -125,11 +126,9 @@ bool CommonHAKCAnalysis::IsHAKCCompartmentalizationSupportFunction(
       F, SystemInfo.CompartmentalizationSupportFunctions());
 }
 
-HAKCWriter &CommonHAKCAnalysis::getWriter() {
-  return getWriter(Debug);
-}
+HAKCWriter &CommonHAKCAnalysis::getWriter() { return getWriter(Debug); }
 
-HAKCWriter &CommonHAKCAnalysis::getWriter(HAKCLogLevel log_level){
+HAKCWriter &CommonHAKCAnalysis::getWriter(HAKCLogLevel log_level) {
   HAKCWriter::SetTempLogLevel(log_level);
   return HAKC_Writer;
 }
@@ -162,9 +161,8 @@ bool CommonHAKCAnalysis::IsCallInIntrinsicSet(
               IntrinsicsSet.end());
     auto OutputDebug = SystemInfo.OutputDebugInfo(Call->getFunction());
     if (OutputDebug) {
-      getWriter()
-          << "Intrinsic (" << intrinsic->getIntrinsicID() << ") from "
-          << Call->getFunction()->getName() << " " << intrinsic;
+      getWriter() << "Intrinsic (" << intrinsic->getIntrinsicID() << ") from "
+                  << Call->getFunction()->getName() << " " << intrinsic;
       if (result) {
         getWriter() << " is in { ";
       } else {
@@ -183,8 +181,7 @@ bool CommonHAKCAnalysis::IsConstantUsedInGlobal(Value *V) {
   bool Result = false;
   if (auto *Const = dyn_cast<Constant>(V)) {
     auto Search = [](User *U) {
-      return isa<GlobalVariable>(U) ||
-             IsConstantUsedInGlobal(U);
+      return isa<GlobalVariable>(U) || IsConstantUsedInGlobal(U);
     };
 
     Result = llvm::any_of(Const->users(), Search);
@@ -237,9 +234,8 @@ void CommonHAKCAnalysis::findDefChain(Value *v, bool followLoad,
 
     if (DefchainCache.contains(curr)) {
       auto CachedChain = DefchainCache[curr];
-      getWriter(Verbose)
-          << "Adding cached chain for " << curr << " containing "
-          << CachedChain.size() << " links\n";
+      getWriter(Verbose) << "Adding cached chain for " << curr << " containing "
+                         << CachedChain.size() << " links\n";
       for (auto *Link : CachedChain) {
         getWriter(Verbose) << "\t" << Link << "\n";
         Results.push_back(Link);
@@ -248,8 +244,8 @@ void CommonHAKCAnalysis::findDefChain(Value *v, bool followLoad,
     }
 
     if (auto *gep = dyn_cast<GetElementPtrInst>(curr)) {
-      getWriter()
-          << "Adding GEP Operator pointer " << gep->getPointerOperand() << "\n";
+      getWriter() << "Adding GEP Operator pointer " << gep->getPointerOperand()
+                  << "\n";
       working_list.push_back(gep->getPointerOperand());
     } else if (auto *BitCastI = dyn_cast<BitCastInst>(curr)) {
       working_list.push_back(BitCastI->getOperand(0));
@@ -257,21 +253,18 @@ void CommonHAKCAnalysis::findDefChain(Value *v, bool followLoad,
       if (call->getCalledFunction() &&
           IsHAKCTransferFunction(call->getCalledFunction())) {
         auto TransferDef = GetHAKCTransferDefinition(call->getCalledFunction());
-        getWriter()
-            << "Adding Arg " << TransferDef->GetSignedPtrIdx()
-            << " of HAKC Transfer " << call << "\n";
+        getWriter() << "Adding Arg " << TransferDef->GetSignedPtrIdx()
+                    << " of HAKC Transfer " << call << "\n";
         working_list.push_back(call->getArgOperand(
             TransferDef->GetSignedPtrIdx()->getZExtValue()));
       } else if (call->getCalledFunction() &&
                  call->getCalledFunction()->isIntrinsic()) {
-        getWriter()
-            << "Call is intrinsic: " << call->getCalledFunction()->getName()
-            << "\n";
+        getWriter() << "Call is intrinsic: "
+                    << call->getCalledFunction()->getName() << "\n";
 
         auto BitshiftIntrinsics = GetBitshiftIntrinsics();
         if (IsCallInIntrinsicSet(call, BitshiftIntrinsics)) {
-          getWriter()
-              << "Adding argument 0 of " << call << "\n";
+          getWriter() << "Adding argument 0 of " << call << "\n";
           working_list.push_back(call->getArgOperand(0));
         }
       }
@@ -293,9 +286,8 @@ void CommonHAKCAnalysis::findDefChain(Value *v, bool followLoad,
     } else if (auto *binOp = dyn_cast<BinaryOperator>(curr)) {
       auto PointerBinOps = GetPointerManipulatingBinaryOps();
       if (PointerBinOps.find(binOp->getOpcode()) == PointerBinOps.end()) {
-        getWriter()
-            << "BinaryOperator " << binOp
-            << " is not a pointer manipulating binary operation\n";
+        getWriter() << "BinaryOperator " << binOp
+                    << " is not a pointer manipulating binary operation\n";
         goto add_to_chain;
       }
 
@@ -305,21 +297,19 @@ void CommonHAKCAnalysis::findDefChain(Value *v, bool followLoad,
       auto *LHSDef = getDef(binOp->getOperand(0), false);
       auto *RHSDef = getDef(binOp->getOperand(1), false);
       if (!isa<Constant>(LHSDef) && ValueIsUsedAsPointer(LHSDef)) {
-        getWriter()
-            << "Adding LHS Binary Operand " << binOp->getOperand(0) << "\n";
+        getWriter() << "Adding LHS Binary Operand " << binOp->getOperand(0)
+                    << "\n";
         working_list.push_back(binOp->getOperand(0));
       } else if (!isa<Constant>(RHSDef) && ValueIsUsedAsPointer(RHSDef)) {
-        getWriter()
-            << "Adding RHS Binary Operand " << binOp->getOperand(1) << "\n";
+        getWriter() << "Adding RHS Binary Operand " << binOp->getOperand(1)
+                    << "\n";
         working_list.push_back(binOp->getOperand(1));
       } else if (!isa<Constant>(LHSDef) && !isa<Constant>(RHSDef)) {
-        getWriter()
-            << "Neither LHS nor RHS of " << binOp << " are constants\n";
+        getWriter() << "Neither LHS nor RHS of " << binOp << " are constants\n";
         /* We stop here */
         goto add_to_chain;
       } else if (isa<Constant>(LHSDef) && isa<Constant>(RHSDef)) {
-        getWriter()
-            << "Both LHS and RHS of " << binOp << " are constants\n";
+        getWriter() << "Both LHS and RHS of " << binOp << " are constants\n";
         /* We stop here */
         goto add_to_chain;
       }
@@ -328,9 +318,8 @@ void CommonHAKCAnalysis::findDefChain(Value *v, bool followLoad,
     Results.push_back(curr);
   }
 
-  getWriter()
-      << "Returning Def Chain of length " << Results.size() << " for " << v
-      << "\n";
+  getWriter() << "Returning Def Chain of length " << Results.size() << " for "
+              << v << "\n";
   DefchainCache[v].append(Results);
 }
 
@@ -398,8 +387,8 @@ bool CommonHAKCAnalysis::valueHasAttribute(Value *V, Attribute::AttrKind Kind) {
   bool result = false;
   auto attrName = Attribute::getNameFromAttrKind(Kind);
   if (attrName.empty()) {
-    getWriter(Fatal)
-        << "Invalid AttrKind name for value " << std::to_string(Kind) << "\n";
+    getWriter(Fatal) << "Invalid AttrKind name for value "
+                     << std::to_string(Kind) << "\n";
     throw std::exception();
   }
 
@@ -506,11 +495,10 @@ bool CommonHAKCAnalysis::IsCapabilityReassignmentFunc(Function *F) {
 }
 
 void CommonHAKCAnalysis::VerifyFunction(Function *F) {
-  if (llvm::verifyFunction(*F,
-                           &getWriter().ostream())) {
+  if (llvm::verifyFunction(*F, &getWriter().ostream())) {
     getWriter(Fatal) << "Verification failed for function\n"
-                                        << F->getName() << "\n"
-                                        << F->getParent() << "\n";
+                     << F->getName() << "\n"
+                     << F->getParent() << "\n";
     throw std::exception();
   }
 }
@@ -709,7 +697,8 @@ void CommonHAKCAnalysis::GetModuleFullPath(Module &M,
 
   auto err = sys::fs::real_path(SourceFileName, Result, true);
   if (err) {
-    getWriter(Fatal) << "Could not get real path to " << M.getSourceFileName() << "\n";
+    getWriter(Fatal) << "Could not get real path to " << M.getSourceFileName()
+                     << "\n";
     throw std::exception();
   }
 }
@@ -726,16 +715,14 @@ bool CommonHAKCAnalysis::ValueIsUsedAsPointer(Value *V) {
      * integer */
     for (auto &U : V->uses()) {
       if (auto *IToPtrI = dyn_cast<IntToPtrInst>(U.getUser())) {
-        getWriter(
-            GetSystemInfo().OutputDebugInfo(IToPtrI->getFunction()))
+        getWriter(GetSystemInfo().OutputDebugInfo(IToPtrI->getFunction()))
             << "User of " << *V << " is an inttoptr: " << *U.getUser() << "\n";
         CallIsUsedAsPointer = true;
       } else if (auto *BinOp = dyn_cast<BinaryOperator>(U.getUser())) {
         if (BinOp->getOpcode() == BinaryOperator::Add) {
           unsigned OpNum = (U.getOperandNo() + 1) % 2;
           auto *OtherOp = U.getUser()->getOperand(OpNum);
-          getWriter(
-              GetSystemInfo().OutputDebugInfo(BinOp->getFunction()))
+          getWriter(GetSystemInfo().OutputDebugInfo(BinOp->getFunction()))
               << "Checking operator " << OpNum << " of " << *BinOp << ": "
               << *OtherOp << "\n";
           if (OtherOp->getType()->isPointerTy()) {

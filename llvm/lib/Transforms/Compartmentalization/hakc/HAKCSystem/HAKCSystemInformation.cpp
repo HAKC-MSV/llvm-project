@@ -54,17 +54,17 @@ void HAKCDatabaseInformation::operator<<(
 
 HAKCSystemInformation::HAKCSystemInformation(CommonHAKCAnalysis &CommonAnalysis)
     : CommonAnalysis(CommonAnalysis), TypeIdentifier(CommonAnalysis),
-      DatabaseInformation(), LogLevel(Verbose), DebugDatabase(), PassMode(InvalidPassModeType),
-      Arch(), Platform(), DagAnalysisRootPath(), IncludePathsList(),
-      NoTransferFunctionList(), CompartmentTransferFunctionList(),
-      CodeValidationFunction(nullptr), DataValidationFunction(nullptr),
-      SignWithDivisionFunction(nullptr), DefaultCompartmentTransfer(nullptr),
-      PerCPUCompartmentTransfer(nullptr),
+      DatabaseInformation(), LogLevel(Verbose), DebugDatabase(),
+      PassMode(InvalidPassModeType), Arch(), Platform(), DagAnalysisRootPath(),
+      IncludePathsList(), NoTransferFunctionList(),
+      CompartmentTransferFunctionList(), CodeValidationFunction(nullptr),
+      DataValidationFunction(nullptr), SignWithDivisionFunction(nullptr),
+      DefaultCompartmentTransfer(nullptr), PerCPUCompartmentTransfer(nullptr),
       CompartmentalizationSupportFunctionList(), SymbolsToOutputDebugInfo(),
       SeparateNamespacePathList(), HAKCSourcePathList(),
       SafeTransitionFunctionList(), IgnoredGlobalList(),
       AllocationFunctionList(), CustomTransferList(), PreTransferActionList(),
-      PostTargetActionList(), StructList(){}
+      PostTargetActionList(), StructList() {}
 
 hakc::function_def_t HAKCSystemInformation::CreateHAKCFunction(
     HAKCYAMLFunctionDefinition &YAMLFunctionDef,
@@ -138,18 +138,18 @@ void HAKCSystemInformation::operator<<(HAKCYamlConfig &YamlConfig) {
   DatabaseInformation << YamlConfig.DatabaseConfig;
   if (PassMode == RunDataAccessGraphAnalysisSingleSourceFile) {
     SingleSourceFile = YamlConfig.SingleSourceFile;
-    if(GetModule().getSourceFileName() != SingleSourceFile){
-      errs () << "Source file " << GetModule().getSourceFileName() << " is not the target source file: " << SingleSourceFile;
+    if (GetModule().getSourceFileName() != SingleSourceFile) {
+      errs() << "Source file " << GetModule().getSourceFileName()
+             << " is not the target source file: " << SingleSourceFile;
       return;
     }
   }
 
   // ProcessDebugInfo must happen before creating custom transfers
   // dag analysis actually happens here!
-  if (PassMode == RunDataAccessGraphAnalysis){
+  if (PassMode == RunDataAccessGraphAnalysis) {
     TypeIdentifier.ProcessDebugInfo();
-  }
-  else {
+  } else {
     TypeIdentifier.ProcessDebugInfo();
   }
 
@@ -331,8 +331,7 @@ HAKCTypeIdentifier &HAKCSystemInformation::GetTypeIdentifier() {
   return TypeIdentifier;
 }
 
-function_def_t
-HAKCSystemInformation::CompartmentTransfer(bool PerCPU) const {
+function_def_t HAKCSystemInformation::CompartmentTransfer(bool PerCPU) const {
   if (PerCPU) {
     return PerCPUCompartmentTransfer;
   } else {
@@ -340,7 +339,8 @@ HAKCSystemInformation::CompartmentTransfer(bool PerCPU) const {
   }
 }
 
-HAKCLogLevel HAKCSystemInformation::OutputDebugInfo(StringRef SymbolName) const {
+HAKCLogLevel
+HAKCSystemInformation::OutputDebugInfo(StringRef SymbolName) const {
   auto Search = [SymbolName](const GlobalValue *Symbol) {
     return Symbol->getName() == SymbolName;
   };

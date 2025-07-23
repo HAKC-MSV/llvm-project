@@ -70,7 +70,7 @@ protected:
   bool CheckConnection() const;
 };
 
-class HAKCCompartmentalizationPolicy{
+class HAKCCompartmentalizationPolicy {
 public:
   explicit HAKCCompartmentalizationPolicy(
       HAKCSystemInformation &SystemInformation);
@@ -112,9 +112,11 @@ protected:
                                      bool CheckForExisting);
 };
 
-class HAKCCompartmentalizationPolicyDAG : public HAKCCompartmentalizationPolicy {
+class HAKCCompartmentalizationPolicyDAG
+    : public HAKCCompartmentalizationPolicy {
 public:
-  explicit HAKCCompartmentalizationPolicyDAG(HAKCSystemInformation &SystemInformation);
+  explicit HAKCCompartmentalizationPolicyDAG(
+      HAKCSystemInformation &SystemInformation);
 
   HAKCCompartmentDivision &GetDivision(GlobalValue *GV) override;
   HAKCCompartmentDivision &GetDefaultDivision() override;

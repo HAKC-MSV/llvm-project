@@ -68,7 +68,6 @@ static bool runDataAccessGraphAnalysis(CommonHAKCAnalysis &HAKCAnalysis) {
   sys::path::replace_extension(Path, ".dag.yml");
   sys::path::make_preferred(Path);
 
-
   StringRef CurrentSourceName(M.getSourceFileName());
   for (auto &path : HAKCAnalysis.GetSystemInfo().HAKCSourcePaths()) {
     if (CurrentSourceName.contains(path)) {
@@ -81,8 +80,7 @@ static bool runDataAccessGraphAnalysis(CommonHAKCAnalysis &HAKCAnalysis) {
   for (auto &path : HAKCAnalysis.GetSystemInfo().SeparateNamespacePaths()) {
     if (CurrentSourceName.contains(path)) {
       CommonHAKCAnalysis::getWriter(Error)
-          << "Skipping separate namespace source " << CurrentSourceName <<
-          "\n";
+          << "Skipping separate namespace source " << CurrentSourceName << "\n";
       return false;
     }
   }
@@ -122,8 +120,11 @@ static bool RunHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM) {
   case RunDataAccessGraphAnalysis:
     return runDataAccessGraphAnalysis(HAKCAnalysis);
   case RunDataAccessGraphAnalysisSingleSourceFile:
-    if(M.getSourceFileName() != HAKCAnalysis.GetSystemInfo().GetSingleSourceFile()) {
-      errs () << "Source file " << M.getSourceFileName() << " is not the target source file: " << HAKCAnalysis.GetSystemInfo().GetSingleSourceFile();
+    if (M.getSourceFileName() !=
+        HAKCAnalysis.GetSystemInfo().GetSingleSourceFile()) {
+      errs() << "Source file " << M.getSourceFileName()
+             << " is not the target source file: "
+             << HAKCAnalysis.GetSystemInfo().GetSingleSourceFile();
       return false;
     }
     errs() << "Analyzing target source file: " << M.getSourceFileName() << "\n";

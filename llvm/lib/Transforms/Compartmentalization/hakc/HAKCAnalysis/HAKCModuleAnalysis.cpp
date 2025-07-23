@@ -143,8 +143,7 @@ bool HAKCModuleAnalysis::useEscapes(Use &U) {
   std::set<Value *> examined;
   bool escapes = _useEscapes(U, examined);
 
-  CommonHAKCAnalysis::getWriter()
-      << "Use " << U.get() << " in " << U.getUser();
+  CommonHAKCAnalysis::getWriter() << "Use " << U.get() << " in " << U.getUser();
   if (escapes) {
     CommonHAKCAnalysis::getWriter() << " escapes\n";
   } else {
@@ -288,20 +287,15 @@ void HAKCModuleAnalysis::TemporalAnalysis() {
   // FunctionTemporalAnalysis
   CommonHAKCAnalysis::getWriter(Error)
       << "!!!! Starting Module Temporal Analysis !!!!\n";
-  // create managed pointers (essentially what is being done at the beginning of the compartmentalization code)
+  // create managed pointers (essentially what is being done at the beginning of
+  // the compartmentalization code)
   HAKCCompartmentalizationPolicyDAG Policy(GetCommonAnalysis().GetSystemInfo());
   HAKCTransformer Transformer((*this), Policy);
   for (auto *F : AnalysisFunctions) {
-    // TODO: may need to run all analysis for all functions, then do the temporal analysis
+    // temporal analysis
     HAKCFunctionAnalysis FunctionAnalysis(F, (*this), Transformer, Policy);
     FunctionAnalysis.TemporalAnalysis();
-    // FunctionAnalysis.InstrumentCode();
   }
-
-
-  // for (auto *DISubProg : TypeIdentifier.GetDbgInfoFinder().subprograms()) {
-  //   FunctionTemporalAnalysis(DISubProg);
-  // }
   CommonHAKCAnalysis::getWriter(Error)
       << "!!!! Finished Module Temporal Analysis !!!!\n";
 }
