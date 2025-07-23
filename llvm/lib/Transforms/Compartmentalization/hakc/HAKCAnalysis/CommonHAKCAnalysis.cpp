@@ -74,10 +74,10 @@ bool CommonHAKCAnalysis::FunctionIsAnalysisCandidate(Function *F) {
 
 void CommonHAKCAnalysis::InitConfig(StringRef ConfigPath) {
   if (!sys::fs::exists(ConfigPath)) {
-    getWriter(HAKCLogLevel::Error) << "Could not find YAML file " << ConfigPath << "\n";
+    getWriter(Fatal) << "Could not find YAML file " << ConfigPath << "\n";
     throw std::exception();
   } else if (!sys::fs::is_regular_file(ConfigPath)) {
-    getWriter(HAKCLogLevel::Error) << ConfigPath << " is not a regular file\n";
+    getWriter(Fatal) << ConfigPath << " is not a regular file\n";
     throw std::exception();
   }
 
@@ -88,7 +88,7 @@ void CommonHAKCAnalysis::InitConfig(StringRef ConfigPath) {
   // yaml parsed here
   yin >> SystemConfig;
   if (yin.error()) {
-    getWriter(HAKCLogLevel::Error) << "Error parsing config file " << ConfigPath << "\n";
+    getWriter(Fatal) << "Error parsing config file " << ConfigPath << "\n";
     throw std::exception();
   }
 
@@ -219,7 +219,7 @@ function_def_t CommonHAKCAnalysis::GetHAKCTransferDefinition(Function *F) {
 void CommonHAKCAnalysis::findDefChain(Value *v, bool followLoad,
                                       SmallVectorImpl<Value *> &Results) {
   if (v == nullptr) {
-    getWriter(HAKCLogLevel::Error) << "v is null\n";
+    getWriter(Fatal) << "v is null\n";
     throw std::exception();
   }
   if (DefchainCache.contains(v)) {
@@ -228,7 +228,7 @@ void CommonHAKCAnalysis::findDefChain(Value *v, bool followLoad,
     return;
   }
 
-  getWriter(Debug) << "Getting Def Chain for " << v << "\n";
+  getWriter() << "Getting Def Chain for " << v << "\n";
 
   SmallVector<Value *> working_list = {v};
   while (!working_list.empty()) {
@@ -237,18 +237,18 @@ void CommonHAKCAnalysis::findDefChain(Value *v, bool followLoad,
 
     if (DefchainCache.contains(curr)) {
       auto CachedChain = DefchainCache[curr];
-      getWriter(Debug)
+      getWriter(Verbose)
           << "Adding cached chain for " << curr << " containing "
           << CachedChain.size() << " links\n";
       for (auto *Link : CachedChain) {
-        getWriter(Debug) << "\t" << Link << "\n";
+        getWriter(Verbose) << "\t" << Link << "\n";
         Results.push_back(Link);
       }
       continue;
     }
 
     if (auto *gep = dyn_cast<GetElementPtrInst>(curr)) {
-      getWriter(Debug)
+      getWriter()
           << "Adding GEP Operator pointer " << gep->getPointerOperand() << "\n";
       working_list.push_back(gep->getPointerOperand());
     } else if (auto *BitCastI = dyn_cast<BitCastInst>(curr)) {
@@ -257,20 +257,20 @@ void CommonHAKCAnalysis::findDefChain(Value *v, bool followLoad,
       if (call->getCalledFunction() &&
           IsHAKCTransferFunction(call->getCalledFunction())) {
         auto TransferDef = GetHAKCTransferDefinition(call->getCalledFunction());
-        getWriter(Debug)
+        getWriter()
             << "Adding Arg " << TransferDef->GetSignedPtrIdx()
             << " of HAKC Transfer " << call << "\n";
         working_list.push_back(call->getArgOperand(
             TransferDef->GetSignedPtrIdx()->getZExtValue()));
       } else if (call->getCalledFunction() &&
                  call->getCalledFunction()->isIntrinsic()) {
-        getWriter(Debug)
+        getWriter()
             << "Call is intrinsic: " << call->getCalledFunction()->getName()
             << "\n";
 
         auto BitshiftIntrinsics = GetBitshiftIntrinsics();
         if (IsCallInIntrinsicSet(call, BitshiftIntrinsics)) {
-          getWriter(Debug)
+          getWriter()
               << "Adding argument 0 of " << call << "\n";
           working_list.push_back(call->getArgOperand(0));
         }
@@ -293,7 +293,7 @@ void CommonHAKCAnalysis::findDefChain(Value *v, bool followLoad,
     } else if (auto *binOp = dyn_cast<BinaryOperator>(curr)) {
       auto PointerBinOps = GetPointerManipulatingBinaryOps();
       if (PointerBinOps.find(binOp->getOpcode()) == PointerBinOps.end()) {
-        getWriter(Debug)
+        getWriter()
             << "BinaryOperator " << binOp
             << " is not a pointer manipulating binary operation\n";
         goto add_to_chain;
@@ -305,20 +305,20 @@ void CommonHAKCAnalysis::findDefChain(Value *v, bool followLoad,
       auto *LHSDef = getDef(binOp->getOperand(0), false);
       auto *RHSDef = getDef(binOp->getOperand(1), false);
       if (!isa<Constant>(LHSDef) && ValueIsUsedAsPointer(LHSDef)) {
-        getWriter(Debug)
+        getWriter()
             << "Adding LHS Binary Operand " << binOp->getOperand(0) << "\n";
         working_list.push_back(binOp->getOperand(0));
       } else if (!isa<Constant>(RHSDef) && ValueIsUsedAsPointer(RHSDef)) {
-        getWriter(Debug)
+        getWriter()
             << "Adding RHS Binary Operand " << binOp->getOperand(1) << "\n";
         working_list.push_back(binOp->getOperand(1));
       } else if (!isa<Constant>(LHSDef) && !isa<Constant>(RHSDef)) {
-        getWriter(Debug)
+        getWriter()
             << "Neither LHS nor RHS of " << binOp << " are constants\n";
         /* We stop here */
         goto add_to_chain;
       } else if (isa<Constant>(LHSDef) && isa<Constant>(RHSDef)) {
-        getWriter(Debug)
+        getWriter()
             << "Both LHS and RHS of " << binOp << " are constants\n";
         /* We stop here */
         goto add_to_chain;
@@ -328,7 +328,7 @@ void CommonHAKCAnalysis::findDefChain(Value *v, bool followLoad,
     Results.push_back(curr);
   }
 
-  getWriter(Debug)
+  getWriter()
       << "Returning Def Chain of length " << Results.size() << " for " << v
       << "\n";
   DefchainCache[v].append(Results);
@@ -343,7 +343,7 @@ Value *CommonHAKCAnalysis::getDef(Value *V, bool followLoad) {
   SmallVector<Value *> Chain;
   findDefChain(V, followLoad, Chain);
   if (Chain.empty()) {
-    getWriter(HAKCLogLevel::Error) << "Def Chain for " << V << " is empty!\n";
+    getWriter(Fatal) << "Def Chain for " << V << " is empty!\n";
     throw std::exception();
   }
   return Chain.back();
@@ -398,7 +398,7 @@ bool CommonHAKCAnalysis::valueHasAttribute(Value *V, Attribute::AttrKind Kind) {
   bool result = false;
   auto attrName = Attribute::getNameFromAttrKind(Kind);
   if (attrName.empty()) {
-    getWriter(HAKCLogLevel::Error)
+    getWriter(Fatal)
         << "Invalid AttrKind name for value " << std::to_string(Kind) << "\n";
     throw std::exception();
   }
@@ -508,7 +508,7 @@ bool CommonHAKCAnalysis::IsCapabilityReassignmentFunc(Function *F) {
 void CommonHAKCAnalysis::VerifyFunction(Function *F) {
   if (llvm::verifyFunction(*F,
                            &getWriter().ostream())) {
-    getWriter(HAKCLogLevel::Error) << "Verification failed for function\n"
+    getWriter(Fatal) << "Verification failed for function\n"
                                         << F->getName() << "\n"
                                         << F->getParent() << "\n";
     throw std::exception();
@@ -709,7 +709,7 @@ void CommonHAKCAnalysis::GetModuleFullPath(Module &M,
 
   auto err = sys::fs::real_path(SourceFileName, Result, true);
   if (err) {
-    getWriter(HAKCLogLevel::Error) << "Could not get real path to " << M.getSourceFileName() << "\n";
+    getWriter(Fatal) << "Could not get real path to " << M.getSourceFileName() << "\n";
     throw std::exception();
   }
 }

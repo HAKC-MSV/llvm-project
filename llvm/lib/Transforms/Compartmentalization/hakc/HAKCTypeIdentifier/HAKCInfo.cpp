@@ -10,7 +10,7 @@ HAKCInfo::HAKCInfo(CommonHAKCAnalysis &Analysis, StringRef Name,
                    bool DebugActive)
     : Analysis(Analysis), DebugActive(DebugActive), Name(Name.str()) {
   if (Name.empty()) {
-    CommonHAKCAnalysis::getWriter() << "Name is empty!\n";
+    CommonHAKCAnalysis::getWriter(Fatal) << "Name is empty!\n";
     throw std::exception();
   }
 }

@@ -90,7 +90,7 @@ static bool runDataAccessGraphAnalysis(CommonHAKCAnalysis &HAKCAnalysis) {
   std::error_code err;
   err = sys::fs::create_directories(sys::path::parent_path(Path));
   if (err) {
-    CommonHAKCAnalysis::getWriter(Error)
+    CommonHAKCAnalysis::getWriter(Fatal)
         << "Failed to create " << sys::path::parent_path(Path) << "\n";
     throw std::exception();
   }
@@ -101,7 +101,7 @@ static bool runDataAccessGraphAnalysis(CommonHAKCAnalysis &HAKCAnalysis) {
     ModuleAnalysis.OutputYAML(out);
     out.close();
   } else {
-    CommonHAKCAnalysis::getWriter(Error) << "Failed to open " << Path << "\n";
+    CommonHAKCAnalysis::getWriter(Fatal) << "Failed to open " << Path << "\n";
     throw std::exception();
   }
   return false;
@@ -112,13 +112,11 @@ static bool RunHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM) {
   HAKCWriter::CreateLog();
 
   if (HAKC_CONFIG_PATH.empty()) {
-    CommonHAKCAnalysis::getWriter(Error) << "no hakc-config pass specified\n";
+    CommonHAKCAnalysis::getWriter(Fatal) << "no hakc-config pass specified\n";
     throw std::exception();
   }
 
   CommonHAKCAnalysis HAKCAnalysis(M, MAM, HAKC_CONFIG_PATH);
-
-  CommonHAKCAnalysis::getWriter() << "abc\n";
 
   switch (HAKCAnalysis.GetSystemInfo().GetPassMode()) {
   case RunDataAccessGraphAnalysis:
@@ -135,7 +133,7 @@ static bool RunHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM) {
   case RunConfigAndExit:
     return false;
   default:
-    CommonHAKCAnalysis::getWriter(Error) << "Invalid HAKC pass mode\n";
+    CommonHAKCAnalysis::getWriter(Fatal) << "Invalid HAKC pass mode\n";
     throw std::exception();
   }
 }

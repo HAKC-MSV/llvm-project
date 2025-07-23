@@ -71,7 +71,7 @@ hakc::function_def_t HAKCSystemInformation::CreateHAKCFunction(
     const HAKCTypeIdentifier &TypeIdentifier) const {
   auto *TransferFunc = YAMLFunctionDef.GetFunction(TypeIdentifier);
   if (!TransferFunc) {
-    CommonHAKCAnalysis::getWriter(Error)
+    CommonHAKCAnalysis::getWriter(Fatal)
         << "Could not find function " << YAMLFunctionDef.SymbolName << "\n";
     throw std::exception();
   } else {
@@ -89,7 +89,7 @@ hakc::custom_transfer_def_t HAKCSystemInformation::CreateCustomTransferFunction(
     const HAKCTypeIdentifier &TypeIdentifier) {
   auto *TransferFunc = YAMLCustomTransfer.GetFunction(TypeIdentifier);
   if (!TransferFunc) {
-    CommonHAKCAnalysis::getWriter(Error)
+    CommonHAKCAnalysis::getWriter(Fatal)
         << "Could not find function " << YAMLCustomTransfer.SymbolName << "\n";
     throw std::exception();
   }
@@ -105,7 +105,7 @@ void HAKCSystemInformation::PopulateHAKCFunctionArgs(
   for (auto &YAMLArg : YAMLFunctionDef.Arguments) {
     auto *ArgTy = YAMLArg.GetType(TypeIdentifier);
     if (!ArgTy) {
-      CommonHAKCAnalysis::getWriter(Error)
+      CommonHAKCAnalysis::getWriter(Fatal)
           << "Could not determine type for argument " << YAMLArg.Idx
           << " in definition for " << YAMLFunctionDef.SymbolName << "\n";
       throw std::exception();
@@ -172,7 +172,7 @@ void HAKCSystemInformation::operator<<(HAKCYamlConfig &YamlConfig) {
   CodeValidationFunction =
       CreateHAKCFunction(YamlConfig.CodeValidationFunction, TypeIdentifier);
   if (!CodeValidationFunction) {
-    CommonHAKCAnalysis::getWriter(Error)
+    CommonHAKCAnalysis::getWriter(Fatal)
         << "Could not get CodeValidationFunction "
         << YamlConfig.CodeValidationFunction.SymbolName << "\n";
     throw std::exception();
@@ -180,7 +180,7 @@ void HAKCSystemInformation::operator<<(HAKCYamlConfig &YamlConfig) {
   DataValidationFunction =
       CreateHAKCFunction(YamlConfig.DataValidationFunction, TypeIdentifier);
   if (!DataValidationFunction) {
-    CommonHAKCAnalysis::getWriter(Error)
+    CommonHAKCAnalysis::getWriter(Fatal)
         << "Could not get DataValidationFunction "
         << YamlConfig.DataValidationFunction.SymbolName << "\n";
     throw std::exception();

@@ -45,7 +45,7 @@ void hakc::HAKCSymbolInfo::GetLocalScopePath(
 
 std::string hakc::HAKCSymbolInfo::GetYamlHeader(unsigned int Indents) const {
   if (!this->Type) {
-    CommonHAKCAnalysis::getWriter(Error)
+    CommonHAKCAnalysis::getWriter(Fatal)
         << "Symbol " << GetName() << " has no HAKCType!\n";
     throw std::exception();
   }
@@ -118,7 +118,7 @@ std::string hakc::HAKCSymbolInfo::GetYaml(unsigned Indents) const {
 
 void hakc::HAKCSymbolInfo::SetGlobalObj(GlobalObject *Global) {
   if (!Global) {
-    CommonHAKCAnalysis::getWriter(Error)
+    CommonHAKCAnalysis::getWriter(Fatal)
         << "Trying to set null GlobalVariable\n";
     throw std::exception();
   }
@@ -142,7 +142,7 @@ void hakc::HAKCSymbolInfo::SetLocalScope(const DIScope *Scope) {
 
   if (!(isa<DISubprogram>(LocalScope) || isa<DIFile>(LocalScope) ||
         isa<DICompileUnit>(LocalScope))) {
-    CommonHAKCAnalysis::getWriter(Error)
+    CommonHAKCAnalysis::getWriter(Fatal)
         << "Unexpected LocalScope: " << *LocalScope << "\n";
     throw std::exception();
   }

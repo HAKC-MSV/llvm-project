@@ -27,7 +27,7 @@ HAKCFunctionAnalysis::HAKCFunctionAnalysis(
       CompartmentTransferCount(0) {}
 
 HAKCWriter &HAKCFunctionAnalysis::getWriter() {
-  return ModuleAnalysis.GetCommonAnalysis().CommonHAKCAnalysis::getWriter();
+  return ModuleAnalysis.GetCommonAnalysis().getWriter();
 }
 
 HAKCWriter &HAKCFunctionAnalysis::getWriter(HAKCLogLevel log_level) {
@@ -40,11 +40,10 @@ void HAKCFunctionAnalysis::UpdateHAKCFunctionParameters() const {
     return;
                                                       }
 
-  CommonHAKCAnalysis::CommonHAKCAnalysis::getWriter(Debug) << "Updating parameters for the following HAKC functions:\n";
+  CommonHAKCAnalysis::CommonHAKCAnalysis::getWriter() << "Updating parameters for the following HAKC functions:\n";
   for (auto *CallI : HAKCFunctionCalls) {
-    CommonHAKCAnalysis::CommonHAKCAnalysis::getWriter(Debug) << CallI << "\n";
+    CommonHAKCAnalysis::CommonHAKCAnalysis::getWriter() << CallI << "\n";
   }
-
 
   auto *F = &GetFunction();
   auto *TransferTarget = F;
@@ -976,7 +975,6 @@ void HAKCFunctionAnalysis::TemporalAnalysisHandleStore(ManagedHAKCPointerUseP St
     CommonHAKCAnalysis::getWriter(Debug) << "StoreUse was not operand 1! (Is this even possible?)" << *StoreUse << "\n";
   }
 }
-
 
 void HAKCFunctionAnalysis::setup() {
   if (!SetupHasRun) {

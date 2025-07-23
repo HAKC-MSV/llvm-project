@@ -179,7 +179,7 @@ bool HAKCTypeInfo::IsPointerToPointer() const {
 
 void HAKCTypeInfo::SetLLVMType(Type *Ty) {
   if (!Ty) {
-    CommonHAKCAnalysis::getWriter(Error)
+    CommonHAKCAnalysis::getWriter(Fatal)
         << "Trying to set null LLVM Type for " << GetName() << "\n";
     throw std::exception();
   }
@@ -200,7 +200,7 @@ void HAKCTypeInfo::SetLLVMType(Type *Ty) {
       }
     }
 
-    CommonHAKCAnalysis::getWriter(Error)
+    CommonHAKCAnalysis::getWriter(Fatal)
         << "Trying to change LLVM Type for " << GetName() << " from "
         << *LLVMType << " to " << *Ty << "\n";
     throw std::exception();

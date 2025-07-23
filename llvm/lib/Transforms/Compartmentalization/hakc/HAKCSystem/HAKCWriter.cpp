@@ -10,7 +10,6 @@
 #include "llvm/BinaryFormat/Dwarf.h"
 
 namespace llvm::hakc {
-// std::error_code EC;
 
 HAKCWriter::HAKCWriter() : os(errs()) {}
 
@@ -55,7 +54,7 @@ HAKCWriter &HAKCWriter::operator<<(const char *s) {
 }
 
 void HAKCWriter::printDIType(const DIType *type, unsigned indents) const {
-  if (!TempLogLevel) {
+  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel) ) {
     return;
   }
 
@@ -85,7 +84,7 @@ void HAKCWriter::printDIType(const DIType *type, unsigned indents) const {
 }
 
 HAKCWriter &HAKCWriter::operator<<(llvm::Value *V) {
-  if (!TempLogLevel) {
+  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel) ) {
     return *this;
   }
   if (V == nullptr) {
@@ -106,7 +105,7 @@ HAKCWriter &HAKCWriter::operator<<(llvm::Value *V) {
 }
 
 HAKCWriter &HAKCWriter::operator<<(llvm::Use &U) {
-  if (!TempLogLevel) {
+  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel) ) {
     return *this;
   }
 
@@ -120,7 +119,7 @@ HAKCWriter &HAKCWriter::operator<<(llvm::Value &V) {
 }
 
 HAKCWriter &HAKCWriter::operator<<(StringRef str) {
-  if (!TempLogLevel) {
+  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel) ) {
     return *this;
   }
   os << str;
@@ -129,7 +128,7 @@ HAKCWriter &HAKCWriter::operator<<(StringRef str) {
 }
 
 HAKCWriter &HAKCWriter::operator<<(unsigned int i) {
-  if (!TempLogLevel) {
+  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel) ) {
     return *this;
   }
   os << i;
@@ -138,7 +137,7 @@ HAKCWriter &HAKCWriter::operator<<(unsigned int i) {
 }
 
 HAKCWriter &HAKCWriter::operator<<(unsigned long i) {
-  if (!TempLogLevel) {
+  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel) ) {
     return *this;
   }
   os << i;
@@ -147,7 +146,7 @@ HAKCWriter &HAKCWriter::operator<<(unsigned long i) {
 }
 
 HAKCWriter &HAKCWriter::operator<<(ssize_t i) {
-  if (!TempLogLevel) {
+  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel) ) {
     return *this;
   }
   os << i;
@@ -156,7 +155,7 @@ HAKCWriter &HAKCWriter::operator<<(ssize_t i) {
 }
 
 HAKCWriter &HAKCWriter::operator<<(bool b) {
-  if (!TempLogLevel) {
+  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel) ) {
     return *this;
   }
   os << (b ? "True" : "False");
@@ -165,7 +164,7 @@ HAKCWriter &HAKCWriter::operator<<(bool b) {
 }
 
 HAKCWriter &HAKCWriter::operator<<(const std::string &str) {
-  if (!TempLogLevel) {
+  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel) ) {
     return *this;
   }
   os << str;
@@ -175,7 +174,7 @@ HAKCWriter &HAKCWriter::operator<<(const std::string &str) {
 
 
 HAKCWriter &HAKCWriter::operator<<(const Function &F) {
-  if (!TempLogLevel) {
+  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel) ) {
     return *this;
   }
   F.print(os, nullptr);
@@ -184,7 +183,7 @@ HAKCWriter &HAKCWriter::operator<<(const Function &F) {
 }
 
 HAKCWriter &HAKCWriter::operator<<(const Module &M) {
-  if (!TempLogLevel) {
+  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel) ) {
     return *this;
   }
   M.print(os, nullptr);
@@ -203,7 +202,7 @@ HAKCWriter &HAKCWriter::operator<<(const Type *Ty) {
 }
 
 HAKCWriter &HAKCWriter::operator<<(const Type &Ty) {
-  if (!TempLogLevel) {
+  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel) ) {
     return *this;
   }
   os << Ty;
@@ -217,7 +216,7 @@ HAKCWriter &HAKCWriter::operator<<(const DINode *DiNode) {
 }
 
 HAKCWriter &HAKCWriter::operator<<(const DINode &DiNode) {
-  if (!TempLogLevel) {
+  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel) ) {
     return *this;
   }
   os << DiNode;
@@ -231,7 +230,7 @@ HAKCWriter &HAKCWriter::operator<<(const DIType *DiType) {
 }
 
 HAKCWriter &HAKCWriter::operator<<(const hakc::HAKCCompartment &Compartment) {
-  if (!TempLogLevel) {
+  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel) ) {
     return *this;
   }
   os << "Compartment " << Compartment.GetCompartmentIDValue();
@@ -241,7 +240,7 @@ HAKCWriter &HAKCWriter::operator<<(const hakc::HAKCCompartment &Compartment) {
 
 HAKCWriter &
 HAKCWriter::operator<<(const hakc::HAKCCompartmentDivision &Division) {
-  if (!TempLogLevel) {
+  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel) ) {
     return *this;
   }
   *this << Division.GetHAKCCompartment();
@@ -251,7 +250,7 @@ HAKCWriter::operator<<(const hakc::HAKCCompartmentDivision &Division) {
 }
 
 HAKCWriter &HAKCWriter::operator<<(const hakc::HAKCTypeInfo &TypeInfo) {
-  if (!TempLogLevel) {
+  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel) ) {
     return *this;
   }
   TypeInfo >> os;
@@ -261,7 +260,7 @@ HAKCWriter &HAKCWriter::operator<<(const hakc::HAKCTypeInfo &TypeInfo) {
 
 HAKCWriter &
 HAKCWriter::operator<<(const enum HAKCAllocationTypeEnum AllocationType) {
-  if (!TempLogLevel) {
+  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel) ) {
     return *this;
   }
   switch (AllocationType) {
@@ -295,7 +294,7 @@ HAKCWriter::operator<<(const enum HAKCAllocationTypeEnum AllocationType) {
 
 HAKCWriter &
 HAKCWriter::operator<<(const ManagedHAKCPointerUse &HAKCPointerUse) {
-  if (!TempLogLevel) {
+  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel) ) {
     return *this;
   }
   os << "[" << HAKCPointerUse.getID() << "] Argument " << HAKCPointerUse.getOperandNo() << " of ";
@@ -306,7 +305,7 @@ HAKCWriter::operator<<(const ManagedHAKCPointerUse &HAKCPointerUse) {
 }
 
 HAKCWriter &HAKCWriter::operator<<(const HAKCPointerBase &ManagedPointer) {
-  if (!TempLogLevel) {
+  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel) ) {
     return *this;
   }
   os << "Managed Pointer " << ManagedPointer.GetID();
@@ -330,7 +329,7 @@ HAKCWriter &HAKCWriter::operator<<(const HAKCPointerBaseP &ManagedPointer) {
 }
 
 HAKCWriter &HAKCWriter::operator<<(const HAKCFunctionInfo &HAKCFuncInfo) {
-  if (!TempLogLevel) {
+  if (!TempLogLevel || (TempLogLevel < ConfiguredLogLevel) ) {
     return *this;
   }
   HAKCFuncInfo >> os;
