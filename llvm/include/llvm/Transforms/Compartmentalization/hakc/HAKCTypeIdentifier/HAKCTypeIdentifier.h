@@ -44,7 +44,7 @@ public:
 
   HAKCTypeP FindHAKCTypeForUse(Use &U);
 
-  HAKCTypeP GetVoidPointerPointeeType() const;
+  HAKCTypeP GetVoidPointerPointeeType();
 
   HAKCTypeP GetVoidPointerType();
 

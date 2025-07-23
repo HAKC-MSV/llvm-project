@@ -1869,8 +1869,19 @@ void hakc::HAKCTypeIdentifier::AddIgnoredType(StringRef TypeName) const {
     }
   }
 }
-hakc::HAKCTypeP hakc::HAKCTypeIdentifier::GetVoidPointerPointeeType() const {
-  return FindType(IntegerType::get(GetModule().getContext(), BITS_PER_BYTE));
+hakc::HAKCTypeP hakc::HAKCTypeIdentifier::GetVoidPointerPointeeType() {
+  auto Result =
+      FindType(IntegerType::get(GetModule().getContext(), BITS_PER_BYTE));
+  if (!Result) {
+    Result = std::make_shared<HAKCTypeInfo>(
+        AnalysisHelper, "unsigned char",
+        AnalysisHelper.GetSystemInfo().OutputDebugInfo());
+    Result->SetDbgTypeName("unsigned char");
+    Result->SetLLVMType(
+        IntegerType::get(GetModule().getContext(), BITS_PER_BYTE));
+    TypesMissingDebugInfo.insert(Result);
+  }
+  return Result;
 }
 hakc::HAKCTypeP hakc::HAKCTypeIdentifier::GetVoidPointerType() {
   auto VoidPointerTy = FindPointerType(*GetVoidPointerPointeeType());

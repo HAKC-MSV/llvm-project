@@ -199,6 +199,11 @@ bool HAKCPointerManager::ManageNewPointer(Use &U) {
 
   auto ManagedPointer =
       std::make_shared<ManagedHAKCPointer>(BaseDefinition, *this, NextID);
+  if (NextID == 3 &&
+      HAKCAnalysis.GetFunction().getName() == "mpihelp_addmul_1") {
+    CommonHAKCAnalysis::getWriter(DebugActive)
+        << "Found " << *ManagedPointer << "\n";
+  }
   HAKCAnalysis.GetModuleAnalysis().GetTypeIdentifier().FindType(
       *ManagedPointer);
   if (ManagedPointer->GetType() && ManagedPointer->GetType()->IsIgnoredType()) {
