@@ -107,7 +107,7 @@ static bool runDataAccessGraphAnalysis(CommonHAKCAnalysis &HAKCAnalysis) {
 
 static bool RunHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM) {
   HAKCWriter::SetLogPath(M.getSourceFileName() + ".log");
-  HAKCWriter::CreateLog();
+
 
   if (HAKC_CONFIG_PATH.empty()) {
     CommonHAKCAnalysis::getWriter(Fatal) << "no hakc-config pass specified\n";
@@ -118,6 +118,7 @@ static bool RunHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM) {
 
   switch (HAKCAnalysis.GetSystemInfo().GetPassMode()) {
   case RunDataAccessGraphAnalysis:
+    HAKCWriter::CreateLog();
     return runDataAccessGraphAnalysis(HAKCAnalysis);
   case RunDataAccessGraphAnalysisSingleSourceFile:
     if (M.getSourceFileName() !=
@@ -127,9 +128,11 @@ static bool RunHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM) {
              << HAKCAnalysis.GetSystemInfo().GetSingleSourceFile();
       return false;
     }
+    HAKCWriter::CreateLog();
     errs() << "Analyzing target source file: " << M.getSourceFileName() << "\n";
     return runDataAccessGraphAnalysis(HAKCAnalysis);
   case RunCompartmentalization:
+      HAKCWriter::CreateLog();
     return runCompartmentalization(HAKCAnalysis);
   case RunConfigAndExit:
     return false;
