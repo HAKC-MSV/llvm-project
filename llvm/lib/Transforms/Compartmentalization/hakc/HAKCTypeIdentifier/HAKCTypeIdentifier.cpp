@@ -27,6 +27,23 @@ hakc::HAKCTypeIdentifier::FindType(const DIType *type) {
   CommonHAKCAnalysis::getWriter(
       AnalysisHelper.GetSystemInfo().OutputDebugInfo())
       << "Finding HAKCTypeInfo for " << *type << "\n";
+  if (auto *Derived = dyn_cast<DIDerivedType>(type)) {
+    CommonHAKCAnalysis::getWriter(
+        AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+        << " with base type ";
+    if (Derived->getBaseType()) {
+      CommonHAKCAnalysis::getWriter(
+          AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+          << Derived->getBaseType();
+    } else {
+      CommonHAKCAnalysis::getWriter(
+          AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+          << "void";
+    }
+    CommonHAKCAnalysis::getWriter(
+        AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+        << "\n";
+  }
   auto it = TypesWithDebugInfo.find(type);
   if (it == TypesWithDebugInfo.end()) {
     return nullptr;
@@ -1048,6 +1065,10 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindPointeeType(HAKCTypeP BaseType) {
     return nullptr;
   }
 
+  if (BaseType->IsVoidPtrType()) {
+    return GetVoidPointerPointeeType();
+  }
+
   if (BaseType->GetPointeeType()) {
     return BaseType->GetPointeeType();
   }
@@ -1316,16 +1337,17 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
   } else {
     findDbgUsers(DbgUsers, V, &DVRUsers);
     for (const auto *DVI : DbgUsers) {
-      if (const auto *DIVar = DVI->getVariable()) {
-        FoundType = FindTypeFromDebug(*DIVar, V);
+      if (isa<DbgDeclareInst>(DVI) ||
+          (isa<DbgValueInst>(DVI) && !isa<DbgAssignIntrinsic>(DVI))) {
+        FoundType = FindTypeFromDebug(*DVI->getVariable(), V);
         if (FoundType) {
           goto exit;
         }
       }
     }
     for (auto *DVR : DVRUsers) {
-      if (const auto *DIVar = DVR->getVariable()) {
-        FoundType = FindTypeFromDebug(*DIVar, V);
+      if (DVR->isDbgValue() || DVR->isDbgDeclare()) {
+        FoundType = FindTypeFromDebug(*DVR->getVariable(), V);
         if (FoundType) {
           goto exit;
         }
@@ -1378,6 +1400,9 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
       }
       if (auto PointeeType = FindHAKCType(LoadI->getPointerOperand())) {
         FoundType = FindPointeeType(PointeeType);
+        if (FoundType) {
+          goto exit;
+        }
       }
     }
 
@@ -1442,7 +1467,7 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
     } else if (auto *PHI = dyn_cast<PHINode>(V)) {
       for (auto &IncomingV : PHI->incoming_values()) {
         auto *Def = AnalysisHelper.getDef(IncomingV, false);
-        if (isa<PHINode>(Def)) {
+        if (isa<PHINode>(Def) || isa<ConstantPointerNull>(Def)) {
           continue;
         }
         FoundType = FindHAKCType(IncomingV);
@@ -1470,6 +1495,8 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
         const auto *ReturnTy = SubprogramTy->getTypeArray()[0];
         FoundType = FindType(ReturnTy);
       }
+    } else if (auto *ZExtI = dyn_cast<ZExtInst>(V)) {
+      FoundType = FindType(ZExtI->getType());
     }
   }
 

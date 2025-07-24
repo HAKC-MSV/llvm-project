@@ -39,7 +39,11 @@ void HAKCTypeInfo::SetIsIgnoredType(bool IsIgnored) {
 bool HAKCTypeInfo::IsVoidPtrType() const {
   auto *StrippedDbgTy = StripTypeModifiers(DbgType);
   if (isa_and_nonnull<DIDerivedType>(StrippedDbgTy)) {
-    return dyn_cast<DIDerivedType>(StrippedDbgTy)->getBaseType() == nullptr;
+    StrippedDbgTy = StripTypeModifiers(
+        dyn_cast<DIDerivedType>(StrippedDbgTy)->getBaseType());
+    if (isa_and_nonnull<DIDerivedType>(StrippedDbgTy)) {
+      return dyn_cast<DIDerivedType>(StrippedDbgTy)->getBaseType() == nullptr;
+    }
   }
   return false;
 }

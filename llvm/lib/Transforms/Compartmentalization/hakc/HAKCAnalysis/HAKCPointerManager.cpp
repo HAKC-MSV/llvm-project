@@ -199,8 +199,7 @@ bool HAKCPointerManager::ManageNewPointer(Use &U) {
 
   auto ManagedPointer =
       std::make_shared<ManagedHAKCPointer>(BaseDefinition, *this, NextID);
-  if (NextID == 3 &&
-      HAKCAnalysis.GetFunction().getName() == "mpihelp_addmul_1") {
+  if (NextID == 4 && HAKCAnalysis.GetFunction().getName() == "wrmsr_on_cpus") {
     CommonHAKCAnalysis::getWriter(DebugActive)
         << "Found " << *ManagedPointer << "\n";
   }
