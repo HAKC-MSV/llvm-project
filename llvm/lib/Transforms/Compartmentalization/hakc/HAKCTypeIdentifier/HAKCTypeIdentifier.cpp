@@ -1376,7 +1376,7 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
         FoundType = AddMissingPointerType(FuncTy);
       }
     }
-  } else {
+  } else if (isa<Instruction>(V)) {
     findDbgUsers(DbgUsers, V, &DVRUsers);
     for (const auto *DVI : DbgUsers) {
       CommonHAKCAnalysis::getWriter(
@@ -1401,142 +1401,142 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
         }
       }
     }
+  }
 
-    if (auto *LoadI = dyn_cast<LoadInst>(V)) {
-      FoundType = CheckCallUses(LoadI);
-      if (FoundType) {
-        goto exit;
-      }
-      if (!getLoadStoreType(LoadI)->isPointerTy()) {
-        SmallVector<HAKCTypeP> Types;
-        auto *LoadTy = getLoadStoreType(LoadI);
-        FindAllTypes(LoadTy, Types);
-        for (auto HAKCTy : Types) {
+  if (auto *LoadI = dyn_cast<LoadInst>(V)) {
+    FoundType = CheckCallUses(LoadI);
+    if (FoundType) {
+      goto exit;
+    }
+    if (!getLoadStoreType(LoadI)->isPointerTy()) {
+      SmallVector<HAKCTypeP> Types;
+      auto *LoadTy = getLoadStoreType(LoadI);
+      FindAllTypes(LoadTy, Types);
+      for (auto HAKCTy : Types) {
+        CommonHAKCAnalysis::getWriter(
+            AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+            << "Testing Load Type " << *HAKCTy << "\n";
+        if (HAKCTy->GetDbgType()) {
           CommonHAKCAnalysis::getWriter(
               AnalysisHelper.GetSystemInfo().OutputDebugInfo())
-              << "Testing Load Type " << *HAKCTy << "\n";
-          if (HAKCTy->GetDbgType()) {
-            CommonHAKCAnalysis::getWriter(
-                AnalysisHelper.GetSystemInfo().OutputDebugInfo())
-                << " with DIType " << *HAKCTy->GetDbgType() << "\n";
-          }
-          if (LoadTy->isIntegerTy()) {
-            auto UsedAsPointer = AnalysisHelper.ValueIsUsedAsPointer(LoadI);
-            if (UsedAsPointer && IsPointerLikeType(HAKCTy->GetDbgType())) {
-              FoundType = HAKCTy;
-            } else {
-              FoundType = HAKCTy;
-            }
+              << " with DIType " << *HAKCTy->GetDbgType() << "\n";
+        }
+        if (LoadTy->isIntegerTy()) {
+          auto UsedAsPointer = AnalysisHelper.ValueIsUsedAsPointer(LoadI);
+          if (UsedAsPointer && IsPointerLikeType(HAKCTy->GetDbgType())) {
+            FoundType = HAKCTy;
           } else {
             FoundType = HAKCTy;
           }
-        }
-        if (FoundType) {
-          goto exit;
+        } else {
+          FoundType = HAKCTy;
         }
       }
-      if (auto PointeeType = FindHAKCType(LoadI->getPointerOperand())) {
-        FoundType = FindPointeeType(PointeeType);
-        if (FoundType) {
-          goto exit;
-        }
+      if (FoundType) {
+        goto exit;
       }
     }
-
-    // We have no debug information for V here, so try our best to deduce
-    if (isa<GetElementPtrInst>(V) || isa<GEPOperator>(V)) {
-      Type *SourceType, *DestTy;
-      Value *SourceValue;
-      APInt ByteOffset(64, 0);
-      bool FoundOffset = false;
-      if (isa<GetElementPtrInst>(V)) {
-        auto *GEPI = dyn_cast<GetElementPtrInst>(V);
-        SourceType = GEPI->getSourceElementType();
-        DestTy = GEPI->getResultElementType();
-        SourceValue = GEPI->getPointerOperand();
-        FoundOffset = GEPI->accumulateConstantOffset(
-            GetModule().getDataLayout(), ByteOffset);
-      } else {
-        auto *GEPO = dyn_cast<GEPOperator>(V);
-        SourceType = GEPO->getSourceElementType();
-        SourceValue = GEPO->getPointerOperand();
-        DestTy = GEPO->getResultElementType();
-        FoundOffset = GEPO->accumulateConstantOffset(
-            GetModule().getDataLayout(), ByteOffset);
+    if (auto PointeeType = FindHAKCType(LoadI->getPointerOperand())) {
+      FoundType = FindPointeeType(PointeeType);
+      if (FoundType) {
+        goto exit;
       }
-      if (FoundOffset) {
-        auto SourceHAKCTy = FindHAKCType(SourceValue);
-        if (SourceHAKCTy && SourceHAKCTy->GetPointeeType()) {
-          if (isa_and_nonnull<DICompositeType>(
-                  SourceHAKCTy->GetPointeeType()->GetDbgType())) {
-            auto *DICompositeTy = dyn_cast<DICompositeType>(
-                SourceHAKCTy->GetPointeeType()->GetDbgType());
-            for (auto *Element : DICompositeTy->getElements()) {
-              if (Element->getTag() == dwarf::DW_TAG_member) {
-                auto *Member = dyn_cast<DIDerivedType>(Element);
-                if (Member->getOffsetInBits() / BITS_PER_BYTE ==
-                    ByteOffset.getZExtValue()) {
-                  auto PointeeType = FindType(Member->getBaseType());
-                  FoundType = FindPointerType(*PointeeType);
-                  if (!FoundType) {
-                    FoundType = AddMissingPointerType(PointeeType);
-                  }
-                  goto exit;
+    }
+  }
+
+  // We have no debug information for V here, so try our best to deduce
+  if (isa<GetElementPtrInst>(V) || isa<GEPOperator>(V)) {
+    Type *SourceType, *DestTy;
+    Value *SourceValue;
+    APInt ByteOffset(64, 0);
+    bool FoundOffset = false;
+    if (isa<GetElementPtrInst>(V)) {
+      auto *GEPI = dyn_cast<GetElementPtrInst>(V);
+      SourceType = GEPI->getSourceElementType();
+      DestTy = GEPI->getResultElementType();
+      SourceValue = GEPI->getPointerOperand();
+      FoundOffset = GEPI->accumulateConstantOffset(GetModule().getDataLayout(),
+                                                   ByteOffset);
+    } else {
+      auto *GEPO = dyn_cast<GEPOperator>(V);
+      SourceType = GEPO->getSourceElementType();
+      SourceValue = GEPO->getPointerOperand();
+      DestTy = GEPO->getResultElementType();
+      FoundOffset = GEPO->accumulateConstantOffset(GetModule().getDataLayout(),
+                                                   ByteOffset);
+    }
+    if (FoundOffset) {
+      auto SourceHAKCTy = FindHAKCType(SourceValue);
+      if (SourceHAKCTy && SourceHAKCTy->GetPointeeType()) {
+        if (isa_and_nonnull<DICompositeType>(
+                SourceHAKCTy->GetPointeeType()->GetDbgType())) {
+          auto *DICompositeTy = dyn_cast<DICompositeType>(
+              SourceHAKCTy->GetPointeeType()->GetDbgType());
+          for (auto *Element : DICompositeTy->getElements()) {
+            if (Element->getTag() == dwarf::DW_TAG_member) {
+              auto *Member = dyn_cast<DIDerivedType>(Element);
+              if (Member->getOffsetInBits() / BITS_PER_BYTE ==
+                  ByteOffset.getZExtValue()) {
+                auto PointeeType = FindType(Member->getBaseType());
+                FoundType = FindPointerType(*PointeeType);
+                if (!FoundType) {
+                  FoundType = AddMissingPointerType(PointeeType);
                 }
+                goto exit;
               }
             }
           }
         }
-      } else if (DestTy->isPointerTy()) {
-        CommonHAKCAnalysis::getWriter(
-            AnalysisHelper.GetSystemInfo().OutputDebugInfo())
-            << "Could not determine type for GEP " << *V << "\n";
-        FoundType = GetVoidPointerType();
+      }
+    } else if (DestTy->isPointerTy()) {
+      CommonHAKCAnalysis::getWriter(
+          AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+          << "Could not determine type for GEP " << *V << "\n";
+      FoundType = GetVoidPointerType();
+      goto exit;
+    }
+
+    if (auto ElementType = FindType(SourceType)) {
+      FoundType = FindPointerType(*ElementType);
+      if (!FoundType) {
+        FoundType = AddMissingPointerType(ElementType);
+      }
+    }
+  } else if (auto *PHI = dyn_cast<PHINode>(V)) {
+    for (auto &IncomingV : PHI->incoming_values()) {
+      auto *Def = AnalysisHelper.getDef(IncomingV, false);
+      if (isa<PHINode>(Def) || isa<ConstantPointerNull>(Def)) {
+        continue;
+      }
+      FoundType = FindHAKCType(IncomingV);
+      if (FoundType) {
         goto exit;
       }
+    }
+  }
 
-      if (auto ElementType = FindType(SourceType)) {
-        FoundType = FindPointerType(*ElementType);
-        if (!FoundType) {
-          FoundType = AddMissingPointerType(ElementType);
-        }
-      }
-    } else if (auto *PHI = dyn_cast<PHINode>(V)) {
-      for (auto &IncomingV : PHI->incoming_values()) {
-        auto *Def = AnalysisHelper.getDef(IncomingV, false);
-        if (isa<PHINode>(Def) || isa<ConstantPointerNull>(Def)) {
-          continue;
-        }
-        FoundType = FindHAKCType(IncomingV);
-        if (FoundType) {
-          goto exit;
-        }
+  if (auto *Arg = dyn_cast<Argument>(V)) {
+    FoundType = GetArgumentHAKCType(Arg);
+  } else if (auto *Func = dyn_cast<Function>(V)) {
+    if (Func->getSubprogram()) {
+      const auto FuncTy = FindType(Func->getSubprogram()->getType());
+      FoundType = FindPointerType(*FuncTy);
+      if (!FoundType) {
+        FoundType = AddMissingPointerType(FuncTy);
       }
     }
-
-    if (auto *Arg = dyn_cast<Argument>(V)) {
-      FoundType = GetArgumentHAKCType(Arg);
-    } else if (auto *Func = dyn_cast<Function>(V)) {
-      if (Func->getSubprogram()) {
-        const auto FuncTy = FindType(Func->getSubprogram()->getType());
-        FoundType = FindPointerType(*FuncTy);
-        if (!FoundType) {
-          FoundType = AddMissingPointerType(FuncTy);
-        }
-      }
-    } else if (auto *CallI = dyn_cast<CallInst>(V)) {
-      if (CallI->getCalledFunction() &&
-          CallI->getCalledFunction()->getSubprogram()) {
-        const auto *SubprogramTy =
-            CallI->getCalledFunction()->getSubprogram()->getType();
-        const auto *ReturnTy = SubprogramTy->getTypeArray()[0];
-        FoundType = FindType(ReturnTy);
-      }
-    } else if (auto *ZExtI = dyn_cast<ZExtInst>(V)) {
-      FoundType = FindType(ZExtI->getType());
-    } else if (isa<AllocaInst>(V)) {
-      FoundType = CheckCallUses(V);
+  } else if (auto *CallI = dyn_cast<CallInst>(V)) {
+    if (CallI->getCalledFunction() &&
+        CallI->getCalledFunction()->getSubprogram()) {
+      const auto *SubprogramTy =
+          CallI->getCalledFunction()->getSubprogram()->getType();
+      const auto *ReturnTy = SubprogramTy->getTypeArray()[0];
+      FoundType = FindType(ReturnTy);
     }
+  } else if (auto *ZExtI = dyn_cast<ZExtInst>(V)) {
+    FoundType = FindType(ZExtI->getType());
+  } else if (isa<AllocaInst>(V)) {
+    FoundType = CheckCallUses(V);
   }
 
 exit:

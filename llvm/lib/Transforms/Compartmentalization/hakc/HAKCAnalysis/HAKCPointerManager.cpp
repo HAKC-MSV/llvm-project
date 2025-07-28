@@ -199,7 +199,8 @@ bool HAKCPointerManager::ManageNewPointer(Use &U) {
 
   auto ManagedPointer =
       std::make_shared<ManagedHAKCPointer>(BaseDefinition, *this, NextID);
-  if (NextID == 14 && HAKCAnalysis.GetFunction().getName() == "efi_partition") {
+  if (NextID == 5 &&
+      HAKCAnalysis.GetFunction().getName() == "fixup_vdso_exception") {
     CommonHAKCAnalysis::getWriter(DebugActive)
         << "Found " << *ManagedPointer << "\n";
   }
