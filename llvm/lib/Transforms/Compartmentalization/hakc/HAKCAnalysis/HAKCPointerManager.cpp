@@ -306,7 +306,7 @@ bool HAKCPointerManager::UseShouldBeCloned(Use &U) {
                   isa<SelectInst>(UserP) || isa<SExtInst>(UserP) ||
                   isa<IntToPtrInst>(UserP) || isa<PHINode>(UserP) ||
                   isa<FreezeInst>(UserP) || isa<BinaryOperator>(UserP) ||
-                  isa<TruncInst>(UserP);
+                  isa<TruncInst>(UserP) || isa<ZExtInst>(UserP);
 
   if (isa<SubOperator>(UserP)) {
     CloneUse = false;
