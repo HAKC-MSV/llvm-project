@@ -151,6 +151,8 @@ protected:
 
   HAKCTypeP FindTypeFromDebug(const DILocalVariable &DLV, Value *V);
 
+  HAKCTypeP CheckCallUses(Value *V);
+
   CommonHAKCAnalysis &AnalysisHelper;
   DebugInfoFinder DbgInfoFinder;
   std::map<const DIType *, HAKCTypeP> TypesWithDebugInfo;

@@ -100,6 +100,12 @@ public:
   HAKCWriter &operator<<(const enum HAKCFunctionArgumentUse ArgUse);
 
   HAKCWriter &operator<<(const HAKCTransferAction &TransferAction);
+
+  HAKCWriter &operator<<(const DbgVariableRecord &DVR);
+
+  HAKCWriter &operator<<(const DbgVariableIntrinsic &DVI);
+
+  HAKCWriter &operator<<(const DILocalVariable &DLV);
 };
 } // namespace llvm::hakc
 
