@@ -20,6 +20,7 @@ CommonHAKCAnalysis &HAKCInfo::GetCommonHAKCAnalysis() const { return Analysis; }
 StringRef HAKCInfo::GetName() const { return Name; }
 
 raw_ostream &HAKCInfo::operator>>(raw_ostream &os) const {
+  // TODO: consolidate with hakc writer?
   os << GetYaml(HAKCInfo::IndentSpaces());
   return os;
 }
@@ -35,7 +36,7 @@ unsigned int HAKCInfo::EntrySpaces() { return 2; }
 
 std::string HAKCInfo::GetYamlHeader(unsigned int Indents) const {
   std::string Yaml;
-  llvm::raw_string_ostream sstream(Yaml);
+  raw_string_ostream sstream(Yaml);
 
   sstream << GetYamlIdentifier() << "\n";
   sstream.indent(Indents + EntrySpaces()) << "Name: \"" << GetName() << "\"";

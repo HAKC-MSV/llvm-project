@@ -6,15 +6,13 @@
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartmentalizationPolicy.h"
 
 #include "llvm/IR/DerivedTypes.h"
-#include "llvm/IR/Verifier.h"
 
 namespace llvm::hakc {
 std::error_code EC;
-HAKCWriter HAKC_Writer;
-std::string HAKCWriter::log_path = ""; // to be overwritten when pass is called
-raw_fd_ostream *HAKCWriter::fd_os = nullptr;
-HAKCLogLevel HAKCWriter::ConfiguredLogLevel = Debug;
-HAKCLogLevel HAKCWriter::TempLogLevel = Debug;
+std::shared_ptr<HAKCLogger> HAKCLog = std::make_shared<HAKCLogger>();
+// HAKCLog = std::make_shared<HAKCLogger>();
+// HAKCLogger* HAKCLog;
+// auto tmp = new HAKCLogger();
 
 bool CommonHAKCAnalysis::IsNoTransferFunction(Function *F) {
   return IsFunctionInFunctionList(F, SystemInfo.NoTransferFunctions());
@@ -91,15 +89,45 @@ void CommonHAKCAnalysis::InitConfig(StringRef ConfigPath) {
     getWriter(Fatal) << "Error parsing config file " << ConfigPath << "\n";
     throw std::exception();
   }
+  // Creating fd log as soon as possible
+  getWriter().addStream(createLogPath(SystemConfig.DagAnalysisRootPath));
+  getWriter().SetConfiguredLogLevel(SystemConfig.LogLevel);
 
+  // A bunch of work is done creating SystemInfo, so we want the log to be created before this
   SystemInfo << SystemConfig;
-  HAKCWriter::SetConfiguredLogLevel(SystemInfo.GetLogLevel());
 }
 
 CommonHAKCAnalysis::CommonHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM,
                                        StringRef ConfigPath)
     : M(M), MAM(MAM), SystemInfo(*this) {
+  // create hakc logger?
+  // auto* log = new HAKCLogger();
+  // HAKCLog = std::make_shared<HAKCLogger>();
+  // trying to store reference to HAKCLog so it is not destroyed during common analysis lifetime
+  _HAKCLog = HAKCLog;
   InitConfig(ConfigPath);
+}
+
+StringRef CommonHAKCAnalysis::createDagYamlPath(StringRef DagAnalysisRootPath) {
+  SmallString<256> Path;
+  SmallString<256> ModulePath;
+  GetModuleFullPath(M, ModulePath);
+  sys::path::append(Path, DagAnalysisRootPath);
+  sys::path::append(Path,ModulePath);
+  sys::path::replace_extension(Path, ".dag.yml");
+  sys::path::make_preferred(Path);
+  return Path;
+}
+
+StringRef CommonHAKCAnalysis::createLogPath(StringRef DagAnalysisRootPath) {
+  SmallString<256> Path;
+  SmallString<256> ModulePath;
+  GetModuleFullPath(M, ModulePath);
+  sys::path::append(Path, DagAnalysisRootPath);
+  sys::path::append(Path,ModulePath);
+  sys::path::replace_extension(Path, ".log");
+  sys::path::make_preferred(Path);
+  return Path;
 }
 
 Module &CommonHAKCAnalysis::GetModule() const { return M; }
@@ -126,11 +154,13 @@ bool CommonHAKCAnalysis::IsHAKCCompartmentalizationSupportFunction(
       F, SystemInfo.CompartmentalizationSupportFunctions());
 }
 
-HAKCWriter &CommonHAKCAnalysis::getWriter() { return getWriter(Debug); }
+HAKCLogger &CommonHAKCAnalysis::getWriter() { return getWriter(Debug); }
 
-HAKCWriter &CommonHAKCAnalysis::getWriter(HAKCLogLevel log_level) {
-  HAKCWriter::SetTempLogLevel(log_level);
-  return HAKC_Writer;
+HAKCLogger &CommonHAKCAnalysis::getWriter(HAKCLogLevel log_level) {
+  // HAKCLog.SetTempLogLevel(log_level);
+  // segfault below
+  HAKCLog->SetTempLogLevel(log_level);
+  return *HAKCLog;
 }
 
 bool CommonHAKCAnalysis::IsPointerLikeType(Type *Ty) {
@@ -495,7 +525,7 @@ bool CommonHAKCAnalysis::IsCapabilityReassignmentFunc(Function *F) {
 }
 
 void CommonHAKCAnalysis::VerifyFunction(Function *F) {
-  if (llvm::verifyFunction(*F, &getWriter().ostream())) {
+  if (getWriter().verifyFunction(F)) {
     getWriter(Fatal) << "Verification failed for function\n"
                      << F->getName() << "\n"
                      << F->getParent() << "\n";

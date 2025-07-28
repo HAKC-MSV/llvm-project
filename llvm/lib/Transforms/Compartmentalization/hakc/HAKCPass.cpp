@@ -27,6 +27,9 @@ using namespace llvm::hakc;
 
 namespace llvm {
 namespace hakc {
+
+
+
 static bool runCompartmentalization(CommonHAKCAnalysis &HAKCAnalysis) {
   bool PerformTransformations = true;
   Module &M = HAKCAnalysis.GetModule();
@@ -59,14 +62,7 @@ static bool runCompartmentalization(CommonHAKCAnalysis &HAKCAnalysis) {
 
 static bool runDataAccessGraphAnalysis(CommonHAKCAnalysis &HAKCAnalysis) {
   Module &M = HAKCAnalysis.GetModule();
-  SmallString<256> Path;
-  SmallString<256> ModulePath;
-  CommonHAKCAnalysis::GetModuleFullPath(M, ModulePath);
-  sys::path::append(Path,
-                    HAKCAnalysis.GetSystemInfo().GetDagAnalysisRootPath());
-  sys::path::append(Path, ModulePath);
-  sys::path::replace_extension(Path, ".dag.yml");
-  sys::path::make_preferred(Path);
+  SmallString<256> Path = HAKCAnalysis.createDagYamlPath(HAKCAnalysis.GetSystemInfo().GetDagAnalysisRootPath());
 
   StringRef CurrentSourceName(M.getSourceFileName());
   for (auto &path : HAKCAnalysis.GetSystemInfo().HAKCSourcePaths()) {
@@ -95,19 +91,24 @@ static bool runDataAccessGraphAnalysis(CommonHAKCAnalysis &HAKCAnalysis) {
   raw_fd_ostream out(Path, err);
   if (!err) {
     HAKCModuleAnalysis ModuleAnalysis(HAKCAnalysis);
-    ModuleAnalysis.TemporalAnalysis();
+    if (HAKCAnalysis.GetSystemInfo().GetTemporalAnalysisEnabled()) {
+      ModuleAnalysis.TemporalAnalysis();
+    }
     ModuleAnalysis.OutputYAML(out);
     out.close();
   } else {
     CommonHAKCAnalysis::getWriter(Fatal) << "Failed to open " << Path << "\n";
     throw std::exception();
   }
+  // TODO: do I need this?
+  // CommonHAKCAnalysis::getWriter().~HAKCLogger();
+  // HAKCAnalysis.getWriter().~HAKCLogger();
+  HAKCAnalysis.getWriter() << "STOP\n";
   return false;
 }
 
 static bool RunHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM) {
-  HAKCWriter::SetLogPath(M.getSourceFileName() + ".log");
-
+  // auto* tmp = &CommonHAKCAnalysis::getWriter();
 
   if (HAKC_CONFIG_PATH.empty()) {
     CommonHAKCAnalysis::getWriter(Fatal) << "no hakc-config pass specified\n";
@@ -115,24 +116,21 @@ static bool RunHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM) {
   }
 
   CommonHAKCAnalysis HAKCAnalysis(M, MAM, HAKC_CONFIG_PATH);
-
+  std::shared_ptr<HAKCLogger> _Logger = HAKCAnalysis.get();
   switch (HAKCAnalysis.GetSystemInfo().GetPassMode()) {
   case RunDataAccessGraphAnalysis:
-    HAKCWriter::CreateLog();
     return runDataAccessGraphAnalysis(HAKCAnalysis);
   case RunDataAccessGraphAnalysisSingleSourceFile:
     if (M.getSourceFileName() !=
         HAKCAnalysis.GetSystemInfo().GetSingleSourceFile()) {
-      errs() << "Source file " << M.getSourceFileName()
+      CommonHAKCAnalysis::getWriter(Fatal) << "Source file " << M.getSourceFileName()
              << " is not the target source file: "
-             << HAKCAnalysis.GetSystemInfo().GetSingleSourceFile();
+             << HAKCAnalysis.GetSystemInfo().GetSingleSourceFile() << "\n";
       return false;
     }
-    HAKCWriter::CreateLog();
-    errs() << "Analyzing target source file: " << M.getSourceFileName() << "\n";
+    CommonHAKCAnalysis::getWriter(Fatal) << "Analyzing target source file: " << M.getSourceFileName() << "\n";
     return runDataAccessGraphAnalysis(HAKCAnalysis);
   case RunCompartmentalization:
-      HAKCWriter::CreateLog();
     return runCompartmentalization(HAKCAnalysis);
   case RunConfigAndExit:
     return false;

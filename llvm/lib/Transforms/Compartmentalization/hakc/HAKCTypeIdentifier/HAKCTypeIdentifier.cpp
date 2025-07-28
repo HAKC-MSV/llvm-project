@@ -247,8 +247,6 @@ Type *HAKCTypeIdentifier::FindNamedType(StringRef TypeName) const {
 
 Type *
 HAKCTypeIdentifier::FindAnonymousType(const DICompositeType *CompositeTy) {
-  auto debug = Debug;
-
   auto Cached = AnonymousTypes.find(CompositeTy);
   if (Cached != AnonymousTypes.end()) {
     return Cached->second;
@@ -330,7 +328,6 @@ HAKCTypeIdentifier::GetLLVMFunctionTy(const DISubroutineType *FunctionTy) {
   auto &Ctx = GetModule().getContext();
   auto *ReturnTy = Type::getVoidTy(Ctx);
   auto TyArray = FunctionTy->getTypeArray();
-  auto debug = Debug;
   if (TyArray[0]) {
     ReturnTy = GetLLVMType(TyArray[0]);
     if (!ReturnTy) {
@@ -735,7 +732,6 @@ void HAKCTypeIdentifier::AddUsedGlobals(
     const std::set<GlobalObject *> &GlobalObjects,
     const std::shared_ptr<HAKCSymbolInfo> &UserSymbol) {
   for (auto *UsedGlobal : GlobalObjects) {
-    auto debug = AnalysisHelper.GetSystemInfo().OutputDebugInfo(UsedGlobal);
     auto Symbol = FindSymbol(UsedGlobal);
     if (!Symbol) {
       CommonHAKCAnalysis::getWriter()
@@ -1592,19 +1588,19 @@ void HAKCTypeIdentifier::FindTypesInFunctions() {
     auto *F = it.second->GetFunction();
     auto debug = AnalysisHelper.GetSystemInfo().OutputDebugInfo(F);
 
-    CommonHAKCAnalysis::getWriter()
+    CommonHAKCAnalysis::getWriter(debug)
         << "Finding types in Function " << F->getName() << "\n";
     for (auto InstIt = inst_begin(F); InstIt != inst_end(F); ++InstIt) {
       auto *I = &(*InstIt);
       if (auto *DbgIntrinsic = dyn_cast<DbgVariableIntrinsic>(I)) {
         auto *V = DbgIntrinsic->getVariableLocationOp(0);
         if (isa<UndefValue>(V)) {
-          CommonHAKCAnalysis::getWriter()
+          CommonHAKCAnalysis::getWriter(debug)
               << "Skipping undef Value in Instruction " << *I << "\n";
           continue;
         }
         auto *DebugV = DbgIntrinsic->getVariable();
-        CommonHAKCAnalysis::getWriter()
+        CommonHAKCAnalysis::getWriter(debug)
             << "Found " << *V << " to " << *DebugV
             << " mapping from Instruction " << *I << "\n";
         const auto HAKCType = FindType(DebugV->getType());
@@ -1621,7 +1617,7 @@ void HAKCTypeIdentifier::FindTypesInFunctions() {
           if (CallI->isInlineAsm()) {
             /* Inline assembly causes too much type confusion, so skip these
              * mappings */
-            CommonHAKCAnalysis::getWriter() << "Skipping inline assembly\n";
+            CommonHAKCAnalysis::getWriter(debug) << "Skipping inline assembly\n";
             continue;
           }
         }
@@ -1701,7 +1697,7 @@ ModuleAnalysisManager &HAKCTypeIdentifier::GetMAM() const {
 void HAKCTypeIdentifier::ProcessDebugInfo() {
   // this is where the dag analysis actually happens!
   DbgInfoFinder.processModule(GetModule());
-
+  // segfault on line below?
   CommonHAKCAnalysis::getWriter() << GetModule() << "\n";
 
   StringRef ModulePath = GetModule().getSourceFileName();
@@ -1714,7 +1710,7 @@ void HAKCTypeIdentifier::ProcessDebugInfo() {
       }
     }
   }
-
+  // HAKCWriter seems to die around here, for some reason
   if (!CompilationUnitScope) {
     CommonHAKCAnalysis::getWriter()
         << "Could not find Compilation Unit Scope\n";
@@ -1735,6 +1731,11 @@ void HAKCTypeIdentifier::ProcessDebugInfo() {
 
   CommonHAKCAnalysis::getWriter() << "!!!! Starting Global Handling !!!!\n";
   for (auto *DIGlobal : DbgInfoFinder.global_variables()) {
+    // The DIGlobal->getVariable seems to be null sometimes
+    // if (!DIGlobal->getVariable()) {
+    //   CommonHAKCAnalysis::getWriter() << "DIGlobal->getVariable() is NULL!\n";
+    //   throw std::exception();
+    // }
     auto GlobalP = HandleGlobal(DIGlobal->getVariable());
   }
   CommonHAKCAnalysis::getWriter() << "!!!! Finished Global Handling !!!!\n";

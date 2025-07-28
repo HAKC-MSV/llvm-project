@@ -66,7 +66,7 @@ HAKCSystemInformation::HAKCSystemInformation(CommonHAKCAnalysis &CommonAnalysis)
       AllocationFunctionList(), CustomTransferList(), PreTransferActionList(),
       PostTargetActionList(), StructList() {}
 
-hakc::function_def_t HAKCSystemInformation::CreateHAKCFunction(
+function_def_t HAKCSystemInformation::CreateHAKCFunction(
     HAKCYAMLFunctionDefinition &YAMLFunctionDef,
     const HAKCTypeIdentifier &TypeIdentifier) const {
   auto *TransferFunc = YAMLFunctionDef.GetFunction(TypeIdentifier);
@@ -84,7 +84,7 @@ hakc::function_def_t HAKCSystemInformation::CreateHAKCFunction(
   return std::make_shared<HAKCFunctionDefinition>(TransferFunc, Args);
 }
 
-hakc::custom_transfer_def_t HAKCSystemInformation::CreateCustomTransferFunction(
+custom_transfer_def_t HAKCSystemInformation::CreateCustomTransferFunction(
     HAKCYAMLCustomTransferType &YAMLCustomTransfer, HAKCTypeP HAKCTy,
     const HAKCTypeIdentifier &TypeIdentifier) {
   auto *TransferFunc = YAMLCustomTransfer.GetFunction(TypeIdentifier);
@@ -139,7 +139,7 @@ void HAKCSystemInformation::operator<<(HAKCYamlConfig &YamlConfig) {
   if (PassMode == RunDataAccessGraphAnalysisSingleSourceFile) {
     SingleSourceFile = YamlConfig.SingleSourceFile;
     if (GetModule().getSourceFileName() != SingleSourceFile) {
-      errs() << "Source file " << GetModule().getSourceFileName()
+      CommonHAKCAnalysis::getWriter() << "Source file " << GetModule().getSourceFileName()
              << " is not the target source file: " << SingleSourceFile;
       return;
     }

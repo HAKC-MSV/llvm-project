@@ -27,6 +27,7 @@ protected:
   HAKCSystemInformation SystemInfo;
 
   // HAKCWriter &HAKC_Writer;
+  std::shared_ptr<HAKCLogger> _HAKCLog;
 
   static bool IsFunctionInHAKCTransferFunctionList(
       Function *F, iterator_range<HAKCTransferList::iterator> Range);
@@ -35,6 +36,9 @@ protected:
 
 public:
   virtual ~CommonHAKCAnalysis() = default;
+  // virtual ~CommonHAKCAnalysis();
+
+  std::shared_ptr<HAKCLogger> get(){ return _HAKCLog; }
 
   // explicit CommonHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM,
   //                             StringRef ConfigPath, HAKCWriter &HAKC_Writer);
@@ -97,9 +101,9 @@ public:
   bool functionIsTransferCandidate(Function *F,
                                    HAKCCompartmentalizationPolicy &Policy);
 
-  static HAKCWriter &getWriter();
+  static HAKCLogger &getWriter();
 
-  static HAKCWriter &getWriter(HAKCLogLevel log_level);
+  static HAKCLogger &getWriter(HAKCLogLevel log_level);
 
   FunctionType *GetDataAuthenticationFunctionType(Module &M,
                                                   unsigned AddrSpace = 0);
@@ -177,6 +181,10 @@ public:
   PointerShouldBeConsideredCode(const ManagedHAKCPointer &ManagedPointer);
 
   static Function *GetOriginalFunctionFromTransferFunction(Function *F);
+
+  StringRef createDagYamlPath(StringRef DagAnalysisRootPath);
+
+  StringRef createLogPath(StringRef DagAnalysisRootPath);
 
 private:
   static bool valueHasAttribute(Value *v, Attribute::AttrKind Kind);

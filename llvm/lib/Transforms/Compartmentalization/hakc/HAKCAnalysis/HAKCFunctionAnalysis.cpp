@@ -26,13 +26,13 @@ HAKCFunctionAnalysis::HAKCFunctionAnalysis(
       DTree(*F), CurrentFunction(F), SetupHasRun(false),
       CompartmentTransferCount(0) {}
 
-HAKCWriter &HAKCFunctionAnalysis::getWriter() {
-  return ModuleAnalysis.GetCommonAnalysis().getWriter();
-}
-
-HAKCWriter &HAKCFunctionAnalysis::getWriter(HAKCLogLevel log_level) {
-  return ModuleAnalysis.GetCommonAnalysis().getWriter(log_level);
-}
+// HAKCLogger &HAKCFunctionAnalysis::getWriter() {
+//   return ModuleAnalysis.GetCommonAnalysis().getWriter();
+// }
+//
+// HAKCWriter &HAKCFunctionAnalysis::getWriter(HAKCLogLevel log_level) {
+//   return ModuleAnalysis.GetCommonAnalysis().getWriter(log_level);
+// }
 
 void HAKCFunctionAnalysis::UpdateHAKCFunctionParameters() const {
   if (CommonHAKCAnalysis::IsUncompartmentalizedSymbol(CurrentFunction,
@@ -927,8 +927,9 @@ void HAKCFunctionAnalysis::TemporalAnalysis() {
 
 void HAKCFunctionAnalysis::AddPermissionUse(
     const ManagedHAKCPointer &ManagedPointer, TypePerms perm) const {
-  auto HAKCTy = ManagedPointer.GetType()->GetPointeeType();
-  GetTypeIdentifier().ModifyTypeUse(CurrentFunction, HAKCTy, perm);
+  // TODO: fix segfault on line below when GetType() is null?
+  // auto HAKCTy = ManagedPointer.GetType()->GetPointeeType();
+  // GetTypeIdentifier().ModifyTypeUse(CurrentFunction, HAKCTy, perm);
 }
 
 void HAKCFunctionAnalysis::TemporalAnalysisHandleCall(
