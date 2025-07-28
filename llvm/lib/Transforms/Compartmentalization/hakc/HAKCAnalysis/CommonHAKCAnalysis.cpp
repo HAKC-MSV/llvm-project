@@ -9,10 +9,7 @@
 
 namespace llvm::hakc {
 std::error_code EC;
-std::shared_ptr<HAKCLogger> HAKCLog = std::make_shared<HAKCLogger>();
-// HAKCLog = std::make_shared<HAKCLogger>();
-// HAKCLogger* HAKCLog;
-// auto tmp = new HAKCLogger();
+std::shared_ptr<HAKCLogger> HAKCLog = std::make_shared<HAKCLogger>(Verbose); // setting configured log level for errs(), which by default is the highest mode
 
 bool CommonHAKCAnalysis::IsNoTransferFunction(Function *F) {
   return IsFunctionInFunctionList(F, SystemInfo.NoTransferFunctions());
@@ -90,8 +87,8 @@ void CommonHAKCAnalysis::InitConfig(StringRef ConfigPath) {
     throw std::exception();
   }
   // Creating fd log as soon as possible
-  getWriter().addStream(createLogPath(SystemConfig.DagAnalysisRootPath));
-  getWriter().SetConfiguredLogLevel(SystemConfig.LogLevel);
+  getWriter().SetAllWriterConfiguredLogLevels(SystemConfig.LogLevel); // setting the errs() stream to the configured log level
+  getWriter().addStream(createLogPath(SystemConfig.DagAnalysisRootPath), SystemConfig.LogLevel); // setting the fd_ostream to configured log level
 
   // A bunch of work is done creating SystemInfo, so we want the log to be created before this
   SystemInfo << SystemConfig;
@@ -157,8 +154,6 @@ bool CommonHAKCAnalysis::IsHAKCCompartmentalizationSupportFunction(
 HAKCLogger &CommonHAKCAnalysis::getWriter() { return getWriter(Debug); }
 
 HAKCLogger &CommonHAKCAnalysis::getWriter(HAKCLogLevel log_level) {
-  // HAKCLog.SetTempLogLevel(log_level);
-  // segfault below
   HAKCLog->SetTempLogLevel(log_level);
   return *HAKCLog;
 }

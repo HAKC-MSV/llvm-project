@@ -100,10 +100,6 @@ static bool runDataAccessGraphAnalysis(CommonHAKCAnalysis &HAKCAnalysis) {
     CommonHAKCAnalysis::getWriter(Fatal) << "Failed to open " << Path << "\n";
     throw std::exception();
   }
-  // TODO: do I need this?
-  // CommonHAKCAnalysis::getWriter().~HAKCLogger();
-  // HAKCAnalysis.getWriter().~HAKCLogger();
-  HAKCAnalysis.getWriter() << "STOP\n";
   return false;
 }
 
