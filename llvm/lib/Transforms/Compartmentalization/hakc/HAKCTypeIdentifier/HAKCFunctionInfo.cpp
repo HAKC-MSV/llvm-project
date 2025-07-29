@@ -16,7 +16,7 @@ void HAKCFunctionInfo::SetFunction(Function *F) { SetGlobalObj(F); }
 Function *HAKCFunctionInfo::GetFunction() const {
   auto glob = GetGlobalObj();
   if (!glob) {
-    CommonHAKCAnalysis::getWriter(Error) << "GetGlobalObj() is NULL!\n";
+    CommonHAKCAnalysis::getLogger(Error) << "GetGlobalObj() is NULL!\n";
     return nullptr;
   }
   return dyn_cast<Function>(glob);
@@ -24,24 +24,24 @@ Function *HAKCFunctionInfo::GetFunction() const {
 
 void HAKCFunctionInfo::AddTypeUse(const std::shared_ptr<HAKCTypeInfo> &Ty) {
   if (!Ty) {
-    CommonHAKCAnalysis::getWriter(Fatal)
+    CommonHAKCAnalysis::getLogger(Fatal)
         << "Trying to add type use of type null\n";
     throw std::exception();
   }
   if (!TypesUsed.contains(Ty)) {
     TypesUsed[Ty] = 0b0;
+    CommonHAKCAnalysis::getLogger(Debug, !DebugActive) << "Adding type use " << *Ty << "\n";
   }
-  CommonHAKCAnalysis::getWriter(Debug) << "Adding type use " << *Ty << "\n";
 }
 
 unsigned HAKCFunctionInfo::GetTypeUse(const std::shared_ptr<HAKCTypeInfo> &Ty) {
   if (!Ty) {
-    CommonHAKCAnalysis::getWriter(Fatal)
+    CommonHAKCAnalysis::getLogger(Fatal)
         << "Trying to get type use of type null\n";
     throw std::exception();
   }
   if (!TypesUsed.contains(Ty)) {
-    CommonHAKCAnalysis::getWriter(Fatal)
+    CommonHAKCAnalysis::getLogger(Fatal)
         << "Trying to get type use of type that is not in TypesUsed\n";
     throw std::exception();
   }
@@ -50,7 +50,7 @@ unsigned HAKCFunctionInfo::GetTypeUse(const std::shared_ptr<HAKCTypeInfo> &Ty) {
 
 void HAKCFunctionInfo::ModifyTypeUse(const std::shared_ptr<HAKCTypeInfo> &Ty, TypePerms perm){
   if (!Ty) {
-    CommonHAKCAnalysis::getWriter(Fatal)
+    CommonHAKCAnalysis::getLogger(Fatal)
         << "Trying to modify type use of type null\n";
     throw std::exception();
   }
@@ -58,10 +58,14 @@ void HAKCFunctionInfo::ModifyTypeUse(const std::shared_ptr<HAKCTypeInfo> &Ty, Ty
   if (!TypesUsed.contains(Ty)) {
     AddTypeUse(Ty);
   }
+  if (TypesUsed[Ty] == (TypesUsed[Ty] | perm)) {
+    // if nothing changes, don't print the debug text (overwhelming amount of debugging)
+    return;
+  }
   // Note: Only to be used internally, and only to add uses, not remove them
-  CommonHAKCAnalysis::getWriter(Debug) << "Modifying TypeUse with mask " << static_cast<unsigned>(perm) << " perm from " << TypesUsed[Ty] << " -> ";
+  CommonHAKCAnalysis::getLogger(Debug, !DebugActive) << "Modifying TypeUse with mask " << static_cast<unsigned>(perm) << " perm from " << TypesUsed[Ty] << " -> ";
   TypesUsed[Ty] |= perm;
-  CommonHAKCAnalysis::getWriter(Debug) << TypesUsed[Ty] << " for type " << *Ty << "\n";
+  CommonHAKCAnalysis::getLogger(Debug, !DebugActive) << TypesUsed[Ty] << " for type " << *Ty << "\n";
 }
 
 StringRef HAKCFunctionInfo::GetYamlIdentifier() const {
@@ -71,7 +75,7 @@ StringRef HAKCFunctionInfo::GetYamlIdentifier() const {
 void HAKCFunctionInfo::AddIndirectCall(
     const std::shared_ptr<HAKCIndirectCallSource> &Source) {
   if (!Source) {
-    CommonHAKCAnalysis::getWriter(Fatal)
+    CommonHAKCAnalysis::getLogger(Fatal)
         << "Trying to add null indirect call source\n";
     throw std::exception();
   }
@@ -81,7 +85,7 @@ void HAKCFunctionInfo::AddIndirectCall(
 void HAKCFunctionInfo::AddDirectCall(
     const std::shared_ptr<HAKCFunctionInfo> &DirectCall) {
   if (!DirectCall) {
-    CommonHAKCAnalysis::getWriter(Fatal) << "Trying to add null Direct Call\n";
+    CommonHAKCAnalysis::getLogger(Fatal) << "Trying to add null Direct Call\n";
     throw std::exception();
   }
   DirectCalls.insert(DirectCall);

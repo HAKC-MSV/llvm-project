@@ -56,6 +56,11 @@ HAKCWriter &HAKCWriter::operator<<(Use &U) {
   return *this;
 }
 
+HAKCWriter &HAKCWriter::operator<<(User *User) {
+  *this << *User;
+  return *this;
+}
+
 HAKCWriter &HAKCWriter::operator<<(Value &V) {
   *this << &V;
   return *this;
@@ -192,13 +197,7 @@ HAKCWriter &
 HAKCWriter::operator<<(const ManagedHAKCPointerUse &HAKCPointerUse) {
   *os << "[" << HAKCPointerUse.getID() << "] Argument "
       << HAKCPointerUse.getOperandNo() << " of ";
-  if (auto user = HAKCPointerUse.getUser()) {
-    *this << user << " for ";
-  }
-  else {
-    *this << "nullptr for ";
-    return *this;
-  }
+  *this << HAKCPointerUse.getUser() << " for ";
   // getManagedPtr is a reference and is guaranteed to not be null
   *this << HAKCPointerUse.getManagedPtr();
   return *this;

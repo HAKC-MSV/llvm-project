@@ -26,6 +26,7 @@ protected:
 
   HAKCSystemInformation SystemInfo;
 
+  // TODO remove below?
   // HAKCWriter &HAKC_Writer;
   std::shared_ptr<HAKCLogger> _HAKCLog;
 
@@ -35,8 +36,10 @@ protected:
   void InitConfig(StringRef ConfigPath);
 
 public:
+
+  bool abort = false;
+
   virtual ~CommonHAKCAnalysis() = default;
-  // virtual ~CommonHAKCAnalysis();
 
   std::shared_ptr<HAKCLogger> get(){ return _HAKCLog; }
 
@@ -101,9 +104,7 @@ public:
   bool functionIsTransferCandidate(Function *F,
                                    HAKCCompartmentalizationPolicy &Policy);
 
-  static HAKCLogger &getWriter();
-
-  static HAKCLogger &getWriter(HAKCLogLevel log_level);
+  static HAKCLogger &getLogger(HAKCLogLevel log_level, bool suppress_output = false);
 
   FunctionType *GetDataAuthenticationFunctionType(Module &M,
                                                   unsigned AddrSpace = 0);

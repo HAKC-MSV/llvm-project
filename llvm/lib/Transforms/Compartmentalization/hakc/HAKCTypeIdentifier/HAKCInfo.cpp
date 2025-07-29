@@ -10,7 +10,7 @@ HAKCInfo::HAKCInfo(CommonHAKCAnalysis &Analysis, StringRef Name,
                    bool DebugActive)
     : Analysis(Analysis), DebugActive(DebugActive), Name(Name.str()) {
   if (Name.empty()) {
-    CommonHAKCAnalysis::getWriter(Fatal) << "Name is empty!\n";
+    CommonHAKCAnalysis::getLogger(Fatal) << "Name is empty!\n";
     throw std::exception();
   }
 }
@@ -20,7 +20,6 @@ CommonHAKCAnalysis &HAKCInfo::GetCommonHAKCAnalysis() const { return Analysis; }
 StringRef HAKCInfo::GetName() const { return Name; }
 
 raw_ostream &HAKCInfo::operator>>(raw_ostream &os) const {
-  // TODO: consolidate with hakc writer?
   os << GetYaml(HAKCInfo::IndentSpaces());
   return os;
 }

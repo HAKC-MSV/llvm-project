@@ -42,7 +42,7 @@ bool HAKCModuleAnalysis::FunctionNeedsAnalysis(Function *F) const {
                        F->getSubprogram() != nullptr &&
                        !CommonHAKCAnalysis::IsOutsideTransferFunc(F) &&
                        !CommonAnalysis.IsHAKCFunction(F);
-
+  bool SuppressOutput = !CommonAnalysis.GetSystemInfo().OutputDebugInfo(F);
   if (!needsAnalysis) {
     goto out;
   }
@@ -54,15 +54,14 @@ bool HAKCModuleAnalysis::FunctionNeedsAnalysis(Function *F) const {
   }
 
 out:
-  if (CommonAnalysis.GetSystemInfo().OutputDebugInfo(F)) {
-    CommonHAKCAnalysis::getWriter(Error) << F->getName();
-    if (!needsAnalysis) {
-      CommonHAKCAnalysis::getWriter(Error) << " does not need ";
-    } else {
-      CommonHAKCAnalysis::getWriter(Error) << " needs ";
-    }
-    CommonHAKCAnalysis::getWriter(Error) << "analysis\n";
+
+  CommonHAKCAnalysis::getLogger(Verbose, SuppressOutput) << F->getName();
+  if (!needsAnalysis) {
+    CommonHAKCAnalysis::getLogger(Verbose, SuppressOutput) << " does not need ";
+  } else {
+    CommonHAKCAnalysis::getLogger(Verbose, SuppressOutput) << " needs ";
   }
+  CommonHAKCAnalysis::getLogger(Verbose, SuppressOutput) << "analysis\n";
 
   return needsAnalysis;
 }
@@ -80,16 +79,14 @@ bool HAKCModuleAnalysis::FunctionDefinedInAssembly(Function *F) {
   SearchTerm += ":";
   Regex NameRegex(SearchTerm);
   SmallVector<StringRef, 2> Matches;
-
+  bool SuppressOutput = !CommonAnalysis.GetSystemInfo().OutputDebugInfo(F);
   auto NameInAssembly = NameRegex.match(ModuleAsm, &Matches, nullptr);
   if (NameInAssembly) {
-    CommonHAKCAnalysis::getWriter(
-        CommonAnalysis.GetSystemInfo().OutputDebugInfo(F))
+    CommonHAKCAnalysis::getLogger(Debug, SuppressOutput)
         << F->getName()
         << " was found in the Module inline assembly: " << Matches[0] << "\n";
   } else {
-    CommonHAKCAnalysis::getWriter(
-        CommonAnalysis.GetSystemInfo().OutputDebugInfo(F))
+    CommonHAKCAnalysis::getLogger(Error, SuppressOutput)
         << "Could not find " << SearchTerm << " in\n"
         << ModuleAsm << "\n";
   }
@@ -143,11 +140,12 @@ bool HAKCModuleAnalysis::useEscapes(Use &U) {
   std::set<Value *> examined;
   bool escapes = _useEscapes(U, examined);
 
-  CommonHAKCAnalysis::getWriter() << "Use " << U.get() << " in " << U.getUser();
+  CommonHAKCAnalysis::getLogger(Verbose)
+      << "Use " << U.get() << " in " << U.getUser();
   if (escapes) {
-    CommonHAKCAnalysis::getWriter() << " escapes\n";
+    CommonHAKCAnalysis::getLogger(Verbose) << " escapes\n";
   } else {
-    CommonHAKCAnalysis::getWriter() << " does not escape\n";
+    CommonHAKCAnalysis::getLogger(Verbose) << " does not escape\n";
   }
 
   return escapes;
@@ -161,9 +159,10 @@ bool HAKCModuleAnalysis::functionEscapes(Function *F) {
     if (useEscapes(U)) {
       return true;
     }
-    CommonHAKCAnalysis::getWriter(
-        CommonAnalysis.GetSystemInfo().OutputDebugInfo(F))
+
+    CommonHAKCAnalysis::getLogger(Debug, !CommonAnalysis.GetSystemInfo().OutputDebugInfo(F))
         << "Use " << U.getUser() << " does not escape\n";
+
   }
   Function *transfer =
       GetModule().getFunction(CommonAnalysis.GetOutsideTransferName(F));
@@ -274,18 +273,15 @@ HAKCModuleAnalysis::ExtractGlobalFromKernelParam(GlobalVariable *GV) {
   else {
     return nullptr;
   }
-
-  CommonHAKCAnalysis::getWriter(
-      CommonAnalysis.GetSystemInfo().OutputDebugInfo(GV))
-      << "processing kernel param\n"
-      << *kernparam << "\n";
+ CommonHAKCAnalysis::getLogger(Debug, !CommonAnalysis.GetSystemInfo().OutputDebugInfo(GV)) << "processing kernel param\n"
+                                         << *kernparam << "\n";
 
   return kernparam;
 }
 
 void HAKCModuleAnalysis::TemporalAnalysis() {
   // FunctionTemporalAnalysis
-  CommonHAKCAnalysis::getWriter(Error)
+  CommonHAKCAnalysis::getLogger(Debug)
       << "!!!! Starting Module Temporal Analysis !!!!\n";
   // create managed pointers (essentially what is being done at the beginning of
   // the compartmentalization code)
@@ -296,7 +292,7 @@ void HAKCModuleAnalysis::TemporalAnalysis() {
     HAKCFunctionAnalysis FunctionAnalysis(F, (*this), Transformer, Policy);
     FunctionAnalysis.TemporalAnalysis();
   }
-  CommonHAKCAnalysis::getWriter(Error)
+  CommonHAKCAnalysis::getLogger(Debug)
       << "!!!! Finished Module Temporal Analysis !!!!\n";
 }
 

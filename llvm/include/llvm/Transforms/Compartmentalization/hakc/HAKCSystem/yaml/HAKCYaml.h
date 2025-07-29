@@ -213,7 +213,8 @@ struct HAKCYamlConfig {
   HAKCYAMLStringSequenceType SeparateNamespacePathsList;
   HAKCYAMLStringSequenceType HAKCSourcePathsList;
   HAKCYAMLStringSequenceType TransferFunctionCandidates;
-  HAKCLogLevel LogLevel;
+  HAKCLogLevel ConsoleLogLevel;
+  HAKCLogLevel FileLogLevel;
   HAKCYamlDatabaseConfig DatabaseConfig;
   bool TemporalAnalysisEnabled;
   bool DebugDatabase;
@@ -430,7 +431,8 @@ template <> struct yaml::MappingTraits<hakc::HAKCYamlConfig> {
       io.mapOptional("IgnoredTypes", YamlConfig.IgnoredTypes);
       io.mapOptional("IgnoredGlobals", YamlConfig.IgnoredGlobals);
       io.mapOptional("AllocationFunctions", YamlConfig.AllocationFunctions);
-      io.mapOptional("LogLevel", YamlConfig.LogLevel, hakc::HAKCLogLevel::Debug);
+      io.mapOptional("ConsoleLogLevel", YamlConfig.ConsoleLogLevel, hakc::HAKCLogLevel::Debug);
+      io.mapOptional("FileLogLevel", YamlConfig.FileLogLevel, hakc::HAKCLogLevel::Debug);
       io.mapOptional("DebugDatabase", YamlConfig.DebugDatabase, false);
       io.mapOptional("DebugOutputSymbols", YamlConfig.PassDebugSymbols);
       io.mapOptional("PerCPUCompartmentTransferFunction",
@@ -477,7 +479,8 @@ template <> struct yaml::MappingTraits<hakc::HAKCYamlConfig> {
       io.mapOptional("IgnoredTypes", YamlConfig.IgnoredTypes);
       io.mapOptional("IgnoredGlobals", YamlConfig.IgnoredGlobals);
       io.mapOptional("AllocationFunctions", YamlConfig.AllocationFunctions);
-      io.mapOptional("LogLevel", YamlConfig.LogLevel, hakc::HAKCLogLevel::Debug);
+      io.mapOptional("ConsoleLogLevel", YamlConfig.ConsoleLogLevel, hakc::HAKCLogLevel::Debug);
+      io.mapOptional("FileLogLevel", YamlConfig.FileLogLevel, hakc::HAKCLogLevel::Debug);
       io.mapOptional("DebugDatabase", YamlConfig.DebugDatabase, false);
       io.mapOptional("DebugOutputSymbols", YamlConfig.PassDebugSymbols);
       io.mapOptional("PerCPUCompartmentTransferFunction",

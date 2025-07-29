@@ -29,7 +29,7 @@ Instruction *hakc::HAKCCustomTransfer::CreateTransfer(
   for (auto &Arg : Args()) {
     auto it = ArgMap.find(Arg.ArgUse);
     if (it == ArgMap.end()) {
-      CommonHAKCAnalysis::getWriter(Error)
+      CommonHAKCAnalysis::getLogger(Fatal)
           << "Unsupported argument use in index " << Arg.Idx
           << " for custom transfer " << GetName() << "\n";
       throw std::exception();
@@ -38,7 +38,7 @@ Instruction *hakc::HAKCCustomTransfer::CreateTransfer(
   }
 
   auto *TransferCall = HAKCIRBuilder.CreateCall(GetFunction(), CallArgs);
-  CommonHAKCAnalysis::getWriter(Debug)
+  CommonHAKCAnalysis::getLogger(Debug)
       << "Created Custom Transfer " << *TransferCall << " for " << *Pointer
       << "\n";
   return TransferCall;

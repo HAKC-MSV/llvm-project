@@ -149,6 +149,8 @@ public:
 
   HAKCTypeIdentifier& GetTypeIdentifier() const;
 
+  HAKCLogger &getLogger(HAKCLogLevel log_level) const;
+
   void TemporalAnalysis();
 
   void TemporalAnalysisHandleCall(ManagedHAKCPointerUseP Use);

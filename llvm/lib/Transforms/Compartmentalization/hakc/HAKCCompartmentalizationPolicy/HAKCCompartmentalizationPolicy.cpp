@@ -83,7 +83,7 @@ ssize_t HAKCDatabaseResponse::ReadFromSocket(raw_socket_stream &OS, void *Dest,
   } while (BytesRead != Size);
 
   if (OS.has_error()) {
-    CommonHAKCAnalysis::getWriter(Error)
+    CommonHAKCAnalysis::getLogger(Fatal)
         << "There was an error reading the policy server socket: "
         << OS.error().message() << "\n";
     throw std::exception();
@@ -144,7 +144,7 @@ void HAKCDatabaseConnection::connect() {
          * Expected object to be properly destructed. llvm::toString does
          * this.
          */
-        CommonHAKCAnalysis::getWriter(Debug)
+        CommonHAKCAnalysis::getLogger(Fatal)
             << "Error connecting to " << DatabaseInformation.GetServerURL()
             << ": " << llvm::toString(NewConnection.takeError()) << "\n";
         throw std::exception();
@@ -161,7 +161,7 @@ void HAKCDatabaseConnection::connect() {
   }
 
   if (!CheckConnection()) {
-    CommonHAKCAnalysis::getWriter(Error)
+    CommonHAKCAnalysis::getLogger(Fatal)
         << "Could not connect to " << DatabaseInformation.GetServerURL()
         << "\n";
     throw std::exception();
@@ -189,7 +189,7 @@ void HAKCCompartmentalizationPolicy::DisconnectFromDatabase() {
 }
 
 void HAKCCompartmentalizationPolicy::ConnectToDatabase() {
-  CommonHAKCAnalysis::getWriter(Debug)
+  CommonHAKCAnalysis::getLogger(Debug)
       << "Connecting to "
       << SystemInformation.GetDatabaseInformation().GetServerURL() << "\n";
   Client.connect();
@@ -197,7 +197,7 @@ void HAKCCompartmentalizationPolicy::ConnectToDatabase() {
 
 void HAKCCompartmentalizationPolicy::CheckConnection() const {
   if (!Client) {
-    CommonHAKCAnalysis::getWriter(Error) << "Client is unavailable\n";
+    CommonHAKCAnalysis::getLogger(Fatal) << "Client is unavailable\n";
     throw std::exception();
   }
 }
@@ -208,7 +208,7 @@ HAKCCompartmentalizationPolicy::GetDivision(GlobalValue *GV) {
   // compartment_id, entry_token)
   auto HAKCSymbol = SystemInformation.GetTypeIdentifier().FindSymbol(GV, true);
   if (!HAKCSymbol) {
-    CommonHAKCAnalysis::getWriter(Debug)
+    CommonHAKCAnalysis::getLogger(Debug)
         << "Could not find HAKCSymbol for " << GV << "\n";
     return GetDefaultDivision();
   }
@@ -222,38 +222,38 @@ HAKCCompartmentalizationPolicy::GetDivision(GlobalValue *GV) {
       Parameters);
   auto DivisionYAML = ResponseData.getObject("Division");
   if (!DivisionYAML) {
-    CommonHAKCAnalysis::getWriter(Error)
+    CommonHAKCAnalysis::getLogger(Fatal)
         << "Invalid Response for " << *GV << "\n";
     throw std::exception();
   }
   auto CompartmentYAML = ResponseData.getObject("Compartment");
   if (!CompartmentYAML) {
-    CommonHAKCAnalysis::getWriter(Error)
+    CommonHAKCAnalysis::getLogger(Fatal)
         << "Invalid Response for " << *GV << "\n";
     throw std::exception();
   }
 
   auto DivisionID = DivisionYAML->getInteger("DivisionID");
   if (!DivisionID.has_value()) {
-    CommonHAKCAnalysis::getWriter(Error)
+    CommonHAKCAnalysis::getLogger(Fatal)
         << "Could not get DivisionID for " << *GV << "\n";
     throw std::exception();
   }
   auto DivisionAccessToken = DivisionYAML->getInteger("AccessToken");
   if (!DivisionAccessToken.has_value()) {
-    CommonHAKCAnalysis::getWriter(Error)
+    CommonHAKCAnalysis::getLogger(Fatal)
         << "Received No Entry Token for " << *GV << "\n";
     throw std::exception();
   }
   auto CompartmentID = CompartmentYAML->getInteger("CompartmentID");
   if (!CompartmentID.has_value()) {
-    CommonHAKCAnalysis::getWriter(Error)
+    CommonHAKCAnalysis::getLogger(Fatal)
         << "Could not find CompartmentID for " << *GV << "\n";
     throw std::exception();
   }
   auto EntryToken = CompartmentYAML->getInteger("EntryToken");
   if (!EntryToken.has_value()) {
-    CommonHAKCAnalysis::getWriter(Error)
+    CommonHAKCAnalysis::getLogger(Fatal)
         << "Received No Entry Token for " << *GV << "\n";
     throw std::exception();
   }
@@ -290,7 +290,7 @@ HAKCDivisionP HAKCCompartmentalizationPolicy::GetDivision(
               Parameters);
   auto DivisionAccessToken = ResponseData.getInteger("AccessToken");
   if (!DivisionAccessToken.has_value()) {
-    CommonHAKCAnalysis::getWriter(Error)
+    CommonHAKCAnalysis::getLogger(Fatal)
         << "Received No Entry Token for Division " << DivisionID << "\n";
     throw std::exception();
   }
@@ -321,7 +321,7 @@ HAKCCompartmentP HAKCCompartmentalizationPolicy::GetCompartment(
       Parameters);
   auto EntryToken = ResponseData.getInteger("EntryToken");
   if (!EntryToken.has_value()) {
-    CommonHAKCAnalysis::getWriter(Error)
+    CommonHAKCAnalysis::getLogger(Fatal)
         << "Received No Entry Token for Compartment " << CompartmentID << "\n";
     throw std::exception();
   }
@@ -341,7 +341,7 @@ void HAKCCompartmentalizationPolicy::GetValidTargets(
       Parameters);
   auto ValidTargets = ResponseData.getArray("ValidTargets");
   if (!ValidTargets) {
-    CommonHAKCAnalysis::getWriter(Debug)
+    CommonHAKCAnalysis::getLogger(Debug)
         << "No ValidTargets found for CompartmentID: " << CompartmentID << "\n";
     return;
   }
@@ -377,13 +377,13 @@ HAKCCompartmentalizationPolicy::Execute(StringRef Endpoint,
   HAKCDatabaseRequest Request(Endpoint, Parameters);
   auto Response = Client.HandleRequest(Request);
   if (!Response) {
-    CommonHAKCAnalysis::getWriter(Error)
+    CommonHAKCAnalysis::getLogger(Fatal)
         << "Error Handling Request to " << Endpoint << "\n";
     throw std::exception();
   }
   auto ParsedJson = Response.GetJSON();
   if (auto E = ParsedJson.takeError()) {
-    CommonHAKCAnalysis::getWriter(Error)
+    CommonHAKCAnalysis::getLogger(Fatal)
         << "Error Parsing JSON: " << llvm::toString(std::move(E)) << "\n";
     throw std::exception();
   }
