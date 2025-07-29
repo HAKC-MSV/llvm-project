@@ -400,8 +400,9 @@ hakc::HAKCTypeIdentifier::HandleType(const DIType *type) {
     CommonHAKCAnalysis::getWriter(debug) << "Already created " << *type << "\n";
     return TypeP;
   }
-  if (isa<DICompositeType>(type) || isa<DISubroutineType>(type) ||
-      isa<DIBasicType>(type)) {
+  auto *StrippedTy = HAKCTypeInfo::StripTypeModifiers(type);
+  if (isa<DICompositeType>(StrippedTy) || isa<DISubroutineType>(StrippedTy) ||
+      isa<DIBasicType>(StrippedTy)) {
     CommonHAKCAnalysis::getWriter(debug) << "Creating HAKCTypeInfo for\n"
                                          << type << "\n";
     auto TypeName = GetTypeName(type);
@@ -444,7 +445,7 @@ hakc::HAKCTypeIdentifier::HandleType(const DIType *type) {
             << "Setting " << *TypeP << " LLVM Type to be " << *LLVMTy << "\n";
         TypeP->SetLLVMType(LLVMTy);
       }
-    } else if (auto *SubRoutineTy = dyn_cast<DISubroutineType>(type)) {
+    } else if (auto *SubRoutineTy = dyn_cast<DISubroutineType>(StrippedTy)) {
       for (auto *FuncTy : SubRoutineTy->getTypeArray()) {
         if (FuncTy) {
           HandleType(FuncTy);
@@ -456,7 +457,7 @@ hakc::HAKCTypeIdentifier::HandleType(const DIType *type) {
       }
     }
     AddTypeMapping(type, TypeP);
-  } else if (auto *DerivedTy = dyn_cast<DIDerivedType>(type)) {
+  } else if (auto *DerivedTy = dyn_cast<DIDerivedType>(StrippedTy)) {
     if (DerivedTy->getTag() == dwarf::DW_TAG_member) {
       if (DerivedTy->getBaseType()) {
         HandleType(DerivedTy->getBaseType());
@@ -1309,12 +1310,22 @@ hakc::HAKCTypeIdentifier::FindPointerType(const HAKCTypeInfo &BaseType) {
 hakc::HAKCTypeP
 hakc::HAKCTypeIdentifier::FindTypeFromDebug(const DbgVariableRecord &DVR,
                                             Value *V) {
+  auto *DITy = DVR.getVariable()->getType();
+  int64_t FragmentSize = 0;
+  auto IsOffset = DVR.getExpression()->extractIfOffset(FragmentSize);
   CommonHAKCAnalysis::getWriter(
       AnalysisHelper.GetSystemInfo().OutputDebugInfo())
-      << "Finding type for " << DVR << "\n";
-  auto *DITy = DVR.getVariable()->getType();
+      << "Finding type for " << DVR << " with Variable " << *DVR.getVariable()
+      << " and DITy " << *DITy;
+  if (IsOffset) {
+    CommonHAKCAnalysis::getWriter(
+        AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+        << " with Fragment size " << FragmentSize;
+  }
+  CommonHAKCAnalysis::getWriter(
+      AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+      << "\n";
   if (DITy->getTag() == dwarf::DW_TAG_structure_type) {
-    auto FragmentSize = DVR.getFragmentSizeInBits();
     auto *CompositeTy = dyn_cast<DICompositeType>(DITy);
     if (FragmentSize) {
       for (auto *Member : CompositeTy->getElements()) {
@@ -1324,11 +1335,11 @@ hakc::HAKCTypeIdentifier::FindTypeFromDebug(const DbgVariableRecord &DVR,
                  << *DITy << " is not a derived type\n";
           continue;
         }
-        if (CompositeMember->getOffsetInBits() == *FragmentSize) {
+        if (CompositeMember->getOffsetInBits() == FragmentSize) {
           CommonHAKCAnalysis::getWriter(
               AnalysisHelper.GetSystemInfo().OutputDebugInfo())
               << "Found Member " << *CompositeMember << " at offset "
-              << *FragmentSize << " with BaseType ";
+              << FragmentSize << " with BaseType ";
           if (!CompositeMember->getBaseType()) {
             CommonHAKCAnalysis::getWriter(
                 AnalysisHelper.GetSystemInfo().OutputDebugInfo())
@@ -1431,7 +1442,6 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
       }
     }
     for (auto *DVR : DVRUsers) {
-
       CommonHAKCAnalysis::getWriter(
           AnalysisHelper.GetSystemInfo().OutputDebugInfo())
           << "Examining Debug Record " << *DVR << "\n";
@@ -1608,6 +1618,9 @@ exit:
       auto PointeeType = FindType(FirstMemberType);
       FoundType->SetPointeeType(PointeeType);
     }
+  }
+  if (FoundType && V->getType()->isPointerTy() && !FoundType->IsPointerType()) {
+    FoundType = FindPointerType(*FoundType);
   }
 
   if (FoundType) {

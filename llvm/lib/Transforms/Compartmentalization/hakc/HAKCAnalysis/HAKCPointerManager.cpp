@@ -199,11 +199,10 @@ bool HAKCPointerManager::ManageNewPointer(Use &U) {
 
   auto ManagedPointer =
       std::make_shared<ManagedHAKCPointer>(BaseDefinition, *this, NextID);
-  /*if (NextID == 4 &&
-      HAKCAnalysis.GetFunction().getName() == "perf_trace_io_uring_defer") {
+  if (NextID == 5 && HAKCAnalysis.GetFunction().getName() == "io_recv") {
     CommonHAKCAnalysis::getWriter(DebugActive)
         << "Found " << *ManagedPointer << "\n";
-  }*/
+  }
   HAKCAnalysis.GetModuleAnalysis().GetTypeIdentifier().FindType(
       *ManagedPointer);
   if (ManagedPointer->GetType() && ManagedPointer->GetType()->IsIgnoredType()) {
@@ -218,6 +217,11 @@ bool HAKCPointerManager::ManageNewPointer(Use &U) {
                          .GetTypeIdentifier()
                          .GetVoidPointerPointeeType();
     ManagedPointer->GetType()->SetPointeeType(PointeeTy);
+  }
+  if (ManagedPointer->GetType() &&
+      !ManagedPointer->GetType()->IsPointerType()) {
+    CommonHAKCAnalysis::getWriter(DebugActive)
+        << *ManagedPointer << " is not a pointer type\n";
   }
   CurrentPointerID++;
   CommonHAKCAnalysis::getWriter(DebugActive)
