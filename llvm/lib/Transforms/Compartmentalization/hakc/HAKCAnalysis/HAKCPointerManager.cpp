@@ -200,6 +200,10 @@ bool HAKCPointerManager::ManageNewPointer(Use &U) {
 
   auto ManagedPointer =
       std::make_shared<ManagedHAKCPointer>(BaseDefinition, *this, NextID);
+  if (NextID == 5 && HAKCAnalysis.GetFunction().getName() == "io_recv") {
+    CommonHAKCAnalysis::getWriter(DebugActive)
+        << "Found " << *ManagedPointer << "\n";
+  }
   HAKCAnalysis.GetModuleAnalysis().GetTypeIdentifier().FindType(
       *ManagedPointer);
   if (ManagedPointer->GetType() && ManagedPointer->GetType()->IsIgnoredType()) {
@@ -214,6 +218,11 @@ bool HAKCPointerManager::ManageNewPointer(Use &U) {
                          .GetTypeIdentifier()
                          .GetVoidPointerPointeeType();
     ManagedPointer->GetType()->SetPointeeType(PointeeTy);
+  }
+  if (ManagedPointer->GetType() &&
+      !ManagedPointer->GetType()->IsPointerType()) {
+    CommonHAKCAnalysis::getWriter(DebugActive)
+        << *ManagedPointer << " is not a pointer type\n";
   }
   CurrentPointerID++;
   HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
@@ -304,7 +313,7 @@ bool HAKCPointerManager::UseShouldBeCloned(Use &U) {
                   isa<SelectInst>(UserP) || isa<SExtInst>(UserP) ||
                   isa<IntToPtrInst>(UserP) || isa<PHINode>(UserP) ||
                   isa<FreezeInst>(UserP) || isa<BinaryOperator>(UserP) ||
-                  isa<TruncInst>(UserP);
+                  isa<TruncInst>(UserP) || isa<ZExtInst>(UserP);
 
   if (isa<SubOperator>(UserP)) {
     CloneUse = false;

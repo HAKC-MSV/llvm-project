@@ -29,6 +29,19 @@ std::shared_ptr<HAKCTypeInfo> HAKCTypeIdentifier::FindType(const DIType *type) {
   }
   CommonHAKCAnalysis::getLogger(Verbose)
       << "Finding HAKCTypeInfo for " << *type << "\n";
+  if (auto *Derived = dyn_cast<DIDerivedType>(type)) {
+    CommonHAKCAnalysis::getLogger(Verbose)
+        << " with base type ";
+    if (Derived->getBaseType()) {
+      CommonHAKCAnalysis::getLogger(Verbose)
+          << Derived->getBaseType();
+    } else {
+      CommonHAKCAnalysis::getLogger(Verbose)
+          << "void";
+    }
+    CommonHAKCAnalysis::getLogger(Verbose)
+        << "\n";
+  }
   auto it = TypesWithDebugInfo.find(type);
   if (it == TypesWithDebugInfo.end()) {
     return nullptr;
@@ -386,15 +399,19 @@ HAKCTypeIdentifier::HandleType(const DIType *type) {
         << "Already created " << *type << "\n";
     return TypeP;
   }
-  if (isa<DICompositeType>(type) || isa<DISubroutineType>(type) ||
-      isa<DIBasicType>(type)) {
-    CommonHAKCAnalysis::getLogger(Verbose) << "Creating HAKCTypeInfo for\n"
-                                           << type << "\n";
+  auto *StrippedTy = HAKCTypeInfo::StripTypeModifiers(type);
+  if (isa<DICompositeType>(StrippedTy) || isa<DISubroutineType>(StrippedTy) ||
+      isa<DIBasicType>(StrippedTy)) {
+    CommonHAKCAnalysis::getLogger(Debug) << "Creating HAKCTypeInfo for\n"
+                                         << type << "\n";
     auto TypeName = GetTypeName(type);
     TypeP = std::make_shared<HAKCTypeInfo>(AnalysisHelper, TypeName, debug);
     if (auto *BasicType = dyn_cast<DIBasicType>(type)) {
-      auto *IntTy = IntegerType::get(GetModule().getContext(),
-                                     BasicType->getSizeInBits());
+      auto BitSize = BasicType->getSizeInBits();
+      if (BasicType->getEncoding() == dwarf::DW_ATE_boolean) {
+        BitSize = 1;
+      }
+      auto *IntTy = IntegerType::get(GetModule().getContext(), BitSize);
       TypeP->SetLLVMType(IntTy);
     } else if (auto *CompositeTy = dyn_cast<DICompositeType>(type)) {
       Type *LLVMTy = nullptr;
@@ -427,7 +444,7 @@ HAKCTypeIdentifier::HandleType(const DIType *type) {
             << "Setting " << *TypeP << " LLVM Type to be " << *LLVMTy << "\n";
         TypeP->SetLLVMType(LLVMTy);
       }
-    } else if (auto *SubRoutineTy = dyn_cast<DISubroutineType>(type)) {
+    } else if (auto *SubRoutineTy = dyn_cast<DISubroutineType>(StrippedTy)) {
       for (auto *FuncTy : SubRoutineTy->getTypeArray()) {
         if (FuncTy) {
           HandleType(FuncTy);
@@ -439,7 +456,7 @@ HAKCTypeIdentifier::HandleType(const DIType *type) {
       }
     }
     AddTypeMapping(type, TypeP);
-  } else if (auto *DerivedTy = dyn_cast<DIDerivedType>(type)) {
+  } else if (auto *DerivedTy = dyn_cast<DIDerivedType>(StrippedTy)) {
     if (DerivedTy->getTag() == dwarf::DW_TAG_member) {
       if (DerivedTy->getBaseType()) {
         HandleType(DerivedTy->getBaseType());
@@ -1064,12 +1081,22 @@ HAKCTypeP HAKCTypeIdentifier::FindPointeeType(HAKCTypeP BaseType) {
     return nullptr;
   }
 
+  auto Debug = AnalysisHelper.GetSystemInfo().OutputDebugInfo();
+  CommonHAKCAnalysis::getLogger(Verbose)
+      << "Finding Pointee Type for " << *BaseType << "\n";
+
+  if (BaseType->IsVoidPtrType()) {
+    return GetVoidPointerPointeeType();
+  }
+
   if (BaseType->GetPointeeType()) {
     return BaseType->GetPointeeType();
   }
 
-  CommonHAKCAnalysis::getLogger(Verbose)
-      << "Finding Pointee Type for " << *BaseType << "\n";
+  if (BaseType->IsIntegerType() && IsPointerLikeType(BaseType->GetDbgType())) {
+    return GetVoidPointerPointeeType();
+  }
+
   DIType *TypeToFind = nullptr;
 
   if (BaseType->IsPointerType()) {
@@ -1140,6 +1167,12 @@ HAKCTypeIdentifier::GetArgumentHAKCType(const DISubroutineType *FunctionTy,
     // The + 1 comes from the fact that the type array stores the return type
     // (including void, which is a null pointer) at index 0
     auto *ArgDIType = FunctionTy->getTypeArray()[ArgNo + 1];
+    if (!ArgDIType) {
+      CommonHAKCAnalysis::getLogger(Verbose)
+          << "Could not find argument " << ArgNo + 1 << " type in "
+          << *FunctionTy << "\n";
+      return nullptr;
+    }
     Result = FindType(ArgDIType);
   }
   return Result;
@@ -1284,9 +1317,50 @@ HAKCTypeP HAKCTypeIdentifier::FindPointerType(const HAKCTypeInfo &BaseType) {
   return nullptr;
 }
 
-HAKCTypeP HAKCTypeIdentifier::FindTypeFromDebug(const DILocalVariable &DLV,
-                                                Value *V) {
-  auto FoundType = FindType(DLV.getType());
+HAKCTypeP
+HAKCTypeIdentifier::FindTypeFromDebug(const DbgVariableRecord &DVR,
+                                            Value *V) {
+  auto *DITy = DVR.getVariable()->getType();
+  int64_t FragmentSize = 0;
+  auto IsOffset = DVR.getExpression()->extractIfOffset(FragmentSize);
+  CommonHAKCAnalysis::getLogger(Debug)
+      << "Finding type for " << DVR << " with Variable " << *DVR.getVariable()
+      << " and DITy " << *DITy;
+  if (IsOffset) {
+    CommonHAKCAnalysis::getLogger(Debug)
+        << " with Fragment size " << FragmentSize;
+  }
+  CommonHAKCAnalysis::getLogger(Debug)
+      << "\n";
+  if (DITy->getTag() == dwarf::DW_TAG_structure_type) {
+    auto *CompositeTy = dyn_cast<DICompositeType>(DITy);
+    if (FragmentSize) {
+      for (auto *Member : CompositeTy->getElements()) {
+        auto *CompositeMember = dyn_cast<DIDerivedType>(Member);
+        if (!CompositeMember) {
+          errs() << *Member << " of " << *DVR.getVariable() << " with type "
+                 << *DITy << " is not a derived type\n";
+          continue;
+        }
+        if (CompositeMember->getOffsetInBits() == FragmentSize) {
+          CommonHAKCAnalysis::getLogger(Verbose)
+              << "Found Member " << *CompositeMember << " at offset "
+              << FragmentSize << " with BaseType ";
+          if (!CompositeMember->getBaseType()) {
+            CommonHAKCAnalysis::getLogger(Verbose)
+                << "void*\n";
+            return GetVoidPointerType();
+          }
+          DITy = CompositeMember->getBaseType();
+          CommonHAKCAnalysis::getLogger(Verbose)
+              << *DITy << "\n";
+          break;
+        }
+      }
+    }
+  }
+
+  auto FoundType = FindType(DITy);
   if (FoundType) {
     if (isa<AllocaInst>(V)) {
       auto PointerType = FindPointerType(*FoundType);
@@ -1297,6 +1371,40 @@ HAKCTypeP HAKCTypeIdentifier::FindTypeFromDebug(const DILocalVariable &DLV,
       }
     }
   }
+  return FoundType;
+}
+
+HAKCTypeP HAKCTypeIdentifier::CheckCallUses(Value *V) {
+  HAKCTypeP FoundType = nullptr;
+  for (auto &U : V->uses()) {
+    if (auto *Call = dyn_cast<CallInst>(U.getUser())) {
+      CommonHAKCAnalysis::getWriter(
+          AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+          << "Examining Call Site " << *Call << "\n";
+      if (U.getOperandNo() == Call->getCalledOperandUse().getOperandNo()) {
+        if (auto PointeeTy = FindType(Call->getFunctionType())) {
+          FoundType = FindPointerType(*PointeeTy);
+          if (!FoundType) {
+            FoundType = AddMissingPointerType(PointeeTy);
+          }
+          if (FoundType) {
+            goto exit;
+          }
+        }
+      } else {
+        auto FuncTy = FindCalledFunctionType(Call->getFunctionType());
+        if (FuncTy && FuncTy->GetDbgType()) {
+          auto *SubroutineTy = dyn_cast<DISubroutineType>(FuncTy->GetDbgType());
+          FoundType = GetArgumentHAKCType(SubroutineTy, U.getOperandNo());
+          if (FoundType) {
+            goto exit;
+          }
+        }
+      }
+    }
+  }
+
+exit:
   return FoundType;
 }
 
@@ -1322,146 +1430,183 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
         FoundType = AddMissingPointerType(FuncTy);
       }
     }
-  } else {
+  } else if (isa<Instruction>(V)) {
     findDbgUsers(DbgUsers, V, &DVRUsers);
     for (const auto *DVI : DbgUsers) {
-      if (const auto *DIVar = DVI->getVariable()) {
-        FoundType = FindTypeFromDebug(*DIVar, V);
+      CommonHAKCAnalysis::getWriter(
+          AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+          << "Examining Debug Intrinsic " << *DVI << "\n";
+      if (isa<DbgDeclareInst>(DVI) ||
+          (isa<DbgValueInst>(DVI) && !isa<DbgAssignIntrinsic>(DVI))) {
+        FoundType = FindTypeFromDebug(DVI, V);
         if (FoundType) {
           goto exit;
         }
       }
     }
     for (auto *DVR : DVRUsers) {
-      if (const auto *DIVar = DVR->getVariable()) {
-        FoundType = FindTypeFromDebug(*DIVar, V);
+      CommonHAKCAnalysis::getWriter(
+          AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+          << "Examining Debug Record " << *DVR << "\n";
+      FoundType = FindTypeFromDebug(*DVR, V);
+      if (FoundType) {
+        goto exit;
+      }
+    }
+  }
+
+  if (auto *LoadI = dyn_cast<LoadInst>(V)) {
+    FoundType = CheckCallUses(LoadI);
+    if (FoundType) {
+      goto exit;
+    }
+    if (!getLoadStoreType(LoadI)->isPointerTy()) {
+      SmallVector<HAKCTypeP> Types;
+      auto *LoadTy = getLoadStoreType(LoadI);
+      FindAllTypes(LoadTy, Types);
+      for (auto HAKCTy : Types) {
+        CommonHAKCAnalysis::getWriter(
+            AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+            << "Testing Load Type " << *HAKCTy << "\n";
+        if (HAKCTy->GetDbgType()) {
+          CommonHAKCAnalysis::getWriter(
+              AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+              << " with DIType " << *HAKCTy->GetDbgType() << "\n";
+        }
+        if (LoadTy->isIntegerTy()) {
+          auto UsedAsPointer = AnalysisHelper.ValueIsUsedAsPointer(LoadI);
+          if (UsedAsPointer && IsPointerLikeType(HAKCTy->GetDbgType())) {
+            FoundType = HAKCTy;
+          } else {
+            FoundType = HAKCTy;
+          }
+        } else {
+          FoundType = HAKCTy;
+        }
+      }
+      if (FoundType) {
+        goto exit;
+      }
+    }
+    if (auto *PHI = dyn_cast<PHINode>(LoadI->getPointerOperand())) {
+      for (auto &IncomingV : PHI->incoming_values()) {
+        auto *Def = AnalysisHelper.getDef(IncomingV.get(), false);
+        if (Def != LoadI) {
+          if (auto PointeeType = FindHAKCType(LoadI->getPointerOperand())) {
+            FoundType = FindPointeeType(PointeeType);
+            if (FoundType) {
+              goto exit;
+            }
+          }
+        }
+      }
+    } else {
+      if (auto PointeeType = FindHAKCType(LoadI->getPointerOperand())) {
+        FoundType = FindPointeeType(PointeeType);
         if (FoundType) {
           goto exit;
         }
       }
     }
+  }
 
-    if (auto *LoadI = dyn_cast<LoadInst>(V)) {
-      for (auto &U : LoadI->uses()) {
-        if (auto *Call = dyn_cast<CallInst>(U.getUser())) {
-          if (U.getOperandNo() == Call->getCalledOperandUse().getOperandNo()) {
-            if (auto PointeeTy = FindType(Call->getFunctionType())) {
-              FoundType = FindPointerType(*PointeeTy);
-              if (!FoundType) {
-                FoundType = AddMissingPointerType(PointeeTy);
-              }
-              if (FoundType) {
+  // We have no debug information for V here, so try our best to deduce
+  if (isa<GetElementPtrInst>(V) || isa<GEPOperator>(V)) {
+    Type *SourceType, *DestTy;
+    Value *SourceValue;
+    APInt ByteOffset(64, 0);
+    bool FoundOffset = false;
+    if (isa<GetElementPtrInst>(V)) {
+      auto *GEPI = dyn_cast<GetElementPtrInst>(V);
+      SourceType = GEPI->getSourceElementType();
+      DestTy = GEPI->getResultElementType();
+      SourceValue = GEPI->getPointerOperand();
+      FoundOffset = GEPI->accumulateConstantOffset(GetModule().getDataLayout(),
+                                                   ByteOffset);
+    } else {
+      auto *GEPO = dyn_cast<GEPOperator>(V);
+      SourceType = GEPO->getSourceElementType();
+      SourceValue = GEPO->getPointerOperand();
+      DestTy = GEPO->getResultElementType();
+      FoundOffset = GEPO->accumulateConstantOffset(GetModule().getDataLayout(),
+                                                   ByteOffset);
+    }
+    if (FoundOffset) {
+      auto SourceHAKCTy = FindHAKCType(SourceValue);
+      if (SourceHAKCTy && SourceHAKCTy->GetPointeeType()) {
+        if (isa_and_nonnull<DICompositeType>(
+                SourceHAKCTy->GetPointeeType()->GetDbgType())) {
+          auto *DICompositeTy = dyn_cast<DICompositeType>(
+              SourceHAKCTy->GetPointeeType()->GetDbgType());
+          for (auto *Element : DICompositeTy->getElements()) {
+            if (Element->getTag() == dwarf::DW_TAG_member) {
+              auto *Member = dyn_cast<DIDerivedType>(Element);
+              if (Member->getOffsetInBits() / BITS_PER_BYTE ==
+                  ByteOffset.getZExtValue()) {
+                auto PointeeType = FindType(Member->getBaseType());
+                FoundType = FindPointerType(*PointeeType);
+                if (!FoundType) {
+                  FoundType = AddMissingPointerType(PointeeType);
+                }
                 goto exit;
               }
             }
           }
         }
       }
-      if (!getLoadStoreType(LoadI)->isPointerTy()) {
-        SmallVector<HAKCTypeP> Types;
-        FindAllTypes(getLoadStoreType(LoadI), Types);
-        for (auto HAKCTy : Types) {
-          CommonHAKCAnalysis::getLogger(Verbose)
-              << "Testing Load Type " << *HAKCTy << "\n";
-          if (HAKCTy->GetDbgType()) {
-            CommonHAKCAnalysis::getLogger(Verbose)
-                << " with DIType " << *HAKCTy->GetDbgType() << "\n";
-          }
-          if (IsPointerLikeType(HAKCTy->GetDbgType())) {
-            FoundType = HAKCTy;
-            break;
-          }
-        }
-        if (FoundType) {
-          goto exit;
-        }
-      }
-      if (auto PointeeType = FindHAKCType(LoadI->getPointerOperand())) {
-        FoundType = FindPointeeType(PointeeType);
-      }
+    } else if (DestTy->isPointerTy() || DestTy->isArrayTy()) {
+      CommonHAKCAnalysis::getWriter(
+          AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+          << "Could not determine type for GEP " << *V << "\n";
+      FoundType = GetVoidPointerType();
+      goto exit;
     }
 
-    // We have no debug information for V here, so try our best to deduce
-    if (isa<GetElementPtrInst>(V) || isa<GEPOperator>(V)) {
-      Type *SourceType;
-      Value *SourceValue;
-      APInt ByteOffset(64, 0);
-      bool FoundOffset = false;
-      if (isa<GetElementPtrInst>(V)) {
-        auto *GEPI = dyn_cast<GetElementPtrInst>(V);
-        SourceType = GEPI->getSourceElementType();
-        SourceValue = GEPI->getPointerOperand();
-        FoundOffset = GEPI->accumulateConstantOffset(
-            GetModule().getDataLayout(), ByteOffset);
-      } else {
-        auto *GEPO = dyn_cast<GEPOperator>(V);
-        SourceType = GEPO->getSourceElementType();
-        SourceValue = GEPO->getPointerOperand();
-        FoundOffset = GEPO->accumulateConstantOffset(
-            GetModule().getDataLayout(), ByteOffset);
-      }
-      if (FoundOffset) {
-        auto SourceHAKCTy = FindHAKCType(SourceValue);
-        if (SourceHAKCTy && SourceHAKCTy->GetPointeeType()) {
-          if (isa_and_nonnull<DICompositeType>(
-                  SourceHAKCTy->GetPointeeType()->GetDbgType())) {
-            auto *DICompositeTy = dyn_cast<DICompositeType>(
-                SourceHAKCTy->GetPointeeType()->GetDbgType());
-            for (auto *Element : DICompositeTy->getElements()) {
-              if (Element->getTag() == dwarf::DW_TAG_member) {
-                auto *Member = dyn_cast<DIDerivedType>(Element);
-                if (Member->getOffsetInBits() / BITS_PER_BYTE ==
-                    ByteOffset.getZExtValue()) {
-                  auto PointeeType = FindType(Member->getBaseType());
-                  FoundType = FindPointerType(*PointeeType);
-                  if (!FoundType) {
-                    FoundType = AddMissingPointerType(PointeeType);
-                  }
-                  goto exit;
-                }
-              }
-            }
-          }
-        }
+    HAKCTypeP ElementType = FindType(SourceType);
+    if (!ElementType) {
+      ElementType = GetVoidPointerPointeeType();
+    }
+    FoundType = FindPointerType(*ElementType);
+    if (!FoundType) {
+      FoundType = AddMissingPointerType(ElementType);
+    }
+  } else if (auto *PHI = dyn_cast<PHINode>(V)) {
+    for (auto &IncomingV : PHI->incoming_values()) {
+      auto *Def = AnalysisHelper.getDef(IncomingV, false);
+
+      if (isa<PHINode>(Def) || isa<ConstantPointerNull>(Def)) {
+        continue;
       }
 
-      if (auto ElementType = FindType(SourceType)) {
-        FoundType = FindPointerType(*ElementType);
-        if (!FoundType) {
-          FoundType = AddMissingPointerType(ElementType);
-        }
-      }
-    } else if (auto *PHI = dyn_cast<PHINode>(V)) {
-      for (auto &IncomingV : PHI->incoming_values()) {
-        if (AnalysisHelper.getDef(IncomingV, false) == PHI) {
-          continue;
-        }
-        FoundType = FindHAKCType(IncomingV);
-        if (FoundType) {
-          goto exit;
-        }
+      FoundType = FindHAKCType(IncomingV);
+      if (FoundType) {
+        goto exit;
       }
     }
+  }
 
-    if (auto *Arg = dyn_cast<Argument>(V)) {
-      FoundType = GetArgumentHAKCType(Arg);
-    } else if (auto *Func = dyn_cast<Function>(V)) {
-      if (Func->getSubprogram()) {
-        const auto FuncTy = FindType(Func->getSubprogram()->getType());
-        FoundType = FindPointerType(*FuncTy);
-        if (!FoundType) {
-          FoundType = AddMissingPointerType(FuncTy);
-        }
-      }
-    } else if (auto *CallI = dyn_cast<CallInst>(V)) {
-      if (CallI->getCalledFunction() &&
-          CallI->getCalledFunction()->getSubprogram()) {
-        const auto *SubprogramTy =
-            CallI->getCalledFunction()->getSubprogram()->getType();
-        const auto *ReturnTy = SubprogramTy->getTypeArray()[0];
-        FoundType = FindType(ReturnTy);
+  if (auto *Arg = dyn_cast<Argument>(V)) {
+    FoundType = GetArgumentHAKCType(Arg);
+  } else if (auto *Func = dyn_cast<Function>(V)) {
+    if (Func->getSubprogram()) {
+      const auto FuncTy = FindType(Func->getSubprogram()->getType());
+      FoundType = FindPointerType(*FuncTy);
+      if (!FoundType) {
+        FoundType = AddMissingPointerType(FuncTy);
       }
     }
+  } else if (auto *CallI = dyn_cast<CallInst>(V)) {
+    if (CallI->getCalledFunction() &&
+        CallI->getCalledFunction()->getSubprogram()) {
+      const auto *SubprogramTy =
+          CallI->getCalledFunction()->getSubprogram()->getType();
+      const auto *ReturnTy = SubprogramTy->getTypeArray()[0];
+      FoundType = FindType(ReturnTy);
+    }
+  } else if (auto *ZExtI = dyn_cast<ZExtInst>(V)) {
+    FoundType = FindType(ZExtI->getType());
+  } else if (isa<AllocaInst>(V)) {
+    FoundType = CheckCallUses(V);
   }
 
 exit:
@@ -1471,13 +1616,14 @@ exit:
         FoundType->SetPointeeType(PointeeType);
       }
     } else if (IsStructTypeThatStartsWithPointerLikeType(*FoundType)) {
-      if (IsStructTypeThatStartsWithPointerLikeType(*FoundType)) {
-        auto *FirstMemberType = GetFirstStructMemberType(
-            dyn_cast<DICompositeType>(FoundType->GetDbgType()));
-        auto PointeeType = FindType(FirstMemberType);
-        FoundType->SetPointeeType(PointeeType);
-      }
+      auto *FirstMemberType = GetFirstStructMemberType(
+          dyn_cast<DICompositeType>(FoundType->GetDbgType()));
+      auto PointeeType = FindType(FirstMemberType);
+      FoundType->SetPointeeType(PointeeType);
     }
+  }
+  if (FoundType && V->getType()->isPointerTy() && !FoundType->IsPointerType()) {
+    FoundType = FindPointerType(*FoundType);
   }
 
   if (FoundType) {
@@ -1866,7 +2012,25 @@ void HAKCTypeIdentifier::AddIgnoredType(StringRef TypeName) const {
     }
   }
 }
-HAKCTypeP HAKCTypeIdentifier::GetVoidPointerPointeeType() const {
-  return FindType(IntegerType::get(GetModule().getContext(), BITS_PER_BYTE));
+HAKCTypeP HAKCTypeIdentifier::GetVoidPointerPointeeType() {
+  auto Result =
+      FindType(IntegerType::get(GetModule().getContext(), BITS_PER_BYTE));
+  if (!Result) {
+    Result = std::make_shared<HAKCTypeInfo>(
+        AnalysisHelper, "unsigned char",
+        AnalysisHelper.GetSystemInfo().OutputDebugInfo());
+    Result->SetDbgTypeName("unsigned char");
+    Result->SetLLVMType(
+        IntegerType::get(GetModule().getContext(), BITS_PER_BYTE));
+    TypesMissingDebugInfo.insert(Result);
+  }
+  return Result;
+}
+HAKCTypeP HAKCTypeIdentifier::GetVoidPointerType() {
+  auto VoidPointerTy = FindPointerType(*GetVoidPointerPointeeType());
+  if (!VoidPointerTy) {
+    VoidPointerTy = AddMissingPointerType(GetVoidPointerPointeeType());
+  }
+  return VoidPointerTy;
 }
 } // namespace llvm::hakc

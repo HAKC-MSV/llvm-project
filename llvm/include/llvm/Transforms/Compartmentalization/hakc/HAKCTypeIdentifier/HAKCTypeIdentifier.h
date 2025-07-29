@@ -44,7 +44,9 @@ public:
 
   HAKCTypeP FindHAKCTypeForUse(Use &U);
 
-  HAKCTypeP GetVoidPointerPointeeType() const;
+  HAKCTypeP GetVoidPointerPointeeType();
+
+  HAKCTypeP GetVoidPointerType();
 
   void ProcessDebugInfo();
 
@@ -162,7 +164,9 @@ public:
 
   Type *FindAnonymousType(const DICompositeType *CompositeTy);
 
-  HAKCTypeP FindTypeFromDebug(const DILocalVariable &DLV, Value *V);
+  HAKCTypeP FindTypeFromDebug(const DbgVariableRecord &DVR, Value *V);
+
+  HAKCTypeP CheckCallUses(Value *V);
 
   CommonHAKCAnalysis &AnalysisHelper;
   DebugInfoFinder DbgInfoFinder;
