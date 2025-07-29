@@ -149,7 +149,7 @@ protected:
 
   Type *FindAnonymousType(const DICompositeType *CompositeTy);
 
-  HAKCTypeP FindTypeFromDebug(const DILocalVariable &DLV, Value *V);
+  HAKCTypeP FindTypeFromDebug(const DbgVariableRecord &DVR, Value *V);
 
   HAKCTypeP CheckCallUses(Value *V);
 

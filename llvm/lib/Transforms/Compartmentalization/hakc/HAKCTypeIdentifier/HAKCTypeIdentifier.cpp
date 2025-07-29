@@ -1307,12 +1307,45 @@ hakc::HAKCTypeIdentifier::FindPointerType(const HAKCTypeInfo &BaseType) {
 }
 
 hakc::HAKCTypeP
-hakc::HAKCTypeIdentifier::FindTypeFromDebug(const DILocalVariable &DLV,
+hakc::HAKCTypeIdentifier::FindTypeFromDebug(const DbgVariableRecord &DVR,
                                             Value *V) {
   CommonHAKCAnalysis::getWriter(
       AnalysisHelper.GetSystemInfo().OutputDebugInfo())
-      << "Finding type for " << DLV << "\n";
-  auto FoundType = FindType(DLV.getType());
+      << "Finding type for " << DVR << "\n";
+  auto *DITy = DVR.getVariable()->getType();
+  if (DITy->getTag() == dwarf::DW_TAG_structure_type) {
+    auto FragmentSize = DVR.getFragmentSizeInBits();
+    auto *CompositeTy = dyn_cast<DICompositeType>(DITy);
+    if (FragmentSize) {
+      for (auto *Member : CompositeTy->getElements()) {
+        auto *CompositeMember = dyn_cast<DIDerivedType>(Member);
+        if (!CompositeMember) {
+          errs() << *Member << " of " << *DVR.getVariable() << " with type "
+                 << *DITy << " is not a derived type\n";
+          continue;
+        }
+        if (CompositeMember->getOffsetInBits() == *FragmentSize) {
+          CommonHAKCAnalysis::getWriter(
+              AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+              << "Found Member " << *CompositeMember << " at offset "
+              << *FragmentSize << " with BaseType ";
+          if (!CompositeMember->getBaseType()) {
+            CommonHAKCAnalysis::getWriter(
+                AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+                << "void*\n";
+            return GetVoidPointerType();
+          }
+          DITy = CompositeMember->getBaseType();
+          CommonHAKCAnalysis::getWriter(
+              AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+              << *DITy << "\n";
+          break;
+        }
+      }
+    }
+  }
+
+  auto FoundType = FindType(DITy);
   if (FoundType) {
     if (isa<AllocaInst>(V)) {
       auto PointerType = FindPointerType(*FoundType);
@@ -1391,17 +1424,18 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
           << "Examining Debug Intrinsic " << *DVI << "\n";
       if (isa<DbgDeclareInst>(DVI) ||
           (isa<DbgValueInst>(DVI) && !isa<DbgAssignIntrinsic>(DVI))) {
-        FoundType = FindTypeFromDebug(*DVI->getVariable(), V);
+        FoundType = FindTypeFromDebug(DVI, V);
         if (FoundType) {
           goto exit;
         }
       }
     }
     for (auto *DVR : DVRUsers) {
+
       CommonHAKCAnalysis::getWriter(
           AnalysisHelper.GetSystemInfo().OutputDebugInfo())
           << "Examining Debug Record " << *DVR << "\n";
-      FoundType = FindTypeFromDebug(*DVR->getVariable(), V);
+      FoundType = FindTypeFromDebug(*DVR, V);
       if (FoundType) {
         goto exit;
       }
