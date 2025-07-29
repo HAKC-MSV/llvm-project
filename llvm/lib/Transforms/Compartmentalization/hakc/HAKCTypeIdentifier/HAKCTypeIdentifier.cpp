@@ -1081,7 +1081,6 @@ HAKCTypeP HAKCTypeIdentifier::FindPointeeType(HAKCTypeP BaseType) {
     return nullptr;
   }
 
-  auto Debug = AnalysisHelper.GetSystemInfo().OutputDebugInfo();
   CommonHAKCAnalysis::getLogger(Verbose)
       << "Finding Pointee Type for " << *BaseType << "\n";
 
@@ -1378,8 +1377,7 @@ HAKCTypeP HAKCTypeIdentifier::CheckCallUses(Value *V) {
   HAKCTypeP FoundType = nullptr;
   for (auto &U : V->uses()) {
     if (auto *Call = dyn_cast<CallInst>(U.getUser())) {
-      CommonHAKCAnalysis::getWriter(
-          AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+      CommonHAKCAnalysis::getLogger(Verbose)
           << "Examining Call Site " << *Call << "\n";
       if (U.getOperandNo() == Call->getCalledOperandUse().getOperandNo()) {
         if (auto PointeeTy = FindType(Call->getFunctionType())) {
@@ -1433,8 +1431,7 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
   } else if (isa<Instruction>(V)) {
     findDbgUsers(DbgUsers, V, &DVRUsers);
     for (const auto *DVI : DbgUsers) {
-      CommonHAKCAnalysis::getWriter(
-          AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+      CommonHAKCAnalysis::getLogger(Verbose)
           << "Examining Debug Intrinsic " << *DVI << "\n";
       if (isa<DbgDeclareInst>(DVI) ||
           (isa<DbgValueInst>(DVI) && !isa<DbgAssignIntrinsic>(DVI))) {
@@ -1445,8 +1442,7 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
       }
     }
     for (auto *DVR : DVRUsers) {
-      CommonHAKCAnalysis::getWriter(
-          AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+      CommonHAKCAnalysis::getLogger(Verbose)
           << "Examining Debug Record " << *DVR << "\n";
       FoundType = FindTypeFromDebug(*DVR, V);
       if (FoundType) {
@@ -1465,12 +1461,10 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
       auto *LoadTy = getLoadStoreType(LoadI);
       FindAllTypes(LoadTy, Types);
       for (auto HAKCTy : Types) {
-        CommonHAKCAnalysis::getWriter(
-            AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+        CommonHAKCAnalysis::getLogger(Verbose)
             << "Testing Load Type " << *HAKCTy << "\n";
         if (HAKCTy->GetDbgType()) {
-          CommonHAKCAnalysis::getWriter(
-              AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+          CommonHAKCAnalysis::getLogger(Verbose)
               << " with DIType " << *HAKCTy->GetDbgType() << "\n";
         }
         if (LoadTy->isIntegerTy()) {
@@ -1555,8 +1549,7 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
         }
       }
     } else if (DestTy->isPointerTy() || DestTy->isArrayTy()) {
-      CommonHAKCAnalysis::getWriter(
-          AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+      CommonHAKCAnalysis::getLogger(Error)
           << "Could not determine type for GEP " << *V << "\n";
       FoundType = GetVoidPointerType();
       goto exit;
@@ -1910,7 +1903,7 @@ void HAKCTypeIdentifier::ProcessDebugInfo() {
   for (auto *DIGlobal : DbgInfoFinder.global_variables()) {
     // The DIGlobal->getVariable seems to be null sometimes
     // if (!DIGlobal->getVariable()) {
-    //   CommonHAKCAnalysis::getWriter() << "DIGlobal->getVariable() is
+    //   CommonHAKCAnalysis::getLogger() << "DIGlobal->getVariable() is
     //   NULL!\n"; throw std::exception();
     // }
     auto GlobalP = HandleGlobal(DIGlobal->getVariable());
@@ -2016,9 +2009,9 @@ HAKCTypeP HAKCTypeIdentifier::GetVoidPointerPointeeType() {
   auto Result =
       FindType(IntegerType::get(GetModule().getContext(), BITS_PER_BYTE));
   if (!Result) {
+    // TODO: fix debugging true/false
     Result = std::make_shared<HAKCTypeInfo>(
-        AnalysisHelper, "unsigned char",
-        AnalysisHelper.GetSystemInfo().OutputDebugInfo());
+        AnalysisHelper, "unsigned char", false);
     Result->SetDbgTypeName("unsigned char");
     Result->SetLLVMType(
         IntegerType::get(GetModule().getContext(), BITS_PER_BYTE));

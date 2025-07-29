@@ -476,6 +476,34 @@ public:
     }
     return *this;
   }
+
+
+
+  HAKCLogger &operator<<(const DbgVariableRecord &DVR){
+    for (std::shared_ptr<HAKCWriter> &stream : HAKCStreams) {
+      if (!disabled && (LogLevel >= stream->GetConfiguredLogLevel())) {
+        stream->operator<<(DVR);
+      }
+    }
+    return *this;
+  }
+  HAKCLogger &operator<<(const DbgVariableIntrinsic &DVI){
+    for (std::shared_ptr<HAKCWriter> &stream : HAKCStreams) {
+      if (!disabled && (LogLevel >= stream->GetConfiguredLogLevel())) {
+        stream->operator<<(DVI);
+      }
+    }
+    return *this;
+  }
+
+  HAKCLogger &operator<<(const DILocalVariable &DLV){
+    for (std::shared_ptr<HAKCWriter> &stream : HAKCStreams) {
+      if (!disabled && (LogLevel >= stream->GetConfiguredLogLevel())) {
+        stream->operator<<(DLV);
+      }
+    }
+    return *this;
+  }
 };
 
 } // namespace llvm::hakc

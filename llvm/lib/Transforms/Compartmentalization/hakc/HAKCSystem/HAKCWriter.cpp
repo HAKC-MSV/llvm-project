@@ -272,25 +272,16 @@ HAKCWriter &HAKCWriter::operator<<(const HAKCTransferAction &TransferAction) {
 }
 
 HAKCWriter &HAKCWriter::operator<<(const DbgVariableRecord &DVR) {
-  if (!debug) {
-    return *this;
-  }
-  os << DVR;
+  *os << DVR;
   return *this;
 }
 HAKCWriter &HAKCWriter::operator<<(const DbgVariableIntrinsic &DVI) {
-  if (!debug) {
-    return *this;
-  }
-  os << DVI;
+  *os << DVI;
   return *this;
 }
 
 HAKCWriter &HAKCWriter::operator<<(const DILocalVariable &DLV) {
-  if (!debug) {
-    return *this;
-  }
-  os << DLV;
+  *os << DLV;
   return *this;
 }
 } // namespace llvm::hakc
