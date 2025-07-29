@@ -1147,6 +1147,13 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::GetArgumentHAKCType(
     // The + 1 comes from the fact that the type array stores the return type
     // (including void, which is a null pointer) at index 0
     auto *ArgDIType = FunctionTy->getTypeArray()[ArgNo + 1];
+    if (!ArgDIType) {
+      CommonHAKCAnalysis::getWriter(
+          AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+          << "Could not find argument " << ArgNo + 1 << " type in "
+          << *FunctionTy << "\n";
+      return nullptr;
+    }
     Result = FindType(ArgDIType);
   }
   return Result;
@@ -1394,11 +1401,9 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
       CommonHAKCAnalysis::getWriter(
           AnalysisHelper.GetSystemInfo().OutputDebugInfo())
           << "Examining Debug Record " << *DVR << "\n";
-      if (DVR->isDbgValue() || DVR->isDbgDeclare()) {
-        FoundType = FindTypeFromDebug(*DVR->getVariable(), V);
-        if (FoundType) {
-          goto exit;
-        }
+      FoundType = FindTypeFromDebug(*DVR->getVariable(), V);
+      if (FoundType) {
+        goto exit;
       }
     }
   }
@@ -1436,10 +1441,24 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
         goto exit;
       }
     }
-    if (auto PointeeType = FindHAKCType(LoadI->getPointerOperand())) {
-      FoundType = FindPointeeType(PointeeType);
-      if (FoundType) {
-        goto exit;
+    if (auto *PHI = dyn_cast<PHINode>(LoadI->getPointerOperand())) {
+      for (auto &IncomingV : PHI->incoming_values()) {
+        auto *Def = AnalysisHelper.getDef(IncomingV.get(), false);
+        if (Def != LoadI) {
+          if (auto PointeeType = FindHAKCType(LoadI->getPointerOperand())) {
+            FoundType = FindPointeeType(PointeeType);
+            if (FoundType) {
+              goto exit;
+            }
+          }
+        }
+      }
+    } else {
+      if (auto PointeeType = FindHAKCType(LoadI->getPointerOperand())) {
+        FoundType = FindPointeeType(PointeeType);
+        if (FoundType) {
+          goto exit;
+        }
       }
     }
   }
@@ -1488,7 +1507,7 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
           }
         }
       }
-    } else if (DestTy->isPointerTy()) {
+    } else if (DestTy->isPointerTy() || DestTy->isArrayTy()) {
       CommonHAKCAnalysis::getWriter(
           AnalysisHelper.GetSystemInfo().OutputDebugInfo())
           << "Could not determine type for GEP " << *V << "\n";
@@ -1496,18 +1515,22 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
       goto exit;
     }
 
-    if (auto ElementType = FindType(SourceType)) {
-      FoundType = FindPointerType(*ElementType);
-      if (!FoundType) {
-        FoundType = AddMissingPointerType(ElementType);
-      }
+    HAKCTypeP ElementType = FindType(SourceType);
+    if (!ElementType) {
+      ElementType = GetVoidPointerPointeeType();
+    }
+    FoundType = FindPointerType(*ElementType);
+    if (!FoundType) {
+      FoundType = AddMissingPointerType(ElementType);
     }
   } else if (auto *PHI = dyn_cast<PHINode>(V)) {
     for (auto &IncomingV : PHI->incoming_values()) {
       auto *Def = AnalysisHelper.getDef(IncomingV, false);
+
       if (isa<PHINode>(Def) || isa<ConstantPointerNull>(Def)) {
         continue;
       }
+
       FoundType = FindHAKCType(IncomingV);
       if (FoundType) {
         goto exit;
@@ -1546,12 +1569,10 @@ exit:
         FoundType->SetPointeeType(PointeeType);
       }
     } else if (IsStructTypeThatStartsWithPointerLikeType(*FoundType)) {
-      if (IsStructTypeThatStartsWithPointerLikeType(*FoundType)) {
-        auto *FirstMemberType = GetFirstStructMemberType(
-            dyn_cast<DICompositeType>(FoundType->GetDbgType()));
-        auto PointeeType = FindType(FirstMemberType);
-        FoundType->SetPointeeType(PointeeType);
-      }
+      auto *FirstMemberType = GetFirstStructMemberType(
+          dyn_cast<DICompositeType>(FoundType->GetDbgType()));
+      auto PointeeType = FindType(FirstMemberType);
+      FoundType->SetPointeeType(PointeeType);
     }
   }
 

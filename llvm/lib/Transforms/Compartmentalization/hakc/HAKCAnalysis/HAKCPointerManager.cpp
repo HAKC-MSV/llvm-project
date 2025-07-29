@@ -199,8 +199,8 @@ bool HAKCPointerManager::ManageNewPointer(Use &U) {
 
   auto ManagedPointer =
       std::make_shared<ManagedHAKCPointer>(BaseDefinition, *this, NextID);
-  if (NextID == 5 &&
-      HAKCAnalysis.GetFunction().getName() == "fixup_vdso_exception") {
+  if (NextID == 4 &&
+      HAKCAnalysis.GetFunction().getName() == "perf_trace_io_uring_defer") {
     CommonHAKCAnalysis::getWriter(DebugActive)
         << "Found " << *ManagedPointer << "\n";
   }
