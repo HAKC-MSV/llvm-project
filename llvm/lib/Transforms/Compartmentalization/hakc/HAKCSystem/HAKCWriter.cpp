@@ -284,4 +284,12 @@ HAKCWriter &HAKCWriter::operator<<(const DILocalVariable &DLV) {
   *os << DLV;
   return *this;
 }
+
+HAKCWriter &HAKCWriter::operator<<(const DILocation &DL) {
+  if (!debug) {
+    return *this;
+  }
+  os << DL.getFilename() << ":" << DL.getLine();
+  return *this;
+}
 } // namespace llvm::hakc

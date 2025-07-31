@@ -674,6 +674,15 @@ void HAKCTransformer::ValidateHAKCPointer(const HAKCPointerBase &HAKCPointer) {
   if (HAKCPointer.GetType() == nullptr) {
     CommonHAKCAnalysis::getLogger(Fatal)
         << "HAKCPointer " << HAKCPointer << " has no HAKCType\n";
+    if (auto *I = dyn_cast<Instruction>(HAKCPointer.GetBaseDefinition())) {
+      auto DebugLoc = I->getDebugLoc();
+      CommonHAKCAnalysis::getWriter(true)
+          << "in Function " << I->getFunction()->getName();
+      if (DebugLoc && DebugLoc.get()) {
+        CommonHAKCAnalysis::getWriter(true) << " at " << *DebugLoc.get();
+      }
+      CommonHAKCAnalysis::getWriter(true) << "\n";
+    }
     throw std::exception();
   } else if (HAKCPointer.GetType()->GetPointeeType() == nullptr) {
     CommonHAKCAnalysis::getLogger(Fatal)

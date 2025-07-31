@@ -136,6 +136,8 @@ public:
   HAKCWriter &operator<<(const DbgVariableIntrinsic &DVI);
 
   HAKCWriter &operator<<(const DILocalVariable &DLV);
+
+  HAKCWriter &operator<<(const DILocation &DL);
 };
 
 class HAKCLogger {

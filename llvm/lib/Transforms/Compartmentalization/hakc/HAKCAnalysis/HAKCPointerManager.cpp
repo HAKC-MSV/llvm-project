@@ -200,10 +200,6 @@ bool HAKCPointerManager::ManageNewPointer(Use &U) {
 
   auto ManagedPointer =
       std::make_shared<ManagedHAKCPointer>(BaseDefinition, *this, NextID);
-  if (NextID == 5 && HAKCAnalysis.GetFunction().getName() == "io_recv") {
-    CommonHAKCAnalysis::getLogger(Verbose, !DebugActive)
-        << "Found " << *ManagedPointer << "\n";
-  }
   HAKCAnalysis.GetModuleAnalysis().GetTypeIdentifier().FindType(
       *ManagedPointer);
   if (ManagedPointer->GetType() && ManagedPointer->GetType()->IsIgnoredType()) {
@@ -391,8 +387,6 @@ bool HAKCPointerManager::UseShouldUtilizeSignedBasePointer(Use &U) const {
     }
   } else if (isa<AtomicCmpXchgInst>(UserP)) {
     if (U.getOperandNo() != AtomicCmpXchgInst::getPointerOperandIndex()) {
-      HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
-          << "Signed 2\n";
       UseSignedPointer = true;
     }
   } else if (auto *Call = dyn_cast<CallInst>(UserP)) {
