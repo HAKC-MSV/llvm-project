@@ -199,7 +199,8 @@ bool HAKCPointerManager::ManageNewPointer(Use &U) {
 
   auto ManagedPointer =
       std::make_shared<ManagedHAKCPointer>(BaseDefinition, *this, NextID);
-  if (NextID == 5 && HAKCAnalysis.GetFunction().getName() == "io_recv") {
+  if (NextID == 23 &&
+      HAKCAnalysis.GetFunction().getName() == "ZSTD_decompressBlock_internal") {
     CommonHAKCAnalysis::getWriter(DebugActive)
         << "Found " << *ManagedPointer << "\n";
   }
