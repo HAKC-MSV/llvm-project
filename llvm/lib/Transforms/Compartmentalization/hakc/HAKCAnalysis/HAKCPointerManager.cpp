@@ -200,6 +200,11 @@ bool HAKCPointerManager::ManageNewPointer(Use &U) {
 
   auto ManagedPointer =
       std::make_shared<ManagedHAKCPointer>(BaseDefinition, *this, NextID);
+  if (NextID == 4 &&
+      HAKCAnalysis.GetFunction().getName() == "pci_irq_mask_msix") {
+    CommonHAKCAnalysis::getWriter(DebugActive)
+        << "Found " << *ManagedPointer << "\n";
+  }
   HAKCAnalysis.GetModuleAnalysis().GetTypeIdentifier().FindType(
       *ManagedPointer);
   if (ManagedPointer->GetType() && ManagedPointer->GetType()->IsIgnoredType()) {
