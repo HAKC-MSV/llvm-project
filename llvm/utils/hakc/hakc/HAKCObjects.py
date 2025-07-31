@@ -537,7 +537,9 @@ class HAKCFunction(HAKCSymbol):
         self.indirect_calls = IndirectCalls if IndirectCalls is not None else list()
         self.types_used = TypesUsed if TypesUsed is not None else list()
 
-    def pretty_print(self):
+    def pretty_print(self, epoch=None):
+        if epoch:
+            return f"HAKCFunction({self.name} in Epoch {epoch})"
         return f"HAKCFunction({self.name})"
 
     def __str__(self):

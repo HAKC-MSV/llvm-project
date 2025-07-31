@@ -199,23 +199,50 @@ def node_with_max_edges(graph):
 def temporal_coalesce(G: HAKCCompartmentalization):
     # https://networkx.org/documentation/stable/reference/algorithms/traversal.html
     epoch_map = {}
-
     # use main node as source
-    src = list(G.get_symbol_by_name("main"))[0]
-    # print(src)
-    epoch = 0
-    # Note: use nx.edge_bfs because bfs_successors may miss some nodes on partially traversed trees
-    # Note: Also, don't rely on types in types_used to point to the same object because a copy is implicitly made
+    main_tmp = G.get_symbol_by_name("main")
+    _main = [main_tmp[0]] if (len(main_tmp) == 0) else None
 
-    for n0, n1, key in nx.edge_bfs(G, src):
-        if isinstance(n0, HAKCFunction):
-            if n0 not in epoch_map:
-                epoch_map[n0] = epoch
-                epoch += 1
+    type_subG = {}
+    # get all types
+    # print("Types:")
+    tys = G.get_types()
+    for ty in tys:
+        epoch_map[ty] = {}
 
-    G.temporal_coalesce_parent_child(src, epoch_map)
-    G.temporal_coalesce_parent_children(src, epoch_map)
-    G.save_graph("temporal_coalesce.svg", filter_symbols=True)
+        print(f"Ty {ty} edges: {G.in_edges(ty, data=True)}")
+        subG = G.get_type_subgraph(ty)
+        type_subG[ty] = subG
+
+        epoch = 0
+        # Note: use nx.edge_bfs because bfs_successors may miss some nodes on partially traversed trees
+        # Note: Also, don't rely on types in types_used to point to the same object because a copy is implicitly made
+        # Note: Add attributes to the node rather than trying to modify the underlying HAKC object (this seems to do some weird things)
+        # for n in nx.bfs_successors(subG, _main):
+        # Note: Use edge_bfs instead of bfs_successor because bfs_successor requires a source node which we sometimes don't have
+        # set all node epoch values to -1
+        nx.set_node_attributes(subG, -1, "epoch")
+        for n0, n1, key in nx.edge_bfs(subG, _main):
+            if isinstance(n0, HAKCFunction):
+                if subG.nodes[n0]["epoch"] == -1:
+                    subG.nodes[n0]["epoch"] = epoch
+                    epoch += 1
+            if isinstance(n1, HAKCFunction):
+                if subG.nodes[n1]["epoch"] == -1:
+                    subG.nodes[n1]["epoch"] = epoch
+                    epoch += 1
+        # for n0, n1, key in nx.edge_bfs(subG, source=_main):
+        print(f"Produced Epoch Map: {epoch_map[ty]}")
+        subG.save_graph(f"funcs_for_ty_{ty.debug_type}.png".replace(" ",""))
+
+
+        # now save the epoch values to the graph nodes themselves
+        # for n in subG.nodes:
+
+    # G.temporal_coalesce_parent_child(src, epoch_map)
+    # G.temporal_coalesce_parent_children(src, epoch_map)
+    # G.save_graph("temporal_coalesce.svg", filter_symbols=True)
+
     # print(f"Created epoch map {epoch_map}")
     # lst = list()
     # for n0, n1, key in nx.edge_bfs(G, src):
@@ -227,7 +254,6 @@ def temporal_coalesce(G: HAKCCompartmentalization):
             # common_perms = G.get_common_type_perms(n0, n1, debug=True)
             # if(len(common_perms) > 0):
             #     print(f"Could merge {n0} in epoch {epoch_map[n0]} with {n1} in epoch {epoch_map[n1]} with common permissions {common_perms}")
-
 
     # print(f"successors: {nx.bfs_successors(G, sym0)}")
     # for success in nx.bfs_successors(G, src):
@@ -270,11 +296,11 @@ def temporal_analysis(db_dir: str):
     compartmentalization = HAKCCompartmentalization()
     compartmentalization.load_from_db(conn)
 
-    pair = conn.get_functions_to_merge()
-    hash_to_sym_map = conn.get_symbol_hashes_to_symbols()
-    for child0, child1 in pair:
-        print(f"Could merge {hash_to_sym_map[child0]} and {hash_to_sym_map[child1]}")
-    print(f"Found {len(pair)} pairs to merge using Kuzu algorithm")
+    # pair = conn.get_functions_to_merge()
+    # hash_to_sym_map = conn.get_symbol_hashes_to_symbols()
+    # for child0, child1 in pair:
+    #     print(f"Could merge {hash_to_sym_map[child0]} and {hash_to_sym_map[child1]}")
+    # print(f"Found {len(pair)} pairs to merge using Kuzu algorithm")
 
     temporal_coalesce(compartmentalization)
 

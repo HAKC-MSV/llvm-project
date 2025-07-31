@@ -373,6 +373,30 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
     def get_symbol_by_name(self, symbol_name):
         return self.get_filtered_nodes(self, node_filter=lambda n: (isinstance(n, HAKCFunction) or isinstance(n, HAKCGlobalVariable)) and n.name == symbol_name)
 
+    def get_functions_that_use_type(self, ty, debug=False):
+        if debug:
+            print(f"Type {ty} is used in functions:")
+        funcs = set()
+        # Note: For DiGraph, specify in_edges and out_edges, since using just edges() defaults to out edges
+        for func, ty0, data in self.in_edges(ty, data=True):
+            # checks here are probably redundant
+            # print(data)
+            # print(f"Func: {func.name}, Ty: {ty0.debug_type}, data: {data}")
+            if ty0 == ty and isinstance(func, HAKCFunction) and 'R' in data:
+                funcs.add(func)
+                if debug:
+                    print(f"\t{func} with perm {self.convert_rwx(**data)}")
+        return funcs
+
+    def get_type_subgraph(self, ty):
+        funcs_ty_nodes = self.get_functions_that_use_type(ty, False)
+        # G = self.subgraph(list(filter(lambda x: isinstance(x, HAKCSymbol) or isinstance(x, HAKCType), self.nodes)))
+        funcs_ty_nodes.add(ty)
+        G = self.subgraph(list(funcs_ty_nodes))
+        # G.save_graph(f"funcs_for_ty_{str(ty.debug_type).strip()}.png".strip())
+        return G
+
+
     @staticmethod
     def convert_rwx(**rwx):
         return int((rwx["R"] << 2) + (rwx["W"] << 1) + rwx["X"])
@@ -677,6 +701,11 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
 
         return [node for node, degree in sorted_degrees[:n]]
 
+    def relabel_nodes(self, x):
+        if (isinstance(x, HAKCFunction)):
+            return x.pretty_print(self.nodes[x]["epoch"] if "epoch" in self.nodes[x] else None)
+        else:
+            return x.pretty_print()
 
     def save_graph(self, fname, symbol_name = None, prune = False, N = 50, filter_symbols = False):
         from networkx.drawing.nx_pydot import to_pydot
@@ -710,7 +739,9 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             # print(G.nodes)
             G = subgraph
 
-        G = nx.relabel_nodes(G, lambda x: x.pretty_print())
+        # todo: pass in networkx node attributes like epoch so it can be printed
+        # subG.nodes[n0]["epoch"]
+        G = nx.relabel_nodes(G, self.relabel_nodes)
 
         dot = to_pydot(G)
         dot.set_splines("true")
