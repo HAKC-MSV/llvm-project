@@ -200,8 +200,8 @@ bool HAKCPointerManager::ManageNewPointer(Use &U) {
 
   auto ManagedPointer =
       std::make_shared<ManagedHAKCPointer>(BaseDefinition, *this, NextID);
-  if (NextID == 4 &&
-      HAKCAnalysis.GetFunction().getName() == "pci_irq_mask_msix") {
+  if (NextID == 1 &&
+      HAKCAnalysis.GetFunction().getName() == "net_dim_get_rx_moderation") {
     CommonHAKCAnalysis::getWriter(DebugActive)
         << "Found " << *ManagedPointer << "\n";
   }

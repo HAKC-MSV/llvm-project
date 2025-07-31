@@ -1160,8 +1160,20 @@ HAKCTypeP HAKCTypeIdentifier::GetArgumentHAKCType(Argument *Arg) {
   HAKCTypeP Result = nullptr;
   if (DISubprog) {
     Result = GetArgumentHAKCType(DISubprog->getType(), Arg->getArgNo());
-  } else {
-    Result = FindType(Arg->getType());
+  }
+
+  if (!Result) {
+    auto FuncHAKCTy =
+        FindCalledFunctionType(Arg->getParent()->getFunctionType());
+    if (FuncHAKCTy) {
+      auto *DbgFuncTy = dyn_cast<DISubroutineType>(FuncHAKCTy->GetDbgType());
+      for (unsigned i = 1; i < DbgFuncTy->getTypeArray().size(); i++) {
+        if (i == Arg->getArgNo() + 1) {
+          Result = FindType(DbgFuncTy->getTypeArray()[i]);
+          break;
+        }
+      }
+    }
   }
   return Result;
 }
@@ -1170,13 +1182,34 @@ HAKCTypeP
 HAKCTypeIdentifier::GetArgumentHAKCType(const DISubroutineType *FunctionTy,
                                         unsigned ArgNo) {
   HAKCTypeP Result = nullptr;
+  // The + 1 comes from the fact that the type array stores the return type
+  // (including void, which is a null pointer) at index 0
+  auto ArgIdx = ArgNo + 1;
   if (FunctionTy) {
-    // The + 1 comes from the fact that the type array stores the return type
-    // (including void, which is a null pointer) at index 0
-    auto *ArgDIType = FunctionTy->getTypeArray()[ArgNo + 1];
+    if (AnalysisHelper.GetSystemInfo().OutputDebugInfo()) {
+      CommonHAKCAnalysis::getWriter(
+          AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+          << "Getting argument " << ArgIdx << " of " << *FunctionTy << "\n";
+      for (auto *Arg : FunctionTy->getTypeArray()) {
+        if (!Arg) {
+          CommonHAKCAnalysis::getWriter(
+              AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+              << "void\n";
+          continue;
+        }
+        CommonHAKCAnalysis::getWriter(
+            AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+            << *Arg << "\n";
+      }
+    }
+    DIType *ArgDIType = nullptr;
+    if (FunctionTy->getTypeArray().size() < ArgIdx) {
+      ArgDIType = FunctionTy->getTypeArray()[ArgIdx];
+    }
+
     if (!ArgDIType) {
       CommonHAKCAnalysis::getLogger(Verbose)
-          << "Could not find argument " << ArgNo + 1 << " type in "
+          << "Could not find argument " << ArgIdx << " type in "
           << *FunctionTy << "\n";
       return nullptr;
     }
@@ -1466,7 +1499,7 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
         FoundType = AddMissingPointerType(FuncTy);
       }
     }
-  } else if (isa<Instruction>(V)) {
+  } else if (isa<Instruction>(V) || isa<Argument>(V)) {
     findDbgUsers(DbgUsers, V, &DVRUsers);
     for (const auto *DVI : DbgUsers) {
       CommonHAKCAnalysis::getLogger(Verbose)
@@ -1666,12 +1699,15 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
   if (auto *Arg = dyn_cast<Argument>(V)) {
     FoundType = GetArgumentHAKCType(Arg);
   } else if (auto *Func = dyn_cast<Function>(V)) {
+    HAKCTypeP FuncTy = nullptr;
     if (Func->getSubprogram()) {
-      const auto FuncTy = FindType(Func->getSubprogram()->getType());
-      FoundType = FindPointerType(*FuncTy);
-      if (!FoundType) {
-        FoundType = AddMissingPointerType(FuncTy);
-      }
+      FuncTy = FindType(Func->getSubprogram()->getType());
+    } else {
+      FuncTy = FindCalledFunctionType(Func->getFunctionType());
+    }
+    FoundType = FindPointerType(*FuncTy);
+    if (!FoundType) {
+      FoundType = AddMissingPointerType(FuncTy);
     }
   } else if (auto *CallI = dyn_cast<CallInst>(V)) {
     if (CallI->getCalledFunction() &&
