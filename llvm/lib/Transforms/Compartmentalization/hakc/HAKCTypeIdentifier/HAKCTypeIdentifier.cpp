@@ -56,6 +56,15 @@ bool hakc::HAKCTypeIdentifier::IsStructTypeThatStartsWithPointerLikeType(
   if (HAKCTy.GetDbgType()) {
     auto *StrippedTy = HAKCTypeInfo::StripTypeModifiers(HAKCTy.GetDbgType());
     if (auto *CompositeTy = dyn_cast<DICompositeType>(StrippedTy)) {
+      if (CompositeTy->getTag() == dwarf::DW_TAG_union_type) {
+        for (auto *Element : CompositeTy->getElements()) {
+          if (IsPointerLikeType(
+                  dyn_cast<DIDerivedType>(Element)->getBaseType())) {
+            return true;
+          }
+        }
+        return false;
+      }
       auto *FirstMemberTy = GetFirstStructMemberType(CompositeTy);
       return IsPointerLikeType(FirstMemberTy);
     }
@@ -1341,8 +1350,6 @@ hakc::HAKCTypeIdentifier::FindTypeFromDebug(const DbgVariableRecord &DVR,
       for (auto *Member : CompositeTy->getElements()) {
         auto *CompositeMember = dyn_cast<DIDerivedType>(Member);
         if (!CompositeMember) {
-          errs() << *Member << " of " << *DVR.getVariable() << " with type "
-                 << *DITy << " is not a derived type\n";
           continue;
         }
         if (static_cast<int64_t>(CompositeMember->getOffsetInBits()) ==
@@ -1413,6 +1420,27 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::CheckCallUses(Value *V) {
 
 exit:
   return FoundType;
+}
+
+DIDerivedType *
+hakc::HAKCTypeIdentifier::FindUnionMember(const DICompositeType *UnionDef,
+                                          unsigned MemberOffset) const {
+  for (auto *UnionMember : UnionDef->getElements()) {
+    auto MemberTy = HAKCTypeInfo::StripTypeModifiers(
+        dyn_cast<DIDerivedType>(UnionMember)->getBaseType());
+    if (isa_and_nonnull<DICompositeType>(MemberTy)) {
+      auto *MemberStruct = dyn_cast<DICompositeType>(MemberTy);
+      for (auto *Element : MemberStruct->getElements()) {
+        if (Element->getTag() == dwarf::DW_TAG_member) {
+          auto *Member = dyn_cast<DIDerivedType>(Element);
+          if (Member->getOffsetInBits() / BITS_PER_BYTE == MemberOffset) {
+            return Member;
+          }
+        }
+      }
+    }
+  }
+  return nullptr;
 }
 
 hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
@@ -1556,12 +1584,12 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
               auto MemberOffsetInBytes =
                   Member->getOffsetInBits() / BITS_PER_BYTE;
               if (MemberOffsetInBytes == ByteOffset.getZExtValue()) {
-                FoundType = FindType(Member->getBaseType());
-                // auto PointeeType = FindType(Member->getBaseType());
-                // FoundType = FindPointerType(*PointeeType);
-                // if (!FoundType) {
-                //   FoundType = AddMissingPointerType(PointeeType);
-                // }
+                // FoundType = FindType(Member->getBaseType());
+                auto PointeeType = FindType(Member->getBaseType());
+                FoundType = FindPointerType(*PointeeType);
+                if (!FoundType) {
+                  FoundType = AddMissingPointerType(PointeeType);
+                }
                 goto exit;
               }
               if (MemberOffsetInBytes < ByteOffset.getZExtValue()) {
@@ -1570,7 +1598,38 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
             }
           }
           if (!FoundType && PreviousType) {
-            FoundType = FindType(PreviousType->getBaseType());
+            auto *MemberTy =
+                HAKCTypeInfo::StripTypeModifiers(PreviousType->getBaseType());
+            if (isa_and_nonnull<DICompositeType>(MemberTy)) {
+              auto *Submember = dyn_cast<DICompositeType>(MemberTy);
+              auto RemainingOffset =
+                  ByteOffset.getZExtValue() -
+                  PreviousType->getOffsetInBits() / BITS_PER_BYTE;
+              if (Submember->getTag() == dwarf::DW_TAG_union_type) {
+                PreviousType = FindUnionMember(Submember, RemainingOffset);
+                if (!PreviousType) {
+                  FoundType = GetVoidPointerType();
+                  goto exit;
+                }
+              } else {
+                for (auto *Element : Submember->getElements()) {
+                  if (Element->getTag() == dwarf::DW_TAG_member) {
+                    auto *Member = dyn_cast<DIDerivedType>(Element);
+                    auto MemberOffset =
+                        Member->getOffsetInBits() / BITS_PER_BYTE;
+                    if (MemberOffset == RemainingOffset) {
+                      PreviousType = Member;
+                      break;
+                    }
+                  }
+                }
+              }
+            }
+            auto PointeeType = FindType(PreviousType->getBaseType());
+            FoundType = FindPointerType(*PointeeType);
+            if (!FoundType) {
+              FoundType = AddMissingPointerType(PointeeType);
+            }
           }
         }
       }

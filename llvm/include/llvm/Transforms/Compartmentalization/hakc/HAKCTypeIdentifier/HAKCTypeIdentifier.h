@@ -153,6 +153,9 @@ protected:
 
   HAKCTypeP CheckCallUses(Value *V);
 
+  DIDerivedType *FindUnionMember(const DICompositeType *UnionDef,
+                                 unsigned MemberOffset) const;
+
   CommonHAKCAnalysis &AnalysisHelper;
   DebugInfoFinder DbgInfoFinder;
   std::map<const DIType *, HAKCTypeP> TypesWithDebugInfo;
