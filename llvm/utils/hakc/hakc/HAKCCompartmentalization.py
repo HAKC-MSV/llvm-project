@@ -399,7 +399,9 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
 
     @staticmethod
     def convert_rwx(**rwx):
-        return int((rwx["R"] << 2) + (rwx["W"] << 1) + rwx["X"])
+        if 'R' in rwx and 'W' in rwx and 'X' in rwx:
+            return int((rwx["R"] << 2) + (rwx["W"] << 1) + rwx["X"])
+        return None
 
     def get_types_used(self, func, debug=False):
         if debug:
@@ -423,11 +425,53 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             print(f"{type_perms0} ∩ {type_perms1} \n\t= {common_perms}")
         return common_perms
 
-    def temporal_coalesce_parent_child(self, parent, epoch_map):
+    def get_perm(self, func, ty):
+        types_used_data = self.get_edge_data(func,ty)
+        if not types_used_data:
+            return None
+        rwx = types_used_data["has_types_used"] if "has_types_used" in types_used_data else None
+        perm = self.convert_rwx(**rwx)
+        # print(f"get_perm: {perm}")
+        return perm
+
+
+    def temporal_coalesce_parent_child(self, root, ty):
         # coalesce vertically (parent -> child)
         # print(f"Parent {parent} has children:")
-        print(f"Starting temporal coalesce parent child")
-        for successor in nx.bfs_successors(self, parent, depth_limit=1):
+        print(f"!!!Starting temporal coalesce parent child with graph root: {root}!!!")
+        if root:
+            for successor in nx.bfs_successors(self, root):
+                parent = successor[0]
+                children = successor[1]
+                if isinstance(parent, HAKCFunction):
+                    # print(f"\t{successor[0]}, {successor[1]}")
+                    parent_ty_perm = self.get_perm(parent, ty)
+                    print(f"\t{parent.name} parent_ty_perm: {parent_ty_perm}")
+                    for child in children:
+                        if isinstance(child, HAKCFunction):
+                            child_ty_perm = self.get_perm(child, ty)
+                            print(f"\t{child.name} child_ty_perm: {child_ty_perm}")
+                            if parent_ty_perm == child_ty_perm:
+                                parent_epoch = self.nodes[parent]['epoch']
+                                child_epoch = self.nodes[child]['epoch']
+                                new_epoch = min(parent_epoch, child_epoch)
+                                print(f"Merging {parent.pretty_print(parent_epoch)} with {child.pretty_print(child_epoch)} with common permissions {child_ty_perm} to new epoch: {new_epoch}")
+                                self.nodes[parent]['epoch'] = new_epoch
+                                self.nodes[child]['epoch'] = new_epoch
+        else:
+            print(f"Graph Root is None so returning!")
+        print(f"!!!End temporal coalesce parent child!!!\n")
+
+
+    def old_temporal_coalesce_parent_child(self, parent, epoch_map):
+        # coalesce vertically (parent -> child)
+        # print(f"Parent {parent} has children:")
+        if not parent:
+            print(f"In temporal_coalesce_parent_child, parent is None!\n")
+            return
+        print(f"Starting temporal coalesce parent child with graph root: {parent}")
+        # for successor in nx.bfs_successors(self, parent, depth_limit=1):
+        for successor in nx.bfs_successors(self, parent):
             assert(successor[0] == parent)
             children = successor[1]
             # print(f"\t{successor[0]}, {successor[1]}")
@@ -739,8 +783,6 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             # print(G.nodes)
             G = subgraph
 
-        # todo: pass in networkx node attributes like epoch so it can be printed
-        # subG.nodes[n0]["epoch"]
         G = nx.relabel_nodes(G, self.relabel_nodes)
 
         dot = to_pydot(G)

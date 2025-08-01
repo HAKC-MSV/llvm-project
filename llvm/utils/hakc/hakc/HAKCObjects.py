@@ -538,7 +538,7 @@ class HAKCFunction(HAKCSymbol):
         self.types_used = TypesUsed if TypesUsed is not None else list()
 
     def pretty_print(self, epoch=None):
-        if epoch:
+        if epoch != -1:
             return f"HAKCFunction({self.name} in Epoch {epoch})"
         return f"HAKCFunction({self.name})"
 
