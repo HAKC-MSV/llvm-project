@@ -403,6 +403,15 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         # G.save_graph(f"funcs_for_ty_{str(ty.debug_type).strip()}.png".strip())
         return G
 
+    def get_root_subgraphs(self):
+        root_subgraphs = set()
+        root_nodes = self.get_roots()
+        for root_node in root_nodes:
+            symbol_descendents = nx.descendants(self, root_node)
+            symbol_descendents.add(root_node)
+            subG = self.subgraph(symbol_descendents)
+            root_subgraphs.add((root_node, subG))
+        return root_subgraphs
 
     @staticmethod
     def convert_rwx(**rwx):
@@ -441,20 +450,17 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         # print(f"get_perm: {perm}")
         return perm
 
-    def store_coalesced_epochs(self, ty, new_epoch, n0, n1):
-        if ty not in self.coalesced_epochs:
-            self.coalesced_epochs[ty] = dict()
-        if new_epoch not in self.coalesced_epochs[ty]:
-            self.coalesced_epochs[ty][new_epoch] = set()
-        self.coalesced_epochs[ty][new_epoch].add(n0.pretty_print())
-        self.coalesced_epochs[ty][new_epoch].add(n1.pretty_print())
+    def store_coalesced_epochs(self, new_epoch, n0, n1):
+        if new_epoch not in self.coalesced_epochs:
+            self.coalesced_epochs[new_epoch] = set()
+        self.coalesced_epochs[new_epoch].add(n0.pretty_print())
+        self.coalesced_epochs[new_epoch].add(n1.pretty_print())
 
-    def print_coalesced_epochs(self, ty):
-        if ty in self.coalesced_epochs.keys():
-            for key in self.coalesced_epochs[ty].keys():
-                print(f"Merged Epoch {key} with")
-                for value in self.coalesced_epochs[ty][key]:
-                    print(f"\t{value}")
+    def print_coalesced_epochs(self):
+        for epoch in self.coalesced_epochs.keys():
+            print(f"Merged Epoch {epoch} with")
+            for node in self.coalesced_epochs[epoch]:
+                print(f"\t{node}")
 
     def get_root(self):
         max_deg = -1
@@ -467,78 +473,52 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
                 max_node = n
         return max_node
 
-
     def get_roots(self):
         # get all 'roots' of the graph, so all nodes can be traversed
         # i.e., a node with no incoming connections
         return {node for node, in_degree in self.in_degree() if in_degree == 0}
 
-    def assign_initial_epochs(self, roots):
+    def assign_initial_epochs(self, root):
         epoch = 0
-        for root in roots:
-            for n0, n1, key in nx.edge_bfs(self, root):
-                if isinstance(n0, HAKCFunction):
-                    if "epoch" not in self.nodes[n0]:
-                        self.nodes[n0]["epoch"] = epoch
-                        epoch += 1
-                if isinstance(n1, HAKCFunction):
-                    if "epoch" not in self.nodes[n1]:
-                        self.nodes[n1]["epoch"] = epoch
-                        epoch += 1
+        for n0, n1, key in nx.edge_bfs(self, root):
+            if isinstance(n0, HAKCFunction):
+                if "epoch" not in self.nodes[n0]:
+                    self.nodes[n0]["epoch"] = epoch
+                    epoch += 1
+            if isinstance(n1, HAKCFunction):
+                if "epoch" not in self.nodes[n1]:
+                    self.nodes[n1]["epoch"] = epoch
+                    epoch += 1
 
-    def temporal_coalesce_parent_child(self, ty):
+    def temporal_coalesce_parent_child(self, ty, root):
         # coalesce vertically (parent -> child)
-        roots = self.get_roots()
-        assert(len(roots) >= 1)
-        print(f"!!!Starting temporal coalesce parent child with {len(roots)} for type:\n\t{ty}!!!")
+
+        print(f"!!!Starting temporal coalesce parent child with {root} for type:\n\t{ty}!!!")
         # Get root with highest degree (usually is main, but not always) node as source
 
-        self.assign_initial_epochs(roots)
-        self.save_graph(f"initial_epochs_for_ty_{ty.debug_type}.svg".replace(" ","-"))
         # print(f"Parent {parent} has children:")
-        for root in roots:
-            for successor in nx.bfs_successors(self, root):
-                parent = successor[0]
-                children = successor[1]
-                if isinstance(parent, HAKCFunction):
-                    # print(f"\t{successor[0]}, {successor[1]}")
-                    parent_ty_perm = self.get_perm(parent, ty)
-                    # print(f"\t{parent.name} parent_ty_perm: {parent_ty_perm}")
-                    for child in children:
-                        if isinstance(child, HAKCFunction):
-                            child_ty_perm = self.get_perm(child, ty)
-                            # print(f"\t{child.name} child_ty_perm: {child_ty_perm}")
-                            if parent_ty_perm == child_ty_perm:
-                                parent_epoch = self.nodes[parent]['epoch']
-                                child_epoch = self.nodes[child]['epoch']
-                                new_epoch = min(parent_epoch, child_epoch)
-                                print(f"Merging {parent.pretty_print(parent_epoch)} with {child.pretty_print(child_epoch)} with common permissions {child_ty_perm} to new epoch: {new_epoch}")
-                                self.nodes[parent]['epoch'] = new_epoch
-                                self.nodes[child]['epoch'] = new_epoch
-                                self.store_coalesced_epochs(ty, new_epoch, parent, child)
-            self.print_coalesced_epochs(ty)
-            self.save_graph(f"final_epochs_for_ty_{ty.debug_type}.svg".replace(" ","-"), ty=ty)
-        else:
-            print(f"Graph Root is None so returning!")
-        print(f"!!!End temporal coalesce parent child with \n\ttype: {ty}\n\tgraph root: {root}!!!")
-
-    def old_temporal_coalesce_parent_child(self, parent, epoch_map):
-        # coalesce vertically (parent -> child)
-        # print(f"Parent {parent} has children:")
-        if not parent:
-            print(f"In temporal_coalesce_parent_child, parent is None!")
-            return
-        print(f"Starting temporal coalesce parent child with graph root: {parent}")
-        # for successor in nx.bfs_successors(self, parent, depth_limit=1):
-        for successor in nx.bfs_successors(self, parent):
-            assert(successor[0] == parent)
+        for successor in nx.bfs_successors(self, root):
+            parent = successor[0]
             children = successor[1]
-            # print(f"\t{successor[0]}, {successor[1]}")
-            for child in children:
-                common_perms = self.get_common_type_perms(parent, child, debug=True)
-                if(len(common_perms) > 0):
-                    print(f"Could merge {parent} in epoch {epoch_map[parent]} with {child} in epoch {epoch_map[child]} with common permissions {common_perms}")
-        print(f"End temporal coalesce parent child")
+            if isinstance(parent, HAKCFunction):
+                # print(f"\t{successor[0]}, {successor[1]}")
+                parent_ty_perm = self.get_perm(parent, ty)
+                # print(f"\t{parent.name} parent_ty_perm: {parent_ty_perm}")
+                for child in children:
+                    if isinstance(child, HAKCFunction):
+                        child_ty_perm = self.get_perm(child, ty)
+                        # print(f"\t{child.name} child_ty_perm: {child_ty_perm}")
+                        if parent_ty_perm == child_ty_perm:
+                            parent_epoch = self.nodes[parent]['epoch']
+                            child_epoch = self.nodes[child]['epoch']
+                            new_epoch = min(parent_epoch, child_epoch)
+                            # print(f"Merging {parent.pretty_print(parent_epoch)} with {child.pretty_print(child_epoch)} with common permissions {child_ty_perm} to new epoch: {new_epoch}")
+                            self.nodes[parent]['epoch'] = new_epoch
+                            self.nodes[child]['epoch'] = new_epoch
+                            self.store_coalesced_epochs(new_epoch, parent, child)
+        self.print_coalesced_epochs()
+        self.save_graph(f"final_epochs_for_ty_{ty.debug_type}_root_{root.name}.svg".replace(" ","-"))
+        print(f"!!!End temporal coalesce parent child with {root} for type:\n\t{ty}!!!")
 
     @staticmethod
     def init_map(_map, ns, value):
@@ -810,14 +790,10 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         else:
             return x.pretty_print()
 
-    def save_graph(self, fname, ty = None, symbol_name = None, prune = False, N = 50, filter_symbols = False, debug = False):
+    def save_graph(self, fname, symbol_name = None, prune = False, N = 50, filter_symbols = False, debug = False):
         from networkx.drawing.nx_pydot import to_pydot
         if debug:
             print(f"Trying to save {self} to {fname}")
-
-        if ty and ty not in self.coalesced_epochs:
-            print(f"No Epochs Coalesced, so skipping saving graph!")
-            return
 
         if filter_symbols:
             # sorted(list(filter(lambda x: isinstance(x, HAKCFunction), successor[1])))
@@ -861,16 +837,13 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         for node in dot.get_nodes():
             node.set("shape", "box")
             # Change color of box to show nodes that have been coalesced
-
             # print(self.coalesced_epochs[ty])
             # print(node.get("epoch"))
             # if isinstance(node, HAKCFunction):
             epoch = node.get("epoch")
-            # TODO: figure out why epoch could be set to none sometimes? Maybe its not for function types or something
-            if epoch and ty:
-                # if epoch is -1, that means that an epoch value was initialized but never properly assigned
-                assert(int(epoch) != -1)
-                if int(epoch) in self.coalesced_epochs[ty].keys():
+            # Note: Displaying the color of merged nodes only works if a root is specified
+            if epoch:
+                if int(epoch) in self.coalesced_epochs.keys():
                     node.set("style", "filled")
                     node.set("fillcolor", "lightblue")
 

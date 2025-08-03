@@ -204,32 +204,33 @@ def temporal_coalesce(G: HAKCCompartmentalization):
     # print("Types:")
     tys = G.get_types()
     for ty in tys:
-
         # TODO: what to do with multiple roots / disconnected parts of graph
         # print(f"Ty {ty} edges: {G.in_edges(ty, data=True)}")
-        subG = G.get_type_subgraph(ty)
-        type_subG[ty] = subG
-        # check that graph has at least one function, or else skip
-        funcs = sum(1 for n in subG.nodes() if isinstance(n, HAKCFunction))
-        if funcs <= 1:
-            print(f"SubGraph for Type: {ty} has {funcs} <= 1 HAKCFunctions, so skipping graph!")
-            continue
-        # print(f"Found root: {root}")
-        # main_tmp = subG.get_symbol_by_name(root)
-        # actually call list() rather than use [], because this does something weird to networkx (issue with unhashable type)
-        # _main = list(main_tmp)[0] if (len(main_tmp) != 0) else None
+        tySubG = G.get_type_subgraph(ty)
+        root_subgraphs = tySubG.get_root_subgraphs()
+        print(root_subgraphs)
+        type_subG[ty] = dict()
+        for root, subG in root_subgraphs:
+            root_key = root.pretty_print()
+            print(f"root_node: {root.pretty_print()} in subG with {len(subG.nodes)} nodes and {len(subG.edges)} edges")
+            type_subG[ty][root_key] = subG
+            # check that graph has at least one function, or else skip
+            funcs = sum(1 for n in subG.nodes() if isinstance(n, HAKCFunction))
+            if funcs > 1:
+                # Note: use nx.edge_bfs because bfs_successors may miss some nodes on partially traversed trees
+                # Note: Also, don't rely on types in types_used to point to the same object because a copy is implicitly made
+                # Note: Add attributes to the node rather than trying to modify the underlying HAKC object (this seems to do some weird things)
+                # Note: Use edge_bfs instead of bfs_successor because bfs_successor requires a source node which we sometimes don't have
+                # for n in nx.bfs_successors(subG, _main):
 
-        # Note: use nx.edge_bfs because bfs_successors may miss some nodes on partially traversed trees
-        # Note: Also, don't rely on types in types_used to point to the same object because a copy is implicitly made
-        # Note: Add attributes to the node rather than trying to modify the underlying HAKC object (this seems to do some weird things)
-        # for n in nx.bfs_successors(subG, _main):
-        # Note: Use edge_bfs instead of bfs_successor because bfs_successor requires a source node which we sometimes don't have
-        # set all node epoch values to -1 by default
-        # Give each function an epoch of -1 to start
+                subG.assign_initial_epochs(root)
+                # subG.save_graph(f"initial_epochs_for_ty_{ty.debug_type}.svg".replace(" ","-"))
+                subG.temporal_coalesce_parent_child(ty, root)
 
-        subG.temporal_coalesce_parent_child(ty)
+                print()
+            else:
+                print(f"SubGraph for Type: {ty} has {funcs} <= 1 HAKCFunctions, so skipping graph!")
 
-        print()
 
 
     # lst = list()
