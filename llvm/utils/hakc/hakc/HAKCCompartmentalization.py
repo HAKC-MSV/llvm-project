@@ -30,6 +30,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         yaml.YAMLObject.__init__(self)
         nx.MultiDiGraph.__init__(self)
         self.max_division_count = max_division_count
+        self.coalesced_epochs = dict()
         # if nxgraph is not None:
         #     for division in self.get_filtered_nodes(nxgraph, node_filter=lambda n: isinstance(n, HAKCDivision))():
         #         for nbr in nxgraph.neighbors(division):
@@ -84,7 +85,8 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         # get the divisions and compartments first
         # find all divisions that a symbol can reach via dag edges that are in the same compartment
         # create the compartments, then the divisions, then calculate the tokens
-
+        # TODO: rename this get_functions_and_gvs or something
+        # TODO: make this multithreaded?
         functions = conn.get_functions()
         for function in functions:
             self.__add_function(function)
@@ -96,7 +98,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             division, compartment, = conn.get_division_compartment(function)
             self.__add_division_compartment(function, division, compartment)
 
-        self.save_graph("loaded_from_db.png")
+        self.save_graph("loaded_from_db.svg")
 
         print(self)
 
@@ -128,17 +130,22 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             self.__add_persistent_edge(function, direct_call, key=HAKCFunction.relation_direct_calls)
 
         for indirect_call in function.indirect_calls:
-            assert(isinstance(indirect_call, HAKCType))
-            self.__add_type(indirect_call)
-            self.__add_persistent_edge(function, indirect_call, key=HAKCFunction.relation_indirect_calls)
+            # TODO handle indirect call sources
+            # logger.error(f"indirect_call: {type(indirect_call)}")
+            # assert(isinstance(indirect_call, HAKCType))
+            if isinstance(indirect_call, HAKCType):
+                # TODO: should types already be persisted? getting duplicate key error when using data columns as hakctype hashable inputs
+                # self.__add_type(indirect_call, already_persisted = True)
+                self.__add_type(indirect_call)
+                self.__add_persistent_edge(function, indirect_call, key=HAKCFunction.relation_indirect_calls)
 
         for type_used in function.types_used:
             assert(isinstance(type_used, HAKCTypePerm))
             self.__add_persistent_edge(function, type_used.perm_type, key=HAKCFunction.relation_types_used, R = (type_used.RWX & 0b100) >> 2, W = (type_used.RWX & 0b010) >> 1, X = (type_used.RWX & 0b001))
 
-    def __add_type(self, _type: HAKCType):
+    def __add_type(self, _type: HAKCType, already_persisted: bool = False):
         assert(isinstance(_type, HAKCType))
-        self.__add_persistent_node(_type)
+        self.__add_persistent_node(_type, already_persisted=already_persisted)
 
     def add_symbol(self, symbol):
         # function to allow for external access
@@ -434,23 +441,73 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         # print(f"get_perm: {perm}")
         return perm
 
+    def store_coalesced_epochs(self, ty, new_epoch, n0, n1):
+        if ty not in self.coalesced_epochs:
+            self.coalesced_epochs[ty] = dict()
+        if new_epoch not in self.coalesced_epochs[ty]:
+            self.coalesced_epochs[ty][new_epoch] = set()
+        self.coalesced_epochs[ty][new_epoch].add(n0.pretty_print())
+        self.coalesced_epochs[ty][new_epoch].add(n1.pretty_print())
 
-    def temporal_coalesce_parent_child(self, root, ty):
+    def print_coalesced_epochs(self, ty):
+        if ty in self.coalesced_epochs.keys():
+            for key in self.coalesced_epochs[ty].keys():
+                print(f"Merged Epoch {key} with")
+                for value in self.coalesced_epochs[ty][key]:
+                    print(f"\t{value}")
+
+    def get_root(self):
+        max_deg = -1
+        max_node = None
+        for n in self.nodes():
+            # save the first node as the first 'max' then continue to find the actual maximum
+            n_degree = self.degree[n]
+            if n_degree > max_deg or max_node == None:
+                max_deg = n_degree
+                max_node = n
+        return max_node
+
+
+    def get_roots(self):
+        # get all 'roots' of the graph, so all nodes can be traversed
+        # i.e., a node with no incoming connections
+        return {node for node, in_degree in self.in_degree() if in_degree == 0}
+
+    def assign_initial_epochs(self, roots):
+        epoch = 0
+        for root in roots:
+            for n0, n1, key in nx.edge_bfs(self, root):
+                if isinstance(n0, HAKCFunction):
+                    if "epoch" not in self.nodes[n0]:
+                        self.nodes[n0]["epoch"] = epoch
+                        epoch += 1
+                if isinstance(n1, HAKCFunction):
+                    if "epoch" not in self.nodes[n1]:
+                        self.nodes[n1]["epoch"] = epoch
+                        epoch += 1
+
+    def temporal_coalesce_parent_child(self, ty):
         # coalesce vertically (parent -> child)
+        roots = self.get_roots()
+        assert(len(roots) >= 1)
+        print(f"!!!Starting temporal coalesce parent child with {len(roots)} for type:\n\t{ty}!!!")
+        # Get root with highest degree (usually is main, but not always) node as source
+
+        self.assign_initial_epochs(roots)
+        self.save_graph(f"initial_epochs_for_ty_{ty.debug_type}.svg".replace(" ","-"))
         # print(f"Parent {parent} has children:")
-        print(f"!!!Starting temporal coalesce parent child with graph root: {root}!!!")
-        if root:
+        for root in roots:
             for successor in nx.bfs_successors(self, root):
                 parent = successor[0]
                 children = successor[1]
                 if isinstance(parent, HAKCFunction):
                     # print(f"\t{successor[0]}, {successor[1]}")
                     parent_ty_perm = self.get_perm(parent, ty)
-                    print(f"\t{parent.name} parent_ty_perm: {parent_ty_perm}")
+                    # print(f"\t{parent.name} parent_ty_perm: {parent_ty_perm}")
                     for child in children:
                         if isinstance(child, HAKCFunction):
                             child_ty_perm = self.get_perm(child, ty)
-                            print(f"\t{child.name} child_ty_perm: {child_ty_perm}")
+                            # print(f"\t{child.name} child_ty_perm: {child_ty_perm}")
                             if parent_ty_perm == child_ty_perm:
                                 parent_epoch = self.nodes[parent]['epoch']
                                 child_epoch = self.nodes[child]['epoch']
@@ -458,16 +515,18 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
                                 print(f"Merging {parent.pretty_print(parent_epoch)} with {child.pretty_print(child_epoch)} with common permissions {child_ty_perm} to new epoch: {new_epoch}")
                                 self.nodes[parent]['epoch'] = new_epoch
                                 self.nodes[child]['epoch'] = new_epoch
+                                self.store_coalesced_epochs(ty, new_epoch, parent, child)
+            self.print_coalesced_epochs(ty)
+            self.save_graph(f"final_epochs_for_ty_{ty.debug_type}.svg".replace(" ","-"), ty=ty)
         else:
             print(f"Graph Root is None so returning!")
-        print(f"!!!End temporal coalesce parent child!!!\n")
-
+        print(f"!!!End temporal coalesce parent child with \n\ttype: {ty}\n\tgraph root: {root}!!!")
 
     def old_temporal_coalesce_parent_child(self, parent, epoch_map):
         # coalesce vertically (parent -> child)
         # print(f"Parent {parent} has children:")
         if not parent:
-            print(f"In temporal_coalesce_parent_child, parent is None!\n")
+            print(f"In temporal_coalesce_parent_child, parent is None!")
             return
         print(f"Starting temporal coalesce parent child with graph root: {parent}")
         # for successor in nx.bfs_successors(self, parent, depth_limit=1):
@@ -751,9 +810,14 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         else:
             return x.pretty_print()
 
-    def save_graph(self, fname, symbol_name = None, prune = False, N = 50, filter_symbols = False):
+    def save_graph(self, fname, ty = None, symbol_name = None, prune = False, N = 50, filter_symbols = False, debug = False):
         from networkx.drawing.nx_pydot import to_pydot
-        print(f"Trying to save {self} to {fname}")
+        if debug:
+            print(f"Trying to save {self} to {fname}")
+
+        if ty and ty not in self.coalesced_epochs:
+            print(f"No Epochs Coalesced, so skipping saving graph!")
+            return
 
         if filter_symbols:
             # sorted(list(filter(lambda x: isinstance(x, HAKCFunction), successor[1])))
@@ -761,14 +825,14 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         else:
             G = self.subgraph(self.nodes)
 
-
         # node_filter = lambda n: (isinstance(n, HAKCFunction) or isinstance(n, HAKCGlobalVariable)) and n.name == symbol_name
         # _symbol = nx.subgraph_view(G, filter_node=node_filter).nodes()
         functions = self.get_functions()
         # print(functions)
         if symbol_name:
             symbol = [n for n in functions if n.name == symbol_name]
-            print(f"Found {symbol} of type {type(symbol)}")
+            if debug:
+                print(f"Found {symbol} of type {type(symbol)}")
             # symbol = self.nodes[_symbol]
 
             # symbol = self.get_symbol_by_name(symbol_name)
@@ -782,6 +846,11 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             subgraph = G.subgraph(top_n_node_ids)
             # print(G.nodes)
             G = subgraph
+        # remove self loops
+        # subgraph = G.subgraph(G.nodes)
+        # self_loops = list(nx.selfloop_edges(subgraph))  # Convert generator to list to avoid RuntimeError
+        # subgraph.remove_edges_from(self_loops)
+        # G = subgraph
 
         G = nx.relabel_nodes(G, self.relabel_nodes)
 
@@ -791,6 +860,20 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         dot.set("rankdir","LR")
         for node in dot.get_nodes():
             node.set("shape", "box")
+            # Change color of box to show nodes that have been coalesced
+
+            # print(self.coalesced_epochs[ty])
+            # print(node.get("epoch"))
+            # if isinstance(node, HAKCFunction):
+            epoch = node.get("epoch")
+            # TODO: figure out why epoch could be set to none sometimes? Maybe its not for function types or something
+            if epoch and ty:
+                # if epoch is -1, that means that an epoch value was initialized but never properly assigned
+                assert(int(epoch) != -1)
+                if int(epoch) in self.coalesced_epochs[ty].keys():
+                    node.set("style", "filled")
+                    node.set("fillcolor", "lightblue")
+
         # set edge labels
         for edge in dot.get_edges():
             # print(edge.obj_dict)
@@ -813,10 +896,9 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         print(f"Max node {MaxNodeName} -> {MaxNodeAttrs} with found hash {MaxNodeHash}")
         """
 
-
         print(f"Saved {self} to {fname}")
 
-    def save_graph_alt(self, fname):
+    def save_graph_alt(self, fname, debug=False):
         import matplotlib.pyplot as plt
         from networkx.drawing.nx_agraph import graphviz_layout
 
@@ -831,4 +913,5 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         # print(G.edges)
         plt.savefig(fname)
         plt.close()
-        print(f"Saved {self} to {fname}")
+        if debug:
+            print(f"Saved {self} to {fname}")

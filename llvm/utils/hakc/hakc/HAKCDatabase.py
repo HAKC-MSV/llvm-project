@@ -601,22 +601,27 @@ class HAKCDatabase:
     @staticmethod
     def __create_object_from_response(cls, **data):
         # print(cls)
-        if cls == HAKCFunction:
-            ty = HAKCDatabase.__create_object_from_response(HAKCType, **data)
-            # print(ty)
-            sc = HAKCDatabase.__create_object_from_response(HAKCScope, **data)
-            # print(sc)
-            data["HAKCSymbol.Scope"] = sc
-            data["HAKCSymbol.Type"] = ty
+        if cls == HAKCFunction or cls == HAKCGlobalVariable:
+            data["HAKCSymbol.Scope"] = HAKCDatabase.__create_object_from_response(HAKCScope, **data)
+            data["HAKCSymbol.Type"] = HAKCDatabase.__create_object_from_response(HAKCType, **data)
 
             # print(data.keys())
             # if HAKCCompilationUnit.get_primary_key().column_name in data:
             if "HAKCCompilationUnit.DefiningLine" in data:
                 # print(f"Found CompilationUnit")
-                cu = HAKCDatabase.__create_object_from_response(HAKCCompilationUnit, **data)
-                data["HAKCSymbol.CompilationUnit"] = cu
+                data["HAKCSymbol.CompilationUnit"] = HAKCDatabase.__create_object_from_response(HAKCCompilationUnit, **data)
             cls_data = {key.removeprefix(f"{cls.get_table_name()}."): val for key, val in data.items()}
-            return HAKCFunction(**cls_data)
+            if cls == HAKCFunction:
+                return HAKCFunction(**cls_data)
+            if cls == HAKCGlobalVariable:
+                return HAKCGlobalVariable(**cls_data)
+
+        # elif cls == HAKCGlobalVariable:
+        #     data["HAKCSymbol.Scope"] = HAKCDatabase.__create_object_from_response(HAKCScope, **data)
+        #     data["HAKCSymbol.Type"] = HAKCDatabase.__create_object_from_response(HAKCType, **data)
+        #     cls_data = {key.removeprefix(f"{cls.get_table_name()}."): val for key, val in data.items()}
+        #     print(f"__create_object_from_response GV: {cls_data}")
+        #     return HAKCGlobalVariable(**cls_data)
         elif cls == HAKCDivision:
             # data["HAKCDivision.CompartmentID"] = data["HAKCCompartment.CompartmentID"]
             compartment = HAKCDatabase.__create_object_from_response(HAKCCompartment, **data)
@@ -788,7 +793,7 @@ class HAKCDatabase:
                     functions.add(func)
                     # print(func.debug_print())
                 else:
-                    assert(False)
+                    # assert(False)
                     gv = HAKCDatabase.__create_object_from_response(HAKCGlobalVariable, **data)
                     # print(gv)
                     gvs.add(gv)

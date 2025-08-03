@@ -120,7 +120,7 @@ def compute_dag_edges_for_symbol(symbol_hashes):
 def create_dag_single_thread(files: set[str], conn: HAKCDatabase) -> HAKCCompartmentalization:
     compartmentalization = HAKCCompartmentalization()
     for filename in logger.progress_bar(iterable=sorted(files), desc='Parsing YAML'):
-        functions, global_variables = parse_yaml(filename)
+        functions, global_variables = parse_yaml(filename, True)
         logger.debug(
             f'{filename} found {len(functions)} functions and {len(global_variables)} globals')
         compartmentalization.add_symbols(functions, global_variables)
@@ -198,24 +198,26 @@ def node_with_max_edges(graph):
 
 def temporal_coalesce(G: HAKCCompartmentalization):
     # https://networkx.org/documentation/stable/reference/algorithms/traversal.html
-    epoch_map = {}
-
-
+    print(f"!!!Starting temporal coalesce!!!")
     type_subG = {}
     # get all types
     # print("Types:")
     tys = G.get_types()
     for ty in tys:
-        epoch_map[ty] = {}
 
+        # TODO: what to do with multiple roots / disconnected parts of graph
         # print(f"Ty {ty} edges: {G.in_edges(ty, data=True)}")
         subG = G.get_type_subgraph(ty)
         type_subG[ty] = subG
-
-        # use main node as source
-        main_tmp = subG.get_symbol_by_name("main")
+        # check that graph has at least one function, or else skip
+        funcs = sum(1 for n in subG.nodes() if isinstance(n, HAKCFunction))
+        if funcs <= 1:
+            print(f"SubGraph for Type: {ty} has {funcs} <= 1 HAKCFunctions, so skipping graph!")
+            continue
+        # print(f"Found root: {root}")
+        # main_tmp = subG.get_symbol_by_name(root)
         # actually call list() rather than use [], because this does something weird to networkx (issue with unhashable type)
-        _main = list(main_tmp)[0] if (len(main_tmp) != 0) else None
+        # _main = list(main_tmp)[0] if (len(main_tmp) != 0) else None
 
         # Note: use nx.edge_bfs because bfs_successors may miss some nodes on partially traversed trees
         # Note: Also, don't rely on types in types_used to point to the same object because a copy is implicitly made
@@ -223,31 +225,13 @@ def temporal_coalesce(G: HAKCCompartmentalization):
         # for n in nx.bfs_successors(subG, _main):
         # Note: Use edge_bfs instead of bfs_successor because bfs_successor requires a source node which we sometimes don't have
         # set all node epoch values to -1 by default
-        epoch = 0
-        nx.set_node_attributes(subG, -1, "epoch")
-        # manually assign the root node because I guess edge_bfs does not do the first node?
-        # subG.nodes[_main]["epoch"] = 0
-        for n0, n1, key in nx.edge_bfs(subG, _main):
-            if isinstance(n0, HAKCFunction):
-                if subG.nodes[n0]["epoch"] == -1:
-                    subG.nodes[n0]["epoch"] = epoch
-                    epoch += 1
-            if isinstance(n1, HAKCFunction):
-                if subG.nodes[n1]["epoch"] == -1:
-                    subG.nodes[n1]["epoch"] = epoch
-                    epoch += 1
+        # Give each function an epoch of -1 to start
 
-        # print(f"Produced Epoch Map: {epoch_map[ty]}")
-        subG.save_graph(f"initial_epochs_for_ty_{ty.debug_type}.png".replace(" ",""))
+        subG.temporal_coalesce_parent_child(ty)
 
-        subG.temporal_coalesce_parent_child(_main, ty)
+        print()
 
-        subG.save_graph(f"final_epochs_for_ty_{ty.debug_type}.png".replace(" ",""))
 
-        # G.temporal_coalesce_parent_children(src, epoch_map)
-        # G.save_graph("temporal_coalesce.svg", filter_symbols=True)
-
-    # print(f"Created epoch map {epoch_map}")
     # lst = list()
     # for n0, n1, key in nx.edge_bfs(G, src):
     #     #  and key == "has_dag"
@@ -286,7 +270,7 @@ def temporal_coalesce(G: HAKCCompartmentalization):
             #             # print(f"ty1 {ty1} <{rwx1}]- sym1 {sym1} - sym0 {sym0} -[{rwx0}]> ty0 {ty0}")
             #             if rwx0 == rwx1:
             #                 print(f"Can merge epochs at sym0 {sym0} and sym1 {sym1} with rwx {rwx0['R']}{rwx0['W']}{rwx0['X']} -> {rwx1['R']}{rwx1['W']}{rwx1['X']}")
-
+    print(f"!!!End temporal coalesce!!!")
 
 def temporal_analysis(db_dir: str):
 
@@ -306,6 +290,7 @@ def temporal_analysis(db_dir: str):
     #     print(f"Could merge {hash_to_sym_map[child0]} and {hash_to_sym_map[child1]}")
     # print(f"Found {len(pair)} pairs to merge using Kuzu algorithm")
 
+    # temporal_coalesce(compartmentalization, "skb_init")
     temporal_coalesce(compartmentalization)
 
     end = time.time()
@@ -316,7 +301,7 @@ def temporal_analysis(db_dir: str):
     logger.info(f'      Global Count: {len(compartmentalization.get_global_variables())}')
     logger.info(f'    Function Count: {len(compartmentalization.get_functions())}')
     logger.info(f'  DB queries Count: {conn.count_executed_statements}')
-    compartmentalization.save_graph("loaded_dag.svg")
+    # compartmentalization.save_graph("loaded_dag.svg")
     conn.close()
 
 
@@ -341,7 +326,7 @@ def create_dag_multithread(files: set[str], core_count: int, conn: HAKCDatabase)
                     compartmentalization.add_symbols(functions, global_variables)
                 except Exception as e:
                     logger.error(f'Error parsing {file}: {str(e)}')
-    compartmentalization.save_graph("ipv6_sysctl_unregister.svg", symbol_name="ipv6_sysctl_unregister")
+    # compartmentalization.save_graph("ipv6_sysctl_unregister.svg", symbol_name="ipv6_sysctl_unregister")
     # compartmentalization.save_graph("kernel.svg")
 
     compartmentalization.persist_to_database(conn)
