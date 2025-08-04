@@ -95,9 +95,7 @@ bool HAKCTypeInfo::IsIntegerType() const {
 
 bool HAKCTypeInfo::IsPointerType() const {
   if (DbgType) {
-    auto *StrippedDbgTy = StripTypeModifiers(DbgType);
-    return StrippedDbgTy->getTag() == dwarf::DW_TAG_pointer_type ||
-           StrippedDbgTy->getTag() == dwarf::DW_TAG_array_type;
+    return IsTag(dwarf::DW_TAG_pointer_type) || IsTag(dwarf::DW_TAG_array_type);
   }
   if (LLVMType) {
     return LLVMType->isPointerTy() || LLVMType->isArrayTy();
@@ -118,8 +116,7 @@ bool HAKCTypeInfo::IsFunctionType() const {
 
 bool HAKCTypeInfo::IsStructType() const {
   if (DbgType) {
-    auto *StrippedDbgTy = StripTypeModifiers(DbgType);
-    return StrippedDbgTy->getTag() == dwarf::DW_TAG_structure_type;
+    return IsTag(dwarf::DW_TAG_array_type);
   }
 
   if (LLVMType) {
@@ -129,13 +126,20 @@ bool HAKCTypeInfo::IsStructType() const {
   return false;
 }
 
-bool HAKCTypeInfo::IsUnionType() const {
+bool HAKCTypeInfo::IsEnumType() const {
+  return IsTag(dwarf::DW_TAG_enumeration_type);
+}
+
+bool HAKCTypeInfo::IsTag(dwarf::Tag Tag) const {
   if (DbgType) {
     auto *StrippedDbgTy = StripTypeModifiers(DbgType);
-    return StrippedDbgTy->getTag() == dwarf::DW_TAG_union_type;
+    return StrippedDbgTy->getTag() == Tag;
   }
-
   return false;
+}
+
+bool HAKCTypeInfo::IsUnionType() const {
+  return IsTag(dwarf::DW_TAG_union_type);
 }
 
 std::shared_ptr<HAKCTypeInfo> HAKCTypeInfo::GetPointeeType() const {
