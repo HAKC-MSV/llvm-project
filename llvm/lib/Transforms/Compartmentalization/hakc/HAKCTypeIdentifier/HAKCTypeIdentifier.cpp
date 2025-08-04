@@ -15,6 +15,7 @@
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/BinaryFormat/Dwarf.h"
+#include "llvm/IR/DebugInfoMetadata.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/XRay/BlockPrinter.h"
 
@@ -66,6 +67,11 @@ bool hakc::HAKCTypeIdentifier::IsStructTypeThatStartsWithPointerLikeType(
       auto *FirstMemberTy = GetFirstStructMemberType(CompositeTy);
       return IsPointerLikeType(FirstMemberTy);
     }
+  } else {
+    if (isa_and_nonnull<StructType>(HAKCTy.GetLLVMType())) {
+      auto *StructTy = dyn_cast<StructType>(HAKCTy.GetLLVMType());
+      return StructTy->getElementType(0)->isPointerTy();
+    }
   }
 
   return false;
@@ -78,6 +84,9 @@ bool hakc::HAKCTypeIdentifier::IsPointerLikeType(const DIType *DIType) {
   if (!StrippedTy) {
     return false;
   }
+  CommonHAKCAnalysis::getWriter(
+      AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+      << "Checking if " << *StrippedTy << " is Pointer Like\n";
 
   if (PointerLike_Tags.contains(StrippedTy->getTag())) {
     return true;
@@ -1189,7 +1198,9 @@ HAKCTypeIdentifier::GetArgumentHAKCType(const DISubroutineType *FunctionTy,
     if (AnalysisHelper.GetSystemInfo().OutputDebugInfo()) {
       CommonHAKCAnalysis::getWriter(
           AnalysisHelper.GetSystemInfo().OutputDebugInfo())
-          << "Getting argument " << ArgIdx << " of " << *FunctionTy << "\n";
+          << "Getting argument " << ArgIdx << " of " << *FunctionTy
+          << " that has " << FunctionTy->getTypeArray().size()
+          << " arguments\n";
       for (auto *Arg : FunctionTy->getTypeArray()) {
         if (!Arg) {
           CommonHAKCAnalysis::getWriter(
@@ -1203,7 +1214,7 @@ HAKCTypeIdentifier::GetArgumentHAKCType(const DISubroutineType *FunctionTy,
       }
     }
     DIType *ArgDIType = nullptr;
-    if (FunctionTy->getTypeArray().size() < ArgIdx) {
+    if (FunctionTy->getTypeArray().size() > ArgIdx) {
       ArgDIType = FunctionTy->getTypeArray()[ArgIdx];
     }
 
@@ -1223,8 +1234,7 @@ HAKCTypeP HAKCTypeIdentifier::FindHAKCTypeForUse(Use &U) {
       << "Attempting to find HAKCTypeInfo for Use " << U << "\n";
   HAKCTypeP Result = nullptr;
   if (auto *CallI = dyn_cast<CallInst>(U.getUser())) {
-    auto CallTy = FindCalledFunctionType(CallI->getFunctionType());
-    if (CallTy) {
+    if (auto CallTy = FindCalledFunctionType(CallI->getFunctionType())) {
       if (U.getOperandNo() == CallI->getCalledOperandUse().getOperandNo()) {
         auto FuncTy =
             FindType(dyn_cast<DISubroutineType>(CallTy->GetDbgType()));
@@ -1364,16 +1374,12 @@ HAKCTypeIdentifier::FindTypeFromDebug(const DbgVariableRecord &DVR,
     return nullptr;
   }
   auto *DITy = DVR.getVariable()->getType();
-  int64_t FragmentSize = 0;
-  auto IsOffset = DVR.getExpression()->extractIfOffset(FragmentSize);
-  CommonHAKCAnalysis::getLogger(Debug)
+  DebugVariable DebugVar(&DVR);
+  auto FragInfo = DebugVar.getFragment();
+  CommonHAKCAnalysis::getWriter(
+      AnalysisHelper.GetSystemInfo().OutputDebugInfo())
       << "Finding type for " << DVR << " with Variable " << *DVR.getVariable()
       << " and DITy " << *DITy;
-  if (IsOffset) {
-    CommonHAKCAnalysis::getLogger(Debug)
-        << " with Fragment size " << FragmentSize;
-  }
-  CommonHAKCAnalysis::getLogger(Debug) << "\n";
   if (auto *I = dyn_cast<Instruction>(V)) {
     if (I->getDebugLoc() && I->getDebugLoc().get()) {
       CommonHAKCAnalysis::getLogger(Debug)
@@ -1385,16 +1391,16 @@ HAKCTypeIdentifier::FindTypeFromDebug(const DbgVariableRecord &DVR,
       << "\n";
   if (DITy->getTag() == dwarf::DW_TAG_structure_type) {
     auto *CompositeTy = dyn_cast<DICompositeType>(DITy);
-    if (FragmentSize) {
+    if (FragInfo) {
       for (auto *Member : CompositeTy->getElements()) {
         auto *CompositeMember = dyn_cast<DIDerivedType>(Member);
         if (!CompositeMember) {
           continue;
         }
-        if (CompositeMember->getOffsetInBits() == FragmentSize) {
+        if (CompositeMember->getOffsetInBits() == FragInfo->startInBits()) {
           CommonHAKCAnalysis::getLogger(Verbose)
               << "Found Member " << *CompositeMember << " at offset "
-              << FragmentSize << " with BaseType ";
+              << FragInfo->startInBits() << " with BaseType ";
           if (!CompositeMember->getBaseType()) {
             CommonHAKCAnalysis::getLogger(Verbose)
                 << "void*\n";
@@ -1732,6 +1738,8 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
     FoundType = CheckCallUses(V);
   } else if (isa<IntToPtrInst>(V)) {
     FoundType = GetVoidPointerType();
+  } else if (auto *FreezeI = dyn_cast<FreezeInst>(V)) {
+    FoundType = FindHAKCType(FreezeI->getOperand(0));
   }
 
 exit:
@@ -1741,10 +1749,14 @@ exit:
         FoundType->SetPointeeType(PointeeType);
       }
     } else if (IsStructTypeThatStartsWithPointerLikeType(*FoundType)) {
-      auto *FirstMemberType = GetFirstStructMemberType(
-          dyn_cast<DICompositeType>(FoundType->GetDbgType()));
-      auto PointeeType = FindType(FirstMemberType);
-      FoundType->SetPointeeType(PointeeType);
+      if (FoundType->GetDbgType()) {
+        auto *FirstMemberType = GetFirstStructMemberType(
+            dyn_cast<DICompositeType>(FoundType->GetDbgType()));
+        auto PointeeType = FindType(FirstMemberType);
+        FoundType->SetPointeeType(PointeeType);
+      } else {
+        FoundType->SetPointeeType(GetVoidPointerType());
+      }
     }
   }
   if (FoundType && V->getType()->isPointerTy() && FoundType->GetDbgType() &&

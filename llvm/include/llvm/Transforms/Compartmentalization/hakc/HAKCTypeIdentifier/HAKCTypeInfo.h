@@ -67,6 +67,8 @@ public:
 
   bool IsStructType() const;
 
+  bool IsUnionType() const;
+
   void SetIsIgnoredType(bool IsIgnored);
 
   static const DIType *StripTypeModifiers(const DIType *DiType);

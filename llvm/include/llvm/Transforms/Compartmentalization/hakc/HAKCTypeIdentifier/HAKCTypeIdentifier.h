@@ -125,10 +125,9 @@ public:
 
   static FunctionType *GetIndirectCallFunctionType(const CallInst *CallI);
 
-  static bool
-  IsStructTypeThatStartsWithPointerLikeType(const HAKCTypeInfo &HAKCTy);
+  bool IsStructTypeThatStartsWithPointerLikeType(const HAKCTypeInfo &HAKCTy);
 
-  static bool IsPointerLikeType(const DIType *DIType);
+  bool IsPointerLikeType(const DIType *DIType);
 
   static const DIType *
   GetFirstStructMemberType(const DICompositeType *DICompositeTy);
