@@ -67,6 +67,8 @@ public:
 
   bool IsUnionType() const;
 
+  bool IsEnumType() const;
+
   void SetIsIgnoredType(bool IsIgnored);
 
   static const DIType *StripTypeModifiers(const DIType *DiType);
@@ -81,6 +83,8 @@ protected:
   bool IsIgnored;
 
   static bool IsPointerToPointer(const DIType *DiType);
+
+  bool IsTag(dwarf::Tag Tag) const;
 
 public:
   friend bool operator==(const HAKCTypeInfo &Lhs, const HAKCTypeInfo &Rhs) {

@@ -215,10 +215,12 @@ bool HAKCPointerManager::ManageNewPointer(Use &U) {
   if (ManagedPointer->GetType() &&
       ManagedPointer->GetType()->GetPointeeType() == nullptr &&
       (ManagedPointer->GetType()->IsStructType() ||
-       ManagedPointer->GetType()->IsUnionType())) {
+       ManagedPointer->GetType()->IsUnionType() ||
+       ManagedPointer->GetType()->IsEnumType())) {
     CommonHAKCAnalysis::getWriter(DebugActive)
         << "Ignoring " << *ManagedPointer
-        << " because it is a struct or union that does not point is not "
+        << " because it is an enum or a struct or union that is "
+           "not "
            "equivalent to a pointer\n";
     return false;
   }
