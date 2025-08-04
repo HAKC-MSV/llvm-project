@@ -354,7 +354,11 @@ Type *hakc::HAKCTypeIdentifier::GetLLVMType(const DIType *Ty) {
       return FindAnonymousType(dyn_cast<DICompositeType>(Ty));
     }
   } else if (Ty->getTag() == dwarf::DW_TAG_enumeration_type) {
-    return GetLLVMType(dyn_cast<DICompositeType>(Ty)->getBaseType());
+    auto *BaseTy = dyn_cast<DICompositeType>(Ty)->getBaseType();
+    if (!BaseTy) {
+      return IntegerType::get(Ctx, 32);
+    }
+    return GetLLVMType(BaseTy);
   }
   return nullptr;
 }
