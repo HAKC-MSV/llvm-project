@@ -823,7 +823,6 @@ class HAKCDatabase:
         # print(f"Returning {len(functions)} functions")
         return functions
 
-
     def get_functions_to_merge(self) -> set:
         # find two functions that are a child of a function (direct call), and both have the same RWX to the same type
         #   and then join?

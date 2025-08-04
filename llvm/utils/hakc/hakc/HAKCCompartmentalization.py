@@ -107,6 +107,21 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         compartmentalization_data = json_graph.node_link_data(data, edges='edges')
         compartmentalization_data['max_division_count'] = data.max_division_count
         return dumper.represent_mapping(cls.yaml_tag, compartmentalization_data)
+        # return dumper.represent_mapping(cls.yaml_tag, data)
+
+
+    @classmethod
+    def from_yaml(cls, loader: yaml.Loader, node):
+        # TODO: implement
+        # print(node)
+        data = loader.construct_mapping(node)
+        max_division_count = data.pop('max_division_count',0)
+        graph = json_graph.node_link_graph(data, directed=True)
+        new_graph = cls(max_division_count=max_division_count)
+        new_graph.add_nodes_from(graph.nodes(data=True))
+        new_graph.add_edges_from(graph.edges(data=True))
+        return new_graph
+        # return cls(**loader.construct_mapping(node, deep=True))
 
     def add_symbols(self, functions: list[HAKCFunction], global_variables: list[HAKCGlobalVariable]):
 
@@ -228,7 +243,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             print(f"adding div {division} -> comp {compartment} for symbol {symbol}")
             self.__add_division_compartment(symbol, division, compartment)
             compartment_id += 1
-        #
+
         # divs_comps = self.get_divisions_compartments()
         # for div, comp in divs_comps:
         #     # save original nodes
@@ -444,6 +459,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
     def get_perm(self, func, ty):
         types_used_data = self.get_edge_data(func,ty)
         if not types_used_data:
+            assert(False)
             return None
         rwx = types_used_data["has_types_used"] if "has_types_used" in types_used_data else None
         perm = self.convert_rwx(**rwx)
@@ -458,25 +474,14 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
 
     def print_coalesced_epochs(self):
         for epoch in self.coalesced_epochs.keys():
-            print(f"Merged Epoch {epoch} with")
+            print(f"\tMerged Epoch {epoch} with")
             for node in self.coalesced_epochs[epoch]:
-                print(f"\t{node}")
-
-    def get_root(self):
-        max_deg = -1
-        max_node = None
-        for n in self.nodes():
-            # save the first node as the first 'max' then continue to find the actual maximum
-            n_degree = self.degree[n]
-            if n_degree > max_deg or max_node == None:
-                max_deg = n_degree
-                max_node = n
-        return max_node
+                print(f"\t\t{node}")
 
     def get_roots(self):
         # get all 'roots' of the graph, so all nodes can be traversed
         # i.e., a node with no incoming connections
-        return {node for node, in_degree in self.in_degree() if in_degree == 0}
+        return {node for node, in_degree in self.in_degree() if (in_degree == 0 or (nx.number_of_selfloops(self) == in_degree)) and isinstance(node, HAKCFunction)}
 
     def assign_initial_epochs(self, root):
         epoch = 0
@@ -484,41 +489,53 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             if isinstance(n0, HAKCFunction):
                 if "epoch" not in self.nodes[n0]:
                     self.nodes[n0]["epoch"] = epoch
+                    # print(f"Assigned {n0.name} {epoch}")
                     epoch += 1
             if isinstance(n1, HAKCFunction):
                 if "epoch" not in self.nodes[n1]:
                     self.nodes[n1]["epoch"] = epoch
+                    # print(f"Assigned {n1.name} {epoch}")
                     epoch += 1
+
+    def clear_epochs(self, root):
+        for n0, n1, key in nx.edge_bfs(self, root):
+            if isinstance(n0, HAKCFunction):
+                if "epoch" in self.nodes[n0]:
+                    del self.nodes[n0]["epoch"]
+            if isinstance(n1, HAKCFunction):
+                if "epoch" in self.nodes[n1]:
+                    del self.nodes[n1]["epoch"]
 
     def temporal_coalesce_parent_child(self, ty, root):
         # coalesce vertically (parent -> child)
-
         print(f"!!!Starting temporal coalesce parent child with {root} for type:\n\t{ty}!!!")
-        # Get root with highest degree (usually is main, but not always) node as source
-
+        self.assign_initial_epochs(root)
         # print(f"Parent {parent} has children:")
-        for successor in nx.bfs_successors(self, root):
-            parent = successor[0]
-            children = successor[1]
-            if isinstance(parent, HAKCFunction):
-                # print(f"\t{successor[0]}, {successor[1]}")
+        # for successor in nx.bfs_successors(self, root):
+        for n0, n1, key in nx.edge_bfs(self, root):
+            parent = n0
+            child = n1
+            if isinstance(parent, HAKCFunction) and isinstance(child, HAKCFunction):
+                # print(f"parent {parent.pretty_print()} -> child {child.pretty_print()}")
                 parent_ty_perm = self.get_perm(parent, ty)
+                child_ty_perm = self.get_perm(child, ty)
                 # print(f"\t{parent.name} parent_ty_perm: {parent_ty_perm}")
-                for child in children:
-                    if isinstance(child, HAKCFunction):
-                        child_ty_perm = self.get_perm(child, ty)
-                        # print(f"\t{child.name} child_ty_perm: {child_ty_perm}")
-                        if parent_ty_perm == child_ty_perm:
-                            parent_epoch = self.nodes[parent]['epoch']
-                            child_epoch = self.nodes[child]['epoch']
-                            new_epoch = min(parent_epoch, child_epoch)
-                            # print(f"Merging {parent.pretty_print(parent_epoch)} with {child.pretty_print(child_epoch)} with common permissions {child_ty_perm} to new epoch: {new_epoch}")
-                            self.nodes[parent]['epoch'] = new_epoch
-                            self.nodes[child]['epoch'] = new_epoch
-                            self.store_coalesced_epochs(new_epoch, parent, child)
-        self.print_coalesced_epochs()
-        self.save_graph(f"final_epochs_for_ty_{ty.debug_type}_root_{root.name}.svg".replace(" ","-"))
+                # print(f"\t{child.name} child_ty_perm: {child_ty_perm}")
+                if parent_ty_perm == child_ty_perm:
+                    parent_epoch = self.nodes[parent]['epoch']
+                    child_epoch = self.nodes[child]['epoch']
+                    new_epoch = min(parent_epoch, child_epoch)
+                    # print(f"Merging {parent.pretty_print(parent_epoch)} with {child.pretty_print(child_epoch)} with common permissions {child_ty_perm} to new epoch: {new_epoch}")
+                    self.nodes[parent]['epoch'] = new_epoch
+                    self.nodes[child]['epoch'] = new_epoch
+                    self.store_coalesced_epochs(new_epoch, parent, child)
+        if len(self.coalesced_epochs) > 0:
+            self.print_coalesced_epochs()
+            self.save_graph(f"epochs_ty_{ty.debug_type}_root_{root.name}.svg".replace(" ","-"))
+        # TODO: the assigned epochs to the networkx graph seem to persist, so clearing them now
+        self.clear_epochs(root)
         print(f"!!!End temporal coalesce parent child with {root} for type:\n\t{ty}!!!")
+        return len(self.coalesced_epochs)
 
     @staticmethod
     def init_map(_map, ns, value):
@@ -570,7 +587,6 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             for child0 in children:
                 print(f"{child0.name}\t\t", end="")
                 for child1 in children:
-
                     if child0 != child1:
                         common_perms = self.get_common_type_perms(child0, child1, debug=False)
                         if len(common_perms) > 0:
@@ -785,7 +801,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         return [node for node, degree in sorted_degrees[:n]]
 
     def relabel_nodes(self, x):
-        if (isinstance(x, HAKCFunction)):
+        if isinstance(x, HAKCFunction):
             return x.pretty_print(self.nodes[x]["epoch"] if "epoch" in self.nodes[x] else None)
         else:
             return x.pretty_print()
@@ -834,18 +850,18 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         dot.set_splines("true")
         dot.set("overlap", "false")
         dot.set("rankdir","LR")
+        colors = ["lightblue", "green", "aquamarine", "yellow", "orange"]
         for node in dot.get_nodes():
             node.set("shape", "box")
             # Change color of box to show nodes that have been coalesced
             # print(self.coalesced_epochs[ty])
             # print(node.get("epoch"))
-            # if isinstance(node, HAKCFunction):
             epoch = node.get("epoch")
             # Note: Displaying the color of merged nodes only works if a root is specified
             if epoch:
                 if int(epoch) in self.coalesced_epochs.keys():
                     node.set("style", "filled")
-                    node.set("fillcolor", "lightblue")
+                    node.set("fillcolor", colors[int(epoch) % len(colors)])
 
         # set edge labels
         for edge in dot.get_edges():
@@ -856,18 +872,8 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
 
             edge.set_label(str(edge.obj_dict["attributes"]))
 
-        # dot.write_png(fname)  # Requires Graphviz installed
+        # dot.write_png(fname)
         dot.write_svg(fname)
-
-        """
-        node_degrees = sorted(G_ddg.degree, key=lambda x: x[1], reverse=True)
-        # prune graph to only have this graph
-        print(f"Nodes in DDG: {G_ddg.nodes()}")
-        MaxNodeDescendants = nx.descendants(G_ddg, MaxNodeName)
-        print(f"MaxNode Descendents {MaxNodeDescendants}")
-        G_ddg = G_ddg.subgraph(MaxNodeDescendants)
-        print(f"Max node {MaxNodeName} -> {MaxNodeAttrs} with found hash {MaxNodeHash}")
-        """
 
         print(f"Saved {self} to {fname}")
 

@@ -61,13 +61,18 @@ class HAKCHashValue:
     def __eq__(self, other):
         if isinstance(other, int):
             return self.final_hash == other
+        if isinstance(other, str):
+            return self.final_hash == other
         elif isinstance(other, HAKCHashValue):
             return self.final_hash == other.final_hash
         else:
             return False
 
     def __str__(self):
-        assert(isinstance(self.final_hash, int))
+        # assert(isinstance(self.final_hash, int))
+        # Note: loading from dag seems to store the hex value as a string
+        if isinstance(self.final_hash, str):
+            return f'{self.final_hash}'
         return f'{self.final_hash:0x}'
 
     def __repr__(self):

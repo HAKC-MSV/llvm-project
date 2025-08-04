@@ -192,27 +192,21 @@ def node_with_max_edges(graph):
     """
     if not graph.nodes:
         return None
-    # max(graph.degree, key=lambda item: print(item))
-    # print(graph.degree)
     return max(graph.degree, key=lambda item: item[1])[0]
 
 def temporal_coalesce(G: HAKCCompartmentalization):
     # https://networkx.org/documentation/stable/reference/algorithms/traversal.html
     print(f"!!!Starting temporal coalesce!!!")
+    top_merged_epochs = list()
     type_subG = {}
-    # get all types
-    # print("Types:")
     tys = G.get_types()
     for ty in tys:
-        # TODO: what to do with multiple roots / disconnected parts of graph
-        # print(f"Ty {ty} edges: {G.in_edges(ty, data=True)}")
         tySubG = G.get_type_subgraph(ty)
         root_subgraphs = tySubG.get_root_subgraphs()
-        print(root_subgraphs)
         type_subG[ty] = dict()
         for root, subG in root_subgraphs:
             root_key = root.pretty_print()
-            print(f"root_node: {root.pretty_print()} in subG with {len(subG.nodes)} nodes and {len(subG.edges)} edges")
+            print(f"Type: {ty} with root_node: {root_key} in subG with {len(subG.nodes)} nodes and {len(subG.edges)} edges")
             type_subG[ty][root_key] = subG
             # check that graph has at least one function, or else skip
             funcs = sum(1 for n in subG.nodes() if isinstance(n, HAKCFunction))
@@ -222,76 +216,35 @@ def temporal_coalesce(G: HAKCCompartmentalization):
                 # Note: Add attributes to the node rather than trying to modify the underlying HAKC object (this seems to do some weird things)
                 # Note: Use edge_bfs instead of bfs_successor because bfs_successor requires a source node which we sometimes don't have
                 # for n in nx.bfs_successors(subG, _main):
-
-                subG.assign_initial_epochs(root)
-                # subG.save_graph(f"initial_epochs_for_ty_{ty.debug_type}.svg".replace(" ","-"))
-                subG.temporal_coalesce_parent_child(ty, root)
-
-                print()
+                num_merged_epochs = subG.temporal_coalesce_parent_child(ty, root)
+                top_merged_epochs.append((num_merged_epochs, f"epochs_ty_{ty.debug_type}_root_{root.name}.svg".replace(" ","-")))
             else:
                 print(f"SubGraph for Type: {ty} has {funcs} <= 1 HAKCFunctions, so skipping graph!")
-
-
-
-    # lst = list()
-    # for n0, n1, key in nx.edge_bfs(G, src):
-    #     #  and key == "has_dag"
-    #     if isinstance(n0, HAKCFunction) and isinstance(n1, HAKCFunction):
-            # print(n0)
-            # now, get the type perm data
-
-            # common_perms = G.get_common_type_perms(n0, n1, debug=True)
-            # if(len(common_perms) > 0):
-            #     print(f"Could merge {n0} in epoch {epoch_map[n0]} with {n1} in epoch {epoch_map[n1]} with common permissions {common_perms}")
-
-    # print(f"successors: {nx.bfs_successors(G, sym0)}")
-    # for success in nx.bfs_successors(G, src):
-    #     n = success[0]
-    #     e = success[1]
-    #     print(f"Found successor {n} -> {e}")
-    #     if(isinstance(n, HAKCFunction)):
-    #         print(f"\tTypesUsed: {n.types_used}")
-    #     # find edges between
-    #     # print(success)
-
-    # loop through all edges
-    # for e0 in G.edges(data=True):
-    #     sym0 = e0[0]
-    #     ty0 = e0[1]
-    #     rwx0 = e0[2]
-    #     # A is a symbol that uses type B, and the edge between them is an RWX permission
-    #     if isinstance(sym0, HAKCSymbol) and isinstance(ty0, HAKCType) and "R" in rwx0:
-            # Now find all the symbols that are connected to A, and their types and permissions
-            # for _sym1 in [e1[1] for e1 in G.edges(sym0, data=True)]:
-            #     for e2 in G.edges(_sym1, data=True):
-            #         sym1 = e2[0]
-            #         ty1 = e2[1]
-            #         rwx1 = e2[2]
-            #         if isinstance(sym1, HAKCSymbol) and isinstance(ty1, HAKCType) and ty0 == ty1 and sym0 != sym1 and "R" in rwx1:
-            #             # print(f"ty1 {ty1} <{rwx1}]- sym1 {sym1} - sym0 {sym0} -[{rwx0}]> ty0 {ty0}")
-            #             if rwx0 == rwx1:
-            #                 print(f"Can merge epochs at sym0 {sym0} and sym1 {sym1} with rwx {rwx0['R']}{rwx0['W']}{rwx0['X']} -> {rwx1['R']}{rwx1['W']}{rwx1['X']}")
     print(f"!!!End temporal coalesce!!!")
+    top_merged_epochs_sorted = sorted(top_merged_epochs, reverse=True)
+    print(f"Files with most merged epochs:")
+    for i in range(min(10, len(top_merged_epochs_sorted))):
+        print(f"{top_merged_epochs_sorted[i][1]} merged {top_merged_epochs_sorted[i][0]} epochs!")
+    print()
 
-def temporal_analysis(db_dir: str):
+def temporal_analysis(db_dir: str, load_dag: str = None):
 
     logger.info(f'Starting Temporal Analysis')
     start = time.time()
+    compartmentalization = None
 
-    conn = HAKCDatabase(db_dir)
+    # TODO: implement load_dag to speed up testing of skbuff.c
+    if load_dag:
+        print(f"Trying to load dag from {load_dag}")
+        with open(load_dag, 'rb') as f:
+            compartmentalization = yaml.load(f, Loader=yaml.Loader)
+        print(compartmentalization)
+        return
+    else:
+        conn = HAKCDatabase(db_dir)
+        compartmentalization = HAKCCompartmentalization()
+        compartmentalization.load_from_db(conn)
 
-    # load the HAKCCompartmentalization from the database
-
-    compartmentalization = HAKCCompartmentalization()
-    compartmentalization.load_from_db(conn)
-
-    # pair = conn.get_functions_to_merge()
-    # hash_to_sym_map = conn.get_symbol_hashes_to_symbols()
-    # for child0, child1 in pair:
-    #     print(f"Could merge {hash_to_sym_map[child0]} and {hash_to_sym_map[child1]}")
-    # print(f"Found {len(pair)} pairs to merge using Kuzu algorithm")
-
-    # temporal_coalesce(compartmentalization, "skb_init")
     temporal_coalesce(compartmentalization)
 
     end = time.time()
@@ -304,9 +257,6 @@ def temporal_analysis(db_dir: str):
     logger.info(f'  DB queries Count: {conn.count_executed_statements}')
     # compartmentalization.save_graph("loaded_dag.svg")
     conn.close()
-
-
-
 
 def create_dag_multithread(files: set[str], core_count: int, conn: HAKCDatabase) -> HAKCCompartmentalization:
     logger.info(f'Starting multiprocess DAG creation using {core_count} cores')
@@ -327,8 +277,6 @@ def create_dag_multithread(files: set[str], core_count: int, conn: HAKCDatabase)
                     compartmentalization.add_symbols(functions, global_variables)
                 except Exception as e:
                     logger.error(f'Error parsing {file}: {str(e)}')
-    # compartmentalization.save_graph("ipv6_sysctl_unregister.svg", symbol_name="ipv6_sysctl_unregister")
-    # compartmentalization.save_graph("kernel.svg")
 
     compartmentalization.persist_to_database(conn)
     logger.info(f'Total symbols {len(conn.get_symbols())}')
@@ -451,6 +399,7 @@ def main():
                         help='Deletes existing database when creating a new compartmentalization', dest='delete_db',
                         default=True)
     parser.add_argument('--dump-dag', dest='dump_dag', help='dump DAG to json')
+    parser.add_argument('--load-dag', dest='load_dag', help='load DAG from json')
     parser.add_argument('--save-graph', dest='save_g', help='save graph to png')
 
     args = parser.parse_args()
@@ -468,24 +417,18 @@ def main():
         profile = cProfile.Profile()
 
     if args.temporal_analysis_flag:
-        temporal_analysis(args.db_dir)
+        temporal_analysis(args.db_dir, args.load_dag)
         return
 
     if args.create_dag:
         if profile:
             profile.enable()
         compartmentalization = create_new_dag(args.dag_files_root, args.core_count, args.db_dir, args.delete_db)
-        # print(f"create_new_dag post")
-        # print(f"pre profile")
         if profile:
             profile.disable()
             output_profile_stats(profile)
-        # print(f"post profile")
-        # print(f"pre save_g")
         if args.save_g:
             compartmentalization.save_graph(args.save_g)
-            # compartmentalization.save_graph_alt("alt.png")
-        # print(f"post save_g")
 
     if args.adjust:
         logger.info(f'Adjusting compartmentalization based on {args.adjust_path}')
@@ -498,6 +441,7 @@ def main():
         logger.info(f'Dumping compartmentalization to {args.dump_dag}')
         with open(args.dump_dag, "w") as f:
             yaml.dump(compartmentalization, f)
+            # yaml.safe_dump(compartmentalization, f)
         logger.info("Done")
 
 

@@ -31,7 +31,18 @@ class HAKCCompilationUnit(HAKCDBNode, yaml.YAMLObject):
 
     @classmethod
     def from_yaml(cls, loader: yaml.Loader, node):
+        # yaml dumper adds some tags to determine the type of the value stored
+        # we need to manually remove these extra bits of information
+        # print(node.value)
+        # out = dict()
+        # for i in node.value:
+        #     key = i[0]
+        #     val = i[1]
+        #     print(f"{key.value} -> {val.value}")
+        #     out[key.value] = val.value
+
         return cls(**loader.construct_mapping(node, deep=True))
+        # return cls(**out)
 
     def __eq__(self, other):
         if isinstance(other, HAKCCompilationUnit):
@@ -453,8 +464,8 @@ class HAKCSymbol(HashedHAKCDBNode, yaml.YAMLObject):
         self.compilation_unit = CompilationUnit if CompilationUnit else None
         self.used_symbols = UsedSymbols if UsedSymbols else list()
         assert (self.name != "")
-        assert (isinstance(self.type, HAKCType))
-        assert (isinstance(self.scope, HAKCScope))
+        # assert (isinstance(self.type, HAKCType))
+        # assert (isinstance(self.scope, HAKCScope))
         if "type_hash" in kwargs:
             assert kwargs["type_hash"] == self.get_computed_hash(), f"type_hash ({kwargs['type_hash']}) =?= hash(self) ({self.get_computed_hash()})"
 
@@ -472,6 +483,7 @@ class HAKCSymbol(HashedHAKCDBNode, yaml.YAMLObject):
 
     @classmethod
     def from_yaml(cls, loader: yaml.Loader, node):
+        print(f"here000 {node}")
         return cls(**loader.construct_mapping(node, deep=True))
 
     def __eq__(self, other):
