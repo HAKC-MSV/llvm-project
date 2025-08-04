@@ -199,8 +199,8 @@ bool HAKCPointerManager::ManageNewPointer(Use &U) {
 
   auto ManagedPointer =
       std::make_shared<ManagedHAKCPointer>(BaseDefinition, *this, NextID);
-  if (NextID == 1 &&
-      HAKCAnalysis.GetFunction().getName() == "net_dim_get_rx_moderation") {
+  if (NextID == 6 &&
+      HAKCAnalysis.GetFunction().getName() == "prb_reserve_in_last") {
     CommonHAKCAnalysis::getWriter(DebugActive)
         << "Found " << *ManagedPointer << "\n";
   }
@@ -210,6 +210,16 @@ bool HAKCPointerManager::ManageNewPointer(Use &U) {
     CommonHAKCAnalysis::getWriter(DebugActive)
         << "Ignoring pointer " << ManagedPointer
         << " because its HAKCType is ignored\n";
+    return false;
+  }
+  if (ManagedPointer->GetType() &&
+      ManagedPointer->GetType()->GetPointeeType() == nullptr &&
+      (ManagedPointer->GetType()->IsStructType() ||
+       ManagedPointer->GetType()->IsUnionType())) {
+    CommonHAKCAnalysis::getWriter(DebugActive)
+        << "Ignoring " << *ManagedPointer
+        << " because it is a struct or union that does not point is not "
+           "equivalent to a pointer\n";
     return false;
   }
   if (ManagedPointer->GetType() && ManagedPointer->GetType()->IsIntegerType() &&
@@ -310,8 +320,8 @@ bool HAKCPointerManager::UseShouldBeCloned(Use &U) {
   bool CloneUse = isa<BitCastInst>(UserP) || isa<PtrToIntInst>(UserP) ||
                   isa<SelectInst>(UserP) || isa<SExtInst>(UserP) ||
                   isa<IntToPtrInst>(UserP) || isa<PHINode>(UserP) ||
-                  isa<FreezeInst>(UserP) || isa<BinaryOperator>(UserP) ||
-                  isa<TruncInst>(UserP) || isa<ZExtInst>(UserP);
+                  isa<BinaryOperator>(UserP) || isa<TruncInst>(UserP) ||
+                  isa<ZExtInst>(UserP);
 
   if (isa<SubOperator>(UserP)) {
     CloneUse = false;
@@ -326,8 +336,9 @@ bool HAKCPointerManager::UseShouldBeCloned(Use &U) {
 
 bool HAKCPointerManager::UseShouldUtilizeAuthenticatedPointer(Use &U) const {
   auto *UserP = U.getUser();
-  bool UseAuthenticatedPointer =
-      isa<CmpInst>(UserP) || isa<LoadInst>(UserP) || isa<SubOperator>(UserP);
+  bool UseAuthenticatedPointer = isa<CmpInst>(UserP) || isa<LoadInst>(UserP) ||
+                                 isa<SubOperator>(UserP) ||
+                                 isa<FreezeInst>(UserP);
   if (auto *Call = dyn_cast<CallBase>(UserP)) {
     if (GetFunctionAnalysis()
             .GetModuleAnalysis()

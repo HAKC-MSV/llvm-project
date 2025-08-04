@@ -129,6 +129,15 @@ bool HAKCTypeInfo::IsStructType() const {
   return false;
 }
 
+bool HAKCTypeInfo::IsUnionType() const {
+  if (DbgType) {
+    auto *StrippedDbgTy = StripTypeModifiers(DbgType);
+    return StrippedDbgTy->getTag() == dwarf::DW_TAG_union_type;
+  }
+
+  return false;
+}
+
 std::shared_ptr<HAKCTypeInfo> HAKCTypeInfo::GetPointeeType() const {
   return PointeeType;
 }
