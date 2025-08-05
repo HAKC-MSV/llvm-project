@@ -56,6 +56,13 @@ HAKCWriter &HAKCWriter::operator<<(Use &U) {
   return *this;
 }
 
+HAKCWriter &HAKCWriter::operator<<(double d) {
+  if (debug) {
+    os << d;
+  }
+  return *this;
+}
+
 HAKCWriter &HAKCWriter::operator<<(User *User) {
   *this << *User;
   return *this;

@@ -79,6 +79,8 @@ public:
 
   HAKCWriter &operator<<(unsigned long i);
 
+  HAKCWriter &operator<<(double d);
+
   HAKCWriter &operator<<(ssize_t i);
 
   HAKCWriter &operator<<(bool b);

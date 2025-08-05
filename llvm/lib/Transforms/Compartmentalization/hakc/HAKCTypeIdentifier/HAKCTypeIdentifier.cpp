@@ -15,9 +15,9 @@
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/BinaryFormat/Dwarf.h"
+#include "llvm/IR/Constants.h"
 #include "llvm/IR/DebugInfoMetadata.h"
 #include "llvm/IR/DerivedTypes.h"
-#include "llvm/XRay/BlockPrinter.h"
 
 #include "llvm/Analysis/CallGraph.h"
 #include "llvm/Analysis/CallPrinter.h"
@@ -1105,12 +1105,12 @@ HAKCTypeP HAKCTypeIdentifier::FindPointeeType(HAKCTypeP BaseType) {
   CommonHAKCAnalysis::getLogger(Verbose)
       << "Finding Pointee Type for " << *BaseType << "\n";
 
-  if (BaseType->IsVoidPtrType()) {
-    return GetVoidPointerPointeeType();
-  }
-
   if (BaseType->GetPointeeType()) {
     return BaseType->GetPointeeType();
+  }
+
+  if (BaseType->IsVoidPtrType()) {
+    return GetVoidPointerPointeeType();
   }
 
   if (BaseType->IsIntegerType() && IsPointerLikeType(BaseType->GetDbgType())) {
@@ -1377,7 +1377,7 @@ HAKCTypeIdentifier::FindTypeFromDebug(const DbgVariableRecord &DVR,
   if (DVR.hasArgList()) {
     return nullptr;
   }
-  auto *DITy = DVR.getVariable()->getType();
+  const auto *DITy = DVR.getVariable()->getType();
   DebugVariable DebugVar(&DVR);
   auto FragInfo = DebugVar.getFragment();
   CommonHAKCAnalysis::getWriter(
@@ -1394,15 +1394,32 @@ HAKCTypeIdentifier::FindTypeFromDebug(const DbgVariableRecord &DVR,
       AnalysisHelper.GetSystemInfo().OutputDebugInfo())
       << "\n";
   if (DITy->getTag() == dwarf::DW_TAG_structure_type) {
-    auto *CompositeTy = dyn_cast<DICompositeType>(DITy);
+    const auto *CompositeTy = dyn_cast<DICompositeType>(DITy);
     if (FragInfo) {
+      auto CurrentOffset = FragInfo->startInBits();
+
+    restart_analysis:
+      bool restart = false;
+      DIDerivedType *PreviousTy = nullptr;
+      if (CompositeTy->getTag() == dwarf::DW_TAG_union_type &&
+          CurrentOffset < CompositeTy->getSizeInBits()) {
+        /* We are examining a union, and the object could be type in the union
+         * that matches the bit offset. We can't know for sure at this point so
+         * move on */
+        return nullptr;
+      }
+
       for (auto *Member : CompositeTy->getElements()) {
         auto *CompositeMember = dyn_cast<DIDerivedType>(Member);
         if (!CompositeMember) {
           continue;
         }
-        if (CompositeMember->getOffsetInBits() == FragInfo->startInBits()) {
-          CommonHAKCAnalysis::getLogger(Verbose)
+        CommonHAKCAnalysis::getLogger(Verbose)
+            << "Examining member " << *CompositeMember << " at offset "
+            << CompositeMember->getOffsetInBits() << "\n";
+        if (CompositeMember->getOffsetInBits() == CurrentOffset) {
+          CommonHAKCAnalysis::getWriter(
+              AnalysisHelper.GetSystemInfo().OutputDebugInfo())
               << "Found Member " << *CompositeMember << " at offset "
               << FragInfo->startInBits() << " with BaseType ";
           if (!CompositeMember->getBaseType()) {
@@ -1414,11 +1431,32 @@ HAKCTypeIdentifier::FindTypeFromDebug(const DbgVariableRecord &DVR,
           CommonHAKCAnalysis::getLogger(Verbose)
               << *DITy << "\n";
           break;
+        } else if (CompositeMember->getOffsetInBits() > CurrentOffset) {
+          CurrentOffset -= PreviousTy->getOffsetInBits();
+          auto *StrippedTy =
+              HAKCTypeInfo::StripTypeModifiers(PreviousTy->getBaseType());
+
+          restart = isa_and_nonnull<DICompositeType>(StrippedTy);
+          if (restart) {
+            CompositeTy = dyn_cast<DICompositeType>(StrippedTy);
+            CommonHAKCAnalysis::getWriter(
+                AnalysisHelper.GetSystemInfo().OutputDebugInfo())
+                << "Restarting analysis with new type " << *CompositeTy
+                << " at offset " << CurrentOffset << "\n";
+          }
+          break;
+        } else {
+          PreviousTy = CompositeMember;
         }
+      }
+
+      if (restart) {
+        goto restart_analysis;
       }
     }
   }
 
+found:
   auto FoundType = FindType(DITy);
   if (FoundType) {
     if (isa<AllocaInst>(V)) {
@@ -1744,6 +1782,12 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
     FoundType = GetVoidPointerType();
   } else if (auto *FreezeI = dyn_cast<FreezeInst>(V)) {
     FoundType = FindHAKCType(FreezeI->getOperand(0));
+  } else if (auto *CastExpr = dyn_cast<ConstantExpr>(V)) {
+    if (CastExpr->isCast()) {
+      FoundType = FindHAKCType(CastExpr->getOperand(0));
+    } else {
+      FoundType = GetVoidPointerType();
+    }
   }
 
 exit:
