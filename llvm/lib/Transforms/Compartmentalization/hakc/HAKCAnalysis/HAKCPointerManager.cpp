@@ -127,8 +127,12 @@ bool HAKCPointerManager::PointerIsEligibleForManagement(Use &U) const {
     return !HAKCAnalysis.GetModuleAnalysis()
                 .GetCommonAnalysis()
                 .IsIgnoredGlobal(LoadI->getPointerOperand()) &&
-           PointerIsEligibleForManagement(
-               LoadI->getOperandUse(LoadInst::getPointerOperandIndex()));
+           GetFunctionAnalysis()
+               .GetModuleAnalysis()
+               .GetCommonAnalysis()
+               .ValueIsUsedAsPointer(Pointer);
+    // PointerIsEligibleForManagement(
+    //     LoadI->getOperandUse(LoadInst::getPointerOperandIndex()));
   } else if (auto *StoreI = dyn_cast<StoreInst>(U.getUser())) {
     HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
         << *Pointer << " is used in a StoreInst\n";
@@ -200,8 +204,7 @@ bool HAKCPointerManager::ManageNewPointer(Use &U) {
 
   auto ManagedPointer =
       std::make_shared<ManagedHAKCPointer>(BaseDefinition, *this, NextID);
-  if (NextID == 6 &&
-      HAKCAnalysis.GetFunction().getName() == "prb_reserve_in_last") {
+  if (NextID == 9 && HAKCAnalysis.GetFunction().getName() == "delete_node") {
     CommonHAKCAnalysis::getWriter(DebugActive)
         << "Found " << *ManagedPointer << "\n";
   }
@@ -213,6 +216,7 @@ bool HAKCPointerManager::ManageNewPointer(Use &U) {
         << " because its HAKCType is ignored\n";
     return false;
   }
+
   if (ManagedPointer->GetType() &&
       ManagedPointer->GetType()->GetPointeeType() == nullptr &&
       (ManagedPointer->GetType()->IsStructType() ||
