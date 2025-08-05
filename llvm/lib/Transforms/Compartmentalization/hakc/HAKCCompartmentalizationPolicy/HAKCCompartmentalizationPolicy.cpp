@@ -3,6 +3,8 @@
 //
 
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartmentalizationPolicy.h"
+
+#include "llvm/Support/Timer.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/CommonHAKCAnalysis.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartmentDivision.h"
@@ -46,14 +48,19 @@ HAKCDatabaseResponse::operator bool() const { return Success; }
 ssize_t HAKCDatabaseResponse::ReadFromSocket(raw_socket_stream &OS, void *Dest,
                                              ssize_t Size) const {
   ssize_t BytesRead;
+  auto start = llvm::TimeRecord::getCurrentTime();
   do {
-    BytesRead = OS.read(static_cast<char *>(Dest), Size, Timeout);
+    BytesRead = OS.read(static_cast<char *>(Dest), Size);
   } while (BytesRead != Size);
+
+  auto end = llvm::TimeRecord::getCurrentTime();
+  auto duration = end.getWallTime() - start.getWallTime();
 
   if (OS.has_error()) {
     CommonHAKCAnalysis::getWriter(true)
-        << "There was an error reading the policy server socket: "
-        << OS.error().message() << "\n";
+        << "There was an error reading " << Size
+        << " bytes from the policy server socket: " << OS.error().message()
+        << "\nThe duration was " << duration << "\n";
     throw std::exception();
   }
 
@@ -64,10 +71,20 @@ void HAKCDatabaseResponse::operator<<(raw_socket_stream &OS) {
   Response = "";
   ssize_t ResponseSize = 0;
 
-  ReadFromSocket(OS, &ResponseSize, sizeof(ResponseSize));
+  try {
+    ReadFromSocket(OS, &ResponseSize, sizeof(ResponseSize));
+  } catch (std::exception &E) {
+    CommonHAKCAnalysis::getWriter(true) << "Read 1: " << E.what() << "\n";
+    throw E;
+  }
   Response.resize(ResponseSize);
-  auto LastReadSize = ReadFromSocket(OS, Response.data(), ResponseSize);
-  Success = LastReadSize > 0 && ResponseSize == LastReadSize;
+  try {
+    auto LastReadSize = ReadFromSocket(OS, Response.data(), ResponseSize);
+    Success = LastReadSize > 0 && ResponseSize == LastReadSize;
+  } catch (std::exception &E) {
+    CommonHAKCAnalysis::getWriter(true) << "Read 2: " << E.what() << "\n";
+    throw E;
+  }
 }
 
 HAKCDatabaseConnection::HAKCDatabaseConnection(

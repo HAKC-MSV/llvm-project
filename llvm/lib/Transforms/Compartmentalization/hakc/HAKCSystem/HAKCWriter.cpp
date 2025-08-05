@@ -71,6 +71,13 @@ HAKCWriter &HAKCWriter::operator<<(llvm::Use &U) {
   return *this;
 }
 
+HAKCWriter &HAKCWriter::operator<<(double d) {
+  if (debug) {
+    os << d;
+  }
+  return *this;
+}
+
 HAKCWriter &HAKCWriter::operator<<(llvm::Value &V) {
   *this << &V;
   return *this;
