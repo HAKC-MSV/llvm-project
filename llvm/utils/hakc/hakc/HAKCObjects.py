@@ -21,10 +21,10 @@ class HAKCCompilationUnit(HAKCDBNode, yaml.YAMLObject):
         # TODO: Fix compilation unit hash failing
         if "cu_hash" in kwargs:
             if kwargs["cu_hash"] != self.get_computed_hash():
-                print(f"[WARNING] cu_hash ({kwargs['cu_hash']}) != hash(self) ({self.get_computed_hash()})")
+                logger.debug(f"cu_hash ({kwargs['cu_hash']}) != hash(self) ({self.get_computed_hash()})")
             else:
-                print(f"[INFO] cu_hash ({kwargs['cu_hash']}) == hash(self) ({self.get_computed_hash()})")
-            # assert kwargs["cu_hash"] == self.get_computed_hash(), f"cu_hash ({kwargs['cu_hash']}) =?= hash(self) ({self.get_computed_hash()})"
+                logger.debug(f"cu_hash ({kwargs['cu_hash']}) == hash(self) ({self.get_computed_hash()})")
+            assert kwargs["cu_hash"] == self.get_computed_hash(), f"cu_hash ({kwargs['cu_hash']}) =?= hash(self) ({self.get_computed_hash()})"
 
     def pretty_print(self):
         return f"{self.get_table_name()}({self.defining_file}:{self.defining_line})"
@@ -98,8 +98,8 @@ class HAKCDivision(HashedHAKCDBNode, yaml.YAMLObject):
         self.division_id = DivisionID
         self.access_token = AccessToken
         # print(self)
-        # if "division_hash" in kwargs:
-        #     assert kwargs["division_hash"] == self.get_computed_hash(), f"division_hash ({kwargs['division_hash']}) =?= hash(self) ({self.get_computed_hash()})"
+        if "division_hash" in kwargs:
+            assert kwargs["division_hash"] == self.get_computed_hash(), f"division_hash ({kwargs['division_hash']}) =?= hash(self) ({self.get_computed_hash()})"
 
     def pretty_print(self):
         return f"{self.get_table_name()}({self.division_id})"
@@ -126,7 +126,10 @@ class HAKCDivision(HashedHAKCDBNode, yaml.YAMLObject):
         return hash(self) < hash(other)
 
     def get_hash_inputs(self) -> list[object]:
-        return [self.division_id, self.access_token]
+        if self.access_token:
+            return [self.division_id, self.access_token]
+        return [self.division_id]
+
 
     @staticmethod
     def get_primary_key() -> HAKCDBColumn:
@@ -151,22 +154,24 @@ class HAKCDivision(HashedHAKCDBNode, yaml.YAMLObject):
         schema = HAKCDivision.get_db_table_columns()
         assert (len(schema) == (len(self.get_data_columns()) + 1))
         return {
-            schema[0]: hash(self) if convert_hash else self.get_computed_hash(),
+            # schema[0]: hash(self) if convert_hash else self.get_computed_hash(),
+            schema[0]: self.get_computed_hash().final_hash,
             schema[1]: self.division_id,
             schema[2]: self.access_token
         }
 
 class HAKCCompartment(HAKCDBNode, yaml.YAMLObject):
+    # TODO: add salt to hashing value
     yaml_tag = "!HAKCCompartment"
     def __init__(self, CompartmentID: int, EntryToken: Optional[int] = None, **kwargs):
         yaml.YAMLObject.__init__(self)
         # kwargs["Name"] = kwargs.get("Name", str(CompartmentID))
         HAKCDBNode.__init__(self, **kwargs)
+        # print(self)
         self.compartment_id = CompartmentID
         self.entry_token = EntryToken
-        # print(self)
-        # if "compartment_hash" in kwargs:
-        #     assert kwargs["compartment_hash"] == self.get_computed_hash(), f"compartment_hash ({kwargs['compartment_hash']}) =?= hash(self) ({self.get_computed_hash()}) [{self}]"
+        if "compartment_hash" in kwargs:
+            assert kwargs["compartment_hash"] == self.get_computed_hash(), f"compartment_hash ({kwargs['compartment_hash']}) =?= hash(self) ({self.get_computed_hash()}) [{self}]"
 
     def pretty_print(self):
         return f"{self.get_table_name()}({self.compartment_id})"
@@ -184,7 +189,9 @@ class HAKCCompartment(HAKCDBNode, yaml.YAMLObject):
         return False
 
     def __hash__(self):
+        # return self.get_computed_hash().final_hash
         return HAKCDBNode.__hash__(self)
+
 
     # def add_division(self, division: HAKCDivision):
     #     self.divisions.add(division)
@@ -196,7 +203,9 @@ class HAKCCompartment(HAKCDBNode, yaml.YAMLObject):
         return hash(self) < hash(other)
 
     def get_hash_inputs(self) -> list[object]:
-        return [self.compartment_id, self.entry_token]
+        if self.entry_token:
+            return [self.compartment_id, self.entry_token]
+        return [self.compartment_id]
 
     @staticmethod
     def get_primary_key() -> HAKCDBColumn:
@@ -218,8 +227,15 @@ class HAKCCompartment(HAKCDBNode, yaml.YAMLObject):
     def get_db_data(self, convert_hash=True) -> dict[HAKCDBColumn, object]:
         schema = HAKCCompartment.get_db_table_columns()
         assert (len(schema) == (len(self.get_data_columns()) + 1))
+        # Note: something weird here probably. switching from old to new seems to fix the issue with inconsistent hashes
+        # old: schema[0]: hash(self) if convert_hash else self.get_computed_hash(),
+        # new: schema[0]: self.get_computed_hash().final_hash,
+        # note: compartment_hash is incorrect here!!!
+        # is            520818469179354608   -> 73A51A367E5EDF0
+        # but should be 14355876524461518314 -> c73a51a367e5edea
         return {
-            schema[0]: hash(self) if convert_hash else self.get_computed_hash(),
+            # schema[0]: hash(self) if convert_hash else self.get_computed_hash(),
+            schema[0]: self.get_computed_hash().final_hash,
             schema[1]: self.compartment_id,
             schema[2]: self.entry_token
         }
@@ -464,8 +480,8 @@ class HAKCSymbol(HashedHAKCDBNode, yaml.YAMLObject):
         self.compilation_unit = CompilationUnit if CompilationUnit else None
         self.used_symbols = UsedSymbols if UsedSymbols else list()
         assert (self.name != "")
-        # assert (isinstance(self.type, HAKCType))
-        # assert (isinstance(self.scope, HAKCScope))
+        assert (isinstance(self.type, HAKCType))
+        assert (isinstance(self.scope, HAKCScope))
         if "type_hash" in kwargs:
             assert kwargs["type_hash"] == self.get_computed_hash(), f"type_hash ({kwargs['type_hash']}) =?= hash(self) ({self.get_computed_hash()})"
 
@@ -498,7 +514,12 @@ class HAKCSymbol(HashedHAKCDBNode, yaml.YAMLObject):
         return HAKCDBNode.__hash__(self)
 
     def get_hash_inputs(self) -> list[object]:
-        return [self.name, self.type, self.scope]
+        result = [self.name]
+        if self.type:
+            result.append(self.type)
+        if self.scope:
+            result.append(self.scope)
+        return result
 
     # @property
     # def is_definition(self):
@@ -743,8 +764,10 @@ class HAKCIndirectCallSource(HAKCPrintableObj, yaml.YAMLObject):
                 out += f"{whitespace}    {src.debug_print(whitespace=f'{whitespace}')}\n"
         return out
 
-    # def get_hash_inputs(self) -> list[object]:
-    #     result = [self.type]
-    #     for link in self.source:
-    #         result.append(link)
-    #     return result
+    def get_hash_inputs(self) -> list[object]:
+        result = []
+        if self.type:
+            result.append(self.type)
+        for link in self.source:
+            result.append(link)
+        return result

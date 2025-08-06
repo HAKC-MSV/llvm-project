@@ -100,7 +100,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
 
         self.save_graph("loaded_from_db.svg")
 
-        print(self)
+        logger.debug(self)
 
     @classmethod
     def to_yaml(cls, dumper: yaml.Dumper, data):
@@ -240,7 +240,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             compartment.entry_token = self.compute_entry_token(compartment_id)
             division = HAKCDivision(division_id)
             division.access_token = self.compute_access_token(division_id, compartment_id)
-            print(f"adding div {division} -> comp {compartment} for symbol {symbol}")
+            logger.debug(f"adding div {division} -> comp {compartment} for symbol {symbol}")
             self.__add_division_compartment(symbol, division, compartment)
             compartment_id += 1
 
@@ -397,7 +397,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
 
     def get_functions_that_use_type(self, ty, debug=False):
         if debug:
-            print(f"Type {ty} is used in functions:")
+            logger.debug(f"Type {ty} is used in functions:")
         funcs = set()
         # Note: For DiGraph, specify in_edges and out_edges, since using just edges() defaults to out edges
         for func, ty0, data in self.in_edges(ty, data=True):
@@ -407,7 +407,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             if ty0 == ty and isinstance(func, HAKCFunction) and 'R' in data:
                 funcs.add(func)
                 if debug:
-                    print(f"\t{func} with perm {self.convert_rwx(**data)}")
+                    logger.debug(f"\t{func} with perm {self.convert_rwx(**data)}")
         return funcs
 
     def get_type_subgraph(self, ty):
@@ -436,14 +436,14 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
 
     def get_types_used(self, func, debug=False):
         if debug:
-            print(f"Function {func} has types used:")
+            logger.debug(f"Function {func} has types used:")
         types_used = set()
         for n0, ty0, data in self.edges(func, data=True):
             if(n0 == func and isinstance(ty0, HAKCType) and 'R' in data):
                 type_perm = HAKCTypePerm(ty0, self.convert_rwx(**data))
                 types_used.add(type_perm)
                 if debug:
-                    print(f"\t{type_perm}")
+                    logger.debug(f"\t{type_perm}")
         return types_used
 
     def get_common_type_perms(self, sym0, sym1, debug=False):
@@ -452,8 +452,8 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         type_perms1 = self.get_types_used(sym1)
         common_perms = type_perms0.intersection(type_perms1)
         if debug and len(common_perms) > 0:
-            print(f"symbol {sym0} and {sym1}:")
-            print(f"{type_perms0} ∩ {type_perms1} \n\t= {common_perms}")
+            logger.debug(f"symbol {sym0} and {sym1}:")
+            logger.debug(f"{type_perms0} ∩ {type_perms1} \n\t= {common_perms}")
         return common_perms
 
     def get_perm(self, func, ty):
@@ -474,9 +474,9 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
 
     def print_coalesced_epochs(self):
         for epoch in self.coalesced_epochs.keys():
-            print(f"\tMerged Epoch {epoch} with")
+            logger.debug(f"\tMerged Epoch {epoch} with")
             for node in self.coalesced_epochs[epoch]:
-                print(f"\t\t{node}")
+                logger.debug(f"\t\t{node}")
 
     def get_roots(self):
         # get all 'roots' of the graph, so all nodes can be traversed
@@ -484,7 +484,9 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         return {node for node, in_degree in self.in_degree() if (in_degree == 0 or (nx.number_of_selfloops(self) == in_degree)) and isinstance(node, HAKCFunction)}
 
     def assign_initial_epochs(self, root):
-        epoch = 0
+        # reset epochs
+        self.coalesced_epochs = dict()
+        epoch = HAKCCompartmentalization.kernel_compartment_id + 1 # reserving epoch 0 for the kernel compartment
         for n0, n1, key in nx.edge_bfs(self, root):
             if isinstance(n0, HAKCFunction):
                 if "epoch" not in self.nodes[n0]:
@@ -505,37 +507,57 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             if isinstance(n1, HAKCFunction):
                 if "epoch" in self.nodes[n1]:
                     del self.nodes[n1]["epoch"]
+        self.coalesced_epochs = dict()
 
-    def temporal_coalesce_parent_child(self, ty, root):
+    def set_compartment_id_to_epochs(self, conn: HAKCDatabase, func: HAKCFunction, epoch: int):
+        new_epoch = conn.set_compartment_id_by_symbol(func, epoch)
+        assert new_epoch == epoch, f"The set epoch does not match the epoch we just set! This should never be called!"
+
+    def temporal_coalesce_parent_child(self, ty, root, conn):
         # coalesce vertically (parent -> child)
-        print(f"!!!Starting temporal coalesce parent child with {root} for type:\n\t{ty}!!!")
+        logger.debug(f"!!!Starting temporal coalesce parent child with {root} for type:\n\t{ty}!!!")
         self.assign_initial_epochs(root)
-        # print(f"Parent {parent} has children:")
+        # logger.debug(f"Parent {parent} has children:")
         # for successor in nx.bfs_successors(self, root):
         for n0, n1, key in nx.edge_bfs(self, root):
+            # skipping self loops
+            if n0 == n1:
+                continue
             parent = n0
             child = n1
             if isinstance(parent, HAKCFunction) and isinstance(child, HAKCFunction):
-                # print(f"parent {parent.pretty_print()} -> child {child.pretty_print()}")
+                parent_epoch = self.nodes[parent]['epoch']
+                child_epoch = self.nodes[child]['epoch']
+                if parent_epoch == child_epoch:
+                    logger.debug(f"Parent and child are in same epoch {parent_epoch}, skipping")
+                    continue
+                # logger.debug(f"parent {parent.pretty_print()} -> child {child.pretty_print()}")
                 parent_ty_perm = self.get_perm(parent, ty)
                 child_ty_perm = self.get_perm(child, ty)
-                # print(f"\t{parent.name} parent_ty_perm: {parent_ty_perm}")
-                # print(f"\t{child.name} child_ty_perm: {child_ty_perm}")
+                # logger.debug(f"\t{parent.name} parent_ty_perm: {parent_ty_perm}")
+                # logger.debug(f"\t{child.name} child_ty_perm: {child_ty_perm}")
+                # if parent and child are already in the same epoch, skip
                 if parent_ty_perm == child_ty_perm:
-                    parent_epoch = self.nodes[parent]['epoch']
-                    child_epoch = self.nodes[child]['epoch']
                     new_epoch = min(parent_epoch, child_epoch)
-                    # print(f"Merging {parent.pretty_print(parent_epoch)} with {child.pretty_print(child_epoch)} with common permissions {child_ty_perm} to new epoch: {new_epoch}")
-                    self.nodes[parent]['epoch'] = new_epoch
-                    self.nodes[child]['epoch'] = new_epoch
+                    logger.debug(f"Merging {parent.pretty_print(parent_epoch)} with {child.pretty_print(child_epoch)} with common permissions {child_ty_perm} to new epoch: {new_epoch}")
+                    # only changing the epoch when needed to reduce redundant db calls
+                    if parent_epoch != new_epoch:
+                        self.nodes[parent]['epoch'] = new_epoch
+                        self.set_compartment_id_to_epochs(conn, parent, new_epoch)
+                    if child_epoch != new_epoch:
+                        self.nodes[child]['epoch'] = new_epoch
+                        self.set_compartment_id_to_epochs(conn, child, new_epoch)
                     self.store_coalesced_epochs(new_epoch, parent, child)
+
         if len(self.coalesced_epochs) > 0:
             self.print_coalesced_epochs()
             self.save_graph(f"epochs_ty_{ty.debug_type}_root_{root.name}.svg".replace(" ","-"))
         # TODO: the assigned epochs to the networkx graph seem to persist, so clearing them now
+        len_coalesced_epochs = len(self.coalesced_epochs)
         self.clear_epochs(root)
-        print(f"!!!End temporal coalesce parent child with {root} for type:\n\t{ty}!!!")
-        return len(self.coalesced_epochs)
+
+        logger.debug(f"!!!End temporal coalesce parent child with {root} for type:\n\t{ty}!!!")
+        return len_coalesced_epochs
 
     @staticmethod
     def init_map(_map, ns, value):
@@ -574,34 +596,34 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         # construct a map which contains every function node
 
         # funcs = filter(lambda x: isinstance(x, HAKCFunction), self.get_functions())
-        print(f"Starting temporal coalesce parent children")
+        logger.debug(f"Starting temporal coalesce parent children")
         for successor in nx.bfs_successors(self, parent, depth_limit=1):
             assert(successor[0] == parent)
 
             child0_child1_merge_map = dict()
             children = sorted(list(filter(lambda x: isinstance(x, HAKCFunction), successor[1])))
-            print(f"children: {children}")
+            logger.debug(f"children: {children}")
             HAKCCompartmentalization.init_map(child0_child1_merge_map, children, None)
 
-            print("\t\t" + ",\t\t".join(list(map(lambda x: f"{x.name}", children))))
+            logger.debug("\t\t" + ",\t\t".join(list(map(lambda x: f"{x.name}", children))))
             for child0 in children:
-                print(f"{child0.name}\t\t", end="")
+                logger.debug(f"{child0.name}\t\t", end="")
                 for child1 in children:
                     if child0 != child1:
                         common_perms = self.get_common_type_perms(child0, child1, debug=False)
                         if len(common_perms) > 0:
                             HAKCCompartmentalization.insert_map(child0_child1_merge_map, child0, child1, True)
-                            # print(f"Could merge {child0} in epoch {epoch_map[child0]} with {child1} in epoch {epoch_map[child1]} with common permissions {common_perms}")
+                            # logger.debug(f"Could merge {child0} in epoch {epoch_map[child0]} with {child1} in epoch {epoch_map[child1]} with common permissions {common_perms}")
                         else:
                             HAKCCompartmentalization.insert_map(child0_child1_merge_map, child0, child1, False)
-                    print(f"{HAKCCompartmentalization.get_map(child0_child1_merge_map, child0, child1)}\t\t", end="")
-                print()
-            # print(f"child0_child1_merge_map: {child0_child1_merge_map}")
+                    logger.debug(f"{HAKCCompartmentalization.get_map(child0_child1_merge_map, child0, child1)}\t\t", end="")
+                logger.debug()
+            # logger.debug(f"child0_child1_merge_map: {child0_child1_merge_map}")
 
             for a in child0_child1_merge_map.items():
-                print(f"{a[0]} \n\t-> {a[1]}")
+                logger.debug(f"{a[0]} \n\t-> {a[1]}")
 
-        print(f"End temporal coalesce parent children")
+        logger.debug(f"End temporal coalesce parent children")
 
 
     def get_symbol_compartment_id(self, symbol: HAKCSymbol) -> int:
@@ -626,8 +648,8 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         # now search all valid neighbors
         for caller in all_symbols_by_compartment_id:
             for callee in self.neighbors(caller):
-                if self.has_edge(caller, callee, HAKCSymbol.DagEdgeTable):
-                    edge_weight = self.get_edge_data(caller, callee, HAKCSymbol.DagEdgeTable)['weight']
+                if self.has_edge(caller, callee, HAKCSymbol.relation_dag):
+                    edge_weight = self.get_edge_data(caller, callee, HAKCSymbol.relation_dag)['weight']
                     if edge_weight > 0:
                         valid_targets.add(self.get_symbol_compartment_id(callee))
         logger.debug(
@@ -663,11 +685,20 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         for table_name, nodes in logger.progress_bar(iterable=unpersisted_nodes.items(), desc="Persisting to database"):
             data_to_persist = dict()
             for node in nodes:
+                # force hash computation manually
+                # node.recompute_hash()
+                if isinstance(node, HAKCCompartment):
+                    # Note: never persist incomplete objects
+                    logger.debug(f"compartment_hash: {node.computed_hash}")
+                    assert(node.entry_token != None)
+
                 db_data = node.get_db_data()
                 if len(data_to_persist) > 0 and len(db_data) != len(data_to_persist):
                     logger.error(
                         f'Node {node} does not have all the data needed. Data needed is {" ".join(sorted(data_to_persist.keys()))} and data provided is {" ".join(sorted([column.column_name for column in db_data.keys()]))}')
                 for column, data in db_data.items():
+
+                    logger.debug(f"col, data: {column}, {data}")
                     if data is None:
                         logger.debug(f'Node {node} has None for column {column.column_name}')
                         data = column.column_type.default_value
@@ -684,7 +715,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
                     self.nodes[node][HAKCCompartmentalization.persisted_attr] = True
             except Exception as e:
                 del df
-                logger.error(f'Failed to persist to {table_name}: {str(e)}')
+                logger.fatal(f'Failed to persist to {table_name}: {str(e)}')
                 raise e
 
     def _persist_edges(self, conn: HAKCDatabase):
@@ -809,7 +840,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
     def save_graph(self, fname, symbol_name = None, prune = False, N = 50, filter_symbols = False, debug = False):
         from networkx.drawing.nx_pydot import to_pydot
         if debug:
-            print(f"Trying to save {self} to {fname}")
+            logger.debug(f"Trying to save {self} to {fname}")
 
         if filter_symbols:
             # sorted(list(filter(lambda x: isinstance(x, HAKCFunction), successor[1])))
@@ -820,23 +851,23 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         # node_filter = lambda n: (isinstance(n, HAKCFunction) or isinstance(n, HAKCGlobalVariable)) and n.name == symbol_name
         # _symbol = nx.subgraph_view(G, filter_node=node_filter).nodes()
         functions = self.get_functions()
-        # print(functions)
+        # logger.debug(functions)
         if symbol_name:
             symbol = [n for n in functions if n.name == symbol_name]
             if debug:
-                print(f"Found {symbol} of type {type(symbol)}")
+                logger.debug(f"Found {symbol} of type {type(symbol)}")
             # symbol = self.nodes[_symbol]
 
             # symbol = self.get_symbol_by_name(symbol_name)
-            # print(f"Found symbol {symbol} in {len(symbol)}")
+            # logger.debug(f"Found symbol {symbol} in {len(symbol)}")
             symbol_descendents = nx.descendants(G, symbol[0])
-            # print(f"{symbol} has {symbol_descendents} descendents!")
+            # logger.debug(f"{symbol} has {symbol_descendents} descendents!")
             G = G.subgraph(symbol_descendents)
 
         if prune:
             top_n_node_ids = HAKCCompartmentalization.show_top_n_degrees(G, N)
             subgraph = G.subgraph(top_n_node_ids)
-            # print(G.nodes)
+            # logger.debug(G.nodes)
             G = subgraph
         # remove self loops
         # subgraph = G.subgraph(G.nodes)
@@ -854,8 +885,8 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         for node in dot.get_nodes():
             node.set("shape", "box")
             # Change color of box to show nodes that have been coalesced
-            # print(self.coalesced_epochs[ty])
-            # print(node.get("epoch"))
+            # logger.debug(self.coalesced_epochs[ty])
+            # logger.debug(node.get("epoch"))
             epoch = node.get("epoch")
             # Note: Displaying the color of merged nodes only works if a root is specified
             if epoch:
@@ -865,7 +896,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
 
         # set edge labels
         for edge in dot.get_edges():
-            # print(edge.obj_dict)
+            # logger.debug(edge.obj_dict)
             # ignore all 'persisted' attributes
             if "persisted" in edge.obj_dict["attributes"]:
                 del edge.obj_dict["attributes"]["persisted"]
@@ -875,7 +906,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         # dot.write_png(fname)
         dot.write_svg(fname)
 
-        print(f"Saved {self} to {fname}")
+        logger.debug(f"Saved {self} to {fname}")
 
     def save_graph_alt(self, fname, debug=False):
         import matplotlib.pyplot as plt
@@ -889,8 +920,8 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         plt.figure(figsize=(16,9))
         nx.draw(G, pos, with_labels=True, node_shape="o", node_color='none', edgecolors='black')
         nx.draw_networkx_edge_labels(G, pos)
-        # print(G.edges)
+        # logger.debug(G.edges)
         plt.savefig(fname)
         plt.close()
         if debug:
-            print(f"Saved {self} to {fname}")
+            logger.debug(f"Saved {self} to {fname}")

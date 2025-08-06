@@ -141,6 +141,17 @@ void HAKCTransformer::performTransformations() {
       << getModule() << "\n";
 }
 
+void HAKCTransformer::performTemporalTransformations() {
+  CommonHAKCAnalysis::getLogger(Error) <<
+    "!!!Starting temporal transformations!!!\n";
+  TransformModule();
+  CommonHAKCAnalysis::getLogger(Debug)
+      << "Final Module After Transformations:\n"
+      << getModule() << "\n";
+  CommonHAKCAnalysis::getLogger(Error) <<
+    "!!!End temporal transformations!!!\n";
+}
+
 bool HAKCTransformer::TransferFunctionShouldBeCreated(Function *F) {
   if (F->isDeclaration()) {
     return false;

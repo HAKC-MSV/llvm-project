@@ -13,7 +13,7 @@
 namespace llvm::hakc {
 HAKCDatabaseInformation::HAKCDatabaseInformation()
     : ServerURL(), CompartmentEndpoint(), DivisionEndpoint(),
-      SymbolDivisionEndpoint(), Timeout(), MaxConnectionRetries(0) {}
+      SymbolDivisionEndpoint(), Timeout(), MaxConnectionRetries(10) {}
 
 StringRef HAKCDatabaseInformation::GetServerURL() const { return ServerURL; }
 
@@ -48,7 +48,8 @@ void HAKCDatabaseInformation::operator<<(
   DivisionEndpoint = DatabaseConfig.GetDivisionEndpoint;
   SymbolDivisionEndpoint = DatabaseConfig.GetSymbolDivisionEndpoint;
   ValidTargetsEndpoint = DatabaseConfig.GetValidTargetsEndpoint;
-  Timeout = std::chrono::milliseconds(DatabaseConfig.ServerTimeout);
+  // Note: Timeout is in ms, so multiply by 1000
+  Timeout = std::chrono::milliseconds(DatabaseConfig.ServerTimeout * 1000);
   MaxConnectionRetries = DatabaseConfig.MaxConnectionRetries;
 }
 

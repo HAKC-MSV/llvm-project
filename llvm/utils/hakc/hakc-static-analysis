@@ -194,7 +194,7 @@ def node_with_max_edges(graph):
         return None
     return max(graph.degree, key=lambda item: item[1])[0]
 
-def temporal_coalesce(G: HAKCCompartmentalization):
+def temporal_coalesce(G: HAKCCompartmentalization, conn):
     # https://networkx.org/documentation/stable/reference/algorithms/traversal.html
     print(f"!!!Starting temporal coalesce!!!")
     top_merged_epochs = list()
@@ -216,7 +216,7 @@ def temporal_coalesce(G: HAKCCompartmentalization):
                 # Note: Add attributes to the node rather than trying to modify the underlying HAKC object (this seems to do some weird things)
                 # Note: Use edge_bfs instead of bfs_successor because bfs_successor requires a source node which we sometimes don't have
                 # for n in nx.bfs_successors(subG, _main):
-                num_merged_epochs = subG.temporal_coalesce_parent_child(ty, root)
+                num_merged_epochs = subG.temporal_coalesce_parent_child(ty, root, conn)
                 top_merged_epochs.append((num_merged_epochs, f"epochs_ty_{ty.debug_type}_root_{root.name}.svg".replace(" ","-")))
             else:
                 print(f"SubGraph for Type: {ty} has {funcs} <= 1 HAKCFunctions, so skipping graph!")
@@ -245,7 +245,7 @@ def temporal_analysis(db_dir: str, load_dag: str = None):
         compartmentalization = HAKCCompartmentalization()
         compartmentalization.load_from_db(conn)
 
-    temporal_coalesce(compartmentalization)
+    temporal_coalesce(compartmentalization, conn)
 
     end = time.time()
 

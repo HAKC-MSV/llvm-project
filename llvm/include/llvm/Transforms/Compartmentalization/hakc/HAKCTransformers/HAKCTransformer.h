@@ -185,6 +185,8 @@ public:
 
   void performTransformations();
 
+  void performTemporalTransformations();
+
   void AddCompartmentMetadata();
 
   bool TransferFunctionShouldBeCreated(Function *F);

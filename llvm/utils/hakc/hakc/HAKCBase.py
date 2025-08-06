@@ -41,9 +41,13 @@ class HAKCHashValue:
     def __init__(self, values: list[object]):
         if len(values) > 0:
             h = hashlib.sha256()
+            # print(f"Using values: {values}")
             for value in values:
+                # print(f"\t {type(value)} {value}")
                 h.update(HAKCHashValue.get_bytes(value))
             self.final_hash = int.from_bytes(h.digest()[:8], byteorder=HAKCHashValue.ByteOrder)
+            print(f"Computed hash {self.final_hash} based on inputs {values}")
+            # print(f"self.final_hash: {int(self.final_hash)}")
 
     @staticmethod
     def get_bytes(value) -> bytes:
@@ -52,8 +56,7 @@ class HAKCHashValue:
         elif isinstance(value, int):
             return value.to_bytes(8, byteorder=HAKCHashValue.ByteOrder)
         else:
-            hash_value = hash(value)
-            return hash_value.to_bytes(8, byteorder=HAKCHashValue.ByteOrder)
+            return hash(value).to_bytes(8, byteorder=HAKCHashValue.ByteOrder)
 
     def __hash__(self):
         return self.final_hash
@@ -62,18 +65,24 @@ class HAKCHashValue:
         if isinstance(other, int):
             return self.final_hash == other
         if isinstance(other, str):
-            return self.final_hash == other
+            return str(self.final_hash) == other
         elif isinstance(other, HAKCHashValue):
             return self.final_hash == other.final_hash
         else:
             return False
 
+    # def __str__(self):
+    #     return ""
     def __str__(self):
         # assert(isinstance(self.final_hash, int))
         # Note: loading from dag seems to store the hex value as a string
         if isinstance(self.final_hash, str):
             return f'{self.final_hash}'
         return f'{self.final_hash:0x}'
+
+    # def __int__(self):
+    #     return 0
+    #     # return int(self)
 
     def __repr__(self):
         return str(self)
@@ -112,7 +121,9 @@ class HAKCPrintableObj:
     def compute_hash(self):
         if self.computed_hash is None:
             # print(f"Computing hash with [{self.get_hash_inputs()}]")
+            # print(f"\tComputing hash with inputs: {self.get_hash_inputs()}")
             self.computed_hash = HAKCHashValue(self.get_hash_inputs())
+            # print(f"computed_hash: {self.computed_hash}")
 
     def recompute_hash(self):
         self.computed_hash = HAKCHashValue(self.get_hash_inputs())
@@ -183,8 +194,10 @@ class HAKCDBColumn(HAKCPrintableObj):
 
 class HAKCDBNode(HAKCPrintableObj):
     def __init__(self, **kwargs):
+        # print(f"\tHAKCDBNode kwargs: {kwargs}")
         HAKCPrintableObj.__init__(self, **kwargs)
         for key, value in kwargs.items():
+            # print(f"\t\tkey, val {key}, {value} ")
             if key == self.get_primary_key().column_name and self.uses_hashed_key():
                 self.computed_hash = HAKCHashValue.from_int(value)
 

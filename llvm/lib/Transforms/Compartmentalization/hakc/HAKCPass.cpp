@@ -55,6 +55,9 @@ static bool runCompartmentalization(CommonHAKCAnalysis &HAKCAnalysis) {
     HAKCCompartmentalizationPolicy Policy(HAKCAnalysis.GetSystemInfo());
     HAKCModuleAnalysis ModuleAnalysis(HAKCAnalysis);
     HAKCTransformer Transformer(ModuleAnalysis, Policy);
+    if (HAKCAnalysis.GetSystemInfo().GetTemporalAnalysisEnabled()) {
+      Transformer.performTemporalTransformations();
+    }
     Transformer.performTransformations();
   }
 
