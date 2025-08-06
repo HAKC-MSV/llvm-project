@@ -203,7 +203,8 @@ bool HAKCPointerManager::ManageNewPointer(Use &U) {
 
   auto ManagedPointer =
       std::make_shared<ManagedHAKCPointer>(BaseDefinition, *this, NextID);
-  if (NextID == 9 && HAKCAnalysis.GetFunction().getName() == "delete_node") {
+  if (NextID == 2 &&
+      HAKCAnalysis.GetFunction().getName() == "xfrm_state_walk") {
     CommonHAKCAnalysis::getWriter(DebugActive)
         << "Found " << *ManagedPointer << "\n";
   }
