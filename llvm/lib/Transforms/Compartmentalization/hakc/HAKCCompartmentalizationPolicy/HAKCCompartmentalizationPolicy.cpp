@@ -192,7 +192,8 @@ HAKCCompartmentalizationPolicy::HAKCCompartmentalizationPolicy(
     HAKCSystemInformation &SystemInformation)
     : SystemInformation(SystemInformation), Compartments(), Divisions(),
       Client(SystemInformation.GetDatabaseInformation(),
-             SystemInformation.GetDebugDatabase()) {
+             SystemInformation.OutputDebugInfo()),
+      SymbolDivisionMap() {
   // no need to connect to database if doing purely analysis
   if (SystemInformation.GetPassMode() == RunCompartmentalization){
     ConnectToDatabase();
@@ -221,6 +222,16 @@ void HAKCCompartmentalizationPolicy::CheckConnection() const {
   }
 }
 
+HAKCDivisionP HAKCCompartmentalizationPolicy::FindCachedSymbolDivision(
+    HAKCSymbolP Symbol) const {
+  for (auto &it : SymbolDivisionMap) {
+    if (it.first == Symbol) {
+      return it.second;
+    }
+  }
+  return nullptr;
+}
+
 hakc::HAKCCompartmentDivision &
 HAKCCompartmentalizationPolicy::GetDivision(GlobalValue *GV) {
   // Get Division from Global Value -> query for (division_id, access_token,
@@ -230,6 +241,10 @@ HAKCCompartmentalizationPolicy::GetDivision(GlobalValue *GV) {
     CommonHAKCAnalysis::getLogger(Debug)
         << "Could not find HAKCSymbol for " << GV << "\n";
     return GetDefaultDivision();
+  }
+  auto CachedDivision = FindCachedSymbolDivision(HAKCSymbol);
+  if (CachedDivision) {
+    return *CachedDivision;
   }
 
   std::string ObjectYaml;
@@ -284,6 +299,7 @@ HAKCCompartmentalizationPolicy::GetDivision(GlobalValue *GV) {
       static_cast<hakc_access_token_t>(*DivisionAccessToken),
       SystemInformation.GetModule().getContext());
   Divisions.push_back(Division);
+  SymbolDivisionMap[HAKCSymbol] = Division;
   return *Division;
 }
 
@@ -349,8 +365,12 @@ HAKCCompartmentP HAKCCompartmentalizationPolicy::GetCompartment(
 }
 
 void HAKCCompartmentalizationPolicy::GetValidTargets(
-    HAKCCompartment &Compartment) const {
+    HAKCCompartment &Compartment) {
   hakc_compartment_id_t CompartmentID = Compartment.GetCompartmentIDValue();
+  if (RetrievedTargetCompartments.contains(CompartmentID)) {
+    return;
+  }
+
   json::Object Parameters({
       {"compartment-id", std::to_string(CompartmentID)},
   });
@@ -359,6 +379,7 @@ void HAKCCompartmentalizationPolicy::GetValidTargets(
       SystemInformation.GetDatabaseInformation().GetValidTargetsEndpoint(),
       Parameters);
   auto ValidTargets = ResponseData.getArray("ValidTargets");
+  RetrievedTargetCompartments.insert(CompartmentID);
   if (!ValidTargets) {
     auto currentTime = std::chrono::system_clock::now();
     auto milliseconds_since_epoch = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime.time_since_epoch());
