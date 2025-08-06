@@ -20,7 +20,7 @@ HAKCPointerManager::HAKCPointerManager(HAKCFunctionAnalysis &Analysis,
       CurrentPointerUseID(0) {}
 
 bool HAKCPointerManager::PointerIsEligibleForManagement(Use &U) const {
-  CommonHAKCAnalysis::getWriter(DebugActive)
+  HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
       << "Starting Pointer Management checks for " << U.get() << " from "
       << U.getUser() << "\n";
 
@@ -35,24 +35,24 @@ bool HAKCPointerManager::PointerIsEligibleForManagement(Use &U) const {
     PointerTy = AllocaI->getAllocatedType();
   }
   if (isa<ConstantPointerNull>(Definition)) {
-    CommonHAKCAnalysis::getWriter(DebugActive)
+    HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
         << "Pointer Manager ignores null pointers\n";
     return false;
   } else if (isa<ConstantInt>(Pointer)) {
-    CommonHAKCAnalysis::getWriter(DebugActive)
+    HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
         << "Pointer Manager ignores Constant Ints\n";
     return false;
   } else if (!CommonHAKCAnalysis::IsPointerLikeType(PointerTy)) {
-    CommonHAKCAnalysis::getWriter(DebugActive)
+    HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
         << "Pointer Manager ignores non-pointers\n";
     return false;
   }
-  CommonHAKCAnalysis::getWriter(DebugActive)
+  HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
       << *Pointer << " Type " << PointerTy << " is a pointer like type\n";
 
   if (auto *GV = dyn_cast<GlobalVariable>(Definition)) {
     if (CommonHAKCAnalysis::IsStringType(GV->getValueType())) {
-      CommonHAKCAnalysis::getWriter(DebugActive)
+      HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
           << "Pointer Manager is ignoring constant string " << Definition
           << "\n";
       return false;
@@ -60,12 +60,13 @@ bool HAKCPointerManager::PointerIsEligibleForManagement(Use &U) const {
   }
 
   if (auto *call = dyn_cast<CallInst>(Pointer)) {
-    CommonHAKCAnalysis::getWriter(DebugActive)
+    HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
         << "Value " << *Pointer << " is a CallInst\n";
 
     bool IsInline = call->isInlineAsm();
     if (IsInline) {
-      CommonHAKCAnalysis::getWriter(DebugActive) << "Call is Inline Assembly\n";
+      HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
+          << "Call is Inline Assembly\n";
       /* These are usually the result of reading a register value */
       return GetFunctionAnalysis()
           .GetModuleAnalysis()
@@ -75,7 +76,7 @@ bool HAKCPointerManager::PointerIsEligibleForManagement(Use &U) const {
                call->getCalledFunction()->isIntrinsic() &&
                call->getCalledFunction()->getIntrinsicID() ==
                    Intrinsic::IndependentIntrinsics::read_register) {
-      CommonHAKCAnalysis::getWriter(DebugActive)
+      HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
           << "Call is a read register intrinsic\n";
       return false;
     } else if (call->getType()->isIntegerTy(32)) {
@@ -83,7 +84,7 @@ bool HAKCPointerManager::PointerIsEligibleForManagement(Use &U) const {
        * against IS_ERR(). No need to check this.
        * See find_mm_struct in mm/migrate.c.
        */
-      CommonHAKCAnalysis::getWriter(DebugActive)
+      HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
           << "Call returns 32-bit integer\n";
       return false;
     }
@@ -91,37 +92,37 @@ bool HAKCPointerManager::PointerIsEligibleForManagement(Use &U) const {
     if (ConstExpr->isCast()) {
       auto *Operand =
           GetFunctionAnalysis().getDef(ConstExpr->getOperand(0), false);
-      CommonHAKCAnalysis::getWriter(DebugActive)
+      HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
           << *ConstExpr << " operand def is " << *Operand << "\n";
       if (isa<ConstantInt>(Operand)) {
-        CommonHAKCAnalysis::getWriter(DebugActive)
+        HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
             << "ConstExpr is from ConstantInt\n";
         return false;
       }
     }
   } else if (isa<Constant>(Pointer) && Pointer->getType()->isIntegerTy()) {
-    CommonHAKCAnalysis::getWriter(DebugActive)
+    HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
         << *Pointer << " is a constant int\n";
     return false;
   } else if (!CommonHAKCAnalysis::IsPointerLikeType(Pointer->getType()) &&
              !Pointer->getType()->isArrayTy() && !isa<PtrToIntInst>(Pointer)) {
-    CommonHAKCAnalysis::getWriter(DebugActive)
+    HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
         << *Pointer << " is not a pointer, array, or pointer to int cast\n";
     return false;
   } else if (isa<ConstantPointerNull>(Pointer)) {
-    CommonHAKCAnalysis::getWriter(DebugActive)
+    HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
         << *Pointer << " is a constant null pointer\n";
     return false;
   } else if (GetFunctionAnalysis().IsPHIOfGlobalsOnly(Pointer)) {
-    CommonHAKCAnalysis::getWriter(DebugActive)
+    HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
         << *Pointer << " is a PHINode of Globals\n";
     return false;
   } else if (CommonHAKCAnalysis::IsKernelUserPointer(Pointer)) {
-    CommonHAKCAnalysis::getWriter(DebugActive)
+    HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
         << *Pointer << " is a Kernel pointer from user space\n";
     return false;
   } else if (auto *LoadI = dyn_cast<LoadInst>(Pointer)) {
-    CommonHAKCAnalysis::getWriter(DebugActive)
+    HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
         << *Pointer << " is used in a LoadInst\n";
     return !HAKCAnalysis.GetModuleAnalysis()
                 .GetCommonAnalysis()
@@ -129,7 +130,7 @@ bool HAKCPointerManager::PointerIsEligibleForManagement(Use &U) const {
            PointerIsEligibleForManagement(
                LoadI->getOperandUse(LoadInst::getPointerOperandIndex()));
   } else if (auto *StoreI = dyn_cast<StoreInst>(U.getUser())) {
-    CommonHAKCAnalysis::getWriter(DebugActive)
+    HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
         << *Pointer << " is used in a StoreInst\n";
     for (auto &Op : StoreI->operands()) {
       if (HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().IsIgnoredGlobal(
@@ -152,12 +153,12 @@ bool HAKCPointerManager::PointerIsEligibleForManagement(Use &U) const {
       }
     }
   } else if (isa<UndefValue>(Pointer)) {
-    CommonHAKCAnalysis::getWriter(DebugActive)
+    HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
         << *Pointer << " is an undef value\n";
     return false;
   } else if (auto *CallI = dyn_cast<CallInst>(U.getUser())) {
     if (CallI->isInlineAsm()) {
-      CommonHAKCAnalysis::getWriter(DebugActive)
+      HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
           << *Pointer << " is used in inline assembly\n";
       return GetFunctionAnalysis()
           .GetModuleAnalysis()
@@ -165,12 +166,12 @@ bool HAKCPointerManager::PointerIsEligibleForManagement(Use &U) const {
           .ValueIsUsedAsPointer(U.get());
     }
   } else if (!Pointer->getType()->isPointerTy()) {
-    CommonHAKCAnalysis::getWriter(DebugActive)
+    HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
         << *Pointer << " Type is not a pointer: " << *Pointer->getType()
         << "\n";
     return false;
   } else if (Pointer->getType()->isPointerTy()) {
-    CommonHAKCAnalysis::getWriter(DebugActive)
+    HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
         << *Pointer << " Type is a pointer: " << *Pointer->getType() << "\n";
     return !CommonHAKCAnalysis::IsKernelUserPointer(Pointer);
   }
@@ -181,7 +182,7 @@ bool HAKCPointerManager::PointerIsEligibleForManagement(Use &U) const {
 bool HAKCPointerManager::ManageNewPointer(Use &U) {
   auto *BaseDefinition = GetDef(U.get());
   if (!BaseDefinition) {
-    CommonHAKCAnalysis::getWriter(true)
+    CommonHAKCAnalysis::getLogger(Fatal)
         << "Could not find BaseDefinition for " << U << "\n";
     throw std::exception();
   }
@@ -189,7 +190,7 @@ bool HAKCPointerManager::ManageNewPointer(Use &U) {
     bool is_percpu_ptr = CommonHAKCAnalysis::IsPerCPUPointer(U);
 
     if (is_percpu_ptr) {
-      CommonHAKCAnalysis::getWriter(DebugActive)
+      HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
           << "Detected per-cpu pointer: " << U << "\n";
       BaseDefinition = U.get();
     }
@@ -199,15 +200,14 @@ bool HAKCPointerManager::ManageNewPointer(Use &U) {
 
   auto ManagedPointer =
       std::make_shared<ManagedHAKCPointer>(BaseDefinition, *this, NextID);
-  if (NextID == 3 &&
-      HAKCAnalysis.GetFunction().getName() == "mpihelp_addmul_1") {
-    CommonHAKCAnalysis::getWriter(DebugActive)
+  if (NextID == 5 && HAKCAnalysis.GetFunction().getName() == "io_recv") {
+    CommonHAKCAnalysis::getLogger(Verbose, !DebugActive)
         << "Found " << *ManagedPointer << "\n";
   }
   HAKCAnalysis.GetModuleAnalysis().GetTypeIdentifier().FindType(
       *ManagedPointer);
   if (ManagedPointer->GetType() && ManagedPointer->GetType()->IsIgnoredType()) {
-    CommonHAKCAnalysis::getWriter(DebugActive)
+    HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
         << "Ignoring pointer " << ManagedPointer
         << " because its HAKCType is ignored\n";
     return false;
@@ -219,20 +219,27 @@ bool HAKCPointerManager::ManageNewPointer(Use &U) {
                          .GetVoidPointerPointeeType();
     ManagedPointer->GetType()->SetPointeeType(PointeeTy);
   }
+  if (ManagedPointer->GetType() &&
+      !ManagedPointer->GetType()->IsPointerType()) {
+    CommonHAKCAnalysis::getLogger(Verbose, !DebugActive)
+        << *ManagedPointer << " is not a pointer type\n";
+  }
   CurrentPointerID++;
-  CommonHAKCAnalysis::getWriter(DebugActive)
+  HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
       << "Starting the management of pointer " << std::to_string(NextID)
       << " with BaseDefinition " << BaseDefinition << "\n";
   ManagedPointersList.push_back(ManagedPointer);
   AnalyzedUses.clear();
   ClassifyAllUsesOfDefinition(ManagedPointer->GetBaseDefinition(),
                               *ManagedPointer);
-  CommonHAKCAnalysis::getWriter(DebugActive) << "Managing " << ManagedPointer;
+  HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
+      << "Managing " << ManagedPointer;
   if (ManagedPointer->GetType()) {
-    CommonHAKCAnalysis::getWriter(DebugActive)
+    HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
         << " with HAKCType " << *ManagedPointer->GetType();
   }
-  CommonHAKCAnalysis::getWriter(DebugActive) << "\n";
+  HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
+      << "\n";
   return true;
 }
 
@@ -306,7 +313,7 @@ bool HAKCPointerManager::UseShouldBeCloned(Use &U) {
                   isa<SelectInst>(UserP) || isa<SExtInst>(UserP) ||
                   isa<IntToPtrInst>(UserP) || isa<PHINode>(UserP) ||
                   isa<FreezeInst>(UserP) || isa<BinaryOperator>(UserP) ||
-                  isa<TruncInst>(UserP);
+                  isa<TruncInst>(UserP) || isa<ZExtInst>(UserP);
 
   if (isa<SubOperator>(UserP)) {
     CloneUse = false;
@@ -384,7 +391,8 @@ bool HAKCPointerManager::UseShouldUtilizeSignedBasePointer(Use &U) const {
     }
   } else if (isa<AtomicCmpXchgInst>(UserP)) {
     if (U.getOperandNo() != AtomicCmpXchgInst::getPointerOperandIndex()) {
-      CommonHAKCAnalysis::getWriter(DebugActive) << "Signed 2\n";
+      HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
+          << "Signed 2\n";
       UseSignedPointer = true;
     }
   } else if (auto *Call = dyn_cast<CallInst>(UserP)) {
@@ -439,7 +447,7 @@ HAKCPointerManager::CreateManagedPointerUse(ManagedHAKCPointer &ManagedPointer,
 
 void HAKCPointerManager::ClassifyAllUsesOfDefinition(
     Value *Definition, ManagedHAKCPointer &ManagedPointer) {
-  CommonHAKCAnalysis::getWriter(DebugActive)
+  HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
       << "Classifying " << std::to_string(Definition->getNumUses())
       << " uses of " << Definition << "\n";
   for (auto &U : Definition->uses()) {
@@ -452,31 +460,31 @@ void HAKCPointerManager::ClassifyAllUsesOfDefinition(
 
     auto UPtr = CreateManagedPointerUse(ManagedPointer, User, U.getOperandNo());
     if (UseIsAnalyzed(*UPtr)) {
-      CommonHAKCAnalysis::getWriter(DebugActive)
+      HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
           << *UPtr << " is already analyzed\n";
       continue;
     }
     AnalyzedUses.push_back(UPtr);
-    CommonHAKCAnalysis::getWriter(DebugActive)
+    HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
         << "Classifying " << *UPtr << "\n";
     if (UseShouldBeIgnored(U)) {
-      CommonHAKCAnalysis::getWriter(DebugActive)
+      HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
           << *UPtr << " is being ignored\n";
       continue;
     }
     if (UseShouldBeCloned(U)) {
-      CommonHAKCAnalysis::getWriter(DebugActive)
+      HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
           << *User << " should be cloned\n";
       if (IsClonedUseNeedingAdditionalClassification(U)) {
         ClassifyAllUsesOfDefinition(User, ManagedPointer);
       }
       ManagedPointer.AddCloneUse(UPtr);
     } else if (UseShouldUtilizeAuthenticatedPointer(U)) {
-      CommonHAKCAnalysis::getWriter(DebugActive)
+      HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
           << *UPtr << " should use authenticated Base Definition\n";
       ManagedPointer.AddAuthenticatedUse(UPtr);
     } else if (UseShouldUtilizeSignedBasePointer(U)) {
-      CommonHAKCAnalysis::getWriter(DebugActive)
+      HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
           << *UPtr << " should use signed Base Definition\n";
       if (auto *Call = dyn_cast<CallBase>(User)) {
         if (GetFunctionAnalysis()
@@ -484,7 +492,8 @@ void HAKCPointerManager::ClassifyAllUsesOfDefinition(
                 .GetCommonAnalysis()
                 .IsHAKCTransferFunction(Call->getCalledFunction())) {
           ManagedPointer.RegisterManualHAKCTransfer(Call);
-          CommonHAKCAnalysis::getWriter(DebugActive)
+          HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(
+              Verbose)
               << "Registered " << *Call << " as the protected pointer of "
               << ManagedPointer << ".  Classifying uses...\n";
           ClassifyAllUsesOfDefinition(Call, ManagedPointer);
@@ -493,18 +502,18 @@ void HAKCPointerManager::ClassifyAllUsesOfDefinition(
       }
       ManagedPointer.AddProtectedUse(UPtr);
     } else {
-      CommonHAKCAnalysis::getWriter(true)
+      CommonHAKCAnalysis::getLogger(Error)
           << "Unexpected use of " << *UPtr << " --- " << UPtr->get()
           << " --- with " << ManagedPointer << " in \n";
       if (!isa<Argument>(UPtr->getUser()) &&
           !isa<Instruction>(UPtr->getUser())) {
-        CommonHAKCAnalysis::getWriter(true)
+        CommonHAKCAnalysis::getLogger(Error)
             << "here0 " << GetFunctionAnalysis().GetFunction().getParent();
       } else {
-        CommonHAKCAnalysis::getWriter(true)
+        CommonHAKCAnalysis::getLogger(Error)
             << "here1 " << GetFunctionAnalysis().GetFunction();
       }
-      CommonHAKCAnalysis::getWriter(true) << "\n";
+      CommonHAKCAnalysis::getLogger(Fatal) << "\n";
       throw std::exception();
     }
   }
@@ -518,7 +527,7 @@ void HAKCPointerManager::ClassifyAllUsesOfDefinition(
 bool HAKCPointerManager::ManagePointer(Use &U) {
   bool Result = PointerIsEligibleForManagement(U);
   if (!Result) {
-    CommonHAKCAnalysis::getWriter(DebugActive)
+    HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
         << "Use " << U << " is not eligible for management\n";
   } else {
     auto ManagedPointer = GetManagedPointer(U.get());
@@ -546,7 +555,7 @@ HAKCPointerManager::ManagedPointers() {
 }
 
 ManagedHAKCPointerP HAKCPointerManager::GetManagedPointer(Value *V) {
-  CommonHAKCAnalysis::getWriter(DebugActive)
+  HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
       << "Finding Managed Pointer for " << V << "\n";
   auto *Def = GetDef(V);
   for (auto &ManagedPointer : ManagedPointers()) {
@@ -577,7 +586,7 @@ Value *HAKCPointerManager::GetDef(Value *V) const {
     }
 
     if (NewBaseDefinition) {
-      CommonHAKCAnalysis::getWriter(DebugActive)
+      HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
           << "Changing BaseDefinition from " << *BaseDefinition << " to "
           << *NewBaseDefinition << "\n";
       BaseDefinition = NewBaseDefinition;
@@ -605,21 +614,21 @@ HAKCPointerManager::CreateProtectedValue(ManagedHAKCPointerUse &PointerUse) {
 
   auto *ProtectedValue = FindProtectedValue(PointerUse);
   if (ProtectedValue) {
-    CommonHAKCAnalysis::getWriter(DebugActive)
+    HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
         << "Returning Protected Version " << *ProtectedValue << " for "
         << PointerUse << "\n";
     return ProtectedValue;
   }
   auto ManagedPtr = GetManagedPointer(Pointer);
   if (ManagedPtr && ManagedPtr->GetBaseDefinition() == Pointer) {
-    CommonHAKCAnalysis::getWriter(DebugActive)
+    HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
         << "Returning ProtectedPointer\n";
     return ManagedPtr->GetProtectedPointer();
   }
 
   if (auto *I = dyn_cast<Instruction>(Pointer)) {
     auto Clone = CloneInstruction(I);
-    CommonHAKCAnalysis::getWriter(DebugActive)
+    HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
         << "Created Protected Version of " << *I << ": " << Clone << "\n";
     return Clone;
   }
@@ -632,7 +641,7 @@ Value *HAKCPointerManager::CreateAuthenticatedValue(
 
   auto *AuthenticatedCopy = FindAuthenticatedValue(PointerUse);
   if (AuthenticatedCopy) {
-    CommonHAKCAnalysis::getWriter(DebugActive)
+    HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
         << "Returning Authenticated Copy " << AuthenticatedCopy << " for "
         << PointerUse << "\n";
     return AuthenticatedCopy;
@@ -640,7 +649,7 @@ Value *HAKCPointerManager::CreateAuthenticatedValue(
 
   if (auto *I = dyn_cast<Instruction>(Pointer)) {
     auto *Clone = CloneInstruction(I);
-    CommonHAKCAnalysis::getWriter(DebugActive)
+    HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
         << "Created Authenticated Copy of " << *I << ": " << Clone << "\n";
     return Clone;
   }
@@ -663,7 +672,7 @@ void HAKCPointerManager::CreateAllTransfers() {
       ManagedPtr->UpdateUserCounts();
       if (CurrentAuthUserCount != ManagedPtr->GetAuthenticatedUserCount() ||
           CurrentProtUserCount != ManagedPtr->GetProtectedUserCount()) {
-        CommonHAKCAnalysis::getWriter(DebugActive)
+        HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
             << *ManagedPtr << " changed user count\n";
         PointersUpdated = true;
       }
@@ -678,7 +687,7 @@ void HAKCPointerManager::CreateAllTransfers() {
       auto BaseAuthenticatedResult =
           ManagedPtr->DetermineIfBasePointerIsAuthenticated();
       if (OrigBaseIsAuthenticated != BaseAuthenticatedResult) {
-        CommonHAKCAnalysis::getWriter(DebugActive)
+        HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
             << *ManagedPtr << " changed base authentication flag from "
             << std::to_string(OrigBaseIsAuthenticated) << " to "
             << std::to_string(BaseAuthenticatedResult) << "\n";
@@ -709,14 +718,14 @@ void HAKCPointerManager::CreateAuthenticatedPointersAndAllClones() {
   for (auto &ManagedPtr : SortedPointers) {
     ManagedPtr->CreateBaseAuthenticatedPointer();
     if (ManagedPtr->GetAuthenticatedPointer()) {
-      CommonHAKCAnalysis::getWriter(DebugActive)
+      HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
           << "Authenticated Pointer for " << *ManagedPtr << ": "
           << ManagedPtr->GetAuthenticatedPointer() << "\n";
     }
   }
   for (auto &ManagedPtr : SortedPointers) {
     ManagedPtr->CreatePointerUseClones();
-    CommonHAKCAnalysis::getWriter(DebugActive)
+    HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
         << "Created Authenticated and Protected Copies for " << *ManagedPtr
         << "\n";
   }
@@ -729,16 +738,20 @@ Value *HAKCPointerManager::FindManagedPointerReplacement(
     if (ManagedPtr->GetBaseDefinition() == Target ||
         ManagedPtr->GetAuthenticatedPointer() == Target ||
         ManagedPtr->GetProtectedPointer() == Target) {
-      if (DebugActive) {
-        CommonHAKCAnalysis::getWriter(DebugActive) << "Returning ";
+        HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
+            << "Returning ";
         if (ReturnAuthenticatedPointer) {
-          CommonHAKCAnalysis::getWriter(DebugActive) << "authenticated";
+          HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(
+              Verbose, !DebugActive)
+              << "authenticated";
         } else {
-          CommonHAKCAnalysis::getWriter(DebugActive) << "protected";
+          HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(
+              Verbose, !DebugActive)
+              << "protected";
         }
-        CommonHAKCAnalysis::getWriter(DebugActive)
+        HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
             << " pointer for " << *Target << "\n";
-      }
+
       if (ReturnAuthenticatedPointer) {
         Result = ManagedPtr->GetAuthenticatedPointer();
       } else {
@@ -754,12 +767,12 @@ Value *
 HAKCPointerManager::FindAuthenticatedValue(ManagedHAKCPointerUse &PointerUse) {
   auto *AuthValue = FindManagedValue(AuthenticatedValues, PointerUse);
   if (!AuthValue) {
-    CommonHAKCAnalysis::getWriter(DebugActive)
+    HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
         << "Unable to find Authenticated Managed Value for PointerUse "
         << PointerUse << "\n";
     AuthValue = FindManagedPointerReplacement(PointerUse.get(), true);
   }
-  CommonHAKCAnalysis::getWriter(DebugActive)
+  HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
       << "Found authenticated managed pointer " << AuthValue << " for "
       << PointerUse << "\n";
   return AuthValue;
@@ -769,11 +782,11 @@ Value *HAKCPointerManager::FindProtectedValue(
     const ManagedHAKCPointerUse &PointerUse) {
   auto *ProtValue = FindManagedValue(ProtectedValues, PointerUse);
   if (!ProtValue) {
-    CommonHAKCAnalysis::getWriter(DebugActive)
+    HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
         << "Unable to find Protected Managed Value for " << PointerUse << "\n";
     ProtValue = FindManagedPointerReplacement(PointerUse.get(), false);
   }
-  CommonHAKCAnalysis::getWriter(DebugActive)
+  HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
       << "Found protected managed pointer " << ProtValue << " for "
       << PointerUse << "\n";
   return ProtValue;
@@ -805,11 +818,11 @@ Value *HAKCPointerManager::FindManagedValue(
 Value *HAKCPointerManager::FindAuthenticatedValue(Value *V) {
   auto *AuthValue = FindManagedValue(AuthenticatedValues, V);
   if (!AuthValue) {
-    CommonHAKCAnalysis::getWriter(DebugActive)
+    HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
         << "Unable to find Authenticated Managed Value for " << V << "\n";
     AuthValue = FindManagedPointerReplacement(V, true);
   }
-  CommonHAKCAnalysis::getWriter(DebugActive)
+  HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
       << "Found authenticated managed pointer " << AuthValue << " for " << V
       << "\n";
   return AuthValue;
@@ -818,11 +831,11 @@ Value *HAKCPointerManager::FindAuthenticatedValue(Value *V) {
 Value *HAKCPointerManager::FindProtectedValue(Value *V) {
   auto *ProtValue = FindManagedValue(ProtectedValues, V);
   if (!ProtValue) {
-    CommonHAKCAnalysis::getWriter(DebugActive)
+    HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
         << "Unable to find Protected Managed Value for " << V << "\n";
     ProtValue = FindManagedPointerReplacement(V, false);
   }
-  CommonHAKCAnalysis::getWriter(DebugActive)
+  HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
       << "Found protected managed pointer " << ProtValue << " for " << V
       << "\n";
   return ProtValue;
@@ -838,7 +851,7 @@ void HAKCPointerManager::AddHAKCPointerReplacement(
   std::map<ManagedHAKCPointerUseP, Value *> &OtherStorage =
       (AddingAuthenticatedReplacements ? ProtectedValues : AuthenticatedValues);
 
-  CommonHAKCAnalysis::getWriter(DebugActive)
+  HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
       << "Adding " << StorageName << " Pointer Replacement: " << *PtrUse
       << " -> " << Replacement << "\n";
 
@@ -848,7 +861,7 @@ void HAKCPointerManager::AddHAKCPointerReplacement(
       if (OtherStorageReplacement == Replacement) {
         StringRef OtherStorageName =
             AddingAuthenticatedReplacements ? "Protected" : "Authenticated";
-        CommonHAKCAnalysis::getWriter(true)
+        CommonHAKCAnalysis::getLogger(Fatal)
             << StorageName << " replacement " << Replacement << " for "
             << *PtrUse << " matches " << OtherStorageName
             << " replacement in function\n"
@@ -860,12 +873,12 @@ void HAKCPointerManager::AddHAKCPointerReplacement(
 
   auto *ExistingPointer = FindManagedValue(StorageToUse, *PtrUse);
   if (!ExistingPointer) {
-    CommonHAKCAnalysis::getWriter(DebugActive)
+    HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
         << "Adding New " << StorageName << " Pointer Replacement\n";
     StorageToUse[PtrUse] = Replacement;
   } else {
     if (Replacement && ExistingPointer != Replacement) {
-      CommonHAKCAnalysis::getWriter(true)
+      CommonHAKCAnalysis::getLogger(Fatal)
           << "Trying to replace existing " << StorageName << " Replacement "
           << ExistingPointer << " with " << Replacement << " for " << *PtrUse
           << "\n"
@@ -873,11 +886,11 @@ void HAKCPointerManager::AddHAKCPointerReplacement(
       throw std::exception();
     }
     if (Replacement) {
-      CommonHAKCAnalysis::getWriter(DebugActive)
+      HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
           << "Setting Existing " << StorageName << " Pointer Replacement\n";
       StorageToUse[PtrUse] = Replacement;
     } else {
-      CommonHAKCAnalysis::getWriter(DebugActive)
+      HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
           << "Tried to add null to " << StorageName
           << "Pointer Replacement for " << *PtrUse << "\n";
     }
@@ -906,13 +919,13 @@ void HAKCPointerManager::SetFunctionIsCompartmentalized(
 void HAKCPointerManager::PrintManagedValues(
     const std::map<ManagedHAKCPointerUseP, Value *> &Storage) {
   for (auto &it : Storage) {
-    CommonHAKCAnalysis::getWriter(true) << *it.first << " -> ";
+    CommonHAKCAnalysis::getLogger(Verbose) << *it.first << " -> ";
     if (it.second) {
-      CommonHAKCAnalysis::getWriter(true) << it.second;
+      CommonHAKCAnalysis::getLogger(Verbose) << it.second;
     } else {
-      CommonHAKCAnalysis::getWriter(true) << "nullptr";
+      CommonHAKCAnalysis::getLogger(Verbose) << "nullptr";
     }
-    CommonHAKCAnalysis::getWriter(true) << "\n\n";
+    CommonHAKCAnalysis::getLogger(Verbose) << "\n\n";
   }
 }
 
@@ -983,16 +996,16 @@ Value *HAKCPointerManager::CreateAuthenticationAtLocation(
   }
   auto ManagedPointer = GetManagedPointer(Pointer);
   if (!ManagedPointer) {
-    CommonHAKCAnalysis::getWriter(true)
+    CommonHAKCAnalysis::getLogger(Fatal)
         << "Could not find Managed Pointer for " << *Pointer << "\n";
     throw std::exception();
   } else if (!ManagedPointer->GetType()) {
-    CommonHAKCAnalysis::getWriter(true)
+    CommonHAKCAnalysis::getLogger(Fatal)
         << "Managed Pointer " << *ManagedPointer << " found for Value "
         << *Pointer << " does not have a HAKCType\n";
     throw std::exception();
   }
-  CommonHAKCAnalysis::getWriter(DebugActive)
+  HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
       << "Adding Authenticated Pointer for " << *ManagedPointer
       << " with HAKCType " << *ManagedPointer->GetType() << "\n"
       << " at " << *InsertLocation << "\n";

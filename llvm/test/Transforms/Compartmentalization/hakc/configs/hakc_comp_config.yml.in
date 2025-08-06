@@ -8,7 +8,7 @@ Database:
   get-valid-targets-from-compartment-id-endpoint: "get-valid-targets-from-compartment-id"
 DagAnalysisRootPath: @HAKC_DAG_ANALYSIS_PATH@
 OutputDebugInfo: false
-PassMode: RunCompartmentalization
+PassMode: RunPostDominatorAnalysis
 TransferFunctionCandidates: [ ]
 PreTargetActions:
   - { name: "get_hakc_address_color", label: "saved-color" }

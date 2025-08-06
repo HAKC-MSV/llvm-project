@@ -12,7 +12,9 @@
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCTransformer.h"
 
 namespace llvm::hakc {
+
 class HAKCModuleAnalysis;
+class HAKCModuleTransform;
 
 class CommonHAKCAnalysis;
 
@@ -41,6 +43,7 @@ class HAKCPointerManager;
 class HAKCFunctionAnalysis {
 protected:
   HAKCModuleAnalysis &ModuleAnalysis;
+  HAKCTransformer &Transformer;
   HAKCCompartmentalizationPolicy &Policy;
   HAKCPointerManager PointerManager;
   bool DebugActive;
@@ -141,8 +144,20 @@ protected:
 public:
   virtual ~HAKCFunctionAnalysis() = default;
 
-  HAKCFunctionAnalysis(Function *F, HAKCModuleAnalysis &ModuleAnalysis,
+  HAKCFunctionAnalysis(Function *F, HAKCModuleAnalysis &ModuleAnalysis, HAKCTransformer &Transformer,
                        HAKCCompartmentalizationPolicy &Policy);
+
+  HAKCTypeIdentifier& GetTypeIdentifier() const;
+
+  HAKCLogger &getLogger(HAKCLogLevel log_level) const;
+
+  void TemporalAnalysis();
+
+  void TemporalAnalysisHandleCall(ManagedHAKCPointerUseP Use);
+
+  void TemporalAnalysisHandleLoad(ManagedHAKCPointerUseP Use);
+
+  void TemporalAnalysisHandleStore(ManagedHAKCPointerUseP Use);
 
   bool modifiedFunction() const;
 
@@ -179,6 +194,8 @@ public:
 
   bool IsIntrinsicNeedingCloning(CallBase *Call) const;
 
+  void AddPermissionUse(const ManagedHAKCPointer &ManagedPointer, TypePerms perm) const;
+
   bool IsIntrinsicToSkip(CallBase *Call) const;
   // TicTac code
   void AssignFunctionEpochs();
@@ -187,6 +204,10 @@ public:
   // std::map<Type*, std::shared_ptr<TICTACEpoch>> function_epochs;
   Value *AddEpochDataAuthCheckAtLocation(Value *signed_ptr, Instruction *location);
   Value *AddEpochCodeAuthCheckAtLocation(Value *SignedPtr, Instruction *Location);
+
+  HAKCWriter &getWriter();
+
+  HAKCWriter &getWriter(HAKCLogLevel log_level);
 
 };
 } // namespace llvm::hakc

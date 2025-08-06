@@ -25,6 +25,8 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/DOTGraphTraits.h"
 #include "llvm/Support/GraphWriter.h"
+#include "llvm/IR/DebugInfoMetadata.h"
+
 
 using namespace llvm;
 
@@ -141,11 +143,11 @@ struct GraphTraits<CallGraphDOTInfo *>
 
 template <>
 struct DOTGraphTraits<CallGraphDOTInfo *> : public DefaultDOTGraphTraits {
-
+  // TODO: investigate this as dot is written
   DOTGraphTraits(bool isSimple = false) : DefaultDOTGraphTraits(isSimple) {}
 
   static std::string getGraphName(CallGraphDOTInfo *CGInfo) {
-    return "Call graph: " +
+    return "HAKC call graph module: " +
            std::string(CGInfo->getModule()->getModuleIdentifier());
   }
 
@@ -162,6 +164,22 @@ struct DOTGraphTraits<CallGraphDOTInfo *> : public DefaultDOTGraphTraits {
       return "external caller";
     if (Node == CGInfo->getCallGraph()->getCallsExternalNode())
       return "external callee";
+    // node name here
+    // Q: skip declarations?
+    Function *F = Node->getFunction();
+    if (F->isDeclaration()) {
+      errs() << "Function " << *F << " is a declaration\n";
+    }
+
+    if (llvm::DISubprogram *subprogram = F->getSubprogram()) {
+      llvm::StringRef fileName = subprogram->getFile()->getFilename();
+      llvm::StringRef directory = subprogram->getFile()->getDirectory();
+      // subprogram->getScope()
+      unsigned line = subprogram->getLine();
+
+      llvm::errs() << "Function: " << F->getName() << "\n";
+      llvm::errs() << "Defined in: " << directory << "/" << fileName << ":" << line << ", with scope: " << *subprogram->getScope() << " and linkage: " << subprogram->getLinkageName() << "\n";
+    }
 
     if (Function *Func = Node->getFunction())
       return std::string(Func->getName());
@@ -202,16 +220,33 @@ struct DOTGraphTraits<CallGraphDOTInfo *> : public DefaultDOTGraphTraits {
     Function *F = Node->getFunction();
     if (F == nullptr)
       return "";
-    std::string attrs;
-    if (ShowHeatColors) {
-      uint64_t freq = CGInfo->getFreq(F);
-      std::string color = getHeatColor(freq, CGInfo->getMaxFreq());
-      std::string edgeColor = (freq <= (CGInfo->getMaxFreq() / 2))
-                                  ? getHeatColor(0)
-                                  : getHeatColor(1);
-      attrs = "color=\"" + edgeColor + "ff\", style=filled, fillcolor=\"" +
-              color + "80\"";
+    std::string attrs = "";
+    // note: very picky here about format
+    errs() << "Is F a subprogram? \n";
+    if (llvm::DISubprogram *subprogram = F->getSubprogram()) {
+      llvm::StringRef fileName = subprogram->getFile()->getFilename();
+      llvm::StringRef directory = subprogram->getFile()->getDirectory();
+      // subprogram->getScope()
+      unsigned line = subprogram->getLine();
+
+      llvm::errs() << "Function: " << F->getName() << "\n";
+      llvm::errs() << "Defined in: " << directory << "/" << fileName << ":" << line << ", with scope: " << *subprogram->getScope() << " and linkage: " << subprogram->getLinkageName() << "\n";
+
+      attrs += std::string("Name=\"" + std::string(F->getName()) + "\",");
+      attrs += std::string("DefiningFile=\"" + std::string(directory) + "/" + std::string(fileName) + "\",");
+      attrs += std::string("DefiningLine=\"" + std::to_string(line) + "\"");
     }
+
+    // if (ShowHeatColors) {
+    //   uint64_t freq = CGInfo->getFreq(F);
+    //   std::string color = getHeatColor(freq, CGInfo->getMaxFreq());
+    //   std::string edgeColor = (freq <= (CGInfo->getMaxFreq() / 2))
+    //                               ? getHeatColor(0)
+    //                               : getHeatColor(1);
+    //   attrs = "color=\"" + edgeColor + "ff\", style=filled, fillcolor=\"" +
+    //           color + "80\"";
+    // }
+    errs() << "Node Attributes: " << attrs << "\n";
     return attrs;
   }
 };
@@ -311,7 +346,6 @@ bool CallGraphViewer::runOnModule(Module &M) {
 }
 
 // DOT Printer
-
 class CallGraphDOTPrinter : public ModulePass {
 public:
   static char ID;
@@ -346,6 +380,30 @@ INITIALIZE_PASS(CallGraphViewer, "view-callgraph", "View call graph", false,
 char CallGraphDOTPrinter::ID = 0;
 INITIALIZE_PASS(CallGraphDOTPrinter, "dot-callgraph",
                 "Print call graph to 'dot' file", false, false)
+
+
+void llvm::writeCallGraphDOT(Module &M, ModuleAnalysisManager &MAM, std::string pathPrefix) {
+  auto &FAM = MAM.getResult<FunctionAnalysisManagerModuleProxy>(M).getManager();
+  auto LookupBFI = [&FAM](Function &F) {
+    return &FAM.getResult<BlockFrequencyAnalysis>(F);
+  };
+
+  std::string Filename = (pathPrefix + M.getSourceFileName() + ".callgraph.dot");
+  errs() << "Writing '" << Filename << "'...";
+
+  std::error_code EC;
+  raw_fd_ostream File(Filename, EC, sys::fs::OF_Text);
+
+  CallGraph CG(M);
+  CallGraphDOTInfo CFGInfo(&M, &CG, LookupBFI);
+
+  if (!EC)
+    WriteGraph(File, &CFGInfo);
+  else
+    errs() << "  error opening file for writing!";
+  errs() << "\n";
+
+}
 
 // Create methods available outside of this file, to use them
 // "include/llvm/LinkAllPasses.h". Otherwise the pass would be deleted by

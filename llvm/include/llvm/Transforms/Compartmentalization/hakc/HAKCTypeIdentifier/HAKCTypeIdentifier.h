@@ -52,13 +52,26 @@ public:
 
   Module &GetModule() const;
 
+  ModuleAnalysisManager &GetMAM() const;
+
   void GetHAKCTypes(SmallVectorImpl<HAKCTypeP> &Results) const;
 
   Type *GetTypeFromString(StringRef TypeStr) const;
 
   void AddIgnoredType(StringRef TypeName) const;
 
-protected:
+  std::map<const DIGlobalVariable *, HAKCGlobalP> GetGlobals();
+
+  std::set<HAKCGlobalP> GetUnmappedGlobals();
+
+  void ModifyTypeUse(Function* F, const std::shared_ptr<HAKCTypeInfo> &HAKCTy, TypePerms perm);
+
+  std::map<const DISubprogram *, HAKCFunctionP> GetFunctions();
+
+  std::set<HAKCFunctionP> GetUnmappedFunctions();
+
+  DebugInfoFinder GetDbgInfoFinder();
+
   HAKCTypeP FindType(Type *Ty) const;
 
   void FindAllTypes(Type *Ty, SmallVectorImpl<HAKCTypeP> &Results) const;
@@ -87,6 +100,8 @@ protected:
   GlobalVariable *FindGlobal(const DIGlobalVariable *DIGV) const;
 
   HAKCFunctionP HandleFunction(const DISubprogram *SubProg);
+
+  // void FunctionTemporalAnalysis(const DISubprogram *SubProg);
 
   void AddFunctionMapping(const DISubprogram *SubProg,
                           const HAKCFunctionP &HAKCFunction);
@@ -149,18 +164,22 @@ protected:
 
   Type *FindAnonymousType(const DICompositeType *CompositeTy);
 
-  HAKCTypeP FindTypeFromDebug(const DILocalVariable &DLV, Value *V);
+  HAKCTypeP FindTypeFromDebug(const DbgVariableRecord &DVR, Value *V);
+
+  HAKCTypeP CheckCallUses(Value *V);
 
   CommonHAKCAnalysis &AnalysisHelper;
   DebugInfoFinder DbgInfoFinder;
   std::map<const DIType *, HAKCTypeP> TypesWithDebugInfo;
   std::map<const DIGlobalVariable *, HAKCGlobalP> globals;
   std::map<const DISubprogram *, HAKCFunctionP> functions;
+  // std::map<Function *, HAKCFunctionP> FindHAKCFunctionMap;
   std::set<HAKCGlobalP> UnmappedGlobals;
   std::set<HAKCFunctionP> UnmappedFunctions;
   std::set<HAKCTypeP> TypesMissingDebugInfo;
   std::map<CallInst *, HAKCTypeP> IndirectCallsTypes;
   std::map<const DICompositeType *, Type *> AnonymousTypes;
+  std::map<Value *, HAKCTypeP> FindHAKCTypeMap;
   const DIScope *CompilationUnitScope;
   const std::vector<StructType *> IdentifiedStructTypes;
 };

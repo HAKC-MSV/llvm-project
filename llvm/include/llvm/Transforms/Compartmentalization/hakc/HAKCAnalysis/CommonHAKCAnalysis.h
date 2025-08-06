@@ -14,15 +14,21 @@
 namespace llvm::hakc {
 class HAKCTransformer;
 
-typedef std::function<llvm::Value *(llvm::Value *)> hakc_allocation_size_map_t;
+typedef std::function<Value *(Value *)> hakc_allocation_size_map_t;
 
 class CommonHAKCAnalysis {
 protected:
   Module &M;
 
+  ModuleAnalysisManager &MAM;
+
   std::map<Value *, SmallVector<Value *>> DefchainCache;
 
   HAKCSystemInformation SystemInfo;
+
+  // TODO remove below?
+  // HAKCWriter &HAKC_Writer;
+  std::shared_ptr<HAKCLogger> _HAKCLog;
 
   static bool IsFunctionInHAKCTransferFunctionList(
       Function *F, iterator_range<HAKCTransferList::iterator> Range);
@@ -30,13 +36,23 @@ protected:
   void InitConfig(StringRef ConfigPath);
 
 public:
+
+  bool abort = false;
+
   virtual ~CommonHAKCAnalysis() = default;
 
-  explicit CommonHAKCAnalysis(Module &M, StringRef ConfigPath);
+  std::shared_ptr<HAKCLogger> get(){ return _HAKCLog; }
+
+  // explicit CommonHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM,
+  //                             StringRef ConfigPath, HAKCWriter &HAKC_Writer);
+  explicit CommonHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM,
+                              StringRef ConfigPath);
 
   HAKCSystemInformation &GetSystemInfo();
 
   Module &GetModule() const;
+
+  ModuleAnalysisManager &GetMAM() const;
 
   Value *getDef(Value *V, bool followLoad);
 
@@ -88,7 +104,7 @@ public:
   bool functionIsTransferCandidate(Function *F,
                                    HAKCCompartmentalizationPolicy &Policy);
 
-  static hakc::HAKCWriter &getWriter(bool DebugActive);
+  static HAKCLogger &getLogger(HAKCLogLevel log_level, bool suppress_output = false);
 
   FunctionType *GetDataAuthenticationFunctionType(Module &M,
                                                   unsigned AddrSpace = 0);
@@ -147,7 +163,7 @@ public:
 
   bool ValueIsUsedAsPointer(Value *V);
 
-  hakc::function_def_t GetHAKCTransferDefinition(Function *F);
+  function_def_t GetHAKCTransferDefinition(Function *F);
 
   HAKCCustomAllocation GetAllocationDefinition(Function *F);
 
@@ -166,6 +182,10 @@ public:
   PointerShouldBeConsideredCode(const ManagedHAKCPointer &ManagedPointer);
 
   static Function *GetOriginalFunctionFromTransferFunction(Function *F);
+
+  StringRef createDagYamlPath(StringRef DagAnalysisRootPath);
+
+  StringRef createLogPath(StringRef DagAnalysisRootPath);
 
 private:
   static bool valueHasAttribute(Value *v, Attribute::AttrKind Kind);

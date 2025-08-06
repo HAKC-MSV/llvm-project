@@ -7,10 +7,13 @@
 
 #include "HAKCSymbolInfo.h"
 #include "HAKCIndirectCallSource.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKC-defs.h"
+#include <bitset>
 
 using namespace llvm;
 
 namespace llvm::hakc {
+
     class HAKCFunctionInfo : public HAKCSymbolInfo {
     public:
         HAKCFunctionInfo(CommonHAKCAnalysis &Analysis, StringRef Name, bool DebugActive);
@@ -18,6 +21,12 @@ namespace llvm::hakc {
         void SetFunction(Function *F);
 
         Function *GetFunction() const;
+
+        void AddTypeUse(const std::shared_ptr<HAKCTypeInfo> &Ty);
+
+        unsigned GetTypeUse(const std::shared_ptr<HAKCTypeInfo> &Ty);
+
+        void ModifyTypeUse(const std::shared_ptr<HAKCTypeInfo> &Ty, TypePerms perm);
 
         void AddDirectCall(const std::shared_ptr<HAKCFunctionInfo> &DirectCall);
 
@@ -27,6 +36,7 @@ namespace llvm::hakc {
 
         StringRef GetYamlIdentifier() const override;
 
+    std::map<std::shared_ptr<HAKCTypeInfo>, unsigned> TypesUsed;
     protected:
         std::set<std::shared_ptr<HAKCFunctionInfo> > DirectCalls;
         std::set<std::shared_ptr<HAKCIndirectCallSource> > IndirectCalls;
