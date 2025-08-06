@@ -124,7 +124,7 @@ protected:
 
   HAKCTypeP FindCalledFunctionType(FunctionType *FunctionTy) const;
 
-  HAKCTypeP CreateNoDebugType(Type *Ty) const;
+  HAKCTypeP CreateNoDebugType(Type *Ty);
 
   void FindIndirectCallSource(
       CallInst *CallI,

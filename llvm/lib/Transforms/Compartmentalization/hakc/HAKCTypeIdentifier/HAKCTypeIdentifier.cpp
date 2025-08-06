@@ -683,7 +683,7 @@ void hakc::HAKCTypeIdentifier::FindAllGlobalsUsed(
     GlobalSet.insert(GlobalObj);
   } else if (auto *ConstArray = dyn_cast<ConstantArray>(V)) {
     for (auto &Member : ConstArray->operands()) {
-      auto MemberDef = AnalysisHelper.getDef(Member.get(), false);
+      auto *MemberDef = AnalysisHelper.getDef(Member.get(), false);
       if (auto *GlobalMember = dyn_cast<GlobalObject>(MemberDef)) {
         GlobalSet.insert(GlobalMember);
       } else {
@@ -692,7 +692,7 @@ void hakc::HAKCTypeIdentifier::FindAllGlobalsUsed(
     }
   } else if (auto *I = dyn_cast<Instruction>(V)) {
     for (auto &Op : I->operands()) {
-      auto MemberDef = AnalysisHelper.getDef(Op.get(), false);
+      auto *MemberDef = AnalysisHelper.getDef(Op.get(), false);
       if (auto *GlobalMember = dyn_cast<GlobalObject>(MemberDef)) {
         GlobalSet.insert(GlobalMember);
       }
@@ -1508,7 +1508,7 @@ DIDerivedType *
 hakc::HAKCTypeIdentifier::FindUnionMember(const DICompositeType *UnionDef,
                                           unsigned MemberOffset) const {
   for (auto *UnionMember : UnionDef->getElements()) {
-    auto MemberTy = HAKCTypeInfo::StripTypeModifiers(
+    const auto *MemberTy = HAKCTypeInfo::StripTypeModifiers(
         dyn_cast<DIDerivedType>(UnionMember)->getBaseType());
     if (isa_and_nonnull<DICompositeType>(MemberTy)) {
       auto *MemberStruct = dyn_cast<DICompositeType>(MemberTy);
@@ -1999,7 +1999,7 @@ void hakc::HAKCTypeIdentifier::FindTypesInFunctions() {
 }
 
 std::shared_ptr<hakc::HAKCTypeInfo>
-hakc::HAKCTypeIdentifier::CreateNoDebugType(Type *Ty) const {
+hakc::HAKCTypeIdentifier::CreateNoDebugType(Type *Ty) {
   std::string Name;
   llvm::raw_string_ostream sstream(Name);
   if (auto *StructTy = dyn_cast<StructType>(Ty)) {
@@ -2021,9 +2021,9 @@ hakc::HAKCTypeIdentifier::CreateNoDebugType(Type *Ty) const {
     if (!PointeeTy) {
       PointeeTy = CreateNoDebugType(ArrayTy->getElementType());
     }
-  } else if (auto *PointerTy = dyn_cast<PointerType>(Ty)) {
+  } else if (isa<PointerType>(Ty)) {
     /* We can't know what this points to, so have it point to one byte */
-    PointeeTy = FindType(IntegerType::getInt8Ty(Ty->getContext()));
+    PointeeTy = GetVoidPointerPointeeType();
   }
   HAKCType->SetPointeeType(PointeeTy);
   return HAKCType;

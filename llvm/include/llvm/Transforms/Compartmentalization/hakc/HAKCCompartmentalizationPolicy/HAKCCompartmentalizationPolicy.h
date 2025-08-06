@@ -80,7 +80,7 @@ public:
 
   HAKCCompartmentP GetCompartment(hakc_compartment_id_t CompartmentID);
 
-  void GetValidTargets(HAKCCompartment &Compartment) const;
+  void GetValidTargets(HAKCCompartment &Compartment);
 
   hakc::HAKCCompartmentDivision &GetDefaultDivision();
 
@@ -89,6 +89,8 @@ protected:
   std::vector<HAKCCompartmentP> Compartments;
   std::vector<HAKCDivisionP> Divisions;
   HAKCDatabaseConnection Client;
+  std::map<HAKCSymbolP, HAKCDivisionP> SymbolDivisionMap;
+  std::set<hakc_compartment_id_t> RetrievedTargetCompartments;
 
   void CheckConnection() const;
 
@@ -109,6 +111,8 @@ protected:
   HAKCCompartmentP CreateCompartment(hakc_compartment_id_t CompartmentID,
                                      hakc_access_token_t AccessToken,
                                      bool CheckForExisting);
+
+  HAKCDivisionP FindCachedSymbolDivision(HAKCSymbolP Symbol) const;
 };
 } // namespace llvm::hakc
 
