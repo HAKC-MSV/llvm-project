@@ -1621,7 +1621,11 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
       }
     } else {
       if (auto PointeeType = FindHAKCType(LoadI->getPointerOperand())) {
-        FoundType = FindPointeeType(PointeeType);
+        if (PointeeType->IsVoidPtrType() && V->getType()->isPointerTy()) {
+          FoundType = PointeeType;
+        } else {
+          FoundType = FindPointeeType(PointeeType);
+        }
         if (FoundType) {
           goto exit;
         }
