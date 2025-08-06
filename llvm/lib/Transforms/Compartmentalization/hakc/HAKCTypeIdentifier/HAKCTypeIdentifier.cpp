@@ -1619,8 +1619,14 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
       }
     } else {
       if (auto PointeeType = FindHAKCType(LoadI->getPointerOperand())) {
-        if (PointeeType->IsVoidPtrType() && V->getType()->isPointerTy()) {
-          FoundType = PointeeType;
+        if (V->getType()->isPointerTy()) {
+          if (PointeeType->IsVoidPtrType()) {
+            FoundType = PointeeType;
+          } else if (PointeeType->IsIntegerType()) {
+            FoundType = GetVoidPointerType();
+          } else {
+            FoundType = FindPointeeType(PointeeType);
+          }
         } else {
           FoundType = FindPointeeType(PointeeType);
         }
@@ -1635,7 +1641,9 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
   if (isa<GetElementPtrInst>(V) || isa<GEPOperator>(V)) {
     Type *SourceType, *DestTy;
     Value *SourceValue;
-    APInt ByteOffset(64, 0);
+    APInt ByteOffset(GetModule().getDataLayout().getIndexSizeInBits(
+                         V->getType()->getPointerAddressSpace()),
+                     0);
     bool FoundOffset = false;
     if (isa<GetElementPtrInst>(V)) {
       auto *GEPI = dyn_cast<GetElementPtrInst>(V);

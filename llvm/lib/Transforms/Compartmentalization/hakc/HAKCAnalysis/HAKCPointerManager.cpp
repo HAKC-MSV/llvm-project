@@ -204,11 +204,11 @@ bool HAKCPointerManager::ManageNewPointer(Use &U) {
 
   auto ManagedPointer =
       std::make_shared<ManagedHAKCPointer>(BaseDefinition, *this, NextID);
-  if (NextID == 2 &&
-      HAKCAnalysis.GetFunction().getName() == "xfrm_state_walk") {
-    CommonHAKCAnalysis::getWriter(DebugActive)
-        << "Found " << *ManagedPointer << "\n";
-  }
+  // if (NextID == 21 &&
+  //     HAKCAnalysis.GetFunction().getName() == "netlbl_domhsh_add") {
+  //   CommonHAKCAnalysis::getWriter(DebugActive)
+  //       << "Found " << *ManagedPointer << "\n";
+  // }
   HAKCAnalysis.GetModuleAnalysis().GetTypeIdentifier().FindType(
       *ManagedPointer);
   if (ManagedPointer->GetType() && ManagedPointer->GetType()->IsIgnoredType()) {
