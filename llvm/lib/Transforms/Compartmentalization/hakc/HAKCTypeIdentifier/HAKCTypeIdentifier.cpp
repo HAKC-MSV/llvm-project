@@ -1378,6 +1378,10 @@ HAKCTypeIdentifier::FindTypeFromDebug(const DbgVariableRecord &DVR,
     return nullptr;
   }
   const auto *DITy = DVR.getVariable()->getType();
+  if (V->getType()->isPointerTy() && !IsPointerLikeType(DITy)) {
+    return nullptr;
+  }
+
   DebugVariable DebugVar(&DVR);
   auto FragInfo = DebugVar.getFragment();
   CommonHAKCAnalysis::getWriter(
@@ -1456,10 +1460,9 @@ HAKCTypeIdentifier::FindTypeFromDebug(const DbgVariableRecord &DVR,
     }
   }
 
-found:
   auto FoundType = FindType(DITy);
   if (FoundType) {
-    if (isa<AllocaInst>(V)) {
+    if (isa<AllocaInst>(V) || isa<GEPOperator>(V)) {
       auto PointerType = FindPointerType(*FoundType);
       if (!PointerType) {
         FoundType = AddMissingPointerType(FoundType);
@@ -1564,6 +1567,7 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
       CommonHAKCAnalysis::getLogger(Verbose)
           << "Examining Debug Record " << *DVR << "\n";
       FoundType = FindTypeFromDebug(*DVR, V);
+
       if (FoundType) {
         goto exit;
       }
@@ -1787,6 +1791,11 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
       FoundType = FindHAKCType(CastExpr->getOperand(0));
     } else {
       FoundType = GetVoidPointerType();
+    }
+  } else if (auto *SelectI = dyn_cast<SelectInst>(V)) {
+    FoundType = FindHAKCType(SelectI->getTrueValue());
+    if (!FoundType) {
+      FoundType = FindHAKCType(SelectI->getFalseValue());
     }
   }
 
