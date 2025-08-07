@@ -51,15 +51,13 @@ HAKCWriter &HAKCWriter::operator<<(Value *V) {
   return *this;
 }
 
-HAKCWriter &HAKCWriter::operator<<(Use &U) {
+HAKCWriter &HAKCWriter::operator<<(const Use &U) {
   *this << "Operand " << U.getOperandNo() << " of " << U.getUser() << "\n";
   return *this;
 }
 
 HAKCWriter &HAKCWriter::operator<<(double d) {
-  if (debug) {
-    os << d;
-  }
+  *os << d;
   return *this;
 }
 
@@ -104,10 +102,11 @@ HAKCWriter &HAKCWriter::operator<<(const std::string &str) {
 }
 
 HAKCWriter &HAKCWriter::operator<<(const char *s) {
-  if(s) {
+  if (s) {
     *os << s;
   }
-  return *this;// ~__shared_ptr() = default; called after this returns then segfaults
+  return *this; // ~__shared_ptr() = default; called after this returns then
+                // segfaults
 }
 
 HAKCWriter &HAKCWriter::operator<<(const Function &F) {
@@ -121,14 +120,14 @@ HAKCWriter &HAKCWriter::operator<<(const Module &M) {
 }
 
 HAKCWriter &HAKCWriter::operator<<(const Module *M) {
-  if(M) {
+  if (M) {
     *this << *M;
   }
   return *this;
 }
 
 HAKCWriter &HAKCWriter::operator<<(const Type *Ty) {
-  if(Ty) {
+  if (Ty) {
     *this << *Ty;
   }
   return *this;
@@ -140,7 +139,7 @@ HAKCWriter &HAKCWriter::operator<<(const Type &Ty) {
 }
 
 HAKCWriter &HAKCWriter::operator<<(const DINode *DiNode) {
-  if (DiNode){
+  if (DiNode) {
     *this << *DiNode;
   }
   return *this;
@@ -152,7 +151,7 @@ HAKCWriter &HAKCWriter::operator<<(const DINode &DiNode) {
 }
 
 HAKCWriter &HAKCWriter::operator<<(const DIType *DiType) {
-  if (DiType){
+  if (DiType) {
     printDIType(DiType, 0);
   }
   return *this;
@@ -163,8 +162,7 @@ HAKCWriter &HAKCWriter::operator<<(const HAKCCompartment &Compartment) {
   return *this;
 }
 
-HAKCWriter &
-HAKCWriter::operator<<(const HAKCCompartmentDivision &Division) {
+HAKCWriter &HAKCWriter::operator<<(const HAKCCompartmentDivision &Division) {
   *this << Division.GetHAKCCompartment();
   *os << " Division " << Division.GetDivisionID()->getZExtValue();
   return *this;
@@ -293,10 +291,7 @@ HAKCWriter &HAKCWriter::operator<<(const DILocalVariable &DLV) {
 }
 
 HAKCWriter &HAKCWriter::operator<<(const DILocation &DL) {
-  if (!debug) {
-    return *this;
-  }
-  os << DL.getFilename() << ":" << DL.getLine();
+  *os << DL.getFilename() << ":" << DL.getLine();
   return *this;
 }
 } // namespace llvm::hakc

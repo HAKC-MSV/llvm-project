@@ -61,7 +61,8 @@ void HAKCTransformer::MoveGlobalsToHAKCSection() {
     RegisterUsedCompartment(compartment);
 
     if (finalName != pGlobal->getSection()) {
-      CommonHAKCAnalysis::getLogger(Debug, !getCommonAnalysis().GetSystemInfo().OutputDebugInfo(pGlobal))
+      CommonHAKCAnalysis::getLogger(
+          Debug, !getCommonAnalysis().GetSystemInfo().OutputDebugInfo(pGlobal))
           << "Changing section of global " << *pGlobal << " to section "
           << finalName << " from " << pGlobal->getSection() << "\n";
       pGlobal->setSection(finalName);
@@ -104,15 +105,15 @@ bool HAKCTransformer::FunctionDefinedInAssembly(Function *F) {
 
   auto NameInAssembly = NameRegex.match(ModuleAsm, &Matches, nullptr);
   bool SuppressOutput = !getSystemInfo().OutputDebugInfo(F);
-    if (NameInAssembly) {
-      CommonHAKCAnalysis::getLogger(Debug, SuppressOutput)
-          << F->getName()
-          << " was found in the Module inline assembly: " << Matches[0] << "\n";
-    } else {
-      CommonHAKCAnalysis::getLogger(Error, SuppressOutput)
-          << "Could not find " << SearchTerm << " in\n"
-          << ModuleAsm << "\n";
-    }
+  if (NameInAssembly) {
+    CommonHAKCAnalysis::getLogger(Debug, SuppressOutput)
+        << F->getName()
+        << " was found in the Module inline assembly: " << Matches[0] << "\n";
+  } else {
+    CommonHAKCAnalysis::getLogger(Error, SuppressOutput)
+        << "Could not find " << SearchTerm << " in\n"
+        << ModuleAsm << "\n";
+  }
 
   return NameInAssembly;
 }
@@ -142,14 +143,14 @@ void HAKCTransformer::performTransformations() {
 }
 
 void HAKCTransformer::performTemporalTransformations() {
-  CommonHAKCAnalysis::getLogger(Error) <<
-    "!!!Starting temporal transformations!!!\n";
+  CommonHAKCAnalysis::getLogger(Error)
+      << "!!!Starting temporal transformations!!!\n";
   TransformModule();
   CommonHAKCAnalysis::getLogger(Debug)
       << "Final Module After Transformations:\n"
       << getModule() << "\n";
-  CommonHAKCAnalysis::getLogger(Error) <<
-    "!!!End temporal transformations!!!\n";
+  CommonHAKCAnalysis::getLogger(Error)
+      << "!!!End temporal transformations!!!\n";
 }
 
 bool HAKCTransformer::TransferFunctionShouldBeCreated(Function *F) {
@@ -363,9 +364,9 @@ void HAKCTransformer::CreateInitGlobalMemberTransfers() {
   for (auto *GlobToTransfer : GlobalsToModifyDuringInit) {
     auto *InitTransfer = CreateInitTransfer(GlobToTransfer);
 
-    CommonHAKCAnalysis::getLogger(Debug, !getSystemInfo().OutputDebugInfo(GlobToTransfer))
+    CommonHAKCAnalysis::getLogger(
+        Debug, !getSystemInfo().OutputDebugInfo(GlobToTransfer))
         << "Created InitTransfer " << InitTransfer->getName() << "\n";
-
   }
 }
 
@@ -398,11 +399,10 @@ Function *HAKCTransformer::CreateInitTransfer(GlobalVariable *GlobalVar) {
   if (GlobalInitFunc->empty()) {
     PopulateGlobalInitTransferFunc(GlobalInitFunc, GlobalVar);
 
-
-      CommonHAKCAnalysis::getLogger(Debug, !getSystemInfo().OutputDebugInfo(GlobalVar))
-          << "Finished Populating Global Init Transfer\n"
-          << *GlobalInitFunc << "\n";
-
+    CommonHAKCAnalysis::getLogger(Debug,
+                                  !getSystemInfo().OutputDebugInfo(GlobalVar))
+        << "Finished Populating Global Init Transfer\n"
+        << *GlobalInitFunc << "\n";
   }
 
   return GlobalInitFunc;
@@ -676,12 +676,12 @@ void HAKCTransformer::ValidateHAKCPointer(const HAKCPointerBase &HAKCPointer) {
         << "HAKCPointer " << HAKCPointer << " has no HAKCType\n";
     if (auto *I = dyn_cast<Instruction>(HAKCPointer.GetBaseDefinition())) {
       auto DebugLoc = I->getDebugLoc();
-      CommonHAKCAnalysis::getWriter(true)
+      CommonHAKCAnalysis::getLogger(Fatal)
           << "in Function " << I->getFunction()->getName();
       if (DebugLoc && DebugLoc.get()) {
-        CommonHAKCAnalysis::getWriter(true) << " at " << *DebugLoc.get();
+        CommonHAKCAnalysis::getLogger(Fatal) << " at " << DebugLoc;
       }
-      CommonHAKCAnalysis::getWriter(true) << "\n";
+      CommonHAKCAnalysis::getLogger(Fatal) << "\n";
     }
     throw std::exception();
   } else if (HAKCPointer.GetType()->GetPointeeType() == nullptr) {
@@ -714,11 +714,6 @@ Value *HAKCTransformer::CreateSafePointer(HAKCPointerBase &HAKCPointer,
     CommonHAKCAnalysis::getLogger(Fatal)
         << "HAKCPointerBase is a ConstantPointerNull: " << HAKCPointer << "\n";
     throw std::exception();
-  }
-
-  if (HAKCPointer.GetID() == 5 &&
-      I->getFunction()->getName() == "__se_sys_move_pages") {
-    CommonHAKCAnalysis::getWriter(true) << "Found " << HAKCPointer << "\n";
   }
 
   if (HAKCPointer.GetAuthenticatedPointer()) {

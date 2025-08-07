@@ -7,6 +7,7 @@
 
 #include "ManagedHAKCPointer.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartmentalizationPolicy.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCWriter.h"
 #include <memory>
 
 namespace llvm::hakc {
@@ -179,6 +180,8 @@ protected:
                           unsigned OperandNo);
 
   bool IsConstantExprUsedInKernelCall(User *U) const;
+
+  HAKCLogger &GetLogger(HAKCLogLevel log_level, bool suppress_output) const;
 
 private:
   unsigned CurrentPointerID;

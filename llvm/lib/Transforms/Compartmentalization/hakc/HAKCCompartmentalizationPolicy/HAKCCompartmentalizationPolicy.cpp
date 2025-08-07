@@ -191,11 +191,10 @@ void HAKCDatabaseConnection::connect() {
 HAKCCompartmentalizationPolicy::HAKCCompartmentalizationPolicy(
     HAKCSystemInformation &SystemInformation)
     : SystemInformation(SystemInformation), Compartments(), Divisions(),
-      Client(SystemInformation.GetDatabaseInformation(),
-             SystemInformation.OutputDebugInfo()),
+      Client(SystemInformation.GetDatabaseInformation(), false),
       SymbolDivisionMap() {
   // no need to connect to database if doing purely analysis
-  if (SystemInformation.GetPassMode() == RunCompartmentalization){
+  if (SystemInformation.GetPassMode() == RunCompartmentalization) {
     ConnectToDatabase();
   }
 }
@@ -382,9 +381,12 @@ void HAKCCompartmentalizationPolicy::GetValidTargets(
   RetrievedTargetCompartments.insert(CompartmentID);
   if (!ValidTargets) {
     auto currentTime = std::chrono::system_clock::now();
-    auto milliseconds_since_epoch = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime.time_since_epoch());
+    auto milliseconds_since_epoch =
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            currentTime.time_since_epoch());
     // std::time_t c_time = std::chrono::system_clock::to_time_t(currentTime);
-    CommonHAKCAnalysis::getLogger(Debug) << milliseconds_since_epoch.count() << " "
+    CommonHAKCAnalysis::getLogger(Debug)
+        << milliseconds_since_epoch.count() << " "
         << "No ValidTargets found for CompartmentID: " << CompartmentID << "\n";
     return;
   }
@@ -417,9 +419,12 @@ json::Object
 HAKCCompartmentalizationPolicy::Execute(StringRef Endpoint,
                                         json::Object &Parameters) const {
   auto currentTime = std::chrono::system_clock::now();
-  auto milliseconds_since_epoch = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime.time_since_epoch());
-  CommonHAKCAnalysis::getLogger(Fatal) << milliseconds_since_epoch.count() << " "
-    << "Executing command \n";
+  auto milliseconds_since_epoch =
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          currentTime.time_since_epoch());
+  CommonHAKCAnalysis::getLogger(Fatal)
+      << milliseconds_since_epoch.count() << " "
+      << "Executing command \n";
 
   CheckConnection();
   HAKCDatabaseRequest Request(Endpoint, Parameters);
@@ -436,12 +441,17 @@ HAKCCompartmentalizationPolicy::Execute(StringRef Endpoint,
     throw std::exception();
   }
   for (auto pair : *ParsedJson->getAsObject()) {
-    if( pair.getFirst() == "TERMINATING CONNECTION"){
+    if (pair.getFirst() == "TERMINATING CONNECTION") {
       auto currentTime = std::chrono::system_clock::now();
-      auto milliseconds_since_epoch = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime.time_since_epoch());
-      CommonHAKCAnalysis::getLogger(Fatal) << milliseconds_since_epoch.count() << " " << "Unrecoverable error on Policy Server; terminating connection!\n";
+      auto milliseconds_since_epoch =
+          std::chrono::duration_cast<std::chrono::milliseconds>(
+              currentTime.time_since_epoch());
+      CommonHAKCAnalysis::getLogger(Fatal)
+          << milliseconds_since_epoch.count() << " "
+          << "Unrecoverable error on Policy Server; terminating connection!\n";
 
-      throw std::runtime_error("Unrecoverable error on Policy Server; terminating connection!\n");
+      throw std::runtime_error(
+          "Unrecoverable error on Policy Server; terminating connection!\n");
     }
   }
   auto Obj = ParsedJson->getAsObject();

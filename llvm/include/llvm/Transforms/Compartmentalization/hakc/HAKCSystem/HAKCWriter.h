@@ -37,7 +37,8 @@ public:
   explicit HAKCWriter(HAKCLogLevel log_level)
       : os(), log_path(""), ConfiguredLogLevel(log_level) {
     // errs() << "CREATING HAKC WRITER0\n";
-    // allow using shared ptr to errs() but force it to not try to destroy errs()
+    // allow using shared ptr to errs() but force it to not try to destroy
+    // errs()
     os = std::shared_ptr<raw_ostream>(&errs(), // non-owning raw pointer
                                       [](raw_ostream *) {
                                         // no-op deleter to prevent delete on
@@ -57,17 +58,17 @@ public:
     ConfiguredLogLevel = log_level;
   }
 
-  HAKCLogLevel GetConfiguredLogLevel() { return ConfiguredLogLevel; }
+  HAKCLogLevel GetConfiguredLogLevel() const { return ConfiguredLogLevel; }
 
   StringRef GetLogPath() const { return log_path; }
 
-  raw_ostream &GetOS() { return *os; }
+  raw_ostream &GetOS() const { return *os; }
 
   void printDIType(const DIType *type, unsigned indents) const;
 
   HAKCWriter &operator<<(Value *V);
 
-  HAKCWriter &operator<<(Use &U);
+  HAKCWriter &operator<<(const Use &U);
 
   HAKCWriter &operator<<(User *User);
 
@@ -164,8 +165,7 @@ public:
   void addStream(StringRef log_path, HAKCLogLevel log_level) {
     if (log_level == Disabled) {
       disabled = true;
-    }
-    else {
+    } else {
       auto writer = std::make_shared<HAKCWriter>(log_path, log_level);
       if (writer->EC) {
         errs() << "Failed to create log file: " << writer->EC.message() << "\n";
@@ -181,11 +181,11 @@ public:
     disabled = (log_level == Disabled);
   }
 
-  void SetConsoleConfiguredLogLevels(HAKCLogLevel log_level) {
+  void SetConsoleConfiguredLogLevels(HAKCLogLevel log_level) const {
     HAKCStreams[0]->SetConfiguredLogLevel(log_level);
   }
 
-  void SetFileConfiguredLogLevel(HAKCLogLevel log_level) {
+  void SetFileConfiguredLogLevel(HAKCLogLevel log_level) const {
     for (unsigned long i = 0; i < HAKCStreams.size(); ++i) {
       if (i != 0) {
         HAKCStreams[i]->SetConfiguredLogLevel(log_level);
@@ -481,9 +481,7 @@ public:
     return *this;
   }
 
-
-
-  HAKCLogger &operator<<(const DbgVariableRecord &DVR){
+  HAKCLogger &operator<<(const DbgVariableRecord &DVR) {
     for (std::shared_ptr<HAKCWriter> &stream : HAKCStreams) {
       if (!disabled && (LogLevel >= stream->GetConfiguredLogLevel())) {
         stream->operator<<(DVR);
@@ -491,7 +489,7 @@ public:
     }
     return *this;
   }
-  HAKCLogger &operator<<(const DbgVariableIntrinsic &DVI){
+  HAKCLogger &operator<<(const DbgVariableIntrinsic &DVI) {
     for (std::shared_ptr<HAKCWriter> &stream : HAKCStreams) {
       if (!disabled && (LogLevel >= stream->GetConfiguredLogLevel())) {
         stream->operator<<(DVI);
@@ -500,10 +498,28 @@ public:
     return *this;
   }
 
-  HAKCLogger &operator<<(const DILocalVariable &DLV){
+  HAKCLogger &operator<<(const DILocalVariable &DLV) {
     for (std::shared_ptr<HAKCWriter> &stream : HAKCStreams) {
       if (!disabled && (LogLevel >= stream->GetConfiguredLogLevel())) {
         stream->operator<<(DLV);
+      }
+    }
+    return *this;
+  }
+
+  HAKCLogger &operator<<(double d) {
+    for (std::shared_ptr<HAKCWriter> &stream : HAKCStreams) {
+      if (!disabled && (LogLevel >= stream->GetConfiguredLogLevel())) {
+        stream->operator<<(d);
+      }
+    }
+    return *this;
+  }
+
+  HAKCLogger &operator<<(const DebugLoc &Loc) {
+    for (std::shared_ptr<HAKCWriter> &stream : HAKCStreams) {
+      if (!disabled && (LogLevel >= stream->GetConfiguredLogLevel())) {
+        stream->operator<<(Loc);
       }
     }
     return *this;
