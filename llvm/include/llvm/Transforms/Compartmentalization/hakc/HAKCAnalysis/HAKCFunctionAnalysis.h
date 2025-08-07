@@ -79,7 +79,8 @@ protected:
 
   bool userInFunction(Value *user) const;
 
-  BasicBlock *findDominatorUseBlock(Value *ptr, std::set<Instruction *> &users) const;
+  BasicBlock *findDominatorUseBlock(Value *ptr,
+                                    std::set<Instruction *> &users) const;
 
   void createAllAuthenticatedPointers();
 
@@ -87,7 +88,7 @@ protected:
 
   void transformPointerDereferences();
 
-  bool argNeedsAuthentication(Use &arg) const;
+  bool argNeedsAuthentication(Use &arg);
 
   bool phiNodeUsesValue(PHINode *phiNode, Value *target,
                         std::set<PHINode *> &visited);
@@ -167,7 +168,8 @@ public:
 
   Value *getDef(Value *, bool) const;
 
-  Instruction *FindUseInsertionPoint(Value *v, std::set<Instruction *> &users) const;
+  Instruction *FindUseInsertionPoint(Value *v,
+                                     std::set<Instruction *> &users) const;
 
   Value *AddDataAuthCheckAtLocation(Value *signed_ptr, Instruction *location);
 

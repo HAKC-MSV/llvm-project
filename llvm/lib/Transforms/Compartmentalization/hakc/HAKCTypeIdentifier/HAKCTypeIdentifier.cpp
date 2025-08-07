@@ -1378,9 +1378,6 @@ HAKCTypeIdentifier::FindTypeFromDebug(const DbgVariableRecord &DVR,
     return nullptr;
   }
   const auto *DITy = DVR.getVariable()->getType();
-  if (V->getType()->isPointerTy() && !IsPointerLikeType(DITy)) {
-    return nullptr;
-  }
 
   DebugVariable DebugVar(&DVR);
   auto FragInfo = DebugVar.getFragment();
@@ -1460,6 +1457,9 @@ HAKCTypeIdentifier::FindTypeFromDebug(const DbgVariableRecord &DVR,
     }
   }
 
+  if (V->getType()->isPointerTy() && !IsPointerLikeType(DITy)) {
+    return nullptr;
+  }
   auto FoundType = FindType(DITy);
   if (FoundType) {
     if (isa<AllocaInst>(V) || isa<GEPOperator>(V)) {
@@ -1616,6 +1616,9 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
             }
           }
         }
+      }
+      if (V->getType()->isPointerTy()) {
+        FoundType = GetVoidPointerType();
       }
     } else {
       if (auto PointeeType = FindHAKCType(LoadI->getPointerOperand())) {

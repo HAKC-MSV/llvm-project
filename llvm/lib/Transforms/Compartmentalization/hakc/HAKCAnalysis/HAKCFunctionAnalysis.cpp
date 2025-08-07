@@ -294,17 +294,6 @@ bool HAKCFunctionAnalysis::AddManagedPointer(Use &PointerUse) {
           << "Could not find ManagedPointer for " << PointerUse << "\n";
       throw std::exception();
     }
-    // if (auto *PHII = dyn_cast<PHINode>(ManagedPointer->GetBaseDefinition()))
-    // {
-    //   CommonHAKCAnalysis::getWriter()
-    //       << "Definition is a PHI Node. Adding all non-null incoming "
-    //          "members\n";
-    //   for (auto &Incoming : PHII->incoming_values()) {
-    //     CommonHAKCAnalysis::getWriter()
-    //         << "Adding Incoming member " << Incoming << "\n";
-    //     AddManagedPointer(Incoming);
-    //   }
-    // }
   }
   return Result;
 }
@@ -352,7 +341,7 @@ HAKCFunctionAnalysis::AddSafePointerCreationAtLocation(Value *SignedPtr,
  * @param arg The function argument to check
  * @return
  */
-bool HAKCFunctionAnalysis::argNeedsAuthentication(Use &arg) const {
+bool HAKCFunctionAnalysis::argNeedsAuthentication(Use &arg) {
   if (auto *call = dyn_cast<CallInst>(arg.getUser())) {
     if (auto *inlineAsm = dyn_cast<InlineAsm>(call->getCalledOperand())) {
       HAKCFunctionAnalysis::getLogger(Verbose)
