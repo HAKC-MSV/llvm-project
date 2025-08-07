@@ -31,9 +31,17 @@ bool HAKCPointerManager::PointerIsEligibleForManagement(Use &U) {
   auto *Pointer = U.get();
   auto *Definition = GetFunctionAnalysis().getDef(Pointer, false);
   auto *PointerTy = Pointer->getType();
+
   if (auto *AllocaI = dyn_cast<AllocaInst>(Definition)) {
     PointerTy = AllocaI->getAllocatedType();
   }
+  if (!HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().IsPointerLikeType(
+          Definition->getType())) {
+    CommonHAKCAnalysis::getWriter(DebugActive)
+        << "Definition is not a pointer-like Type\n";
+    return false;
+  }
+
   if (isa<ConstantPointerNull>(Definition)) {
     HAKCAnalysis.GetModuleAnalysis().GetCommonAnalysis().getLogger(Verbose, !DebugActive)
         << "Pointer Manager ignores null pointers\n";
@@ -207,11 +215,12 @@ bool HAKCPointerManager::ManageNewPointer(Use &U) {
 
   auto ManagedPointer =
       std::make_shared<ManagedHAKCPointer>(BaseDefinition, *this, NextID);
-  // if (NextID == 21 &&
-  //     HAKCAnalysis.GetFunction().getName() == "netlbl_domhsh_add") {
-  //   CommonHAKCAnalysis::getWriter(DebugActive)
-  //       << "Found " << *ManagedPointer << "\n";
-  // }
+  if (NextID == 5 &&
+      HAKCAnalysis.GetFunction().getName() == "__se_sys_move_pages") {
+    CommonHAKCAnalysis::getWriter(DebugActive)
+        << "Found " << *ManagedPointer << "\n"
+        << PointerIsEligibleForManagement(U) << "\n";
+  }
   HAKCAnalysis.GetModuleAnalysis().GetTypeIdentifier().FindType(
       *ManagedPointer);
   if (ManagedPointer->GetType() && ManagedPointer->GetType()->IsIgnoredType()) {

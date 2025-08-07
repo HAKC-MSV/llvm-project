@@ -716,6 +716,11 @@ Value *HAKCTransformer::CreateSafePointer(HAKCPointerBase &HAKCPointer,
     throw std::exception();
   }
 
+  if (HAKCPointer.GetID() == 5 &&
+      I->getFunction()->getName() == "__se_sys_move_pages") {
+    CommonHAKCAnalysis::getWriter(true) << "Found " << HAKCPointer << "\n";
+  }
+
   if (HAKCPointer.GetAuthenticatedPointer()) {
     return HAKCPointer.GetAuthenticatedPointer();
   }
