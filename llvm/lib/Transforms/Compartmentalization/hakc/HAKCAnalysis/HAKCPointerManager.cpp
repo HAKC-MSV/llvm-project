@@ -19,7 +19,7 @@ HAKCPointerManager::HAKCPointerManager(HAKCFunctionAnalysis &Analysis,
       IsCompartmentalized(false), DebugActive(DebugActive), CurrentPointerID(0),
       CurrentPointerUseID(0) {}
 
-bool HAKCPointerManager::PointerIsEligibleForManagement(Use &U) const {
+bool HAKCPointerManager::PointerIsEligibleForManagement(Use &U) {
   CommonHAKCAnalysis::getWriter(DebugActive)
       << "Starting Pointer Management checks for " << U.get() << " from "
       << U.getUser() << "\n";
@@ -173,10 +173,13 @@ bool HAKCPointerManager::PointerIsEligibleForManagement(Use &U) const {
         << *Pointer << " Type is not a pointer: " << *Pointer->getType()
         << "\n";
     return false;
-  } else if (Pointer->getType()->isPointerTy()) {
-    CommonHAKCAnalysis::getWriter(DebugActive)
-        << *Pointer << " Type is a pointer: " << *Pointer->getType() << "\n";
-    return !CommonHAKCAnalysis::IsKernelUserPointer(Pointer);
+  } else if (auto *GEP = dyn_cast<GEPOperator>(Pointer)) {
+    auto ManagedPointer = GetManagedPointer(GEP->getPointerOperand());
+    if (!ManagedPointer) {
+      CommonHAKCAnalysis::getWriter(DebugActive)
+          << "Pointer of " << *Pointer << " is not managed\n";
+      return false;
+    }
   }
   return Pointer->getType()->isPointerTy() &&
          !CommonHAKCAnalysis::IsKernelUserPointer(Pointer);

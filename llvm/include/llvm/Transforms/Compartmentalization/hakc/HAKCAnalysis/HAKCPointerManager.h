@@ -36,7 +36,7 @@ public:
 
   bool ManagePointer(Use &U);
 
-  bool PointerIsEligibleForManagement(Use &U) const;
+  bool PointerIsEligibleForManagement(Use &U);
 
   iterator_range<ManagedHAKCPointerListType::iterator> ManagedPointers();
 
@@ -48,7 +48,6 @@ public:
    * @return
    */
   ManagedHAKCPointerP GetManagedPointer(Value *V);
-
   bool empty() const;
 
   Value *GetDef(Value *V) const;
