@@ -1707,7 +1707,7 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
         }
       }
     } else if (DestTy->isPointerTy() || DestTy->isArrayTy()) {
-      CommonHAKCAnalysis::getLogger(Error)
+      CommonHAKCAnalysis::getLogger(Debug)
           << "Could not determine type for GEP " << *V << "\n";
       FoundType = GetVoidPointerType();
       goto exit;
