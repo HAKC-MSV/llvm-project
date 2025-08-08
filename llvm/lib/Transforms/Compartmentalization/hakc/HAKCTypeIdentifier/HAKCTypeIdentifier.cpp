@@ -20,7 +20,6 @@
 #include "llvm/IR/DerivedTypes.h"
 
 #include "llvm/Analysis/CallGraph.h"
-#include "llvm/Analysis/CallPrinter.h"
 
 namespace llvm::hakc {
 std::shared_ptr<HAKCTypeInfo> HAKCTypeIdentifier::FindType(const DIType *type) {

@@ -8,7 +8,6 @@
 #include <string>
 #include <vector>
 
-#include "llvm/AsmParser/Parser.h"
 #include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCFunctionDefinition/HAKCFunctionDefinition.h"
@@ -431,8 +430,10 @@ template <> struct yaml::MappingTraits<hakc::HAKCYamlConfig> {
       io.mapOptional("IgnoredTypes", YamlConfig.IgnoredTypes);
       io.mapOptional("IgnoredGlobals", YamlConfig.IgnoredGlobals);
       io.mapOptional("AllocationFunctions", YamlConfig.AllocationFunctions);
-      io.mapOptional("ConsoleLogLevel", YamlConfig.ConsoleLogLevel, hakc::HAKCLogLevel::Debug);
-      io.mapOptional("FileLogLevel", YamlConfig.FileLogLevel, hakc::HAKCLogLevel::Debug);
+      io.mapOptional("ConsoleLogLevel", YamlConfig.ConsoleLogLevel,
+                     hakc::HAKCLogLevel::Error);
+      io.mapOptional("FileLogLevel", YamlConfig.FileLogLevel,
+                     hakc::HAKCLogLevel::Error);
       io.mapOptional("DebugDatabase", YamlConfig.DebugDatabase, false);
       io.mapOptional("DebugOutputSymbols", YamlConfig.PassDebugSymbols);
       io.mapOptional("PerCPUCompartmentTransferFunction",
@@ -443,16 +444,17 @@ template <> struct yaml::MappingTraits<hakc::HAKCYamlConfig> {
       io.mapOptional("PostTargetActions", YamlConfig.PostTargetActions);
       io.mapOptional("TransferFunctionCandidates",
                      YamlConfig.TransferFunctionCandidates);
-      io.mapRequired("TemporalAnalysisEnabled", YamlConfig.TemporalAnalysisEnabled);
+      io.mapOptional("TemporalAnalysisEnabled",
+                     YamlConfig.TemporalAnalysisEnabled, false);
       if (YamlConfig.PassMode == hakc::RunCompartmentalization) {
         io.mapRequired("Database", YamlConfig.DatabaseConfig);
       } else {
         io.mapOptional("Database", YamlConfig.DatabaseConfig);
       }
-      if (YamlConfig.PassMode == hakc::RunDataAccessGraphAnalysisSingleSourceFile) {
+      if (YamlConfig.PassMode ==
+          hakc::RunDataAccessGraphAnalysisSingleSourceFile) {
         io.mapRequired("SingleSourceFile", YamlConfig.SingleSourceFile);
-      }
-      else {
+      } else {
         io.mapOptional("SingleSourceFile", YamlConfig.SingleSourceFile);
       }
     } else if (YamlConfig.TestMode == hakc::TestModeDefault) {
@@ -479,8 +481,10 @@ template <> struct yaml::MappingTraits<hakc::HAKCYamlConfig> {
       io.mapOptional("IgnoredTypes", YamlConfig.IgnoredTypes);
       io.mapOptional("IgnoredGlobals", YamlConfig.IgnoredGlobals);
       io.mapOptional("AllocationFunctions", YamlConfig.AllocationFunctions);
-      io.mapOptional("ConsoleLogLevel", YamlConfig.ConsoleLogLevel, hakc::HAKCLogLevel::Debug);
-      io.mapOptional("FileLogLevel", YamlConfig.FileLogLevel, hakc::HAKCLogLevel::Debug);
+      io.mapOptional("ConsoleLogLevel", YamlConfig.ConsoleLogLevel,
+                     hakc::HAKCLogLevel::Debug);
+      io.mapOptional("FileLogLevel", YamlConfig.FileLogLevel,
+                     hakc::HAKCLogLevel::Debug);
       io.mapOptional("DebugDatabase", YamlConfig.DebugDatabase, false);
       io.mapOptional("DebugOutputSymbols", YamlConfig.PassDebugSymbols);
       io.mapOptional("PerCPUCompartmentTransferFunction",

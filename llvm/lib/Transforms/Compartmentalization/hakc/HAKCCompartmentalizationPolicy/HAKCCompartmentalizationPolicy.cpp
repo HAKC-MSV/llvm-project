@@ -422,7 +422,7 @@ HAKCCompartmentalizationPolicy::Execute(StringRef Endpoint,
   auto milliseconds_since_epoch =
       std::chrono::duration_cast<std::chrono::milliseconds>(
           currentTime.time_since_epoch());
-  CommonHAKCAnalysis::getLogger(Fatal)
+  CommonHAKCAnalysis::getLogger(Debug)
       << milliseconds_since_epoch.count() << " "
       << "Executing command \n";
 
