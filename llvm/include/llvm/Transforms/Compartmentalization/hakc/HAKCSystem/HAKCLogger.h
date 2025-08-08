@@ -27,7 +27,11 @@ public:
   iterator_range<SmallVector<std::shared_ptr<HAKCWriter>>::iterator> Streams();
 };
 
-template <typename T, std::enable_if_t<!std::is_integral_v<T>> * = nullptr>
+template <
+    typename T,
+    std::enable_if_t<!std::is_integral_v<T> && !std::is_same_v<T, StringRef> &&
+                     !std::is_same_v<T, std::string> &&
+                     !std::is_same_v<T, const std::string>> * = nullptr>
 HAKCLogger &operator<<(HAKCLogger &Logger, T &T_) {
   for (std::shared_ptr<HAKCWriter> &stream : Logger.Streams()) {
     if (!Logger.IsDisabled() &&
@@ -48,22 +52,16 @@ template <typename T> HAKCLogger &operator<<(HAKCLogger &Logger, T *T_) {
   return Logger;
 }
 
-template <typename T, std::enable_if_t<std::is_integral_v<T>> * = nullptr>
+template <
+    typename T,
+    std::enable_if_t<std::is_integral_v<T> || std::is_same_v<T, StringRef> ||
+                     std::is_same_v<T, std::string> ||
+                     std::is_same_v<T, const std::string>> * = nullptr>
 HAKCLogger &operator<<(HAKCLogger &Logger, T T_) {
   for (std::shared_ptr<HAKCWriter> &stream : Logger.Streams()) {
     if (!Logger.IsDisabled() &&
         (Logger.GetLogLevel() >= stream->GetConfiguredLogLevel())) {
       *stream << T_;
-    }
-  }
-  return Logger;
-}
-
-inline HAKCLogger &operator<<(HAKCLogger &Logger, const StringRef S) {
-  for (std::shared_ptr<HAKCWriter> &stream : Logger.Streams()) {
-    if (!Logger.IsDisabled() &&
-        (Logger.GetLogLevel() >= stream->GetConfiguredLogLevel())) {
-      *stream << S;
     }
   }
   return Logger;

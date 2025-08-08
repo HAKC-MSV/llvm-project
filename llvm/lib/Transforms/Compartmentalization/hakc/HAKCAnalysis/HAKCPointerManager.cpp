@@ -253,7 +253,7 @@ bool HAKCPointerManager::ManageNewPointer(Use &U) {
   }
   CurrentPointerID++;
   GetLogger(Verbose, !DebugActive)
-      << "Starting the management of pointer " << std::to_string(NextID)
+      << "Starting the management of pointer " << NextID
       << " with BaseDefinition " << BaseDefinition << "\n";
   ManagedPointersList.push_back(ManagedPointer);
   AnalyzedUses.clear();

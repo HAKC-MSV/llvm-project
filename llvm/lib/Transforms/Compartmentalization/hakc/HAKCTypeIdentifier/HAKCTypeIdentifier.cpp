@@ -360,13 +360,13 @@ HAKCTypeIdentifier::GetLLVMFunctionTy(const DISubroutineType *FunctionTy) {
   if (TyArray[0]) {
     ReturnTy = GetLLVMType(TyArray[0]);
     if (!ReturnTy) {
-      CommonHAKCAnalysis::getLogger(Error)
+      CommonHAKCAnalysis::getLogger(Debug)
           << "Could not find Return Type " << TyArray[0] << "\n";
       return nullptr;
     }
   }
   if (!FunctionType::isValidReturnType(ReturnTy)) {
-    CommonHAKCAnalysis::getLogger(Error)
+    CommonHAKCAnalysis::getLogger(Debug)
         << "Type " << ReturnTy << " is not a valid return type\n";
     return nullptr;
   }
