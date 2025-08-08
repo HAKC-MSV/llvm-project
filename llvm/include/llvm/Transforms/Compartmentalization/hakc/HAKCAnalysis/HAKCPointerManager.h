@@ -7,7 +7,7 @@
 
 #include "ManagedHAKCPointer.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartmentalizationPolicy.h"
-#include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCWriter.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCLogger.h"
 #include <memory>
 
 namespace llvm::hakc {

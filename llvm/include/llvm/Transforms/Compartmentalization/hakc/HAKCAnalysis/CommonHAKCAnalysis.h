@@ -8,6 +8,7 @@
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartmentalizationPolicy.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCSystemInformation.h"
 
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCLogger.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCWriter.h"
 #include <map>
 
@@ -36,12 +37,11 @@ protected:
   void InitConfig(StringRef ConfigPath);
 
 public:
-
   bool abort = false;
 
   virtual ~CommonHAKCAnalysis() = default;
 
-  std::shared_ptr<HAKCLogger> get(){ return _HAKCLog; }
+  std::shared_ptr<HAKCLogger> get() { return _HAKCLog; }
 
   // explicit CommonHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM,
   //                             StringRef ConfigPath, HAKCWriter &HAKC_Writer);
@@ -104,7 +104,8 @@ public:
   bool functionIsTransferCandidate(Function *F,
                                    HAKCCompartmentalizationPolicy &Policy);
 
-  static HAKCLogger &getLogger(HAKCLogLevel log_level, bool suppress_output = false);
+  static HAKCLogger &getLogger(HAKCLogLevel log_level,
+                               bool suppress_output = false);
 
   FunctionType *GetDataAuthenticationFunctionType(Module &M,
                                                   unsigned AddrSpace = 0);

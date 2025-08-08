@@ -380,12 +380,12 @@ HAKCTypeIdentifier::GetLLVMFunctionTy(const DISubroutineType *FunctionTy) {
     }
     auto *Ty = GetLLVMType(TyArray[i]);
     if (!Ty) {
-      CommonHAKCAnalysis::getLogger(Error)
+      CommonHAKCAnalysis::getLogger(Debug)
           << "Could not find LLVM Type for " << TyArray[i] << "\n";
       return nullptr;
     }
     if (!FunctionType::isValidArgumentType(Ty)) {
-      CommonHAKCAnalysis::getLogger(Error)
+      CommonHAKCAnalysis::getLogger(Debug)
           << "Type " << Ty << " for DIType " << TyArray[i]
           << " is not a valid argument type\n";
       return nullptr;
@@ -615,7 +615,7 @@ HAKCTypeIdentifier::HandleFunction(const DISubprogram *SubProg) {
   }
 
   if (!F) {
-    CommonHAKCAnalysis::getLogger(Error)
+    CommonHAKCAnalysis::getLogger(Debug)
         << "\nCould not find Function " << SubProg->getName() << "\n";
     return nullptr;
   }
@@ -910,7 +910,7 @@ void HAKCTypeIdentifier::CreateIndirectCallSourceLink(
 
     CreateIndirectCallSourceLink(CallI->getCalledOperand(), Path);
   } else {
-    CommonHAKCAnalysis::getLogger(Error)
+    CommonHAKCAnalysis::getLogger(Debug)
         << "Unhandled Link type: " << V << "\n";
   }
 }
@@ -1371,7 +1371,7 @@ HAKCTypeP HAKCTypeIdentifier::FindTypeFromDebug(const DbgVariableRecord &DVR,
       << " and DITy " << *DITy;
   if (auto *I = dyn_cast<Instruction>(V)) {
     if (I->getDebugLoc() && I->getDebugLoc().get()) {
-      CommonHAKCAnalysis::getLogger(Debug) << " at " << I->getDebugLoc();
+      CommonHAKCAnalysis::getLogger(Debug) << " at " << I->getDebugLoc().get();
     }
   }
   CommonHAKCAnalysis::getLogger(Verbose) << "\n";
@@ -1818,13 +1818,13 @@ exit:
         << "Found HAKCTypeInfo\n"
         << *FoundType << "\nfor " << V << "\n";
   } else {
-    CommonHAKCAnalysis::getLogger(Error)
+    CommonHAKCAnalysis::getLogger(Debug)
         << "Cound not find HAKCTypeInfo for " << V << "\n";
     if (auto *I = dyn_cast<Instruction>(V)) {
       auto DebugLoc = I->getDebugLoc();
       if (DebugLoc && DebugLoc.get()) {
-        CommonHAKCAnalysis::getLogger(Error)
-            << " with a DebugLoc " << DebugLoc << "\n";
+        CommonHAKCAnalysis::getLogger(Debug)
+            << " with a DebugLoc " << *DebugLoc.get() << "\n";
       }
     }
   }

@@ -679,7 +679,7 @@ void HAKCTransformer::ValidateHAKCPointer(const HAKCPointerBase &HAKCPointer) {
       CommonHAKCAnalysis::getLogger(Fatal)
           << "in Function " << I->getFunction()->getName();
       if (DebugLoc && DebugLoc.get()) {
-        CommonHAKCAnalysis::getLogger(Fatal) << " at " << DebugLoc;
+        CommonHAKCAnalysis::getLogger(Fatal) << " at " << DebugLoc.get();
       }
       CommonHAKCAnalysis::getLogger(Fatal) << "\n";
     }
