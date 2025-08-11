@@ -1423,20 +1423,6 @@ HAKCTypeP HAKCTypeIdentifier::FindTypeFromDebug(const DbgVariableRecord &DVR,
                 << " at offset " << CurrentOffset << "\n";
           }
           break;
-        } else if (CompositeMember->getOffsetInBits() > CurrentOffset) {
-          CurrentOffset -= PreviousTy->getOffsetInBits();
-          auto *StrippedTy =
-              HAKCTypeInfo::StripTypeModifiers(PreviousTy->getBaseType());
-
-          restart = isa_and_nonnull<DICompositeType>(StrippedTy);
-          if (restart) {
-            CompositeTy = dyn_cast<DICompositeType>(StrippedTy);
-            CommonHAKCAnalysis::getWriter(
-                AnalysisHelper.GetSystemInfo().OutputDebugInfo())
-                << "Restarting analysis with new type " << *CompositeTy
-                << " at offset " << CurrentOffset << "\n";
-          }
-          break;
         } else {
           PreviousTy = CompositeMember;
         }
