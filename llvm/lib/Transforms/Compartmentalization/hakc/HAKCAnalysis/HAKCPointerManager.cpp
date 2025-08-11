@@ -214,12 +214,6 @@ bool HAKCPointerManager::ManageNewPointer(Use &U) {
 
   auto ManagedPointer =
       std::make_shared<ManagedHAKCPointer>(BaseDefinition, *this, NextID);
-  if (NextID == 5 &&
-      HAKCAnalysis.GetFunction().getName() == "__se_sys_move_pages") {
-    CommonHAKCAnalysis::getWriter(DebugActive)
-        << "Found " << *ManagedPointer << "\n"
-        << PointerIsEligibleForManagement(U) << "\n";
-  }
   HAKCAnalysis.GetModuleAnalysis().GetTypeIdentifier().FindType(
       *ManagedPointer);
   if (ManagedPointer->GetType() && ManagedPointer->GetType()->IsIgnoredType()) {
