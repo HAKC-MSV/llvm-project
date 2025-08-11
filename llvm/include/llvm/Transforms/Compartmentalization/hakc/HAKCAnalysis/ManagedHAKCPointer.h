@@ -149,7 +149,6 @@ protected:
    */
   Value *ProtectedPointer;
 
-  bool DebugActive;
   HAKCPointerManager &Manager;
 
   bool BaseIsAuthenticated;
@@ -189,7 +188,7 @@ protected:
 
   bool ComputeBasePointerAuthenticated();
 
-  void GetAllUses(SmallVectorImpl<ManagedHAKCPointerUseP> &Result) const;
+
 
   void SetProtectedPointer(Value *NewProtectedPointer);
 
@@ -216,6 +215,8 @@ public:
   ManagedHAKCPointer(Value *Pointer, HAKCPointerManager &Manager, unsigned ID);
 
   ~ManagedHAKCPointer() = default;
+
+  void GetAllUses(SmallVectorImpl<ManagedHAKCPointerUseP> &Result) const;
 
   Value *GetProtectedPointer() const;
 

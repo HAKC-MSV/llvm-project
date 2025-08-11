@@ -1,0 +1,120 @@
+!HAKCCompartmentalization
+directed: true
+division_count: 16
+edges:
+- key: IsType
+  persisted: true
+  source: &id001 !HAKCFunction
+    DefiningFile: @HAKC_TEST_DIR@/hakc_temporal_test0.c
+    DefiningLine: 10
+    Name: node_entry
+    is_function: true
+    symbol_hash: 6e33dc681a4eed82
+  target: &id006 !HAKCType
+    DebugType: void (int, int)
+    LLVMType: void (i32, i32)
+    type_hash: cae8ce96f799d183
+- key: HasScope
+  persisted: true
+  source: *id001
+  target: &id007 !HAKCScope
+    LocalScopeName: global
+    Scope: global
+    scope_hash: 8001c27439650c5c
+- key: UsedInCompilationUnit
+  persisted: true
+  source: *id001
+  target: &id002 !HAKCCompilationUnit
+    filename: @HAKC_TEST_DIR@/hakc_temporal_test0.c
+- key: DefinedIn
+  line: 10
+  persisted: true
+  source: *id001
+  target: *id002
+- key: UsesSymbol
+  persisted: true
+  source: *id001
+  target: &id003 !HAKCFunction
+    DefiningFile: null
+    DefiningLine: null
+    Name: node_exit
+    is_function: true
+    symbol_hash: dc7afdd1af3ca13f
+- key: DirectCall
+  persisted: true
+  source: *id001
+  target: *id003
+- key: DagEdge
+  persisted: true
+  source: *id001
+  target: *id003
+  weight: 2
+- key: InDivision
+  persisted: true
+  source: *id001
+  target: &id004 !HAKCDivision
+    AccessToken: 73728
+    DivisionID: 13
+    division_hash: be7396225c569ba9
+- key: IsType
+  persisted: true
+  source: *id003
+  target: &id008 !HAKCType
+    DebugType: '@UNKNOWN@'
+    LLVMType: void (...)
+    type_hash: e3330f59d2fefa57
+- key: HasScope
+  persisted: true
+  source: *id003
+  target: &id009 !HAKCScope
+    LocalScopeName: @HAKC_TEST_DIR@/hakc_temporal_test0.c
+    Scope: local
+    scope_hash: 880c71e15f4d591b
+- key: UsedInCompilationUnit
+  persisted: true
+  source: *id003
+  target: *id002
+- key: InDivision
+  persisted: true
+  source: *id003
+  target: &id005 !HAKCDivision
+    AccessToken: 139264
+    DivisionID: 13
+    division_hash: 4af868d68ac647bc
+- key: InCompartment
+  persisted: true
+  source: *id004
+  target: &id010 !HAKCCompartment
+    CompartmentID: 1
+    EntryToken: 73728
+- key: InCompartment
+  persisted: true
+  source: *id005
+  target: &id011 !HAKCCompartment
+    CompartmentID: 2
+    EntryToken: 139264
+graph: {}
+multigraph: true
+nodes:
+- id: *id001
+  persisted: true
+- id: *id006
+  persisted: true
+- id: *id007
+  persisted: true
+- id: *id002
+  persisted: true
+- id: *id003
+  persisted: true
+- id: *id008
+  persisted: true
+- id: *id009
+  persisted: true
+- id: *id004
+  persisted: true
+- id: *id010
+  persisted: true
+- id: *id005
+  persisted: true
+- id: *id011
+  persisted: true

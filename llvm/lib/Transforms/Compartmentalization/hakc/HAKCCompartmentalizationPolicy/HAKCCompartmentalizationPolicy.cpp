@@ -11,6 +11,39 @@
 #include <unistd.h>
 
 namespace llvm::hakc {
+
+HAKCCompartmentalizationPolicyDAG::HAKCCompartmentalizationPolicyDAG(
+    HAKCSystemInformation &SystemInformation)
+    : HAKCCompartmentalizationPolicy(SystemInformation), GV_to_divs({}),
+      GV_to_div_incr(0) {}
+
+HAKCCompartmentDivision &
+HAKCCompartmentalizationPolicyDAG::GetDivision(GlobalValue *GV) {
+  // TODO: make a proper Null hakccompartmentdivision and hakccompartment
+  // used in dag analysis; always put each symbol in its own compartment (but
+  // all in the same division)
+  if (!GV_to_divs.contains(GV)) {
+    LLVMContext &ctx = SystemInformation.GetModule().getContext();
+    unsigned CompartmentID = GV_to_div_incr;
+    std::shared_ptr<HAKCCompartmentDivision> Division =
+        std::make_shared<HAKCCompartmentDivision>(
+            HAKCCompartment(CompartmentID, 0, ctx), 0, 0, ctx);
+    GV_to_divs[GV] = Division;
+    GV_to_div_incr++;
+  }
+
+  return *GV_to_divs[GV];
+}
+
+HAKCCompartmentDivision &
+HAKCCompartmentalizationPolicyDAG::GetDefaultDivision() {
+  LLVMContext &ctx = SystemInformation.GetModule().getContext();
+  std::shared_ptr<HAKCCompartmentDivision> Division =
+      std::make_shared<HAKCCompartmentDivision>(HAKCCompartment(0, 0, ctx), 0,
+                                                0, ctx);
+  return *Division;
+}
+
 HAKCDatabaseRequest::HAKCDatabaseRequest(StringRef Endpoint,
                                          json::Object &Parameters)
     : Request(nullptr) {
@@ -57,7 +90,7 @@ ssize_t HAKCDatabaseResponse::ReadFromSocket(raw_socket_stream &OS, void *Dest,
   auto duration = end.getWallTime() - start.getWallTime();
 
   if (OS.has_error()) {
-    CommonHAKCAnalysis::getWriter(true)
+    CommonHAKCAnalysis::getLogger(Fatal)
         << "There was an error reading " << Size
         << " bytes from the policy server socket: " << OS.error().message()
         << "\nThe duration was " << duration << "\n";
@@ -71,25 +104,15 @@ void HAKCDatabaseResponse::operator<<(raw_socket_stream &OS) {
   Response = "";
   ssize_t ResponseSize = 0;
 
-  try {
-    ReadFromSocket(OS, &ResponseSize, sizeof(ResponseSize));
-  } catch (std::exception &E) {
-    CommonHAKCAnalysis::getWriter(true) << "Read 1: " << E.what() << "\n";
-    throw E;
-  }
+  ReadFromSocket(OS, &ResponseSize, sizeof(ResponseSize));
   Response.resize(ResponseSize);
-  try {
-    auto LastReadSize = ReadFromSocket(OS, Response.data(), ResponseSize);
-    Success = LastReadSize > 0 && ResponseSize == LastReadSize;
-  } catch (std::exception &E) {
-    CommonHAKCAnalysis::getWriter(true) << "Read 2: " << E.what() << "\n";
-    throw E;
-  }
+  auto LastReadSize = ReadFromSocket(OS, Response.data(), ResponseSize);
+  Success = LastReadSize > 0 && ResponseSize == LastReadSize;
 }
 
 HAKCDatabaseConnection::HAKCDatabaseConnection(
-    const HAKCDatabaseInformation &DatabaseInformation, bool Debug)
-    : Socket(nullptr), DatabaseInformation(DatabaseInformation), Debug(Debug) {}
+    const HAKCDatabaseInformation &DatabaseInformation, bool debug)
+    : Socket(nullptr), DatabaseInformation(DatabaseInformation), debug(debug) {}
 
 HAKCDatabaseResponse HAKCDatabaseConnection::HandleRequest(
     const HAKCDatabaseRequest &Request) const {
@@ -129,11 +152,13 @@ void HAKCDatabaseConnection::connect() {
          * Expected object to be properly destructed. llvm::toString does
          * this.
          */
-        CommonHAKCAnalysis::getWriter(Debug)
+        CommonHAKCAnalysis::getLogger(Debug)
             << "Error connecting to " << DatabaseInformation.GetServerURL()
             << ": " << llvm::toString(NewConnection.takeError()) << "\n";
         throw std::exception();
       }
+      CommonHAKCAnalysis::getLogger(Debug)
+          << "Connected to " << DatabaseInformation.GetServerURL() << "\n";
       Socket = std::move(*NewConnection);
       break;
     } catch (...) {
@@ -146,7 +171,7 @@ void HAKCDatabaseConnection::connect() {
   }
 
   if (!CheckConnection()) {
-    CommonHAKCAnalysis::getWriter(true)
+    CommonHAKCAnalysis::getLogger(Fatal)
         << "Could not connect to " << DatabaseInformation.GetServerURL()
         << "\n";
     throw std::exception();
@@ -156,10 +181,12 @@ void HAKCDatabaseConnection::connect() {
 HAKCCompartmentalizationPolicy::HAKCCompartmentalizationPolicy(
     HAKCSystemInformation &SystemInformation)
     : SystemInformation(SystemInformation), Compartments(), Divisions(),
-      Client(SystemInformation.GetDatabaseInformation(),
-             SystemInformation.OutputDebugInfo()),
+      Client(SystemInformation.GetDatabaseInformation(), false),
       SymbolDivisionMap() {
-  ConnectToDatabase();
+  // no need to connect to database if doing purely analysis
+  if (SystemInformation.GetPassMode() == RunCompartmentalization) {
+    ConnectToDatabase();
+  }
 }
 
 HAKCCompartmentalizationPolicy::~HAKCCompartmentalizationPolicy() {
@@ -171,7 +198,7 @@ void HAKCCompartmentalizationPolicy::DisconnectFromDatabase() {
 }
 
 void HAKCCompartmentalizationPolicy::ConnectToDatabase() {
-  CommonHAKCAnalysis::getWriter(SystemInformation.OutputDebugInfo())
+  CommonHAKCAnalysis::getLogger(Debug)
       << "Connecting to "
       << SystemInformation.GetDatabaseInformation().GetServerURL() << "\n";
   Client.connect();
@@ -179,7 +206,7 @@ void HAKCCompartmentalizationPolicy::ConnectToDatabase() {
 
 void HAKCCompartmentalizationPolicy::CheckConnection() const {
   if (!Client) {
-    CommonHAKCAnalysis::getWriter(true) << "Client is unavailable\n";
+    CommonHAKCAnalysis::getLogger(Fatal) << "Client is unavailable\n";
     throw std::exception();
   }
 }
@@ -200,7 +227,7 @@ HAKCCompartmentalizationPolicy::GetDivision(GlobalValue *GV) {
   // compartment_id, entry_token)
   auto HAKCSymbol = SystemInformation.GetTypeIdentifier().FindSymbol(GV, true);
   if (!HAKCSymbol) {
-    CommonHAKCAnalysis::getWriter(SystemInformation.OutputDebugInfo())
+    CommonHAKCAnalysis::getLogger(Debug)
         << "Could not find HAKCSymbol for " << GV << "\n";
     return GetDefaultDivision();
   }
@@ -210,7 +237,7 @@ HAKCCompartmentalizationPolicy::GetDivision(GlobalValue *GV) {
   }
 
   std::string ObjectYaml;
-  llvm::raw_string_ostream os(ObjectYaml);
+  raw_string_ostream os(ObjectYaml);
   os << *HAKCSymbol;
   json::Object Parameters({{"object", ObjectYaml}});
   auto ResponseData = Execute(
@@ -218,38 +245,38 @@ HAKCCompartmentalizationPolicy::GetDivision(GlobalValue *GV) {
       Parameters);
   auto DivisionYAML = ResponseData.getObject("Division");
   if (!DivisionYAML) {
-    CommonHAKCAnalysis::getWriter(true)
+    CommonHAKCAnalysis::getLogger(Fatal)
         << "Invalid Response for " << *GV << "\n";
     throw std::exception();
   }
   auto CompartmentYAML = ResponseData.getObject("Compartment");
   if (!CompartmentYAML) {
-    CommonHAKCAnalysis::getWriter(true)
+    CommonHAKCAnalysis::getLogger(Fatal)
         << "Invalid Response for " << *GV << "\n";
     throw std::exception();
   }
 
   auto DivisionID = DivisionYAML->getInteger("DivisionID");
   if (!DivisionID.has_value()) {
-    CommonHAKCAnalysis::getWriter(true)
+    CommonHAKCAnalysis::getLogger(Fatal)
         << "Could not get DivisionID for " << *GV << "\n";
     throw std::exception();
   }
   auto DivisionAccessToken = DivisionYAML->getInteger("AccessToken");
   if (!DivisionAccessToken.has_value()) {
-    CommonHAKCAnalysis::getWriter(true)
+    CommonHAKCAnalysis::getLogger(Fatal)
         << "Received No Entry Token for " << *GV << "\n";
     throw std::exception();
   }
   auto CompartmentID = CompartmentYAML->getInteger("CompartmentID");
   if (!CompartmentID.has_value()) {
-    CommonHAKCAnalysis::getWriter(true)
+    CommonHAKCAnalysis::getLogger(Fatal)
         << "Could not find CompartmentID for " << *GV << "\n";
     throw std::exception();
   }
   auto EntryToken = CompartmentYAML->getInteger("EntryToken");
   if (!EntryToken.has_value()) {
-    CommonHAKCAnalysis::getWriter(true)
+    CommonHAKCAnalysis::getLogger(Fatal)
         << "Received No Entry Token for " << *GV << "\n";
     throw std::exception();
   }
@@ -265,8 +292,7 @@ HAKCCompartmentalizationPolicy::GetDivision(GlobalValue *GV) {
   return *Division;
 }
 
-hakc::HAKCCompartmentDivision &
-HAKCCompartmentalizationPolicy::GetDefaultDivision() {
+HAKCCompartmentDivision &HAKCCompartmentalizationPolicy::GetDefaultDivision() {
   return *GetDivision(0, 0);
 }
 
@@ -288,7 +314,7 @@ HAKCDivisionP HAKCCompartmentalizationPolicy::GetDivision(
               Parameters);
   auto DivisionAccessToken = ResponseData.getInteger("AccessToken");
   if (!DivisionAccessToken.has_value()) {
-    CommonHAKCAnalysis::getWriter(true)
+    CommonHAKCAnalysis::getLogger(Fatal)
         << "Received No Entry Token for Division " << DivisionID << "\n";
     throw std::exception();
   }
@@ -319,7 +345,7 @@ HAKCCompartmentP HAKCCompartmentalizationPolicy::GetCompartment(
       Parameters);
   auto EntryToken = ResponseData.getInteger("EntryToken");
   if (!EntryToken.has_value()) {
-    CommonHAKCAnalysis::getWriter(true)
+    CommonHAKCAnalysis::getLogger(Fatal)
         << "Received No Entry Token for Compartment " << CompartmentID << "\n";
     throw std::exception();
   }
@@ -344,7 +370,13 @@ void HAKCCompartmentalizationPolicy::GetValidTargets(
   auto ValidTargets = ResponseData.getArray("ValidTargets");
   RetrievedTargetCompartments.insert(CompartmentID);
   if (!ValidTargets) {
-    CommonHAKCAnalysis::getWriter(SystemInformation.OutputDebugInfo())
+    auto currentTime = std::chrono::system_clock::now();
+    auto milliseconds_since_epoch =
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            currentTime.time_since_epoch());
+    // std::time_t c_time = std::chrono::system_clock::to_time_t(currentTime);
+    CommonHAKCAnalysis::getLogger(Debug)
+        << milliseconds_since_epoch.count() << " "
         << "No ValidTargets found for CompartmentID: " << CompartmentID << "\n";
     return;
   }
@@ -376,19 +408,41 @@ HAKCCompartmentP HAKCCompartmentalizationPolicy::CreateCompartment(
 json::Object
 HAKCCompartmentalizationPolicy::Execute(StringRef Endpoint,
                                         json::Object &Parameters) const {
+  auto currentTime = std::chrono::system_clock::now();
+  auto milliseconds_since_epoch =
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          currentTime.time_since_epoch());
+  CommonHAKCAnalysis::getLogger(Debug)
+      << milliseconds_since_epoch.count() << " "
+      << "Executing command \n";
+
   CheckConnection();
   HAKCDatabaseRequest Request(Endpoint, Parameters);
   auto Response = Client.HandleRequest(Request);
   if (!Response) {
-    CommonHAKCAnalysis::getWriter(true)
+    CommonHAKCAnalysis::getLogger(Fatal)
         << "Error Handling Request to " << Endpoint << "\n";
     throw std::exception();
   }
   auto ParsedJson = Response.GetJSON();
   if (auto E = ParsedJson.takeError()) {
-    CommonHAKCAnalysis::getWriter(true)
+    CommonHAKCAnalysis::getLogger(Fatal)
         << "Error Parsing JSON: " << llvm::toString(std::move(E)) << "\n";
     throw std::exception();
+  }
+  for (auto pair : *ParsedJson->getAsObject()) {
+    if (pair.getFirst() == "TERMINATING CONNECTION") {
+      auto currentTime = std::chrono::system_clock::now();
+      auto milliseconds_since_epoch =
+          std::chrono::duration_cast<std::chrono::milliseconds>(
+              currentTime.time_since_epoch());
+      CommonHAKCAnalysis::getLogger(Fatal)
+          << milliseconds_since_epoch.count() << " "
+          << "Unrecoverable error on Policy Server; terminating connection!\n";
+
+      throw std::runtime_error(
+          "Unrecoverable error on Policy Server; terminating connection!\n");
+    }
   }
   auto Obj = ParsedJson->getAsObject();
   return *Obj;

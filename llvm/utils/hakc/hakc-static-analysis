@@ -10,7 +10,11 @@ import multiprocessing as mp
 import os
 import pstats
 import shutil
+import sys
 import time
+import networkx as nx
+from networkx.drawing.nx_pydot import to_pydot
+
 
 import yaml
 
@@ -18,7 +22,10 @@ from hakc.HAKCCompartmentalization import HAKCCompartmentalization
 from hakc.HAKCDatabase import HAKCDatabase
 from hakc.HAKCLogger import LoggingLevelEnum, parse_log_level, setup_logging, HAKCLogger
 from hakc.HAKCObjects import HAKCSymbol, HAKCFunction, HAKCGlobalVariable, \
-    HAKCCompartment, HAKCDivision, HAKCCompilationUnit, HAKCCompartmentalizationAdjustment
+    HAKCCompartment, HAKCDivision, HAKCCompilationUnit, HAKCCompartmentalizationAdjustment, HAKCType
+
+import matplotlib.pyplot as plt
+from networkx.drawing.nx_agraph import graphviz_layout
 
 logging.setLoggerClass(HAKCLogger)
 
@@ -33,25 +40,36 @@ def batched(iterable, n):
         yield batch
 
 
-def parse_yaml(filename: str):
+
+def parse_yaml(filename: str, debug = False):
+    # parse_yaml needed here instead of in compartmentalization for use in multithreading
     with open(filename, 'rb') as f:
         parsed_yaml = yaml.load(f, Loader=yaml.Loader)
-        compilation_unit = parsed_yaml["CU"]
         functions = parsed_yaml['functions'] if 'functions' in parsed_yaml else list()
         global_variables = parsed_yaml['globals'] if 'globals' in parsed_yaml else list()
-    return compilation_unit, functions, global_variables
 
+    if debug:
+        print(f"debugging yaml parsing of {filename}")
+        for global_variable in global_variables:
+            assert(isinstance(global_variable, HAKCGlobalVariable))
+            print(HAKCGlobalVariable.debug_print(global_variable))
+        for function in functions:
+            assert(isinstance(function, HAKCFunction))
+            print(HAKCFunction.debug_print(function))
 
+    return functions, global_variables
+
+#
 def compute_dag_edge_weight(**kwargs) -> int:
     edge_weight = 0
 
-    if kwargs.get(HAKCFunction.DirectCallTable, False):
+    if kwargs.get(HAKCFunction.relation_indirect_calls, False):
         edge_weight += 1
 
-    if kwargs.get(HAKCSymbol.UsesSymbolTable, False):
+    if kwargs.get(HAKCFunction.relation_direct_calls, False):
         edge_weight += 1
 
-    if kwargs.get(HAKCFunction.IndirectCallTable, False):
+    if kwargs.get(HAKCSymbol.relation_symbol, False):
         edge_weight += 1
 
     return edge_weight
@@ -99,22 +117,13 @@ def compute_dag_edges_for_symbol(symbol_hashes):
     return results
 
 
-def add_symbols(compartmentalization: HAKCCompartmentalization, compilation_unit: str, functions: set[HAKCFunction],
-                global_variables: set[HAKCGlobalVariable]):
-    cu = HAKCCompilationUnit(filename=compilation_unit)
-    for func in functions:
-        compartmentalization.add_symbol(func, cu)
-    for glob in global_variables:
-        compartmentalization.add_symbol(glob, cu)
-
-
 def create_dag_single_thread(files: set[str], conn: HAKCDatabase) -> HAKCCompartmentalization:
     compartmentalization = HAKCCompartmentalization()
     for filename in logger.progress_bar(iterable=sorted(files), desc='Parsing YAML'):
-        compilation_unit, functions, global_variables = parse_yaml(filename)
+        functions, global_variables = parse_yaml(filename, True)
         logger.debug(
-            f'{compilation_unit} found {len(functions)} functions and {len(global_variables)} globals')
-        add_symbols(compartmentalization, compilation_unit, functions, global_variables)
+            f'{filename} found {len(functions)} functions and {len(global_variables)} globals')
+        compartmentalization.add_symbols(functions, global_variables)
 
     compartmentalization.persist_to_database(conn, create_schema=True)
     dag_edges = dict()
@@ -126,12 +135,12 @@ def create_dag_single_thread(files: set[str], conn: HAKCDatabase) -> HAKCCompart
                 dag_edges[head_hash] = dict()
             dag_edges[head_hash][tail_hash] = dag_edge_weight
             tail_symbol = compartmentalization.get_symbol_by_hash(tail_hash)
-            compartmentalization.add_dag_edge(symbol, tail_symbol, dag_edge_weight=dag_edge_weight, add_nodes=False)
+            compartmentalization.add_dag_edge(symbol, tail_symbol, dag_edge_weight=dag_edge_weight)
             dag_edges_added += 1
     logger.info(f'Adding {dag_edges_added} DAG edges to compartmentalization')
     conn.persist_dag_edges(dag_edges)
     logger.info(f'Adding compartmentalization')
-    add_default_compartmentalization(conn, compartmentalization)
+    compartmentalization.add_default_compartmentalization(conn)
     return compartmentalization
 
 
@@ -148,7 +157,8 @@ def adjust_compartmentalization(db_dir: str, adjustment: HAKCCompartmentalizatio
         compartmentalization.add_division(kernel_division, kernel_compartment)
 
     for symbol in logger.progress_bar(iterable=symbols, desc='Adjusting Compartmentalization'):
-        compartmentalization.add_persistent_node(symbol, already_persisted=True)
+        # TODO: figure out if already_persisted is needed here
+        compartmentalization.add_symbol(symbol, already_persisted=True)
         adjusted_division = adjustment.get_adjusted_compartment(symbol.defining_file)
         if adjusted_division is None:
             adjusted_division = kernel_division
@@ -170,19 +180,83 @@ def adjust_compartmentalization(db_dir: str, adjustment: HAKCCompartmentalizatio
     logger.info(f'Compartmentalization now has {len(divisions)} divisions across {len(compartments)} compartments')
     conn.close()
 
+def node_with_max_edges(graph):
+    """
+    Finds the node with the most edges in a NetworkX graph.
 
-def add_default_compartmentalization(conn: HAKCDatabase, compartmentalization: HAKCCompartmentalization,
-                                     create_schema: bool = False):
-    compartment_id = HAKCCompartmentalization.kernel_compartment_id + 1
-    division_id = HAKCCompartmentalization.default_division
-    symbols = list(compartmentalization.get_symbols())
-    for sym in logger.progress_bar(iterable=symbols, desc='Adding default compartmentalization'):
-        compartment = HAKCCompartment(compartment_id)
-        division = HAKCDivision(division_id, compartment_id)
-        compartmentalization.set_symbol_division(sym, division, compartment)
-        compartment_id += 1
-    compartmentalization.persist_to_database(conn, create_schema=create_schema)
+    Args:
+      graph: A NetworkX graph object.
 
+    Returns:
+      The node with the maximum degree, or None if the graph is empty.
+    """
+    if not graph.nodes:
+        return None
+    return max(graph.degree, key=lambda item: item[1])[0]
+
+def temporal_coalesce(G: HAKCCompartmentalization, conn):
+    # https://networkx.org/documentation/stable/reference/algorithms/traversal.html
+    print(f"!!!Starting temporal coalesce!!!")
+    top_merged_epochs = list()
+    type_subG = {}
+    tys = G.get_types()
+    for ty in tys:
+        tySubG = G.get_type_subgraph(ty)
+        root_subgraphs = tySubG.get_root_subgraphs()
+        type_subG[ty] = dict()
+        for root, subG in root_subgraphs:
+            root_key = root.pretty_print()
+            print(f"Type: {ty} with root_node: {root_key} in subG with {len(subG.nodes)} nodes and {len(subG.edges)} edges")
+            type_subG[ty][root_key] = subG
+            # check that graph has at least one function, or else skip
+            funcs = sum(1 for n in subG.nodes() if isinstance(n, HAKCFunction))
+            if funcs > 1:
+                # Note: use nx.edge_bfs because bfs_successors may miss some nodes on partially traversed trees
+                # Note: Also, don't rely on types in types_used to point to the same object because a copy is implicitly made
+                # Note: Add attributes to the node rather than trying to modify the underlying HAKC object (this seems to do some weird things)
+                # Note: Use edge_bfs instead of bfs_successor because bfs_successor requires a source node which we sometimes don't have
+                # for n in nx.bfs_successors(subG, _main):
+                num_merged_epochs = subG.temporal_coalesce_parent_child(ty, root, conn)
+                top_merged_epochs.append((num_merged_epochs, f"epochs_ty_{ty.debug_type}_root_{root.name}.svg".replace(" ","-")))
+            else:
+                print(f"SubGraph for Type: {ty} has {funcs} <= 1 HAKCFunctions, so skipping graph!")
+    print(f"!!!End temporal coalesce!!!")
+    top_merged_epochs_sorted = sorted(top_merged_epochs, reverse=True)
+    print(f"Files with most merged epochs:")
+    for i in range(min(10, len(top_merged_epochs_sorted))):
+        print(f"{top_merged_epochs_sorted[i][1]} merged {top_merged_epochs_sorted[i][0]} epochs!")
+    print()
+
+def temporal_analysis(db_dir: str, load_dag: str = None):
+
+    logger.info(f'Starting Temporal Analysis')
+    start = time.time()
+    compartmentalization = None
+
+    # TODO: implement load_dag to speed up testing of skbuff.c
+    if load_dag:
+        print(f"Trying to load dag from {load_dag}")
+        with open(load_dag, 'rb') as f:
+            compartmentalization = yaml.load(f, Loader=yaml.Loader)
+        print(compartmentalization)
+        return
+    else:
+        conn = HAKCDatabase(db_dir)
+        compartmentalization = HAKCCompartmentalization()
+        compartmentalization.load_from_db(conn)
+
+    temporal_coalesce(compartmentalization, conn)
+
+    end = time.time()
+
+    logger.info(f'Finished Temporal Analysis!')
+    logger.info(f'        Total Time: {end - start} seconds')
+    logger.info(f'        Type Count: {len(compartmentalization.get_types())}')
+    logger.info(f'      Global Count: {len(compartmentalization.get_global_variables())}')
+    logger.info(f'    Function Count: {len(compartmentalization.get_functions())}')
+    logger.info(f'  DB queries Count: {conn.count_executed_statements}')
+    # compartmentalization.save_graph("loaded_dag.svg")
+    conn.close()
 
 def create_dag_multithread(files: set[str], core_count: int, conn: HAKCDatabase) -> HAKCCompartmentalization:
     logger.info(f'Starting multiprocess DAG creation using {core_count} cores')
@@ -197,10 +271,10 @@ def create_dag_multithread(files: set[str], core_count: int, conn: HAKCDatabase)
                 pbar.update(1)
                 file = futures_to_files[future]
                 try:
-                    compilation_unit, functions, global_variables = future.result()
+                    functions, global_variables = future.result()
                     logger.debug(
-                        f'{compilation_unit} found {len(functions)} functions and {len(global_variables)} globals')
-                    add_symbols(compartmentalization, compilation_unit, functions, global_variables)
+                        f'found {len(functions)} functions and {len(global_variables)} globals')
+                    compartmentalization.add_symbols(functions, global_variables)
                 except Exception as e:
                     logger.error(f'Error parsing {file}: {str(e)}')
 
@@ -237,8 +311,7 @@ def create_dag_multithread(files: set[str], core_count: int, conn: HAKCDatabase)
                                 dag_edges[head_hash] = dict()
                             head_symbol = symbol_hashes[head_hash]
                             tail_symbol = symbol_hashes[tail_hash]
-                            compartmentalization.add_dag_edge(head_symbol, tail_symbol, dag_edge_weight=dag_edge_weight,
-                                                              add_nodes=False)
+                            compartmentalization.add_dag_edge(head_symbol, tail_symbol, dag_edge_weight=dag_edge_weight)
                             dag_edges[head_hash][tail_hash] = dag_edge_weight
                             dag_edges_added += 1
                     except Exception as e:
@@ -252,7 +325,7 @@ def create_dag_multithread(files: set[str], core_count: int, conn: HAKCDatabase)
     conn.open(max_num_threads=core_count)
     conn.persist_dag_edges(dag_edges)
     logger.info(f'Adding compartmentalization')
-    add_default_compartmentalization(conn, compartmentalization)
+    compartmentalization.add_default_compartmentalization(conn)
 
     return compartmentalization
 
@@ -289,9 +362,14 @@ def create_new_dag(analysis_root: str, core_count: int, db_dir: str,
     logger.info(f'    Type Count: {len(compartmentalization.get_types())}')
     logger.info(f'  Global Count: {len(compartmentalization.get_global_variables())}')
     logger.info(f'Function Count: {len(compartmentalization.get_functions())}')
-    conn.close()
+    # TODO: figure out why closing the connection here causes a segfault
+    # conn.close()
+    # logger.info(f'Exiting create_new_dag')
     return compartmentalization
 
+def print_edge_data(G):
+    for edge in G.edges:
+        print(f"Edge: {edge} -> {G.get_edge_data(edge[0], edge[1])}")
 
 def output_profile_stats(profile):
     s = io.StringIO()
@@ -309,6 +387,7 @@ def main():
     parser.add_argument('-l', '--log', default=None, dest='log_path')
     parser.add_argument('--log-mode', default='w', dest='log_mode')
     parser.add_argument('--create-dag', dest='create_dag', action='store_true', help='Create new DAG')
+    parser.add_argument('--temporal-analysis', dest='temporal_analysis_flag', action='store_true', help='Run Temporal Analysis')
     parser.add_argument("--adjust", help='Adjust compartmentalization', action='store_true')
     parser.add_argument('--adjust-path', dest='adjust_path', help='Path to adjustment YAML')
     parser.add_argument('--profile', dest='profile', action='store_true')
@@ -320,6 +399,8 @@ def main():
                         help='Deletes existing database when creating a new compartmentalization', dest='delete_db',
                         default=True)
     parser.add_argument('--dump-dag', dest='dump_dag', help='dump DAG to json')
+    parser.add_argument('--load-dag', dest='load_dag', help='load DAG from json')
+    parser.add_argument('--save-graph', dest='save_g', help='save graph to png')
 
     args = parser.parse_args()
 
@@ -335,6 +416,10 @@ def main():
     if args.profile:
         profile = cProfile.Profile()
 
+    if args.temporal_analysis_flag:
+        temporal_analysis(args.db_dir, args.load_dag)
+        return
+
     if args.create_dag:
         if profile:
             profile.enable()
@@ -342,6 +427,8 @@ def main():
         if profile:
             profile.disable()
             output_profile_stats(profile)
+        if args.save_g:
+            compartmentalization.save_graph(args.save_g)
 
     if args.adjust:
         logger.info(f'Adjusting compartmentalization based on {args.adjust_path}')
@@ -354,8 +441,10 @@ def main():
         logger.info(f'Dumping compartmentalization to {args.dump_dag}')
         with open(args.dump_dag, "w") as f:
             yaml.dump(compartmentalization, f)
+            # yaml.safe_dump(compartmentalization, f)
         logger.info("Done")
 
 
 if __name__ == "__main__":
     main()
+    sys.exit(0)

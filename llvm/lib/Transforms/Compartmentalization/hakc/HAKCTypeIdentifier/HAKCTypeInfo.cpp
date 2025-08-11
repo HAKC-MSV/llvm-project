@@ -192,7 +192,7 @@ bool HAKCTypeInfo::IsPointerToPointer() const {
 
 void HAKCTypeInfo::SetLLVMType(Type *Ty) {
   if (!Ty) {
-    CommonHAKCAnalysis::getWriter(true)
+    CommonHAKCAnalysis::getLogger(Fatal)
         << "Trying to set null LLVM Type for " << GetName() << "\n";
     throw std::exception();
   }
@@ -213,7 +213,7 @@ void HAKCTypeInfo::SetLLVMType(Type *Ty) {
       }
     }
 
-    CommonHAKCAnalysis::getWriter(true)
+    CommonHAKCAnalysis::getLogger(Fatal)
         << "Trying to change LLVM Type for " << GetName() << " from "
         << *LLVMType << " to " << *Ty << "\n";
     throw std::exception();
@@ -238,6 +238,43 @@ std::string HAKCTypeInfo::GetYamlHeader(unsigned int Indents) const {
   }
   sstream << "\"\n";
   sstream.indent(Indents + EntrySpaces()) << "LLVMType: \"";
+  if (LLVMType) {
+    if (auto *StructTy = dyn_cast<StructType>(LLVMType)) {
+      if (StructTy->hasName()) {
+        sstream << StructTy->getName();
+      } else {
+        sstream << *LLVMType;
+      }
+    } else {
+      sstream << *LLVMType;
+    }
+  } else {
+    sstream << UnknownType;
+  }
+  sstream << "\"";
+
+  return Yaml;
+}
+std::string HAKCTypeInfo::GetYamlHeader(unsigned int Indents, unsigned RWX) const {
+  // function to generate HAKCTypePerm yaml
+  std::string Yaml;
+  llvm::raw_string_ostream sstream(Yaml);
+
+  sstream << "!HAKCTypePerm\n";
+  sstream.indent(Indents + EntrySpaces()) << "RWX: " << RWX << "\n";
+  sstream.indent(Indents + EntrySpaces()) << "Type:\n";
+
+  sstream.indent(Indents + EntrySpaces() + 4) << HAKCInfo::GetYamlHeader(Indents + 4);
+
+  sstream << "\n";
+  sstream.indent(Indents + EntrySpaces() + 4) << "DebugType: \"";
+  if (!DbgTypeName.empty()) {
+    sstream << DbgTypeName;
+  } else {
+    sstream << UnknownType;
+  }
+  sstream << "\"\n";
+  sstream.indent(Indents + EntrySpaces() + 4) << "LLVMType: \"";
   if (LLVMType) {
     if (auto *StructTy = dyn_cast<StructType>(LLVMType)) {
       if (StructTy->hasName()) {

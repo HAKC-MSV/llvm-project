@@ -45,7 +45,7 @@ void hakc::HAKCSymbolInfo::GetLocalScopePath(
 
 std::string hakc::HAKCSymbolInfo::GetYamlHeader(unsigned int Indents) const {
   if (!this->Type) {
-    CommonHAKCAnalysis::getWriter(true)
+    CommonHAKCAnalysis::getLogger(Fatal)
         << "Symbol " << GetName() << " has no HAKCType!\n";
     throw std::exception();
   }
@@ -54,32 +54,24 @@ std::string hakc::HAKCSymbolInfo::GetYamlHeader(unsigned int Indents) const {
   llvm::raw_string_ostream sstream(Yaml);
 
   sstream << "\n";
-  if (DefiningLocation) {
-    SmallString<256> PathName;
-    GetTransformedPathName(DefiningLocation, PathName);
-
-    sstream.indent(Indents + EntrySpaces())
-        << "DefiningFile: \"" << PathName << "\"\n";
-    sstream.indent(Indents + EntrySpaces())
-        << "DefiningLine: " << DefiningLine << "\n";
-  }
-  sstream.indent(Indents + EntrySpaces()) << "IsDefinition: ";
-  bool IsDefinition;
-
-  if (auto *Global = dyn_cast<GlobalVariable>(GlobalObj)) {
-    IsDefinition = Global->hasInitializer();
-  } else if (auto *F = dyn_cast<Function>(GlobalObj)) {
-    IsDefinition = !F->isDeclaration();
-  } else {
-    CommonHAKCAnalysis::getWriter(true) << "Unexpected GlobalObj\n";
-    throw std::exception();
-  }
-  if (IsDefinition) {
-    sstream << "true";
-  } else {
-    sstream << "false";
-  }
-  sstream << "\n";
+  // Note: IsDefinition can be inferred by whether there is a HAKCCompilationUnit which points to the source file and line
+  // sstream.indent(Indents + EntrySpaces()) << "IsDefinition: ";
+  // bool IsDefinition;
+  //
+  // if (auto *Global = dyn_cast<GlobalVariable>(GlobalObj)) {
+  //   IsDefinition = Global->hasInitializer();
+  // } else if (auto *F = dyn_cast<Function>(GlobalObj)) {
+  //   IsDefinition = !F->isDeclaration();
+  // } else {
+  //   CommonHAKCAnalysis::getLogger(Error) << "Unexpected GlobalObj\n";
+  //   throw std::exception();
+  // }
+  // if (IsDefinition) {
+  //   sstream << "true";
+  // } else {
+  //   sstream << "false";
+  // }
+  // sstream << "\n";
 
   sstream.indent(Indents + EntrySpaces()) << "Scope:\n";
   sstream.indent(Indents + EntrySpaces() + HAKCInfo::IndentSpaces())
@@ -126,7 +118,7 @@ std::string hakc::HAKCSymbolInfo::GetYaml(unsigned Indents) const {
 
 void hakc::HAKCSymbolInfo::SetGlobalObj(GlobalObject *Global) {
   if (!Global) {
-    CommonHAKCAnalysis::getWriter(true)
+    CommonHAKCAnalysis::getLogger(Fatal)
         << "Trying to set null GlobalVariable\n";
     throw std::exception();
   }
@@ -150,7 +142,7 @@ void hakc::HAKCSymbolInfo::SetLocalScope(const DIScope *Scope) {
 
   if (!(isa<DISubprogram>(LocalScope) || isa<DIFile>(LocalScope) ||
         isa<DICompileUnit>(LocalScope))) {
-    CommonHAKCAnalysis::getWriter(true)
+    CommonHAKCAnalysis::getLogger(Fatal)
         << "Unexpected LocalScope: " << *LocalScope << "\n";
     throw std::exception();
   }

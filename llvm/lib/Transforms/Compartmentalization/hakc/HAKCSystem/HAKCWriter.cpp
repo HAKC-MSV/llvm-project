@@ -8,44 +8,33 @@
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/yaml/HAKCYaml.h"
 
 #include "llvm/BinaryFormat/Dwarf.h"
+#include "llvm/Support/raw_ostream.h"
 
 namespace llvm::hakc {
-HAKCWriter::HAKCWriter() : os(errs()), debug(false) {}
-
-raw_ostream &HAKCWriter::ostream() const { return os; }
-
-void HAKCWriter::SetDebug(bool Debug) { debug = Debug; }
 
 void HAKCWriter::printDIType(const DIType *type, unsigned indents) const {
-  if (!debug) {
-    return;
-  }
-
   if (!type) {
     return;
   }
   for (unsigned i = 0; i < indents; i++) {
-    os << "\t";
+    *os << "\t";
   }
-  os << *type << "\n";
+  *os << *type << "\n";
   if (auto *diDerivedType = dyn_cast<DIDerivedType>(type)) {
     if (diDerivedType->getBaseType()) {
-      os << "\n";
+      *os << "\n";
       printDIType(diDerivedType->getBaseType(), indents + 1);
     }
   } else if (auto *diCompositeType = dyn_cast<DICompositeType>(type)) {
     if (diCompositeType->getTag() == dwarf::DW_TAG_enumeration_type ||
         diCompositeType->getTag() == dwarf::DW_TAG_array_type) {
-      os << "\n";
+      *os << "\n";
       printDIType(diCompositeType->getBaseType(), indents + 1);
     }
   }
 }
 
-HAKCWriter &HAKCWriter::operator<<(llvm::Value *V) {
-  if (!debug) {
-    return *this;
-  }
+HAKCWriter &HAKCWriter::operator<<(Value *V) {
   if (V == nullptr) {
     *this << "!!nullptr!!";
   } else if (const auto *F = dyn_cast<Function>(V)) {
@@ -53,193 +42,157 @@ HAKCWriter &HAKCWriter::operator<<(llvm::Value *V) {
   } else if (const auto *GV = dyn_cast<GlobalVariable>(V)) {
     *this << "Global " << GV->getName();
   } else if (auto *Arg = dyn_cast<Argument>(V)) {
-    os << "Argument " << Arg->getArgNo() << " of "
-       << Arg->getParent()->getName();
+    *os << "Argument " << Arg->getArgNo() << " of "
+        << Arg->getParent()->getName();
   } else {
-    os << *V;
+    *os << *V;
   }
 
   return *this;
 }
 
-HAKCWriter &HAKCWriter::operator<<(llvm::Use &U) {
-  if (!debug) {
-    return *this;
-  }
-
+HAKCWriter &HAKCWriter::operator<<(const Use &U) {
   *this << "Operand " << U.getOperandNo() << " of " << U.getUser() << "\n";
   return *this;
 }
 
 HAKCWriter &HAKCWriter::operator<<(double d) {
-  if (debug) {
-    os << d;
-  }
+  *os << d;
   return *this;
 }
 
-HAKCWriter &HAKCWriter::operator<<(llvm::Value &V) {
+HAKCWriter &HAKCWriter::operator<<(User *User) {
+  *this << *User;
+  return *this;
+}
+
+HAKCWriter &HAKCWriter::operator<<(Value &V) {
   *this << &V;
   return *this;
 }
 
 HAKCWriter &HAKCWriter::operator<<(StringRef str) {
-  if (!debug) {
-    return *this;
-  }
-  os << str;
+  *os << str;
   return *this;
 }
 
 HAKCWriter &HAKCWriter::operator<<(unsigned int i) {
-  if (!debug) {
-    return *this;
-  }
-  os << i;
+  *os << i;
   return *this;
 }
 
 HAKCWriter &HAKCWriter::operator<<(unsigned long i) {
-  if (!debug) {
-    return *this;
-  }
-  os << i;
+  *os << i;
   return *this;
 }
 
 HAKCWriter &HAKCWriter::operator<<(ssize_t i) {
-  if (!debug) {
-    return *this;
-  }
-  os << i;
+  *os << i;
   return *this;
 }
 
 HAKCWriter &HAKCWriter::operator<<(bool b) {
-  if (!debug) {
-    return *this;
-  }
-  os << (b ? "True" : "False");
+  *os << (b ? "True" : "False");
   return *this;
 }
 
 HAKCWriter &HAKCWriter::operator<<(const std::string &str) {
-  if (!debug) {
-    return *this;
-  }
-  os << str;
+  *os << str;
   return *this;
 }
 
 HAKCWriter &HAKCWriter::operator<<(const char *s) {
-  if (!debug) {
-    return *this;
+  if (s) {
+    *os << s;
   }
-  os << s;
-  return *this;
+  return *this; // ~__shared_ptr() = default; called after this returns then
+                // segfaults
 }
 
 HAKCWriter &HAKCWriter::operator<<(const Function &F) {
-  if (!debug) {
-    return *this;
-  }
-  F.print(os, nullptr);
+  F.print(*os, nullptr);
   return *this;
 }
 
 HAKCWriter &HAKCWriter::operator<<(const Module &M) {
-  if (!debug) {
-    return *this;
-  }
-  M.print(os, nullptr);
+  M.print(*os, nullptr);
   return *this;
 }
 
 HAKCWriter &HAKCWriter::operator<<(const Module *M) {
-  *this << *M;
+  if (M) {
+    *this << *M;
+  }
   return *this;
 }
 
 HAKCWriter &HAKCWriter::operator<<(const Type *Ty) {
-  *this << *Ty;
+  if (Ty) {
+    *this << *Ty;
+  }
   return *this;
 }
 
 HAKCWriter &HAKCWriter::operator<<(const Type &Ty) {
-  if (!debug) {
-    return *this;
-  }
-  os << Ty;
+  *os << Ty;
   return *this;
 }
 
 HAKCWriter &HAKCWriter::operator<<(const DINode *DiNode) {
-  *this << *DiNode;
+  if (DiNode) {
+    *this << *DiNode;
+  }
   return *this;
 }
 
 HAKCWriter &HAKCWriter::operator<<(const DINode &DiNode) {
-  if (!debug) {
-    return *this;
-  }
-  os << DiNode;
+  *os << DiNode;
   return *this;
 }
 
 HAKCWriter &HAKCWriter::operator<<(const DIType *DiType) {
-  printDIType(DiType, 0);
+  if (DiType) {
+    printDIType(DiType, 0);
+  }
   return *this;
 }
 
-HAKCWriter &HAKCWriter::operator<<(const hakc::HAKCCompartment &Compartment) {
-  if (!debug) {
-    return *this;
-  }
-  os << "Compartment " << Compartment.GetCompartmentIDValue();
+HAKCWriter &HAKCWriter::operator<<(const HAKCCompartment &Compartment) {
+  *os << "Compartment " << Compartment.GetCompartmentIDValue();
   return *this;
 }
 
-HAKCWriter &
-HAKCWriter::operator<<(const hakc::HAKCCompartmentDivision &Division) {
-  if (!debug) {
-    return *this;
-  }
+HAKCWriter &HAKCWriter::operator<<(const HAKCCompartmentDivision &Division) {
   *this << Division.GetHAKCCompartment();
-  os << " Division " << Division.GetDivisionID()->getZExtValue();
+  *os << " Division " << Division.GetDivisionID()->getZExtValue();
   return *this;
 }
 
-HAKCWriter &HAKCWriter::operator<<(const hakc::HAKCTypeInfo &TypeInfo) {
-  if (!debug) {
-    return *this;
-  }
-  TypeInfo >> os;
+HAKCWriter &HAKCWriter::operator<<(const HAKCTypeInfo &TypeInfo) {
+  TypeInfo >> *os;
   return *this;
 }
 
 HAKCWriter &
 HAKCWriter::operator<<(const enum HAKCAllocationTypeEnum AllocationType) {
-  if (!debug) {
-    return *this;
-  }
   switch (AllocationType) {
   case InvalidAllocationType:
-    os << "InvalidAllocationType";
+    *os << "InvalidAllocationType";
     break;
   case SimpleArgumentSize:
-    os << "SimpleArgumentSize";
+    *os << "SimpleArgumentSize";
     break;
   case SimpleStaticSize:
-    os << "SimpleStaticSize";
+    *os << "SimpleStaticSize";
     break;
   case StaticPlusArgument:
-    os << "StaticPlusArgument";
+    *os << "StaticPlusArgument";
     break;
   case MultiplyTwoArguments:
-    os << "MultiplyTwoArguments";
+    *os << "MultiplyTwoArguments";
     break;
   case ArgumentGEP:
-    os << "ArgumentGEP";
+    *os << "ArgumentGEP";
     break;
   }
   return *this;
@@ -247,26 +200,21 @@ HAKCWriter::operator<<(const enum HAKCAllocationTypeEnum AllocationType) {
 
 HAKCWriter &
 HAKCWriter::operator<<(const ManagedHAKCPointerUse &HAKCPointerUse) {
-  if (!debug) {
-    return *this;
-  }
-  os << "[" << HAKCPointerUse.getID() << "] Argument "
-     << HAKCPointerUse.getOperandNo() << " of ";
+  *os << "[" << HAKCPointerUse.getID() << "] Argument "
+      << HAKCPointerUse.getOperandNo() << " of ";
   *this << HAKCPointerUse.getUser() << " for ";
+  // getManagedPtr is a reference and is guaranteed to not be null
   *this << HAKCPointerUse.getManagedPtr();
   return *this;
 }
 
 HAKCWriter &HAKCWriter::operator<<(const HAKCPointerBase &ManagedPointer) {
-  if (!debug) {
-    return *this;
-  }
-  os << "Managed Pointer " << ManagedPointer.GetID();
+  *os << "Managed Pointer " << ManagedPointer.GetID();
   if (ManagedPointer.GetBaseDefinition()) {
-    os << " [";
+    *os << " [";
     if (isa<Argument>(ManagedPointer.GetBaseDefinition()) ||
         isa<GlobalValue>(ManagedPointer.GetBaseDefinition())) {
-      os << "  ";
+      *os << "  ";
     }
     *this << ManagedPointer.GetBaseDefinition() << "  ]";
   }
@@ -279,10 +227,7 @@ HAKCWriter &HAKCWriter::operator<<(const HAKCPointerBaseP &ManagedPointer) {
 }
 
 HAKCWriter &HAKCWriter::operator<<(const HAKCFunctionInfo &HAKCFuncInfo) {
-  if (!debug) {
-    return *this;
-  }
-  HAKCFuncInfo >> os;
+  HAKCFuncInfo >> *os;
   return *this;
 }
 
@@ -332,25 +277,21 @@ HAKCWriter &HAKCWriter::operator<<(const HAKCTransferAction &TransferAction) {
 }
 
 HAKCWriter &HAKCWriter::operator<<(const DbgVariableRecord &DVR) {
-  if (!debug) {
-    return *this;
-  }
-  os << DVR;
+  *os << DVR;
   return *this;
 }
 HAKCWriter &HAKCWriter::operator<<(const DbgVariableIntrinsic &DVI) {
-  if (!debug) {
-    return *this;
-  }
-  os << DVI;
+  *os << DVI;
   return *this;
 }
 
 HAKCWriter &HAKCWriter::operator<<(const DILocalVariable &DLV) {
-  if (!debug) {
-    return *this;
-  }
-  os << DLV;
+  *os << DLV;
+  return *this;
+}
+
+HAKCWriter &HAKCWriter::operator<<(const DILocation &DL) {
+  *os << DL.getFilename() << ":" << DL.getLine();
   return *this;
 }
 
