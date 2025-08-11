@@ -1,0 +1,302 @@
+!HAKCCompartmentalization
+directed: true
+division_count: 16
+edges:
+- key: IsType
+  persisted: true
+  source: &id001 !HAKCFunction
+    DefiningFile: @HAKC_TEST_DIR@/hakc_temporal_test3.c
+    DefiningLine: 34
+    Name: entry
+    is_function: true
+    symbol_hash: 822beb1f0a81f857
+  target: &id012 !HAKCType
+    DebugType: void (int, int)
+    LLVMType: void (i32, i32)
+    type_hash: cae8ce96f799d183
+- key: HasScope
+  persisted: true
+  source: *id001
+  target: &id013 !HAKCScope
+    LocalScopeName: global
+    Scope: global
+    scope_hash: 8001c27439650c5c
+- key: UsedInCompilationUnit
+  persisted: true
+  source: *id001
+  target: &id002 !HAKCCompilationUnit
+    filename: @HAKC_TEST_DIR@/hakc_temporal_test3.c
+- key: DefinedIn
+  line: 34
+  persisted: true
+  source: *id001
+  target: *id002
+- key: UsesSymbol
+  persisted: true
+  source: *id001
+  target: &id003 !HAKCFunction
+    DefiningFile: @HAKC_TEST_DIR@/hakc_temporal_test3.c
+    DefiningLine: 12
+    Name: node_setup
+    is_function: true
+    symbol_hash: 203692f12a7a77d8
+- key: DirectCall
+  persisted: true
+  source: *id001
+  target: *id003
+- key: DagEdge
+  persisted: true
+  source: *id001
+  target: *id003
+  weight: 2
+- key: UsesSymbol
+  persisted: true
+  source: *id001
+  target: &id004 !HAKCFunction
+    DefiningFile: @HAKC_TEST_DIR@/hakc_temporal_test3.c
+    DefiningLine: 19
+    Name: node_steady_state
+    is_function: true
+    symbol_hash: 890aa8f6014c1941
+- key: DirectCall
+  persisted: true
+  source: *id001
+  target: *id004
+- key: DagEdge
+  persisted: true
+  source: *id001
+  target: *id004
+  weight: 2
+- key: UsesSymbol
+  persisted: true
+  source: *id001
+  target: &id005 !HAKCFunction
+    DefiningFile: @HAKC_TEST_DIR@/hakc_temporal_test3.c
+    DefiningLine: 23
+    Name: node_teardown
+    is_function: true
+    symbol_hash: ddf4c476c35c8769
+- key: DirectCall
+  persisted: true
+  source: *id001
+  target: *id005
+- key: DagEdge
+  persisted: true
+  source: *id001
+  target: *id005
+  weight: 2
+- key: UsesSymbol
+  persisted: true
+  source: *id001
+  target: &id006 !HAKCFunction
+    DefiningFile: null
+    DefiningLine: null
+    Name: node_exit
+    is_function: true
+    symbol_hash: 35433d9c59a15029
+- key: DirectCall
+  persisted: true
+  source: *id001
+  target: *id006
+- key: DagEdge
+  persisted: true
+  source: *id001
+  target: *id006
+  weight: 2
+- key: InDivision
+  persisted: true
+  source: *id001
+  target: &id007 !HAKCDivision
+    AccessToken: 73728
+    DivisionID: 13
+    division_hash: be7396225c569ba9
+- key: IsType
+  persisted: true
+  source: *id003
+  target: &id016 !HAKCType
+    DebugType: void (struct anon.6*)
+    LLVMType: void (ptr)
+    type_hash: 8746eae4e4c3e86b
+- key: HasScope
+  persisted: true
+  source: *id003
+  target: !HAKCScope
+    LocalScopeName: global
+    Scope: global
+    scope_hash: 8001c27439650c5c
+- key: UsedInCompilationUnit
+  persisted: true
+  source: *id003
+  target: *id002
+- key: DefinedIn
+  line: 12
+  persisted: true
+  source: *id003
+  target: *id002
+- key: InDivision
+  persisted: true
+  source: *id003
+  target: &id008 !HAKCDivision
+    AccessToken: 139264
+    DivisionID: 13
+    division_hash: 4af868d68ac647bc
+- key: IsType
+  persisted: true
+  source: *id004
+  target: !HAKCType
+    DebugType: void (struct anon.6*)
+    LLVMType: void (ptr)
+    type_hash: 8746eae4e4c3e86b
+- key: HasScope
+  persisted: true
+  source: *id004
+  target: !HAKCScope
+    LocalScopeName: global
+    Scope: global
+    scope_hash: 8001c27439650c5c
+- key: UsedInCompilationUnit
+  persisted: true
+  source: *id004
+  target: *id002
+- key: DefinedIn
+  line: 19
+  persisted: true
+  source: *id004
+  target: *id002
+- key: InDivision
+  persisted: true
+  source: *id004
+  target: &id009 !HAKCDivision
+    AccessToken: 204800
+    DivisionID: 13
+    division_hash: 52437522d301286c
+- key: IsType
+  persisted: true
+  source: *id005
+  target: !HAKCType
+    DebugType: void (struct anon.6*)
+    LLVMType: void (ptr)
+    type_hash: 8746eae4e4c3e86b
+- key: HasScope
+  persisted: true
+  source: *id005
+  target: !HAKCScope
+    LocalScopeName: global
+    Scope: global
+    scope_hash: 8001c27439650c5c
+- key: UsedInCompilationUnit
+  persisted: true
+  source: *id005
+  target: *id002
+- key: DefinedIn
+  line: 23
+  persisted: true
+  source: *id005
+  target: *id002
+- key: InDivision
+  persisted: true
+  source: *id005
+  target: &id010 !HAKCDivision
+    AccessToken: 270336
+    DivisionID: 13
+    division_hash: 976da0fe7b28592c
+- key: IsType
+  persisted: true
+  source: *id006
+  target: &id014 !HAKCType
+    DebugType: '@UNKNOWN@'
+    LLVMType: void (...)
+    type_hash: e3330f59d2fefa57
+- key: HasScope
+  persisted: true
+  source: *id006
+  target: &id015 !HAKCScope
+    LocalScopeName: @HAKC_TEST_DIR@/hakc_temporal_test3.c
+    Scope: local
+    scope_hash: 1a274b2651bfe6d2
+- key: UsedInCompilationUnit
+  persisted: true
+  source: *id006
+  target: *id002
+- key: InDivision
+  persisted: true
+  source: *id006
+  target: &id011 !HAKCDivision
+    AccessToken: 335872
+    DivisionID: 13
+    division_hash: 1bad8f18d4abe42c
+- key: InCompartment
+  persisted: true
+  source: *id007
+  target: &id017 !HAKCCompartment
+    CompartmentID: 1
+    EntryToken: 73728
+- key: InCompartment
+  persisted: true
+  source: *id008
+  target: &id018 !HAKCCompartment
+    CompartmentID: 2
+    EntryToken: 139264
+- key: InCompartment
+  persisted: true
+  source: *id009
+  target: &id019 !HAKCCompartment
+    CompartmentID: 3
+    EntryToken: 204800
+- key: InCompartment
+  persisted: true
+  source: *id010
+  target: &id020 !HAKCCompartment
+    CompartmentID: 4
+    EntryToken: 270336
+- key: InCompartment
+  persisted: true
+  source: *id011
+  target: &id021 !HAKCCompartment
+    CompartmentID: 5
+    EntryToken: 335872
+graph: {}
+multigraph: true
+nodes:
+- id: *id001
+  persisted: true
+- id: *id012
+  persisted: true
+- id: *id013
+  persisted: true
+- id: *id002
+  persisted: true
+- id: *id003
+  persisted: true
+- id: *id004
+  persisted: true
+- id: *id005
+  persisted: true
+- id: *id006
+  persisted: true
+- id: *id014
+  persisted: true
+- id: *id015
+  persisted: true
+- id: *id016
+  persisted: true
+- id: *id007
+  persisted: true
+- id: *id017
+  persisted: true
+- id: *id008
+  persisted: true
+- id: *id018
+  persisted: true
+- id: *id009
+  persisted: true
+- id: *id019
+  persisted: true
+- id: *id010
+  persisted: true
+- id: *id020
+  persisted: true
+- id: *id011
+  persisted: true
+- id: *id021
+  persisted: true

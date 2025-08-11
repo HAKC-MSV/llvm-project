@@ -15,6 +15,7 @@
 
 namespace llvm::hakc {
 class HAKCModuleAnalysis;
+class HAKCModuleTransform;
 class HAKCSystemInformation;
 
 typedef std::shared_ptr<HAKCCompartment> HAKCCompartmentP;
@@ -51,7 +52,7 @@ protected:
 class HAKCDatabaseConnection {
 public:
   HAKCDatabaseConnection(const HAKCDatabaseInformation &DatabaseInformation,
-                         bool Debug);
+                         bool debug);
 
   HAKCDatabaseResponse HandleRequest(const HAKCDatabaseRequest &Request) const;
 
@@ -64,7 +65,7 @@ public:
 protected:
   std::unique_ptr<raw_socket_stream> Socket;
   const HAKCDatabaseInformation &DatabaseInformation;
-  bool Debug;
+  bool debug;
 
   bool CheckConnection() const;
 };
@@ -74,21 +75,23 @@ public:
   explicit HAKCCompartmentalizationPolicy(
       HAKCSystemInformation &SystemInformation);
 
-  ~HAKCCompartmentalizationPolicy();
+  virtual ~HAKCCompartmentalizationPolicy();
 
-  hakc::HAKCCompartmentDivision &GetDivision(GlobalValue *GV);
+  virtual HAKCCompartmentDivision &GetDivision(GlobalValue *GV);
 
   HAKCCompartmentP GetCompartment(hakc_compartment_id_t CompartmentID);
 
-  void GetValidTargets(HAKCCompartment &Compartment) const;
+  void GetValidTargets(HAKCCompartment &Compartment);
 
-  hakc::HAKCCompartmentDivision &GetDefaultDivision();
+  virtual HAKCCompartmentDivision &GetDefaultDivision();
 
 protected:
   HAKCSystemInformation &SystemInformation;
   std::vector<HAKCCompartmentP> Compartments;
   std::vector<HAKCDivisionP> Divisions;
   HAKCDatabaseConnection Client;
+  std::map<HAKCSymbolP, HAKCDivisionP> SymbolDivisionMap;
+  std::set<hakc_compartment_id_t> RetrievedTargetCompartments;
 
   void CheckConnection() const;
 
@@ -109,7 +112,23 @@ protected:
   HAKCCompartmentP CreateCompartment(hakc_compartment_id_t CompartmentID,
                                      hakc_access_token_t AccessToken,
                                      bool CheckForExisting);
+
+  HAKCDivisionP FindCachedSymbolDivision(HAKCSymbolP Symbol) const;
 };
+
+class HAKCCompartmentalizationPolicyDAG
+    : public HAKCCompartmentalizationPolicy {
+public:
+  explicit HAKCCompartmentalizationPolicyDAG(
+      HAKCSystemInformation &SystemInformation);
+
+  HAKCCompartmentDivision &GetDivision(GlobalValue *GV) override;
+  HAKCCompartmentDivision &GetDefaultDivision() override;
+  // std::map<GlobalValue *, HAKCCompartmentDivision*> GV_to_divs;
+  std::map<GlobalValue *, std::shared_ptr<HAKCCompartmentDivision>> GV_to_divs;
+  unsigned GV_to_div_incr;
+};
+
 } // namespace llvm::hakc
 
 #endif // HAKC_HAKCCOMPARTMENTALIZATIONPOLICY_H

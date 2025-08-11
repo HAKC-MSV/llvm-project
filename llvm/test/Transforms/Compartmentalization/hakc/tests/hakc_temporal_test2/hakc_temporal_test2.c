@@ -3,16 +3,33 @@
 // RUN: %HAKC_RUN_COMP_PASS
 // RUN: %HAKC_EVALUATE
 
-void exit();
+void node_setup(int a);
+
+void node_steady_state(int a);
+
+void node_teardown(int a);
+
+void node_exit();
 
 // Note: perform both the post dom analysis and the compartmentalization in this test
 // TODO: add checks -> write post dom analysis result to text file, then use file check for result
 void entry(int a, int b) {
   if(a > 0){
-    ++a;
+    node_setup(a);
   }
   else{
-    ++b;
+    node_setup(b);
   }
-  exit();
+  if(b > 0){
+    node_steady_state(a);
+  }
+  else{
+    node_steady_state(b);
+  }
+  node_teardown(a);
+  node_exit();
 }
+
+
+// CHECK: NULL
+

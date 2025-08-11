@@ -7,6 +7,7 @@
 
 #include "ManagedHAKCPointer.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartmentalizationPolicy.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCLogger.h"
 #include <memory>
 
 namespace llvm::hakc {
@@ -36,7 +37,7 @@ public:
 
   bool ManagePointer(Use &U);
 
-  bool PointerIsEligibleForManagement(Use &U) const;
+  bool PointerIsEligibleForManagement(Use &U);
 
   iterator_range<ManagedHAKCPointerListType::iterator> ManagedPointers();
 
@@ -48,7 +49,6 @@ public:
    * @return
    */
   ManagedHAKCPointerP GetManagedPointer(Value *V);
-
   bool empty() const;
 
   Value *GetDef(Value *V) const;
@@ -180,6 +180,8 @@ protected:
                           unsigned OperandNo);
 
   bool IsConstantExprUsedInKernelCall(User *U) const;
+
+  HAKCLogger &GetLogger(HAKCLogLevel log_level, bool suppress_output) const;
 
 private:
   unsigned CurrentPointerID;

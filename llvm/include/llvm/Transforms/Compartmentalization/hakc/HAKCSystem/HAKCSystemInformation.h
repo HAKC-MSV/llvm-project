@@ -15,22 +15,21 @@
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCPreTransferAction.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTypeIdentifier/HAKCTypeIdentifier.h"
 
-typedef std::shared_ptr<llvm::hakc::HAKCAllocationSize> HAKCCustomAllocation;
+typedef std::shared_ptr<hakc::HAKCAllocationSize> HAKCCustomAllocation;
 
-typedef SmallVector<llvm::hakc::function_def_t> HAKCFunctionList;
-typedef SmallVector<llvm::hakc::function_def_t> HAKCTransferList;
-typedef SmallVector<llvm::hakc::custom_transfer_def_t> HAKCCustomTransferList;
+typedef SmallVector<hakc::function_def_t> HAKCFunctionList;
+typedef SmallVector<hakc::function_def_t> HAKCTransferList;
+typedef SmallVector<hakc::HAKCTypeP> HAKCStructList;
+typedef SmallVector<hakc::custom_transfer_def_t> HAKCCustomTransferList;
 typedef SmallVector<GlobalVariable *> HAKCGlobalVariableList;
 typedef SmallVector<GlobalValue *> HAKCSymbolList;
 typedef SmallVector<Function *> FunctionList;
 typedef SmallVector<std::string, 16> HAKCStringList;
 typedef SmallVector<HAKCCustomAllocation> HAKCCustomAllocationList;
-typedef SmallVector<llvm::hakc::arg_def_t> HAKCArgumentsList;
-typedef SmallVector<llvm::hakc::transfer_action_def_t> HAKCTransferActionList;
-typedef SmallVector<llvm::hakc::pre_transfer_action_def_t>
-    HAKCPreTransferActionList;
-typedef SmallVector<llvm::hakc::post_target_action_def_t>
-    HAKCPostTargetActionList;
+typedef SmallVector<hakc::arg_def_t> HAKCArgumentsList;
+typedef SmallVector<hakc::transfer_action_def_t> HAKCTransferActionList;
+typedef SmallVector<hakc::pre_transfer_action_def_t> HAKCPreTransferActionList;
+typedef SmallVector<hakc::post_target_action_def_t> HAKCPostTargetActionList;
 
 namespace llvm::hakc {
 class CommonHAKCAnalysis;
@@ -70,7 +69,11 @@ class HAKCSystemInformation {
 public:
   explicit HAKCSystemInformation(CommonHAKCAnalysis &CommonAnalysis);
 
-  bool OutputDebugInfo() const;
+  HAKCLogLevel GetConsoleLogLevel() const;
+
+  HAKCLogLevel GetFileLogLevel() const;
+
+  bool GetDebugDatabase() const;
 
   bool OutputDebugInfo(GlobalValue *GV) const;
 
@@ -103,23 +106,26 @@ public:
 
   iterator_range<HAKCStringList::iterator> IncludePaths();
 
-  llvm::hakc::function_def_t CodeValidation() const;
+  function_def_t CodeValidation() const;
 
-  llvm::hakc::function_def_t DataValidation() const;
+  function_def_t DataValidation() const;
 
-  llvm::hakc::function_def_t SignWithDivision() const;
+  function_def_t SignWithDivision() const;
 
-  llvm::hakc::function_def_t CompartmentTransfer(bool PerCPU) const;
+  function_def_t CompartmentTransfer(bool PerCPU) const;
 
   HAKCTypeIdentifier &GetTypeIdentifier();
 
-  hakc::HAKCPassModeTypeEnum GetPassMode() const;
+  HAKCPassModeTypeEnum GetPassMode() const;
+
+  bool GetTemporalAnalysisEnabled() const;
 
   StringRef GetArch() const;
 
   StringRef GetPlatform() const;
 
   StringRef GetDagAnalysisRootPath() const;
+  HAKCStructList GetStructList() const;
 
   iterator_range<HAKCPreTransferActionList::iterator> PreTransferActions();
 
@@ -129,23 +135,29 @@ public:
 
   // symbol_epoch_map_t getEpochs();
 
+  StringRef GetSingleSourceFile();
+
 protected:
   CommonHAKCAnalysis &CommonAnalysis;
   HAKCTypeIdentifier TypeIdentifier;
   HAKCDatabaseInformation DatabaseInformation;
-  bool DebugOutput;
-  hakc::HAKCPassModeTypeEnum PassMode;
+  bool TemporalAnalysisEnabled;
+  HAKCLogLevel ConsoleLogLevel;
+  HAKCLogLevel FileLogLevel;
+  bool DebugDatabase;
+  HAKCPassModeTypeEnum PassMode;
+  std::string SingleSourceFile;
   std::string Arch;
   std::string Platform;
   std::string DagAnalysisRootPath;
   HAKCStringList IncludePathsList;
   FunctionList NoTransferFunctionList;
   HAKCTransferList CompartmentTransferFunctionList;
-  hakc::function_def_t CodeValidationFunction;
-  hakc::function_def_t DataValidationFunction;
-  hakc::function_def_t SignWithDivisionFunction;
-  hakc::function_def_t DefaultCompartmentTransfer;
-  hakc::function_def_t PerCPUCompartmentTransfer;
+  function_def_t CodeValidationFunction;
+  function_def_t DataValidationFunction;
+  function_def_t SignWithDivisionFunction;
+  function_def_t DefaultCompartmentTransfer;
+  function_def_t PerCPUCompartmentTransfer;
   HAKCFunctionList CompartmentalizationSupportFunctionList;
   HAKCSymbolList SymbolsToOutputDebugInfo;
   HAKCStringList SeparateNamespacePathList;
@@ -156,6 +168,7 @@ protected:
   HAKCCustomTransferList CustomTransferList;
   HAKCPreTransferActionList PreTransferActionList;
   HAKCPostTargetActionList PostTargetActionList;
+  HAKCStructList StructList;
 
   void
   GetAllDefinedHAKCFunctions(SmallVectorImpl<hakc::function_def_t> &Results);

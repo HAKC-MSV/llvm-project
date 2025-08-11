@@ -14,7 +14,7 @@ namespace llvm::hakc {
 
     std::string HAKCIndirectCallSource::GetYaml(unsigned Indents) const {
         std::string Yaml = HAKCInfo::GetYamlHeader(Indents);
-        llvm::raw_string_ostream sstream(Yaml);
+        raw_string_ostream sstream(Yaml);
 
         sstream << "\n";
         sstream.indent(Indents + EntrySpaces()) << "Type:\n";
@@ -45,10 +45,10 @@ namespace llvm::hakc {
     }
 
     void HAKCIndirectCallSourceLink::SplitString(StringRef S, unsigned Indents) {
-        llvm::SmallVector<StringRef> SplitTokens;
+        SmallVector<StringRef> SplitTokens;
         S.split(SplitTokens, "\n");
         std::string Yaml;
-        llvm::raw_string_ostream sstream(Yaml);
+        raw_string_ostream sstream(Yaml);
         for (auto Tok: SplitTokens) {
             Yaml = "";
             sstream.indent(Indents) << Tok;
@@ -116,7 +116,7 @@ namespace llvm::hakc {
 
     void HAKCIndirectCallSourceLink::InputLinkType(StringRef LinkType) {
         std::string Yaml;
-        llvm::raw_string_ostream sstream(Yaml);
+        raw_string_ostream sstream(Yaml);
 
         sstream.indent(EntrySpaces()) << "LinkType: " << "\"" << LinkType << "\"";
         LinkYamlTokens.push_back(Yaml);
@@ -124,7 +124,7 @@ namespace llvm::hakc {
 
     void HAKCIndirectCallSourceLink::InputType(const std::shared_ptr<HAKCTypeInfo> &HAKCType) {
         std::string Yaml;
-        llvm::raw_string_ostream sstream(Yaml);
+        raw_string_ostream sstream(Yaml);
 
         sstream.indent(EntrySpaces()) << "Type:";
         LinkYamlTokens.push_back(Yaml);
@@ -134,7 +134,7 @@ namespace llvm::hakc {
 
     void HAKCIndirectCallSourceLink::InputGlobalObject(GlobalObject *GlobalObj) {
         std::string Yaml;
-        llvm::raw_string_ostream sstream(Yaml);
+        raw_string_ostream sstream(Yaml);
 
         sstream.indent(EntrySpaces()) << "GlobalName: " << "\"" << GlobalObj->getName() << "\"";
         LinkYamlTokens.push_back(Yaml);
@@ -147,7 +147,7 @@ namespace llvm::hakc {
 
     void HAKCIndirectCallSourceLink::InputBitoffset(unsigned int BitOffset) {
         std::string Yaml;
-        llvm::raw_string_ostream sstream(Yaml);
+        raw_string_ostream sstream(Yaml);
 
         sstream.indent(EntrySpaces()) << "Offset: " << BitOffset;
         LinkYamlTokens.push_back(Yaml);
@@ -155,7 +155,7 @@ namespace llvm::hakc {
 
     void HAKCIndirectCallSourceLink::InputArgument(Argument *Arg) {
         std::string Yaml;
-        llvm::raw_string_ostream sstream(Yaml);
+        raw_string_ostream sstream(Yaml);
 
         sstream.indent(EntrySpaces()) << "ArgNumber: " << Arg->getArgNo();
         LinkYamlTokens.push_back(Yaml);
@@ -167,7 +167,7 @@ namespace llvm::hakc {
 
     std::string HAKCIndirectCallSourceLink::GetYaml(unsigned int Indents) const {
         std::string Yaml;
-        llvm::raw_string_ostream sstream(Yaml);
+        raw_string_ostream sstream(Yaml);
 
         unsigned Count = 0;
         for (const auto &YamlLine: LinkYamlTokens) {

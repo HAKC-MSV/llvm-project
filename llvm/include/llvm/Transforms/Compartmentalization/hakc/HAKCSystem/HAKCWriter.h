@@ -19,35 +19,68 @@
 
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/yaml/HAKCYaml.h"
 
+#include "llvm/Support/raw_ostream.h"
+
 using namespace llvm;
 
 namespace llvm::hakc {
+
 class HAKCWriter {
-public:
-  HAKCWriter();
-
-  raw_ostream &ostream() const;
-
 protected:
-  raw_ostream &os;
-  bool debug;
+  std::shared_ptr<raw_ostream> os;
+  std::string log_path;
+  HAKCLogLevel ConfiguredLogLevel;
+  void CreateLog() { os = std::make_shared<raw_fd_ostream>(log_path, EC); }
+
+public:
+  std::error_code EC;
+  explicit HAKCWriter(HAKCLogLevel log_level)
+      : os(), log_path(""), ConfiguredLogLevel(log_level) {
+    // errs() << "CREATING HAKC WRITER0\n";
+    // allow using shared ptr to errs() but force it to not try to destroy
+    // errs()
+    os = std::shared_ptr<raw_ostream>(&errs(), // non-owning raw pointer
+                                      [](raw_ostream *) {
+                                        // no-op deleter to prevent delete on
+                                        // singleton
+                                      });
+  }
+  explicit HAKCWriter(StringRef log_path, HAKCLogLevel log_level)
+      : os(), log_path(log_path), ConfiguredLogLevel(log_level) {
+    // errs() << "CREATING HAKC WRITER1\n";
+    CreateLog();
+  }
+  ~HAKCWriter() {
+    // errs() << "DESTROYING HAKC WRITER\n";
+  }
+
+  void SetConfiguredLogLevel(HAKCLogLevel log_level) {
+    ConfiguredLogLevel = log_level;
+  }
+
+  HAKCLogLevel GetConfiguredLogLevel() const { return ConfiguredLogLevel; }
+
+  StringRef GetLogPath() const { return log_path; }
+
+  raw_ostream &GetOS() const { return *os; }
 
   void printDIType(const DIType *type, unsigned indents) const;
 
-public:
-  void SetDebug(bool Debug);
+  HAKCWriter &operator<<(Value *V);
 
-  HAKCWriter &operator<<(llvm::Value *V);
+  HAKCWriter &operator<<(const Use &U);
 
-  HAKCWriter &operator<<(llvm::Value &V);
+  HAKCWriter &operator<<(User *User);
 
-  HAKCWriter &operator<<(llvm::Use &U);
+  HAKCWriter &operator<<(Value &V);
 
   HAKCWriter &operator<<(StringRef str);
 
   HAKCWriter &operator<<(unsigned int i);
 
   HAKCWriter &operator<<(unsigned long i);
+
+  HAKCWriter &operator<<(double d);
 
   HAKCWriter &operator<<(ssize_t i);
 
@@ -73,13 +106,13 @@ public:
 
   HAKCWriter &operator<<(const DIType *DiType);
 
-  HAKCWriter &operator<<(const hakc::HAKCCompartment &Compartment);
+  HAKCWriter &operator<<(const HAKCCompartment &Compartment);
 
-  HAKCWriter &operator<<(const hakc::HAKCCompartmentDivision &Division);
+  HAKCWriter &operator<<(const HAKCCompartmentDivision &Division);
 
-  HAKCWriter &operator<<(const hakc::HAKCTypeInfo &TypeInfo);
+  HAKCWriter &operator<<(const HAKCTypeInfo &TypeInfo);
 
-  HAKCWriter &operator<<(enum HAKCAllocationTypeEnum AllocationType);
+  HAKCWriter &operator<<(const enum HAKCAllocationTypeEnum AllocationType);
 
   HAKCWriter &operator<<(const ManagedHAKCPointerUse &HAKCPointerUse);
 
@@ -100,7 +133,16 @@ public:
   HAKCWriter &operator<<(const enum HAKCFunctionArgumentUse ArgUse);
 
   HAKCWriter &operator<<(const HAKCTransferAction &TransferAction);
+
+  HAKCWriter &operator<<(const DbgVariableRecord &DVR);
+
+  HAKCWriter &operator<<(const DbgVariableIntrinsic &DVI);
+
+  HAKCWriter &operator<<(const DILocalVariable &DLV);
+
+  HAKCWriter &operator<<(const DILocation &DL);
 };
+
 } // namespace llvm::hakc
 
 #endif // HAKCWRITER_H
