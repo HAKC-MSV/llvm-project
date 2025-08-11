@@ -1717,6 +1717,10 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
       goto exit;
     }
 
+    if (FoundType) {
+      goto exit;
+    }
+
     HAKCTypeP ElementType = FindType(SourceType);
     if (!ElementType) {
       ElementType = GetVoidPointerPointeeType();

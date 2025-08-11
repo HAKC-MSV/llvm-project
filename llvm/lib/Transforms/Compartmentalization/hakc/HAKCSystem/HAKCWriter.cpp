@@ -294,4 +294,5 @@ HAKCWriter &HAKCWriter::operator<<(const DILocation &DL) {
   *os << DL.getFilename() << ":" << DL.getLine();
   return *this;
 }
+
 } // namespace llvm::hakc

@@ -104,20 +104,10 @@ void HAKCDatabaseResponse::operator<<(raw_socket_stream &OS) {
   Response = "";
   ssize_t ResponseSize = 0;
 
-  try {
-    ReadFromSocket(OS, &ResponseSize, sizeof(ResponseSize));
-  } catch (std::exception &E) {
-    CommonHAKCAnalysis::getLogger(Fatal) << "Read 1: " << E.what() << "\n";
-    throw E;
-  }
+  ReadFromSocket(OS, &ResponseSize, sizeof(ResponseSize));
   Response.resize(ResponseSize);
-  try {
-    auto LastReadSize = ReadFromSocket(OS, Response.data(), ResponseSize);
-    Success = LastReadSize > 0 && ResponseSize == LastReadSize;
-  } catch (std::exception &E) {
-    CommonHAKCAnalysis::getLogger(Fatal) << "Read 2: " << E.what() << "\n";
-    throw E;
-  }
+  auto LastReadSize = ReadFromSocket(OS, Response.data(), ResponseSize);
+  Success = LastReadSize > 0 && ResponseSize == LastReadSize;
 }
 
 HAKCDatabaseConnection::HAKCDatabaseConnection(
