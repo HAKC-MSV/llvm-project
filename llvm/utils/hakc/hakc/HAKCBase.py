@@ -41,13 +41,9 @@ class HAKCHashValue:
     def __init__(self, values: list[object]):
         if len(values) > 0:
             h = hashlib.sha256()
-            # print(f"Using values: {values}")
             for value in values:
-                # print(f"\t {type(value)} {value}")
                 h.update(HAKCHashValue.get_bytes(value))
-            self.final_hash = int.from_bytes(h.digest()[:8], byteorder=HAKCHashValue.ByteOrder)
-            print(f"Computed hash {self.final_hash} based on inputs {values}")
-            # print(f"self.final_hash: {int(self.final_hash)}")
+            self.final_hash = int.from_bytes(h.digest()[:7], byteorder=HAKCHashValue.ByteOrder)
 
     @staticmethod
     def get_bytes(value) -> bytes:
@@ -71,8 +67,6 @@ class HAKCHashValue:
         else:
             return False
 
-    # def __str__(self):
-    #     return ""
     def __str__(self):
         # assert(isinstance(self.final_hash, int))
         # Note: loading from dag seems to store the hex value as a string
@@ -80,18 +74,12 @@ class HAKCHashValue:
             return f'{self.final_hash}'
         return f'{self.final_hash:0x}'
 
-    # def __int__(self):
-    #     return 0
-    #     # return int(self)
-
     def __repr__(self):
-        return str(self)
+        return self.final_hash
 
 
 class HAKCPrintableObj:
     def __init__(self, **kwargs):
-        if kwargs.get("name", "") == "do_initcall_level":
-            print("Found it")
         self.computed_hash = None
 
     def __repr__(self):

@@ -4,7 +4,7 @@ from typing import Optional
 
 import yaml
 
-from .HAKCBase import HAKCDivisionEnum, HAKCDBColumn, HAKCDBRelation, HAKCDBNode, HAKCPrintableObj, HashedHAKCDBNode, \
+from .HAKCBase import HAKCDBColumn, HAKCDBRelation, HAKCDBNode, HAKCPrintableObj, HashedHAKCDBNode, \
     HAKCPayload
 
 logger = logging.getLogger('hakc-dag')
@@ -24,7 +24,8 @@ class HAKCCompilationUnit(HAKCDBNode, yaml.YAMLObject):
                 logger.debug(f"cu_hash ({kwargs['cu_hash']}) != hash(self) ({self.get_computed_hash()})")
             else:
                 logger.debug(f"cu_hash ({kwargs['cu_hash']}) == hash(self) ({self.get_computed_hash()})")
-            assert kwargs["cu_hash"] == self.get_computed_hash(), f"cu_hash ({kwargs['cu_hash']}) =?= hash(self) ({self.get_computed_hash()})"
+            assert kwargs[
+                       "cu_hash"] == self.get_computed_hash(), f"cu_hash ({kwargs['cu_hash']}) =?= hash(self) ({self.get_computed_hash()})"
 
     def pretty_print(self):
         return f"{self.get_table_name()}({self.defining_file}:{self.defining_line})"
@@ -88,6 +89,7 @@ class HAKCCompilationUnit(HAKCDBNode, yaml.YAMLObject):
             schema[1]: self.defining_file,
         }
 
+
 class HAKCDivision(HashedHAKCDBNode, yaml.YAMLObject):
     yaml_tag = "!HAKCDivision"
     relation_compartment = "has_compartment"
@@ -99,7 +101,8 @@ class HAKCDivision(HashedHAKCDBNode, yaml.YAMLObject):
         self.access_token = AccessToken
         # print(self)
         if "division_hash" in kwargs:
-            assert kwargs["division_hash"] == self.get_computed_hash(), f"division_hash ({kwargs['division_hash']}) =?= hash(self) ({self.get_computed_hash()})"
+            assert kwargs[
+                       "division_hash"] == self.get_computed_hash(), f"division_hash ({kwargs['division_hash']}) =?= hash(self) ({self.get_computed_hash()})"
 
     def pretty_print(self):
         return f"{self.get_table_name()}({self.division_id})"
@@ -130,7 +133,6 @@ class HAKCDivision(HashedHAKCDBNode, yaml.YAMLObject):
             return [self.division_id, self.access_token]
         return [self.division_id]
 
-
     @staticmethod
     def get_primary_key() -> HAKCDBColumn:
         return HAKCDBColumn('division_hash', 'UINT64')
@@ -160,9 +162,11 @@ class HAKCDivision(HashedHAKCDBNode, yaml.YAMLObject):
             schema[2]: self.access_token
         }
 
+
 class HAKCCompartment(HAKCDBNode, yaml.YAMLObject):
     # TODO: add salt to hashing value
     yaml_tag = "!HAKCCompartment"
+
     def __init__(self, CompartmentID: int, EntryToken: Optional[int] = None, **kwargs):
         yaml.YAMLObject.__init__(self)
         # kwargs["Name"] = kwargs.get("Name", str(CompartmentID))
@@ -171,7 +175,8 @@ class HAKCCompartment(HAKCDBNode, yaml.YAMLObject):
         self.compartment_id = CompartmentID
         self.entry_token = EntryToken
         if "compartment_hash" in kwargs:
-            assert kwargs["compartment_hash"] == self.get_computed_hash(), f"compartment_hash ({kwargs['compartment_hash']}) =?= hash(self) ({self.get_computed_hash()}) [{self}]"
+            assert kwargs[
+                       "compartment_hash"] == self.get_computed_hash(), f"compartment_hash ({kwargs['compartment_hash']}) =?= hash(self) ({self.get_computed_hash()}) [{self}]"
 
     def pretty_print(self):
         return f"{self.get_table_name()}({self.compartment_id})"
@@ -191,7 +196,6 @@ class HAKCCompartment(HAKCDBNode, yaml.YAMLObject):
     def __hash__(self):
         # return self.get_computed_hash().final_hash
         return HAKCDBNode.__hash__(self)
-
 
     # def add_division(self, division: HAKCDivision):
     #     self.divisions.add(division)
@@ -227,12 +231,6 @@ class HAKCCompartment(HAKCDBNode, yaml.YAMLObject):
     def get_db_data(self, convert_hash=True) -> dict[HAKCDBColumn, object]:
         schema = HAKCCompartment.get_db_table_columns()
         assert (len(schema) == (len(self.get_data_columns()) + 1))
-        # Note: something weird here probably. switching from old to new seems to fix the issue with inconsistent hashes
-        # old: schema[0]: hash(self) if convert_hash else self.get_computed_hash(),
-        # new: schema[0]: self.get_computed_hash().final_hash,
-        # note: compartment_hash is incorrect here!!!
-        # is            520818469179354608   -> 73A51A367E5EDF0
-        # but should be 14355876524461518314 -> c73a51a367e5edea
         return {
             # schema[0]: hash(self) if convert_hash else self.get_computed_hash(),
             schema[0]: self.get_computed_hash().final_hash,
@@ -246,8 +244,6 @@ class HAKCType(HashedHAKCDBNode, yaml.YAMLObject):
     unknown_type = "@UNKNOWN@"
 
     def __init__(self, LLVMType: str, DebugType: Optional[str] = None, **kwargs):
-        # del kwargs["type_hash"]
-        # print(f"LLVMType: {LLVMType}, DebugType: {DebugType}, kwargs: {kwargs}")
         yaml.YAMLObject.__init__(self)
         if 'Name' not in kwargs:
             kwargs['Name'] = DebugType if DebugType is not None and DebugType != HAKCType.unknown_type else LLVMType
@@ -257,9 +253,10 @@ class HAKCType(HashedHAKCDBNode, yaml.YAMLObject):
         self._debug_type_transformed = HAKCType.transform_type_str(self.debug_type)
         self._debug_type_is_known = self.debug_type != HAKCType.unknown_type
         self._llvm_type_is_known = self.llvm_type != HAKCType.unknown_type
-        assert(isinstance(self.llvm_type, str) and self.llvm_type != "")
+        assert (isinstance(self.llvm_type, str) and self.llvm_type != "")
         if "type_hash" in kwargs:
-            assert kwargs["type_hash"] == self.get_computed_hash(), f"type_hash ({kwargs['type_hash']}) =?= hash(self) ({self.get_computed_hash()})"
+            assert kwargs[
+                       "type_hash"] == self.get_computed_hash(), f"type_hash ({kwargs['type_hash']}) =?= hash(self) ({self.get_computed_hash()})"
 
     def pretty_print(self):
         return f"{self.get_table_name()}({self.debug_type})"
@@ -294,7 +291,6 @@ class HAKCType(HashedHAKCDBNode, yaml.YAMLObject):
     def get_hash_inputs(self) -> list[object]:
         # a type 'int ()' might be converted to 'int', causing an improper alias
         if self._debug_type_is_known:
-            print(f"Transformed debug type: {self._debug_type_transformed}")
             return [self._debug_type_transformed]
         else:
             return [self.llvm_type]
@@ -338,6 +334,7 @@ class HAKCType(HashedHAKCDBNode, yaml.YAMLObject):
             schema[2]: self.llvm_type
         }
 
+
 class HAKCTypePerm(yaml.YAMLObject):
     # purely an edge between function and type
     yaml_tag = "!HAKCTypePerm"
@@ -348,7 +345,7 @@ class HAKCTypePerm(yaml.YAMLObject):
         self.RWX = RWX
         self.perm_type = Type
         assert (isinstance(self.RWX, int))
-        assert (0 <= self.RWX <= 7) # RWX should be between 000 and 111
+        assert (0 <= self.RWX <= 7)  # RWX should be between 000 and 111
         assert (isinstance(self.perm_type, HAKCType))
 
     def __repr__(self):
@@ -394,7 +391,8 @@ class HAKCScope(HashedHAKCDBNode, yaml.YAMLObject):
         self.is_local_scope = self.scope == HAKCScope.local_scope
         assert (isinstance(self.scope, str))
         if "scope_hash" in kwargs:
-            assert kwargs["scope_hash"] == self.get_computed_hash(), f"scope_hash ({kwargs['scope_hash']}) =?= hash(self) ({self.get_computed_hash()})"
+            assert kwargs[
+                       "scope_hash"] == self.get_computed_hash(), f"scope_hash ({kwargs['scope_hash']}) =?= hash(self) ({self.get_computed_hash()})"
 
     def pretty_print(self):
         return f"HAKCScope({self.scope})"
@@ -460,12 +458,12 @@ class HAKCScope(HashedHAKCDBNode, yaml.YAMLObject):
 
 
 class HAKCSymbol(HashedHAKCDBNode, yaml.YAMLObject):
-    relation_type="has_type"
-    relation_symbol="has_symbol"
-    relation_scope="has_scope"
-    relation_compilation_unit="has_compilation_unit"
-    relation_division="has_division"
-    relation_dag="has_dag"
+    relation_type = "has_type"
+    relation_symbol = "has_symbol"
+    relation_scope = "has_scope"
+    relation_compilation_unit = "has_compilation_unit"
+    relation_division = "has_division"
+    relation_dag = "has_dag"
 
     # Init takes the attributes directly from the original dag.yml file the pass creates
     # Also, enforcing that some minimum amount of data is present (e.g., symbol needs a name and a type)
@@ -483,8 +481,8 @@ class HAKCSymbol(HashedHAKCDBNode, yaml.YAMLObject):
         assert (isinstance(self.type, HAKCType))
         assert (isinstance(self.scope, HAKCScope))
         if "type_hash" in kwargs:
-            assert kwargs["type_hash"] == self.get_computed_hash(), f"type_hash ({kwargs['type_hash']}) =?= hash(self) ({self.get_computed_hash()})"
-
+            assert kwargs[
+                       "type_hash"] == self.get_computed_hash(), f"type_hash ({kwargs['type_hash']}) =?= hash(self) ({self.get_computed_hash()})"
 
     def debug_print(self, root=True, whitespace=""):
         out = f"{whitespace}{self.name} of {self.type.debug_print()} in {self.scope.debug_print()}" + (
@@ -544,7 +542,8 @@ class HAKCSymbol(HashedHAKCDBNode, yaml.YAMLObject):
             HAKCDBRelation(HAKCSymbol.relation_type, HAKCSymbol, HAKCType),
             HAKCDBRelation(HAKCSymbol.relation_scope, HAKCSymbol, HAKCScope),
             HAKCDBRelation(HAKCSymbol.relation_symbol, HAKCSymbol, HAKCSymbol),
-            HAKCDBRelation(HAKCSymbol.relation_compilation_unit, HAKCSymbol, HAKCCompilationUnit, DefiningLine="UINT64"),
+            HAKCDBRelation(HAKCSymbol.relation_compilation_unit, HAKCSymbol, HAKCCompilationUnit,
+                           DefiningLine="UINT64"),
             HAKCDBRelation(HAKCSymbol.relation_division, HAKCSymbol, HAKCDivision),
             HAKCDBRelation(HAKCSymbol.relation_dag, HAKCSymbol, HAKCSymbol, weight="INT32")
         ]
@@ -582,7 +581,6 @@ class HAKCFunction(HAKCSymbol):
         return f"HAKCFunction({self.name})"
         # return f"HAKCFunction({self.name}, {self.type})"
 
-
     # need non_recursive parameter or else this will cause infinite recursion
     def debug_print(self, root=True, whitespace=""):
         out = f"{self.yaml_tag}\n" if root else ''
@@ -603,7 +601,7 @@ class HAKCFunction(HAKCSymbol):
         return out
 
     # def get_hash_inputs(self) -> list[object]:
-        # return [HAKCSymbol.get_hash_inputs(self), self.direct_calls, self.indirect_calls, self.types_used]
+    # return [HAKCSymbol.get_hash_inputs(self), self.direct_calls, self.indirect_calls, self.types_used]
 
     @classmethod
     def from_yaml(cls, loader: yaml.Loader, node):
@@ -630,7 +628,6 @@ class HAKCGlobalVariable(HAKCSymbol):
 
     def pretty_print(self):
         return f"HAKCGlobalVariable({self.name})"
-
 
     def debug_print(self, root=True, whitespace=""):
         return HAKCSymbol.debug_print(self)
@@ -685,6 +682,7 @@ class HAKCCompartmentalizationAdjustment(yaml.YAMLObject):
                 adjusted_division = adjustment.division
 
         return adjusted_division
+
 
 class HAKCDivisionCompartmentPayload(HAKCPayload):
     def __init__(self, division: HAKCDivision, compartment: HAKCCompartment, **kwargs):
@@ -741,6 +739,7 @@ class HAKCIndirectSourceLink(HAKCPrintableObj, yaml.YAMLObject):
         out += f"\n"
         return out
 
+
 class HAKCIndirectCallSource(HAKCPrintableObj, yaml.YAMLObject):
     yaml_tag = "!HAKCIndirectSource"
     kuzu_name = "indirect_call"
@@ -750,7 +749,7 @@ class HAKCIndirectCallSource(HAKCPrintableObj, yaml.YAMLObject):
         HAKCPrintableObj.__init__(self, **kwargs)
         self.source = Source
         self.type = Type
-        assert(isinstance(self.type, HAKCType))
+        assert (isinstance(self.type, HAKCType))
 
     @classmethod
     def from_yaml(cls, loader: yaml.Loader, node):
