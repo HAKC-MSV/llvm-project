@@ -171,7 +171,6 @@ class HAKCCompartment(HAKCDBNode, yaml.YAMLObject):
         yaml.YAMLObject.__init__(self)
         # kwargs["Name"] = kwargs.get("Name", str(CompartmentID))
         HAKCDBNode.__init__(self, **kwargs)
-        # print(self)
         self.compartment_id = CompartmentID
         self.entry_token = EntryToken
         if "compartment_hash" in kwargs:
@@ -497,7 +496,6 @@ class HAKCSymbol(HashedHAKCDBNode, yaml.YAMLObject):
 
     @classmethod
     def from_yaml(cls, loader: yaml.Loader, node):
-        print(f"here000 {node}")
         return cls(**loader.construct_mapping(node, deep=True))
 
     def __eq__(self, other):
@@ -518,10 +516,6 @@ class HAKCSymbol(HashedHAKCDBNode, yaml.YAMLObject):
         if self.scope:
             result.append(self.scope)
         return result
-
-    # @property
-    # def is_definition(self):
-    #     return self.defining_file is not None
 
     @staticmethod
     def get_primary_key() -> HAKCDBColumn:
@@ -579,7 +573,6 @@ class HAKCFunction(HAKCSymbol):
 
     def __str__(self):
         return f"HAKCFunction({self.name})"
-        # return f"HAKCFunction({self.name}, {self.type})"
 
     # need non_recursive parameter or else this will cause infinite recursion
     def debug_print(self, root=True, whitespace=""):
