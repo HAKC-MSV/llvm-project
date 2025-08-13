@@ -7,7 +7,7 @@ import pandas as pd
 from .HAKCBase import HAKCDBNode, HAKCDBRelation
 from .HAKCLogger import HAKCLogger
 from .HAKCObjects import HAKCSymbol, HAKCFunction, HAKCScope, HAKCType, HAKCGlobalVariable, HAKCDivision, \
-    HAKCCompartment, HAKCCompilationUnit
+    HAKCCompartment, HAKCCompilationUnit, HAKCSymbolDefinitionLocation
 
 logging.setLoggerClass(HAKCLogger)
 logger = logging.getLogger('hakc-dag')
@@ -71,30 +71,28 @@ class HAKCDatabase:
             logger.debug(f"Found access_token: {access_token} for division_id: {division_id}")
             return int(access_token)
 
-    def get_division_id_compartment_id_from_symbol(self, symbol: HAKCSymbol) -> Optional[Tuple[int, int, int, int]]:
+    def get_division_id_compartment_id_from_symbol(self, symbol: HAKCSymbol) -> Optional[
+        Tuple[HAKCDivision, HAKCCompartment]]:
         cmd = f"""        
-        MATCH (scope:{HAKCScope.get_table_name()})<-[:{HAKCSymbol.HasScopeTable}]-(sym:{HAKCSymbol.get_table_name()})-[:{HAKCSymbol.InDivisionTable}]->(div:{HAKCDivision.get_table_name()})-[:{HAKCDivision.InCompartmentTable}]->(comp:{HAKCCompartment.get_table_name()})
-        WITH sym.Name as Name, scope.Scope as Scope, div.DivisionID as division_id, div.AccessToken as access_token, comp.CompartmentID as compartment_id, comp.EntryToken as entry_token
+        MATCH (scope:{HAKCScope.get_table_name()})<-[:{HAKCSymbol.relation_scope}]-(sym:{HAKCSymbol.get_table_name()})-[:{HAKCSymbol.relation_division}]->(div:{HAKCDivision.get_table_name()})-[:{HAKCDivision.relation_compartment}]->(comp:{HAKCCompartment.get_table_name()})
+        WITH sym.Name as Name, scope.Scope as Scope, div.DivisionID as DivisionID, div.Salt as Salt, comp.CompartmentID as CompartmentID
         WHERE Name = $Name AND Scope = $Scope
-        RETURN division_id, access_token, compartment_id, entry_token
+        RETURN DivisionID, Salt, CompartmentID
         """
         response = self.execute_prepared_stmt(cmd, Name=symbol.name, Scope=symbol.scope.scope)
         # TODO: double check that this only returns one row
         ret = response.get_as_df()
         if ret.empty:
-            logger.error(f'Command: {cmd} returned None\n')
-            logger.error(f'Searched with Name: {symbol.name}, Scope: {str(symbol.scope)}')
+            logger.debug(f'Command: {cmd} returned None\n')
+            logger.debug(f'Searched with Name: {symbol.name}, Scope: {str(symbol.scope)}')
             return None
         else:
-            # TODO: check that this is correct when this is eventually called
-            division_id = ret["division_id"][0]
-            access_token = ret["access_token"][0]
-            compartment_id = ret["compartment_id"][0]
-            entry_token = ret["entry_token"][0]
-            logger.error(
-                f"Found division_id, access_token, compartment_id, entry_token: ({division_id}, {access_token}, {compartment_id}, {entry_token}) for symbol: {symbol}")
-            # need to cast to int because json cant parse numpy.uint64s apparently
-            return int(division_id), int(access_token), int(compartment_id), int(entry_token)
+            data = ret.to_dict(orient='records')
+            division = HAKCDivision(**data)
+            compartment = HAKCCompartment(**data)
+            logger.debug(
+                f"Found division_id, access_token, compartment_id, entry_token: ({division}, {compartment}) for symbol: {symbol}")
+            return division, compartment
 
     def get_valid_targets_from_compartment_id(self, source_compartment_id: int) -> list[int]:
         # TODO: double check this
@@ -103,7 +101,7 @@ class HAKCDatabase:
         # Get valid target compartments given compartment id
         # comp1 <- div1 <- symbol1 -(Dag2)-> symbol2 -> div2 -> comp2
         cmd = f"""
-        MATCH (comp1:{HAKCCompartment.get_table_name()})<-[:{HAKCDivision.InCompartmentTable}]-(div1:{HAKCDivision.get_table_name()})<-[:{HAKCSymbol.InDivisionTable}]-(sym1:{HAKCSymbol.get_table_name()})-[:{HAKCSymbol.DagEdgeTable}]->(sym2:{HAKCSymbol.get_table_name()})-[:{HAKCSymbol.InDivisionTable}]->(div2:{HAKCDivision.get_table_name()})-[:{HAKCDivision.InCompartmentTable}]->(comp2:{HAKCCompartment.get_table_name()})
+        MATCH (comp1:{HAKCCompartment.get_table_name()})<-[:{HAKCDivision.relation_compartment}]-(div1:{HAKCDivision.get_table_name()})<-[:{HAKCSymbol.relation_division}]-(sym1:{HAKCSymbol.get_table_name()})-[:{HAKCSymbol.relation_dag}]->(sym2:{HAKCSymbol.get_table_name()})-[:{HAKCSymbol.relation_division}]->(div2:{HAKCDivision.get_table_name()})-[:{HAKCDivision.relation_compartment}]->(comp2:{HAKCCompartment.get_table_name()})
         WITH  *
         WHERE comp1.CompartmentID = $source_compartment_id
         RETURN comp1.CompartmentID, comp2.CompartmentID, comp2.EntryToken;
@@ -189,23 +187,23 @@ class HAKCDatabase:
                 divisions.add(HAKCDivision(**data))
         return divisions
 
-    def get_symbol_definition_location(self, symbol: HAKCSymbol) -> tuple[HAKCCompilationUnit, int] | None:
+    def get_symbol_definition_location(self, symbol: HAKCSymbol) -> HAKCSymbolDefinitionLocation | None:
         cmd = f"""
         MATCH (sym:{HAKCSymbol.get_table_name()})-[e:{HAKCSymbol.relation_compilation_unit}]->(cu:{HAKCCompilationUnit.get_table_name()})
         WHERE sym.{str(HAKCSymbol.get_primary_key())} = $symbol_hash
-        RETURN cu.filename as filename, e.line as line;
+        RETURN cu.DefiningFile as DefiningFile, e.DefiningLine as DefiningLine;
         """
         response = self.execute_prepared_stmt(cmd, symbol_hash=hash(symbol))
         if response.has_next():
             resp_dict = response.get_as_df().to_dict(orient='records')
-            logger.info(f'resp_dict df: {resp_dict}')
-            return HAKCCompilationUnit(filename=resp_dict['filename'][0]), resp_dict['line'][0]
+            cu = HAKCCompilationUnit(**resp_dict)
+            return HAKCSymbolDefinitionLocation(DefiningFile=cu, DefiningLine=resp_dict['DefiningLine'])
         return None
 
     def get_dag_computation_edges(self, symbol_hash: int) -> dict[str, list[int]]:
         result = dict()
         cmd = f"""
-        MATCH (sym:{HAKCSymbol.get_table_name()})-[:{HAKCFunction.relation_indirect_calls}]->(:{HAKCType.get_table_name()})<-[:{HAKCSymbol.IsTypeTable}]-(indirect:{HAKCSymbol.get_table_name()})
+        MATCH (sym:{HAKCSymbol.get_table_name()})-[:{HAKCFunction.relation_indirect_calls}]->(:{HAKCType.get_table_name()})<-[:{HAKCSymbol.relation_type}]-(indirect:{HAKCSymbol.get_table_name()})
         WHERE sym.{str(HAKCSymbol.get_primary_key())} = $symbol_hash
         RETURN DISTINCT indirect.{str(HAKCSymbol.get_primary_key())} AS {HAKCFunction.relation_direct_calls}
         """
@@ -257,11 +255,11 @@ class HAKCDatabase:
 
         cmd.append("RETURN")
         return_str = """
-        sym.Name, sym.IsFunction AS IsFunction, scope.Scope, scope.LocalScopeName, ty.DebugType, ty.LLVMType
+        sym.Name, sym.IsFunction AS is_function, scope.Scope, scope.LocalScopeName, ty.DebugType, ty.LLVMType
         """
         cmd.append(f'{return_str}')
         if assume_defined:
-            cmd.append(", def.line AS DefiningLine, cu.filename AS DefiningFile")
+            cmd.append(", def.DefiningLine AS DefiningLine, cu.DefiningFile AS DefiningFile")
         cmd.append(f"""
             ORDER BY sym.Name, ty.DebugType, scope.Scope, scope.LocalScopeName
         """)

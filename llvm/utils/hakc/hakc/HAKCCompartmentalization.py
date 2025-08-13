@@ -7,10 +7,11 @@ import pandas as pd
 import yaml
 from networkx.readwrite import json_graph
 
-from .HAKCBase import HAKCDivisionEnum, HAKCDBNode, HAKCDBRelation
+from .HAKCBase import HAKCDivisionEnum, HAKCDBNode
 from .HAKCDatabase import HAKCDatabase
 from .HAKCLogger import HAKCLogger
-from .HAKCObjects import HAKCSymbol, HAKCCompilationUnit, HAKCFunction, HAKCType, HAKCTypePerm, HAKCCompartment, HAKCDivision, \
+from .HAKCObjects import HAKCSymbol, HAKCCompilationUnit, HAKCFunction, HAKCType, HAKCTypePerm, HAKCCompartment, \
+    HAKCDivision, \
     HAKCScope, HAKCGlobalVariable
 
 logging.setLoggerClass(HAKCLogger)
@@ -26,105 +27,30 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
     persisted_attr = 'persisted'
     yaml_tag = "!HAKCCompartmentalization"
 
-    def __init__(self, max_division_count: Optional[int] = 16, nxgraph: Optional[nx.MultiDiGraph] = None):
+    def __init__(self, max_division_count: Optional[int] = 16):
         yaml.YAMLObject.__init__(self)
         nx.MultiDiGraph.__init__(self)
         self.max_division_count = max_division_count
-        self.coalesced_epochs = dict()
-        # if nxgraph is not None:
-        #     for division in self.get_filtered_nodes(nxgraph, node_filter=lambda n: isinstance(n, HAKCDivision))():
-        #         for nbr in nxgraph.neighbors(division):
-        #             for edge_data in nxgraph.get_edge_data(division, nbr):
-        #                 if edge_data == HAKCDivision.InCompartmentTable:
-        #                     division.compartment_id = nbr.compartment_id
-        #                     self.add_division(division, nbr)
-        #
-        #     symbol_mapping = dict()
-        #     for symbol in self.get_filtered_nodes(nxgraph, node_filter=lambda n: isinstance(n, HAKCFunction) or isinstance(n, HAKCGlobalVariable)):
-        #         compilation_unit = None
-        #         division: Optional[HAKCDivision] = None
-        #         if isinstance(symbol, HAKCFunction):
-        #             new_symbol = HAKCFunction(Name=symbol.name)
-        #         else:
-        #             new_symbol = HAKCGlobalVariable(Name=symbol.name)
-        #         for nbr in nxgraph.neighbors(symbol):
-        #             for edge_data in nxgraph.get_edge_data(symbol, nbr):
-        #                 if edge_data == HAKCSymbol.IsTypeTable:
-        #                     new_symbol.type = nbr
-        #                 elif edge_data == HAKCSymbol.HasScopeTable:
-        #                     new_symbol.scope = nbr
-        #                 elif edge_data == HAKCSymbol.SymbolCompilationUnitTable:
-        #                     compilation_unit = nbr
-        #                 elif edge_data == HAKCSymbol.InDivisionTable:
-        #                     division = nbr
-        #                 elif edge_data == HAKCSymbol.DefinedInTable:
-        #                     new_symbol.defining_file = nbr.filename
-        #                     new_symbol.defining_line = nxgraph.get_edge_data(symbol, nbr, key=edge_data)['line']
-        #
-        #         new_symbol.computed_hash = None
-        #         self.add_symbol(new_symbol, compilation_unit)
-        #         self.set_division(new_symbol, division.division_id, division.compartment_id)
-        #         symbol_mapping[symbol] = new_symbol
-        #
-        #     for head, tail, edge_name, edge_data in nxgraph.edges.data(keys=True):
-        #         if edge_name in {HAKCSymbol.UsesSymbolTable, HAKCSymbol.DagEdgeTable, HAKCFunction.TypesUsedTable}:
-        #             new_head = symbol_mapping[head]
-        #             new_tail = symbol_mapping[tail]
-        #             if edge_name == HAKCSymbol.UsesSymbolTable:
-        #                 self.add_symbol_use(new_head, new_tail)
-        #             elif edge_name == HAKCSymbol.DagEdgeTable:
-        #                 self.add_dag_edge(new_head, new_tail, edge_data['weight'])
-        #             elif edge_name == HAKCFunction.TypesUsedTable:
-        #                 self.add_type_perm_type_edge(new_head, new_tail)
-
-
-    def load_from_db(self, conn: HAKCDatabase):
-        assert(isinstance(conn, HAKCDatabase))
-
-        # TODO: by default, the allowable access is empty (as far as I can tell), so this shouldn't be needed to validate the token hashes yet
-        # get the divisions and compartments first
-        # find all divisions that a symbol can reach via dag edges that are in the same compartment
-        # create the compartments, then the divisions, then calculate the tokens
-        # TODO: rename this get_functions_and_gvs or something
-        # TODO: make this multithreaded?
-        functions = conn.get_functions()
-        for function in functions:
-            self.__add_function(function)
-            dag_edges = conn.get_dag_edges(function)
-            for dag_edge in dag_edges:
-                self.add_dag_edge(dag_edge[0], function, dag_edge[1])
-                # print(f"Adding dag_edge: ({function})-[{dag_edge[1]}]->({dag_edge[0]})")
-
-            division, compartment, = conn.get_division_compartment(function)
-            self.__add_division_compartment(function, division, compartment)
-
-        self.save_graph("loaded_from_db.svg")
-
-        logger.debug(self)
 
     @classmethod
     def to_yaml(cls, dumper: yaml.Dumper, data):
         compartmentalization_data = json_graph.node_link_data(data, edges='edges')
         compartmentalization_data['max_division_count'] = data.max_division_count
         return dumper.represent_mapping(cls.yaml_tag, compartmentalization_data)
-        # return dumper.represent_mapping(cls.yaml_tag, data)
-
 
     @classmethod
     def from_yaml(cls, loader: yaml.Loader, node):
         # TODO: implement
         # print(node)
         data = loader.construct_mapping(node)
-        max_division_count = data.pop('max_division_count',0)
+        max_division_count = data.pop('max_division_count', 0)
         graph = json_graph.node_link_graph(data, directed=True)
         new_graph = cls(max_division_count=max_division_count)
         new_graph.add_nodes_from(graph.nodes(data=True))
         new_graph.add_edges_from(graph.edges(data=True))
         return new_graph
-        # return cls(**loader.construct_mapping(node, deep=True))
 
     def add_symbols(self, functions: list[HAKCFunction], global_variables: list[HAKCGlobalVariable]):
-
         for global_variable in global_variables:
             self.__add_global_variable(global_variable)
 
@@ -132,7 +58,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             self.__add_function(function)
 
     def __add_function(self, function: HAKCFunction):
-        assert(isinstance(function, HAKCFunction))
+        assert (isinstance(function, HAKCFunction))
 
         # add symbol with all its attributes
         self.__add_symbol(function)
@@ -140,7 +66,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
 
         # add function specific attributes,
         for direct_call in function.direct_calls:
-            assert(isinstance(direct_call, HAKCFunction))
+            assert (isinstance(direct_call, HAKCFunction))
             self.__add_symbol(direct_call)
             self.__add_persistent_edge(function, direct_call, key=HAKCFunction.relation_direct_calls)
 
@@ -155,11 +81,13 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
                 self.__add_persistent_edge(function, indirect_call, key=HAKCFunction.relation_indirect_calls)
 
         for type_used in function.types_used:
-            assert(isinstance(type_used, HAKCTypePerm))
-            self.__add_persistent_edge(function, type_used.perm_type, key=HAKCFunction.relation_types_used, R = (type_used.RWX & 0b100) >> 2, W = (type_used.RWX & 0b010) >> 1, X = (type_used.RWX & 0b001))
+            assert (isinstance(type_used, HAKCTypePerm))
+            self.__add_persistent_edge(function, type_used.perm_type, key=HAKCFunction.relation_types_used,
+                                       R=(type_used.RWX & 0b100) >> 2, W=(type_used.RWX & 0b010) >> 1,
+                                       X=(type_used.RWX & 0b001))
 
     def __add_type(self, _type: HAKCType, already_persisted: bool = False):
-        assert(isinstance(_type, HAKCType))
+        assert (isinstance(_type, HAKCType))
         self.__add_persistent_node(_type, already_persisted=already_persisted)
 
     def add_symbol(self, symbol):
@@ -168,7 +96,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
 
     def __add_symbol(self, symbol: HAKCSymbol):
         # add 'sanitized' version of the HAKCSymbol (e.g., don't include HAKCTypePerm as a node, since it should be an edge?)
-        assert(isinstance(symbol, HAKCSymbol))
+        assert (isinstance(symbol, HAKCSymbol))
 
         # add the symbol node
         self.__add_persistent_node(symbol)
@@ -176,17 +104,16 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         # now add all the edges from the symbol node to node (and add the nodes at the same time!)
         self.__add_persistent_edge(symbol, symbol.type, key=HAKCSymbol.relation_type)
         self.__add_persistent_edge(symbol, symbol.scope, key=HAKCSymbol.relation_scope)
-        if symbol.compilation_unit:
-            # print(f"Adding CompilationUnit! {symbol}")
-            self.__add_persistent_edge(symbol, symbol.compilation_unit, key=HAKCSymbol.relation_compilation_unit, DefiningLine=symbol.compilation_unit.defining_line)
+        if symbol.definition_location:
+            self.__add_persistent_edge(symbol, symbol.definition_location.file,
+                                       key=HAKCSymbol.relation_compilation_unit,
+                                       DefiningLine=symbol.definition_location.definition_line)
         for used_symbol in symbol.used_symbols:
             self.__add_persistent_edge(symbol, used_symbol, key=HAKCSymbol.relation_symbol)
 
-
     def __add_global_variable(self, global_variable: HAKCGlobalVariable):
-        assert(isinstance(global_variable, HAKCGlobalVariable))
+        assert (isinstance(global_variable, HAKCGlobalVariable))
         self.__add_symbol(global_variable)
-
 
     def add_dag_edge(self, head: HAKCSymbol, tail: HAKCSymbol, dag_edge_weight: int):
         if dag_edge_weight > 0:
@@ -195,7 +122,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
     def __add_persistent_node(self, node: HAKCDBNode, already_persisted: bool = False):
         # Note: networkx determines if a node is already in the graph if the id(node) exists, meaning the memory address, not the actual hash
         # need to maintain internal map of object hashes to the actual networkx node (prevent duplicates, ensure data normalcy)
-        assert(isinstance(node, HAKCDBNode))
+        assert (isinstance(node, HAKCDBNode))
         if node not in self:
             attrs = {HAKCCompartmentalization.persisted_attr: already_persisted}
             self.add_node(node, **attrs)
@@ -206,7 +133,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         return node
 
     def get_compartment_from_division(self, division: HAKCDivision):
-        assert(isinstance(division, HAKCDivision))
+        assert (isinstance(division, HAKCDivision))
         for edge in self.edges(division):
             compartment = edge[1]
             if isinstance(compartment, HAKCCompartment):
@@ -221,9 +148,9 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         return nodes
 
     def __add_division_compartment(self, symbol: HAKCSymbol, division: HAKCDivision, compartment: HAKCCompartment):
-        assert(isinstance(symbol, HAKCSymbol))
-        assert(isinstance(division, HAKCDivision))
-        assert(isinstance(compartment, HAKCCompartment))
+        assert (isinstance(symbol, HAKCSymbol))
+        assert (isinstance(division, HAKCDivision))
+        assert (isinstance(compartment, HAKCCompartment))
 
         self.__add_persistent_edge(symbol, division, key=HAKCSymbol.relation_division)
         self.__add_persistent_edge(division, compartment, key=HAKCDivision.relation_compartment)
@@ -282,14 +209,19 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
 
         self.persist_to_database(conn, create_schema=create_schema)
 
-    def compute_entry_token(self, compartment_id: int, divisions: list['HAKCDivision'] = []) -> int:
+    def compute_entry_token(self, compartment_id: int, divisions=None) -> int:
+        if divisions is None:
+            divisions = []
         token = compartment_id << self.max_division_count
         # TODO: ask derrick - does this apply to all divisions, or just divisions in the same compartment?
         for division in divisions:
             token |= (1 << division.division_id)
         return token
 
-    def compute_access_token(self, division_id: int, compartment_id: int, allowable_accesses: list['HAKCDivision'] = []) -> int:
+    def compute_access_token(self, division_id: int, compartment_id: int,
+                             allowable_accesses=None) -> int:
+        if allowable_accesses is None:
+            allowable_accesses = []
         if division_id != HAKCDivisionEnum.NO_DIVISION.value:
             access_token = (compartment_id << self.max_division_count) | (1 << division_id)
             for division in allowable_accesses:
@@ -302,7 +234,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         return access_token
 
     def __add_persistent_edge(self, u_for_edge: HAKCDBNode, v_for_edge: HAKCDBNode, key, **attr):
-        if not(self.has_edge(u_for_edge, v_for_edge, key)):
+        if not (self.has_edge(u_for_edge, v_for_edge, key)):
             attr[HAKCCompartmentalization.persisted_attr] = False
             self.add_edge(u_for_edge, v_for_edge, key, **attr)
 
@@ -336,8 +268,6 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
                 return division
         return None
 
-
-
     # def set_division(self, symbol: HAKCSymbol, division_id: int, compartment_id: int):
     #     division = self.get_division_node(division_id, compartment_id)
     #     compartment = self.get_compartment_node(compartment_id)
@@ -347,9 +277,9 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
     #         division = HAKCDivision(division_id, compartment_id, max_division_count=compartment.max_division_count)
     #     self.set_symbol_division(symbol, division, compartment)
 
-    # def add_division(self, division: HAKCDivision, compartment: HAKCCompartment):
-    #     compartment.add_division(division)
-    #     self.__add_persistent_edge(division, compartment, key=HAKCDivision.relation_compartment)
+    def add_division(self, division: HAKCDivision, compartment: HAKCCompartment):
+        self.__add_persistent_edge(division, compartment, key=HAKCDivision.relation_compartment)
+
     #
     # def set_symbol_division(self, symbol: HAKCSymbol, division: HAKCDivision, compartment: HAKCCompartment):
     #     # print(f"Adding symbol division for {symbol} in division {division} with compartment {compartment}")
@@ -381,7 +311,8 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         return self.get_filtered_nodes(self, node_filter=lambda n: isinstance(n, HAKCGlobalVariable))
 
     def get_symbols(self):
-        return self.get_filtered_nodes(self, node_filter=lambda n: isinstance(n, HAKCFunction) or isinstance(n, HAKCGlobalVariable))
+        return self.get_filtered_nodes(self, node_filter=lambda n: isinstance(n, HAKCFunction) or isinstance(n,
+                                                                                                             HAKCGlobalVariable))
 
     def get_scopes(self):
         return self.get_filtered_nodes(self, node_filter=lambda n: isinstance(n, HAKCScope))
@@ -393,238 +324,8 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         return self.get_filtered_nodes(self, node_filter=lambda n: isinstance(n, HAKCDivision))
 
     def get_symbol_by_name(self, symbol_name):
-        return self.get_filtered_nodes(self, node_filter=lambda n: (isinstance(n, HAKCFunction) or isinstance(n, HAKCGlobalVariable)) and n.name == symbol_name)
-
-    def get_functions_that_use_type(self, ty, debug=False):
-        if debug:
-            logger.debug(f"Type {ty} is used in functions:")
-        funcs = set()
-        # Note: For DiGraph, specify in_edges and out_edges, since using just edges() defaults to out edges
-        for func, ty0, data in self.in_edges(ty, data=True):
-            # checks here are probably redundant
-            # print(data)
-            # print(f"Func: {func.name}, Ty: {ty0.debug_type}, data: {data}")
-            if ty0 == ty and isinstance(func, HAKCFunction) and 'R' in data:
-                funcs.add(func)
-                if debug:
-                    logger.debug(f"\t{func} with perm {self.convert_rwx(**data)}")
-        return funcs
-
-    def get_type_subgraph(self, ty):
-        funcs_ty_nodes = self.get_functions_that_use_type(ty, False)
-        # G = self.subgraph(list(filter(lambda x: isinstance(x, HAKCSymbol) or isinstance(x, HAKCType), self.nodes)))
-        funcs_ty_nodes.add(ty)
-        G = self.subgraph(list(funcs_ty_nodes))
-        # G.save_graph(f"funcs_for_ty_{str(ty.debug_type).strip()}.png".strip())
-        return G
-
-    def get_root_subgraphs(self):
-        root_subgraphs = set()
-        root_nodes = self.get_roots()
-        for root_node in root_nodes:
-            symbol_descendents = nx.descendants(self, root_node)
-            symbol_descendents.add(root_node)
-            subG = self.subgraph(symbol_descendents)
-            root_subgraphs.add((root_node, subG))
-        return root_subgraphs
-
-    @staticmethod
-    def convert_rwx(**rwx):
-        if 'R' in rwx and 'W' in rwx and 'X' in rwx:
-            return int((rwx["R"] << 2) + (rwx["W"] << 1) + rwx["X"])
-        return None
-
-    def get_types_used(self, func, debug=False):
-        if debug:
-            logger.debug(f"Function {func} has types used:")
-        types_used = set()
-        for n0, ty0, data in self.edges(func, data=True):
-            if(n0 == func and isinstance(ty0, HAKCType) and 'R' in data):
-                type_perm = HAKCTypePerm(ty0, self.convert_rwx(**data))
-                types_used.add(type_perm)
-                if debug:
-                    logger.debug(f"\t{type_perm}")
-        return types_used
-
-    def get_common_type_perms(self, sym0, sym1, debug=False):
-        # return the intersection of the types used / permissions for two symbols
-        type_perms0 = self.get_types_used(sym0)
-        type_perms1 = self.get_types_used(sym1)
-        common_perms = type_perms0.intersection(type_perms1)
-        if debug and len(common_perms) > 0:
-            logger.debug(f"symbol {sym0} and {sym1}:")
-            logger.debug(f"{type_perms0} ∩ {type_perms1} \n\t= {common_perms}")
-        return common_perms
-
-    def get_perm(self, func, ty):
-        types_used_data = self.get_edge_data(func,ty)
-        if not types_used_data:
-            assert(False)
-            return None
-        rwx = types_used_data["has_types_used"] if "has_types_used" in types_used_data else None
-        perm = self.convert_rwx(**rwx)
-        # print(f"get_perm: {perm}")
-        return perm
-
-    def store_coalesced_epochs(self, new_epoch, n0, n1):
-        if new_epoch not in self.coalesced_epochs:
-            self.coalesced_epochs[new_epoch] = set()
-        self.coalesced_epochs[new_epoch].add(n0.pretty_print())
-        self.coalesced_epochs[new_epoch].add(n1.pretty_print())
-
-    def print_coalesced_epochs(self):
-        for epoch in self.coalesced_epochs.keys():
-            logger.debug(f"\tMerged Epoch {epoch} with")
-            for node in self.coalesced_epochs[epoch]:
-                logger.debug(f"\t\t{node}")
-
-    def get_roots(self):
-        # get all 'roots' of the graph, so all nodes can be traversed
-        # i.e., a node with no incoming connections
-        return {node for node, in_degree in self.in_degree() if (in_degree == 0 or (nx.number_of_selfloops(self) == in_degree)) and isinstance(node, HAKCFunction)}
-
-    def assign_initial_epochs(self, root):
-        # reset epochs
-        self.coalesced_epochs = dict()
-        epoch = HAKCCompartmentalization.kernel_compartment_id + 1 # reserving epoch 0 for the kernel compartment
-        for n0, n1, key in nx.edge_bfs(self, root):
-            if isinstance(n0, HAKCFunction):
-                if "epoch" not in self.nodes[n0]:
-                    self.nodes[n0]["epoch"] = epoch
-                    # print(f"Assigned {n0.name} {epoch}")
-                    epoch += 1
-            if isinstance(n1, HAKCFunction):
-                if "epoch" not in self.nodes[n1]:
-                    self.nodes[n1]["epoch"] = epoch
-                    # print(f"Assigned {n1.name} {epoch}")
-                    epoch += 1
-
-    def clear_epochs(self, root):
-        for n0, n1, key in nx.edge_bfs(self, root):
-            if isinstance(n0, HAKCFunction):
-                if "epoch" in self.nodes[n0]:
-                    del self.nodes[n0]["epoch"]
-            if isinstance(n1, HAKCFunction):
-                if "epoch" in self.nodes[n1]:
-                    del self.nodes[n1]["epoch"]
-        self.coalesced_epochs = dict()
-
-    def set_compartment_id_to_epochs(self, conn: HAKCDatabase, func: HAKCFunction, epoch: int):
-        new_epoch = conn.set_compartment_id_by_symbol(func, epoch)
-        assert new_epoch == epoch, f"The set epoch does not match the epoch we just set! This should never be called!"
-
-    def temporal_coalesce_parent_child(self, ty, root, conn):
-        # coalesce vertically (parent -> child)
-        logger.debug(f"!!!Starting temporal coalesce parent child with {root} for type:\n\t{ty}!!!")
-        self.assign_initial_epochs(root)
-        # logger.debug(f"Parent {parent} has children:")
-        # for successor in nx.bfs_successors(self, root):
-        for n0, n1, key in nx.edge_bfs(self, root):
-            # skipping self loops
-            if n0 == n1:
-                continue
-            parent = n0
-            child = n1
-            if isinstance(parent, HAKCFunction) and isinstance(child, HAKCFunction):
-                parent_epoch = self.nodes[parent]['epoch']
-                child_epoch = self.nodes[child]['epoch']
-                if parent_epoch == child_epoch:
-                    logger.debug(f"Parent and child are in same epoch {parent_epoch}, skipping")
-                    continue
-                # logger.debug(f"parent {parent.pretty_print()} -> child {child.pretty_print()}")
-                parent_ty_perm = self.get_perm(parent, ty)
-                child_ty_perm = self.get_perm(child, ty)
-                # logger.debug(f"\t{parent.name} parent_ty_perm: {parent_ty_perm}")
-                # logger.debug(f"\t{child.name} child_ty_perm: {child_ty_perm}")
-                # if parent and child are already in the same epoch, skip
-                if parent_ty_perm == child_ty_perm:
-                    new_epoch = min(parent_epoch, child_epoch)
-                    logger.debug(f"Merging {parent.pretty_print(parent_epoch)} with {child.pretty_print(child_epoch)} with common permissions {child_ty_perm} to new epoch: {new_epoch}")
-                    # only changing the epoch when needed to reduce redundant db calls
-                    if parent_epoch != new_epoch:
-                        self.nodes[parent]['epoch'] = new_epoch
-                        self.set_compartment_id_to_epochs(conn, parent, new_epoch)
-                    if child_epoch != new_epoch:
-                        self.nodes[child]['epoch'] = new_epoch
-                        self.set_compartment_id_to_epochs(conn, child, new_epoch)
-                    self.store_coalesced_epochs(new_epoch, parent, child)
-
-        if len(self.coalesced_epochs) > 0:
-            self.print_coalesced_epochs()
-            self.save_graph(f"epochs_ty_{ty.debug_type}_root_{root.name}.svg".replace(" ","-"))
-        # TODO: the assigned epochs to the networkx graph seem to persist, so clearing them now
-        len_coalesced_epochs = len(self.coalesced_epochs)
-        self.clear_epochs(root)
-
-        logger.debug(f"!!!End temporal coalesce parent child with {root} for type:\n\t{ty}!!!")
-        return len_coalesced_epochs
-
-    @staticmethod
-    def init_map(_map, ns, value):
-        if not _map:
-            # initialize first level
-            for n0 in ns:
-                _map[n0] = dict()
-            # construct pairs
-            for n0 in ns:
-                for n1 in ns:
-                    if hash(n0) < hash(n1):
-                        n0, n1 = n1, n0
-                    _map[n0][n1] = value
-
-    @staticmethod
-    def insert_map(_map, n0, n1, value):
-        if hash(n0) < hash(n1):
-            n0, n1 = n1, n0
-        # only insert value if it does not exist
-        # if n0 not in _map:
-        #     _map[n0] = dict()
-        # if n1 not in _map[n0]:
-        if not(_map[n0][n1]):
-            _map[n0][n1] = value
-
-    @staticmethod
-    def get_map(_map, n0, n1):
-        if hash(n0) < hash(n1):
-            n0, n1 = n1, n0
-        return _map[n0][n1]
-
-    def temporal_coalesce_parent_children(self, parent, epoch_map):
-        # coalesce horizontally (parent -> child0, parent -> child1)
-        # for n0, n1, key in nx.edge_bfs(self, parent):
-
-        # construct a map which contains every function node
-
-        # funcs = filter(lambda x: isinstance(x, HAKCFunction), self.get_functions())
-        logger.debug(f"Starting temporal coalesce parent children")
-        for successor in nx.bfs_successors(self, parent, depth_limit=1):
-            assert(successor[0] == parent)
-
-            child0_child1_merge_map = dict()
-            children = sorted(list(filter(lambda x: isinstance(x, HAKCFunction), successor[1])))
-            logger.debug(f"children: {children}")
-            HAKCCompartmentalization.init_map(child0_child1_merge_map, children, None)
-
-            logger.debug("\t\t" + ",\t\t".join(list(map(lambda x: f"{x.name}", children))))
-            for child0 in children:
-                logger.debug(f"{child0.name}\t\t", end="")
-                for child1 in children:
-                    if child0 != child1:
-                        common_perms = self.get_common_type_perms(child0, child1, debug=False)
-                        if len(common_perms) > 0:
-                            HAKCCompartmentalization.insert_map(child0_child1_merge_map, child0, child1, True)
-                            # logger.debug(f"Could merge {child0} in epoch {epoch_map[child0]} with {child1} in epoch {epoch_map[child1]} with common permissions {common_perms}")
-                        else:
-                            HAKCCompartmentalization.insert_map(child0_child1_merge_map, child0, child1, False)
-                    logger.debug(f"{HAKCCompartmentalization.get_map(child0_child1_merge_map, child0, child1)}\t\t", end="")
-                logger.debug()
-            # logger.debug(f"child0_child1_merge_map: {child0_child1_merge_map}")
-
-            for a in child0_child1_merge_map.items():
-                logger.debug(f"{a[0]} \n\t-> {a[1]}")
-
-        logger.debug(f"End temporal coalesce parent children")
-
+        return self.get_filtered_nodes(self, node_filter=lambda n: (isinstance(n, HAKCFunction) or isinstance(n,
+                                                                                                              HAKCGlobalVariable)) and n.name == symbol_name)
 
     def get_symbol_compartment_id(self, symbol: HAKCSymbol) -> int:
         for neighbor in self.neighbors(symbol):
@@ -690,10 +391,9 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
                 if isinstance(node, HAKCCompartment):
                     # Note: never persist incomplete objects
                     logger.debug(f"compartment_hash: {node.computed_hash}")
-                    assert(node.entry_token != None)
 
                 db_data = node.get_db_data()
-                if len(data_to_persist) > 0 and len(db_data) != len(data_to_persist):
+                if 0 < len(data_to_persist) != len(db_data):
                     logger.error(
                         f'Node {node} does not have all the data needed. Data needed is {" ".join(sorted(data_to_persist.keys()))} and data provided is {" ".join(sorted([column.column_name for column in db_data.keys()]))}')
                 for column, data in db_data.items():
@@ -831,97 +531,93 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
 
         return [node for node, degree in sorted_degrees[:n]]
 
-    def relabel_nodes(self, x):
-        if isinstance(x, HAKCFunction):
-            return x.pretty_print(self.nodes[x]["epoch"] if "epoch" in self.nodes[x] else None)
-        else:
-            return x.pretty_print()
-
-    def save_graph(self, fname, symbol_name = None, prune = False, N = 50, filter_symbols = False, debug = False):
-        from networkx.drawing.nx_pydot import to_pydot
-        if debug:
-            logger.debug(f"Trying to save {self} to {fname}")
-
-        if filter_symbols:
-            # sorted(list(filter(lambda x: isinstance(x, HAKCFunction), successor[1])))
-            G = self.subgraph(list(filter(lambda x: isinstance(x, HAKCSymbol) or isinstance(x, HAKCType), self.nodes)))
-        else:
-            G = self.subgraph(self.nodes)
-
-        # node_filter = lambda n: (isinstance(n, HAKCFunction) or isinstance(n, HAKCGlobalVariable)) and n.name == symbol_name
-        # _symbol = nx.subgraph_view(G, filter_node=node_filter).nodes()
-        functions = self.get_functions()
-        # logger.debug(functions)
-        if symbol_name:
-            symbol = [n for n in functions if n.name == symbol_name]
-            if debug:
-                logger.debug(f"Found {symbol} of type {type(symbol)}")
-            # symbol = self.nodes[_symbol]
-
-            # symbol = self.get_symbol_by_name(symbol_name)
-            # logger.debug(f"Found symbol {symbol} in {len(symbol)}")
-            symbol_descendents = nx.descendants(G, symbol[0])
-            # logger.debug(f"{symbol} has {symbol_descendents} descendents!")
-            G = G.subgraph(symbol_descendents)
-
-        if prune:
-            top_n_node_ids = HAKCCompartmentalization.show_top_n_degrees(G, N)
-            subgraph = G.subgraph(top_n_node_ids)
-            # logger.debug(G.nodes)
-            G = subgraph
-        # remove self loops
-        # subgraph = G.subgraph(G.nodes)
-        # self_loops = list(nx.selfloop_edges(subgraph))  # Convert generator to list to avoid RuntimeError
-        # subgraph.remove_edges_from(self_loops)
-        # G = subgraph
-
-        G = nx.relabel_nodes(G, self.relabel_nodes)
-
-        dot = to_pydot(G)
-        dot.set_splines("true")
-        dot.set("overlap", "false")
-        dot.set("rankdir","LR")
-        colors = ["lightblue", "green", "aquamarine", "yellow", "orange"]
-        for node in dot.get_nodes():
-            node.set("shape", "box")
-            # Change color of box to show nodes that have been coalesced
-            # logger.debug(self.coalesced_epochs[ty])
-            # logger.debug(node.get("epoch"))
-            epoch = node.get("epoch")
-            # Note: Displaying the color of merged nodes only works if a root is specified
-            if epoch:
-                if int(epoch) in self.coalesced_epochs.keys():
-                    node.set("style", "filled")
-                    node.set("fillcolor", colors[int(epoch) % len(colors)])
-
-        # set edge labels
-        for edge in dot.get_edges():
-            # logger.debug(edge.obj_dict)
-            # ignore all 'persisted' attributes
-            if "persisted" in edge.obj_dict["attributes"]:
-                del edge.obj_dict["attributes"]["persisted"]
-
-            edge.set_label(str(edge.obj_dict["attributes"]))
-
-        # dot.write_png(fname)
-        dot.write_svg(fname)
-
-        logger.debug(f"Saved {self} to {fname}")
+    def save_graph(self, fname, symbol_name=None, prune=False, N=50, filter_symbols=False, debug=False):
+        pass
+        # from networkx.drawing.nx_pydot import to_pydot
+        # if debug:
+        #     logger.debug(f"Trying to save {self} to {fname}")
+        #
+        # if filter_symbols:
+        #     # sorted(list(filter(lambda x: isinstance(x, HAKCFunction), successor[1])))
+        #     G = self.subgraph(list(filter(lambda x: isinstance(x, HAKCSymbol) or isinstance(x, HAKCType), self.nodes)))
+        # else:
+        #     G = self.subgraph(self.nodes)
+        #
+        # # node_filter = lambda n: (isinstance(n, HAKCFunction) or isinstance(n, HAKCGlobalVariable)) and n.name == symbol_name
+        # # _symbol = nx.subgraph_view(G, filter_node=node_filter).nodes()
+        # functions = self.get_functions()
+        # # logger.debug(functions)
+        # if symbol_name:
+        #     symbol = [n for n in functions if n.name == symbol_name]
+        #     if debug:
+        #         logger.debug(f"Found {symbol} of type {type(symbol)}")
+        #     # symbol = self.nodes[_symbol]
+        #
+        #     # symbol = self.get_symbol_by_name(symbol_name)
+        #     # logger.debug(f"Found symbol {symbol} in {len(symbol)}")
+        #     symbol_descendents = nx.descendants(G, symbol[0])
+        #     # logger.debug(f"{symbol} has {symbol_descendents} descendents!")
+        #     G = G.subgraph(symbol_descendents)
+        #
+        # if prune:
+        #     top_n_node_ids = HAKCCompartmentalization.show_top_n_degrees(G, N)
+        #     subgraph = G.subgraph(top_n_node_ids)
+        #     # logger.debug(G.nodes)
+        #     G = subgraph
+        # # remove self loops
+        # # subgraph = G.subgraph(G.nodes)
+        # # self_loops = list(nx.selfloop_edges(subgraph))  # Convert generator to list to avoid RuntimeError
+        # # subgraph.remove_edges_from(self_loops)
+        # # G = subgraph
+        #
+        # # G = nx.relabel_nodes(G, self.relabel_nodes)
+        #
+        # dot = to_pydot(G)
+        # dot.set_splines("true")
+        # dot.set("overlap", "false")
+        # dot.set("rankdir", "LR")
+        # colors = ["lightblue", "green", "aquamarine", "yellow", "orange"]
+        # for node in dot.get_nodes():
+        #     node.set("shape", "box")
+        #     # Change color of box to show nodes that have been coalesced
+        #     # logger.debug(self.coalesced_epochs[ty])
+        #     # logger.debug(node.get("epoch"))
+        #     epoch = node.get("epoch")
+        #     # Note: Displaying the color of merged nodes only works if a root is specified
+        #     if epoch:
+        #         if int(epoch) in self.coalesced_epochs.keys():
+        #             node.set("style", "filled")
+        #             node.set("fillcolor", colors[int(epoch) % len(colors)])
+        #
+        # # set edge labels
+        # for edge in dot.get_edges():
+        #     # logger.debug(edge.obj_dict)
+        #     # ignore all 'persisted' attributes
+        #     if "persisted" in edge.obj_dict["attributes"]:
+        #         del edge.obj_dict["attributes"]["persisted"]
+        #
+        #     edge.set_label(str(edge.obj_dict["attributes"]))
+        #
+        # # dot.write_png(fname)
+        # dot.write_svg(fname)
+        #
+        # logger.debug(f"Saved {self} to {fname}")
 
     def save_graph_alt(self, fname, debug=False):
-        import matplotlib.pyplot as plt
-        from networkx.drawing.nx_agraph import graphviz_layout
-
-        G = self.subgraph(self.nodes)
-        G = nx.relabel_nodes(G, lambda x: x.pretty_print())
-
-        pos = graphviz_layout(G, prog='dot', args='-Grankdir="LR" -Gminlen="1"')
-
-        plt.figure(figsize=(16,9))
-        nx.draw(G, pos, with_labels=True, node_shape="o", node_color='none', edgecolors='black')
-        nx.draw_networkx_edge_labels(G, pos)
-        # logger.debug(G.edges)
-        plt.savefig(fname)
-        plt.close()
-        if debug:
-            logger.debug(f"Saved {self} to {fname}")
+        pass
+        # import matplotlib.pyplot as plt
+        # from networkx.drawing.nx_agraph import graphviz_layout
+        #
+        # G = self.subgraph(self.nodes)
+        # G = nx.relabel_nodes(G, lambda x: x.pretty_print())
+        #
+        # pos = graphviz_layout(G, prog='dot', args='-Grankdir="LR" -Gminlen="1"')
+        #
+        # plt.figure(figsize=(16, 9))
+        # nx.draw(G, pos, with_labels=True, node_shape="o", node_color='none', edgecolors='black')
+        # nx.draw_networkx_edge_labels(G, pos)
+        # # logger.debug(G.edges)
+        # plt.savefig(fname)
+        # plt.close()
+        # if debug:
+        #     logger.debug(f"Saved {self} to {fname}")
