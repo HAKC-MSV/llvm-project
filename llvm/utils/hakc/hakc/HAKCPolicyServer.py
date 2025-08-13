@@ -244,13 +244,14 @@ class KUZUHAKCPolicyDataStore(HAKCPolicyDataSource):
         return HAKCCompartment(compartment_id, EntryToken=entry_token)
 
     def _get_division_from_backing_store(self, division_id: int, compartment_id: int) -> Optional[HAKCDivision]:
-        logger.debug(f"Trying to get division_id: {division_id} from backing store")
-        access_token = self.database.get_division_access_token_from_id(division_id, compartment_id)
-        if access_token is None:
+        logger.debug(f"Trying to get division {division_id} in compartment {compartment_id}")
+        division = self.database.get_division(division_id, compartment_id)
+
+        if division is None:
             logger.error(
                 f"Unable to find access_token for division_id {division_id}, so using default value of {self.default_division}!")
-            return self.default_division
-        return HAKCDivision(division_id, AccessToken=access_token)
+            division = self.default_division
+        return division
 
     def _get_symbol_division_from_backing_store(self, symbol: HAKCSymbol) -> Optional[HAKCDivisionCompartmentPayload]:
         assert (isinstance(symbol, HAKCSymbol))

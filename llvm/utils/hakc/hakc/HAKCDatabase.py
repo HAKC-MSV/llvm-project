@@ -50,17 +50,32 @@ class HAKCDatabase:
 
     def get_division_access_token_from_id(self, division_id: int, compartment_id: int) -> Optional[int]:
         cmd = f"""
+        MATCH
         (comp:{HAKCCompartment.get_table_name()})<-[:{str(HAKCDivision.relation_compartment)}]-(div1:{HAKCDivision.get_table_name()})<-[:{str(HAKCSymbol.relation_division)}]-(:{HAKCSymbol.get_table_name()})-[:{HAKCSymbol.relation_dag}]->(:{HAKCSymbol.get_table_name()})-[:{str(HAKCSymbol.relation_division)}]->(div2:{HAKCDivision.get_table_name()})-[:{str(HAKCDivision.relation_compartment)}]->(comp)
         WHERE comp.{str(HAKCCompartment.get_primary_key())} = $compartment_id AND div1.DivisionID = $division_id
         RETURN DISTINCT div2.DivisionID AS DivisionID
         """
-        logger.debug(f"cmd = {cmd}")
         response = self.execute_prepared_stmt(cmd, division_id=division_id, compartment_id=compartment_id)
         ret = response.get_as_df()
         division_ids = {division_id}
         for division_id in ret["DivisionID"]:
             division_ids.add(int(division_id))
         return HAKCDivision.compute_access_token(compartment_id, division_ids)
+
+    def get_division(self, division_id: int, compartment_id: int) -> Optional[HAKCDivision]:
+        access_token = self.get_division_access_token_from_id(division_id, compartment_id)
+        cmd = f"""
+        MATCH (div:{HAKCDivision.get_table_name()})-[:{HAKCDivision.relation_compartment}]->(c:{HAKCCompartment.get_table_name()})
+        WHERE div.DivisionID = $division_id AND c.CompartmentID = $compartment_id
+        RETURN div.DivisionID AS DivisionID, div.Salt AS Salt, div.{str(HAKCDivision.get_primary_key())} AS division_hash
+        """
+        response = self.execute_prepared_stmt(cmd, division_id=division_id, compartment_id=compartment_id)
+        if response.has_next():
+            ret = response.get_as_df()
+            data = ret.to_dict(orient='records')
+            division = HAKCDivision(AccessToken=access_token, **data)
+            return division
+        return None
 
     def get_division_id_compartment_id_from_symbol(self, symbol: HAKCSymbol) -> Optional[
         Tuple[HAKCDivision, HAKCCompartment]]:
@@ -167,8 +182,8 @@ class HAKCDatabase:
 
     def get_all_divisions(self):
         cmd = f"""
-        MATCH (div:{HAKCDivision.get_table_name()})-[:{HAKCDivision.relation_compartment}]->(c:{HAKCCompartment.get_table_name()})
-        RETURN div.DivisionID as DivisionID, c.CompartmentID AS compartment_id
+        MATCH (div:{HAKCDivision.get_table_name()})
+        RETURN div.DivisionID as DivisionID, div.Salt as Salt, div.{str(HAKCDivision.get_primary_key())} as division_hash
         """
         divisions = set()
         response = self.execute_prepared_stmt(cmd)

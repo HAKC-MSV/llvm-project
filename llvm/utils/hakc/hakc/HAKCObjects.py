@@ -181,7 +181,7 @@ class HAKCCompartment(HAKCDBNode, yaml.YAMLObject):
 
     @staticmethod
     def get_primary_key() -> HAKCDBColumn:
-        return HAKCDBColumn('compartment_id', 'UINT64')
+        return HAKCDBColumn('CompartmentID', 'UINT64')
 
     @staticmethod
     def get_table_name() -> str:
