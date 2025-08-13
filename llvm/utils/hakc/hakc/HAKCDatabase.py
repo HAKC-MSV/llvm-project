@@ -37,39 +37,30 @@ class HAKCDatabase:
 
     def get_compartment_entry_token_from_id(self, compartment_id: int) -> Optional[int]:
         cmd = f"""
-        MATCH (comp:{HAKCCompartment.get_table_name()})
-        WITH comp.CompartmentID as compartment_id, comp.EntryToken as entry_token
-        WHERE compartment_id = $compartment_id
-        RETURN entry_token;
+        (comp:{HAKCCompartment.get_table_name()})<-[:{str(HAKCDivision.relation_compartment)}]-(div1:{HAKCDivision.get_table_name()})<-[:{str(HAKCSymbol.relation_division)}]-(:{HAKCSymbol.get_table_name()})-[:{HAKCSymbol.relation_dag}]->(:{HAKCSymbol.get_table_name()})
+        WHERE comp.{str(HAKCCompartment.get_primary_key())} = $compartment_id
+        RETURN DISTINCT div1.DivisionID AS DivisionID
         """
         response = self.execute_prepared_stmt(cmd, compartment_id=compartment_id)
         ret = response.get_as_df()
-        if ret.empty:
-            logger.debug(f'Command: {cmd} returned None')
-            logger.debug(f'Searched with compartment_id: {compartment_id}')
-            return None
-        else:
-            entry_token = ret["entry_token"][0]
-            logger.debug(f"Found entry_token: {entry_token} for compartment_id: {compartment_id}")
-            return int(entry_token)
+        target_divisions = set()
+        for division_id in ret["DivisionID"]:
+            target_divisions.add(int(division_id))
+        return HAKCCompartment.compute_entry_token(compartment_id, target_divisions)
 
     def get_division_access_token_from_id(self, division_id: int, compartment_id: int) -> Optional[int]:
         cmd = f"""
-        MATCH (div:{HAKCDivision.get_table_name()})-[:{HAKCDivision.relation_compartment}]->(comp:{HAKCCompartment.get_table_name()})
-        WITH div.DivisionID as division_id, div.AccessToken as access_token, comp.CompartmentID AS compartment_id, comp.EntryToken AS entry_token
-        WHERE division_id = $division_id AND compartment_id = $compartment_id 
-        RETURN access_token, entry_token;
+        (comp:{HAKCCompartment.get_table_name()})<-[:{str(HAKCDivision.relation_compartment)}]-(div1:{HAKCDivision.get_table_name()})<-[:{str(HAKCSymbol.relation_division)}]-(:{HAKCSymbol.get_table_name()})-[:{HAKCSymbol.relation_dag}]->(:{HAKCSymbol.get_table_name()})-[:{str(HAKCSymbol.relation_division)}]->(div2:{HAKCDivision.get_table_name()})-[:{str(HAKCDivision.relation_compartment)}]->(comp)
+        WHERE comp.{str(HAKCCompartment.get_primary_key())} = $compartment_id AND div1.DivisionID = $division_id
+        RETURN DISTINCT div2.DivisionID AS DivisionID
         """
+        logger.debug(f"cmd = {cmd}")
         response = self.execute_prepared_stmt(cmd, division_id=division_id, compartment_id=compartment_id)
         ret = response.get_as_df()
-        if ret.empty:
-            logger.debug(f'Command: {cmd} returned None')
-            logger.debug(f'Searched with division_id: {division_id}, compartment_id: {compartment_id}')
-            return None
-        else:
-            access_token = ret["access_token"][0]
-            logger.debug(f"Found access_token: {access_token} for division_id: {division_id}")
-            return int(access_token)
+        division_ids = {division_id}
+        for division_id in ret["DivisionID"]:
+            division_ids.add(int(division_id))
+        return HAKCDivision.compute_access_token(compartment_id, division_ids)
 
     def get_division_id_compartment_id_from_symbol(self, symbol: HAKCSymbol) -> Optional[
         Tuple[HAKCDivision, HAKCCompartment]]:

@@ -72,9 +72,10 @@ class HAKCDivision(HashedHAKCDBNode, yaml.YAMLObject):
         HashedHAKCDBNode.__init__(self, **kwargs)
         self.division_id = DivisionID
         self.salt = kwargs.get("Salt", random.randint(0, sys.maxsize))
+        self.access_token = kwargs.get("AccessToken", None)
 
     @staticmethod
-    def compute_entry_token(compartment_id: int, division_ids: set[int]) -> int:
+    def compute_access_token(compartment_id: int, division_ids: set[int]) -> int:
         token = compartment_id << HAKCCompartment.max_compartments
         for division_id in division_ids:
             assert 0 <= division_id < HAKCCompartment.max_compartments, f"Invalid division ID {division_id}"
@@ -143,6 +144,14 @@ class HAKCCompartment(HAKCDBNode, yaml.YAMLObject):
         yaml.YAMLObject.__init__(self)
         HAKCDBNode.__init__(self, **kwargs)
         self.compartment_id = CompartmentID
+
+    @staticmethod
+    def compute_entry_token(compartment_id: int, entry_divisions: set[int]):
+        token = compartment_id << HAKCCompartment.max_compartments
+        for division_id in entry_divisions:
+            assert 0 <= division_id < HAKCCompartment.max_compartments
+            token |= (1 << division_id)
+        return token
 
     def pretty_print(self):
         return f"{self.get_table_name()}({self.compartment_id})"
