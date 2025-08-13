@@ -92,8 +92,8 @@ class HAKCPolicyDataSource:
                           config.get_division_from_symbol_endpoint: self.get_symbol_division,
                           config.get_valid_targets_from_compartment_id_endpoint: self.get_valid_targets_from_compartment_id}
         self.yaml_loader = yaml_loader
-        self.default_compartment = HAKCCompartment(config.default_compartment_id)
-        self.default_division = HAKCDivision(config.default_division_id)
+        self.default_compartment = HAKCCompartment(config.default_compartment_id, EntryToken=0)
+        self.default_division = HAKCDivision(config.default_division_id, AccessToken=0, Salt=0)
         self.socket_path = config.socket_path
         self.test_mode = config.test_mode
 
@@ -135,7 +135,7 @@ class HAKCPolicyDataSource:
         return compartment
 
     def get_symbol_division(self, **kwargs) -> HAKCDivisionCompartmentPayload:
-        _symbol = kwargs_get(object, "object", None, **kwargs)
+        _symbol = kwargs_get(str, "object", None, **kwargs)
         symbol = yaml.load(_symbol, Loader=self.yaml_loader)
         ret = None
 
@@ -256,9 +256,9 @@ class KUZUHAKCPolicyDataStore(HAKCPolicyDataSource):
     def _get_symbol_division_from_backing_store(self, symbol: HAKCSymbol) -> Optional[HAKCDivisionCompartmentPayload]:
         assert (isinstance(symbol, HAKCSymbol))
         logger.debug(f"Trying to get HAKCDivision object from backing store with symbol: {symbol}")
-        compartment_id_division_id_tuple = self.database.get_division_compartment(symbol)
+        compartment_id_division_id_tuple = self.database.get_division_id_compartment_id_from_symbol(symbol)
         if compartment_id_division_id_tuple is None:
-            logger.error(f"get_division_compartment returned None for symbol: {symbol}")
+            logger.error(f"get_division_id_compartment_id_from_symbol returned None for symbol: {symbol}")
             return None
         return HAKCDivisionCompartmentPayload(division=compartment_id_division_id_tuple[0],
                                               compartment=compartment_id_division_id_tuple[1])

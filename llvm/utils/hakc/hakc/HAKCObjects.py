@@ -135,6 +135,15 @@ class HAKCDivision(HashedHAKCDBNode, yaml.YAMLObject):
             schema[2]: self.salt
         }
 
+    def get_info_tokens(self, convert_hash=True) -> dict[str, object]:
+        tokens = {
+            "DivisionID": self.division_id,
+            "Salt": self.salt,
+        }
+        if self.access_token is not None:
+            tokens["AccessToken"] = self.access_token
+        return tokens
+
 
 class HAKCCompartment(HAKCDBNode, yaml.YAMLObject):
     yaml_tag = "!HAKCCompartment"
@@ -144,6 +153,7 @@ class HAKCCompartment(HAKCDBNode, yaml.YAMLObject):
         yaml.YAMLObject.__init__(self)
         HAKCDBNode.__init__(self, **kwargs)
         self.compartment_id = CompartmentID
+        self.entry_token = kwargs.get("EntryToken", None)
 
     @staticmethod
     def compute_entry_token(compartment_id: int, entry_divisions: set[int]):
@@ -201,6 +211,12 @@ class HAKCCompartment(HAKCDBNode, yaml.YAMLObject):
     @classmethod
     def get_data_columns(cls) -> list[HAKCDBColumn]:
         return []
+
+    def get_info_tokens(self, convert_hash=True) -> dict[str, object]:
+        tokens = {self.get_primary_key().column_name: self.compartment_id}
+        if self.entry_token is not None:
+            tokens['EntryToken'] = self.entry_token
+        return tokens
 
 
 class HAKCType(HashedHAKCDBNode, yaml.YAMLObject):

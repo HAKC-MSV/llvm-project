@@ -37,6 +37,7 @@ class HAKCDatabase:
 
     def get_compartment_entry_token_from_id(self, compartment_id: int) -> Optional[int]:
         cmd = f"""
+        MATCH
         (comp:{HAKCCompartment.get_table_name()})<-[:{str(HAKCDivision.relation_compartment)}]-(div1:{HAKCDivision.get_table_name()})<-[:{str(HAKCSymbol.relation_division)}]-(:{HAKCSymbol.get_table_name()})-[:{HAKCSymbol.relation_dag}]->(:{HAKCSymbol.get_table_name()})
         WHERE comp.{str(HAKCCompartment.get_primary_key())} = $compartment_id
         RETURN DISTINCT div1.DivisionID AS DivisionID
@@ -97,7 +98,7 @@ class HAKCDatabase:
             division = HAKCDivision(**data)
             compartment = HAKCCompartment(**data)
             logger.debug(
-                f"Found division_id, access_token, compartment_id, entry_token: ({division}, {compartment}) for symbol: {symbol}")
+                f"Found ({division}, {compartment}) for symbol: {symbol}")
             return division, compartment
 
     def get_valid_targets_from_compartment_id(self, source_compartment_id: int) -> list[int]:
@@ -110,7 +111,7 @@ class HAKCDatabase:
         MATCH (comp1:{HAKCCompartment.get_table_name()})<-[:{HAKCDivision.relation_compartment}]-(div1:{HAKCDivision.get_table_name()})<-[:{HAKCSymbol.relation_division}]-(sym1:{HAKCSymbol.get_table_name()})-[:{HAKCSymbol.relation_dag}]->(sym2:{HAKCSymbol.get_table_name()})-[:{HAKCSymbol.relation_division}]->(div2:{HAKCDivision.get_table_name()})-[:{HAKCDivision.relation_compartment}]->(comp2:{HAKCCompartment.get_table_name()})
         WITH  *
         WHERE comp1.CompartmentID = $source_compartment_id
-        RETURN comp1.CompartmentID, comp2.CompartmentID, comp2.EntryToken;
+        RETURN comp1.CompartmentID, comp2.CompartmentID
         """
         response = self.execute_prepared_stmt(cmd, source_compartment_id=source_compartment_id)
         data = response.get_as_df()
@@ -123,7 +124,6 @@ class HAKCDatabase:
             targets = list()
             for index, row in data.iterrows():
                 target_id = row["comp2.CompartmentID"]
-                # entry_token = row["comp2.EntryToken"] // probably don't need entry token here
                 if target_id not in targets:
                     logger.debug(f"Found valid_targets from {row['comp1.CompartmentID']} to {target_id}")
                     targets.append(int(target_id))
