@@ -12,13 +12,14 @@ from .HAKCBase import HAKCDBColumn, HAKCDBRelation, HAKCDBNode, HAKCPrintableObj
 logger = logging.getLogger('hakc-dag')
 
 
-class HAKCCompilationUnit(HAKCDBNode, yaml.YAMLObject):
+class HAKCDefinitionLocation(HAKCDBNode, yaml.YAMLObject):
     yaml_tag = "!HAKCCompilationUnit"
 
-    def __init__(self, DefiningFile: str, **kwargs):
+    def __init__(self, DefiningFile: str, DefiningLine: int, **kwargs):
         yaml.YAMLObject.__init__(self)
         HAKCDBNode.__init__(self, **kwargs)
         self.defining_file = DefiningFile
+        self.defining_line = DefiningLine
 
     def pretty_print(self):
         return f"{self.get_table_name()}({self.defining_file})"
@@ -28,7 +29,7 @@ class HAKCCompilationUnit(HAKCDBNode, yaml.YAMLObject):
         return cls(**loader.construct_mapping(node, deep=True))
 
     def __eq__(self, other):
-        if isinstance(other, HAKCCompilationUnit):
+        if isinstance(other, HAKCDefinitionLocation):
             return self.defining_file == other.defining_file
         return False
 
@@ -53,10 +54,10 @@ class HAKCCompilationUnit(HAKCDBNode, yaml.YAMLObject):
 
     @staticmethod
     def get_table_name() -> str:
-        return HAKCCompilationUnit.yaml_tag[1:]
+        return HAKCDefinitionLocation.yaml_tag[1:]
 
     def get_db_data(self, convert_hash=True) -> dict[HAKCDBColumn, object]:
-        schema = HAKCCompilationUnit.get_db_table_columns()
+        schema = HAKCDefinitionLocation.get_db_table_columns()
         return {
             schema[0]: hash(self) if convert_hash else self.get_computed_hash(),
             schema[1]: self.defining_file,
@@ -438,30 +439,6 @@ class HAKCScope(HashedHAKCDBNode, yaml.YAMLObject):
         }
 
 
-class HAKCSymbolDefinitionLocation(HAKCPrintableObj):
-    def __init__(self, DefiningFile: HAKCCompilationUnit, DefiningLine: int, **kwargs):
-        super().__init__(**kwargs)
-        self.file = DefiningFile
-        self.definition_line = DefiningLine
-
-    def get_info_tokens(self, convert_hash=True) -> dict[str, object]:
-        return {
-            "file": self.file,
-            "line": self.definition_line,
-        }
-
-    def get_hash_inputs(self) -> list[object]:
-        return [self.file, self.definition_line]
-
-    def debug_print(self):
-        return str(self)
-
-    def __eq__(self, other):
-        if isinstance(other, HAKCSymbolDefinitionLocation):
-            return self.definition_line == other.definition_line and self.file == other.file
-        return False
-
-
 class HAKCSymbol(HashedHAKCDBNode, yaml.YAMLObject):
     relation_type = "has_type"
     relation_symbol = "has_symbol"
@@ -473,7 +450,7 @@ class HAKCSymbol(HashedHAKCDBNode, yaml.YAMLObject):
     # Init takes the attributes directly from the original dag.yml file the pass creates
     # Also, enforcing that some minimum amount of data is present (e.g., symbol needs a name and a type)
     def __init__(self, Name: str, Type: HAKCType = None, Scope: HAKCScope = None,
-                 Definition: Optional[HAKCSymbolDefinitionLocation] = None,
+                 Definition: Optional[HAKCDefinitionLocation] = None,
                  UsedSymbols: Optional[list] = None, **kwargs):
         yaml.YAMLObject.__init__(self)
         HashedHAKCDBNode.__init__(self, **kwargs)
@@ -542,7 +519,7 @@ class HAKCSymbol(HashedHAKCDBNode, yaml.YAMLObject):
             HAKCDBRelation(HAKCSymbol.relation_type, HAKCSymbol, HAKCType),
             HAKCDBRelation(HAKCSymbol.relation_scope, HAKCSymbol, HAKCScope),
             HAKCDBRelation(HAKCSymbol.relation_symbol, HAKCSymbol, HAKCSymbol),
-            HAKCDBRelation(HAKCSymbol.relation_compilation_unit, HAKCSymbol, HAKCCompilationUnit,
+            HAKCDBRelation(HAKCSymbol.relation_compilation_unit, HAKCSymbol, HAKCDefinitionLocation,
                            DefiningLine="UINT64"),
             HAKCDBRelation(HAKCSymbol.relation_division, HAKCSymbol, HAKCDivision),
             HAKCDBRelation(HAKCSymbol.relation_dag, HAKCSymbol, HAKCSymbol, weight="INT32")

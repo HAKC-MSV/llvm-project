@@ -7,7 +7,7 @@ import pandas as pd
 from .HAKCBase import HAKCDBNode, HAKCDBRelation
 from .HAKCLogger import HAKCLogger
 from .HAKCObjects import HAKCSymbol, HAKCFunction, HAKCScope, HAKCType, HAKCGlobalVariable, HAKCDivision, \
-    HAKCCompartment, HAKCCompilationUnit, HAKCSymbolDefinitionLocation
+    HAKCCompartment, HAKCDefinitionLocation
 
 logging.setLoggerClass(HAKCLogger)
 logger = logging.getLogger('hakc-dag')
@@ -193,17 +193,17 @@ class HAKCDatabase:
                 divisions.add(HAKCDivision(**data))
         return divisions
 
-    def get_symbol_definition_location(self, symbol: HAKCSymbol) -> HAKCSymbolDefinitionLocation | None:
+    def get_symbol_definition_location(self, symbol: HAKCSymbol) -> Optional[HAKCDefinitionLocation]:
         cmd = f"""
-        MATCH (sym:{HAKCSymbol.get_table_name()})-[e:{HAKCSymbol.relation_compilation_unit}]->(cu:{HAKCCompilationUnit.get_table_name()})
+        MATCH (sym:{HAKCSymbol.get_table_name()})-[e:{HAKCSymbol.relation_compilation_unit}]->(cu:{HAKCDefinitionLocation.get_table_name()})
         WHERE sym.{str(HAKCSymbol.get_primary_key())} = $symbol_hash
         RETURN cu.DefiningFile as DefiningFile, e.DefiningLine as DefiningLine;
         """
         response = self.execute_prepared_stmt(cmd, symbol_hash=hash(symbol))
         if response.has_next():
             resp_dict = response.get_as_df().to_dict(orient='records')
-            cu = HAKCCompilationUnit(**resp_dict)
-            return HAKCSymbolDefinitionLocation(DefiningFile=cu, DefiningLine=resp_dict['DefiningLine'])
+            cu = HAKCDefinitionLocation(**resp_dict)
+            return cu
         return None
 
     def get_dag_computation_edges(self, symbol_hash: int) -> dict[str, list[int]]:
@@ -255,7 +255,7 @@ class HAKCDatabase:
         """]
         if assume_defined:
             cmd.append(
-                f",(sym)-[def:{HAKCSymbol.relation_compilation_unit}]->(cu:{HAKCCompilationUnit.get_table_name()})")
+                f",(sym)-[def:{HAKCSymbol.relation_compilation_unit}]->(cu:{HAKCDefinitionLocation.get_table_name()})")
         if where_clause is not None:
             cmd.append(where_clause)
 
@@ -338,7 +338,7 @@ class HAKCDatabase:
         #
         cmd = f"""
                 MATCH (head: {HAKCSymbol.get_table_name()})-[:{HAKCFunction.relation_direct_calls}]->(tail: {HAKCSymbol.get_table_name()})-[:{HAKCSymbol.relation_type}]->(ty:{HAKCType.get_table_name()})
-                OPTIONAL MATCH (head)-[def:{HAKCSymbol.relation_compilation_unit}]->(cu:{HAKCCompilationUnit.get_table_name()})
+                OPTIONAL MATCH (head)-[def:{HAKCSymbol.relation_compilation_unit}]->(cu:{HAKCDefinitionLocation.get_table_name()})
                 WHERE head.symbol_hash = $symbol_hash and head.symbol_hash <> tail.symbol_hash
                 RETURN DISTINCT head.*, tail.*, ty.*, def.*, cu.*;
             """

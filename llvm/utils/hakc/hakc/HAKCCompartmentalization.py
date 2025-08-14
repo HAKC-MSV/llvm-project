@@ -10,7 +10,7 @@ from networkx.readwrite import json_graph
 from .HAKCBase import HAKCDivisionEnum, HAKCDBNode
 from .HAKCDatabase import HAKCDatabase
 from .HAKCLogger import HAKCLogger
-from .HAKCObjects import HAKCSymbol, HAKCCompilationUnit, HAKCFunction, HAKCType, HAKCTypePerm, HAKCCompartment, \
+from .HAKCObjects import HAKCSymbol, HAKCDefinitionLocation, HAKCFunction, HAKCType, HAKCTypePerm, HAKCCompartment, \
     HAKCDivision, \
     HAKCScope, HAKCGlobalVariable
 
@@ -105,9 +105,9 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         self.__add_persistent_edge(symbol, symbol.type, key=HAKCSymbol.relation_type)
         self.__add_persistent_edge(symbol, symbol.scope, key=HAKCSymbol.relation_scope)
         if symbol.definition_location:
-            self.__add_persistent_edge(symbol, symbol.definition_location.file,
+            self.__add_persistent_edge(symbol, symbol.definition_location,
                                        key=HAKCSymbol.relation_compilation_unit,
-                                       DefiningLine=symbol.definition_location.definition_line)
+                                       DefiningLine=symbol.definition_location.defining_line)
         for used_symbol in symbol.used_symbols:
             self.__add_persistent_edge(symbol, used_symbol, key=HAKCSymbol.relation_symbol)
 
@@ -318,7 +318,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         return self.get_filtered_nodes(self, node_filter=lambda n: isinstance(n, HAKCScope))
 
     def get_compilation_units(self):
-        return self.get_filtered_nodes(self, node_filter=lambda n: isinstance(n, HAKCCompilationUnit))
+        return self.get_filtered_nodes(self, node_filter=lambda n: isinstance(n, HAKCDefinitionLocation))
 
     def get_divisions(self):
         return self.get_filtered_nodes(self, node_filter=lambda n: isinstance(n, HAKCDivision))
@@ -508,7 +508,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             HAKCSymbol,
             HAKCCompartment,
             HAKCDivision,
-            HAKCCompilationUnit,
+            HAKCDefinitionLocation,
             HAKCFunction
         ]
 

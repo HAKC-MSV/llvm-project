@@ -1,30 +1,18 @@
 #!/usr/bin/env python3
 
 import argparse
-import cProfile
-import concurrent.futures
-import io
-import itertools
 import logging
-import multiprocessing as mp
 import os
-import pstats
 import shutil
-import time
 
 import yaml
 
-
-from hakc.HAKCCompartmentalization import HAKCCompartmentalization
 from hakc.HAKCDatabase import HAKCDatabase
-from hakc.HAKCLogger import LoggingLevelEnum, parse_log_level, setup_logging, HAKCLogger
-from hakc.HAKCObjects import HAKCSymbol, HAKCFunction, HAKCGlobalVariable, \
-    HAKCCompartment, HAKCDivision, HAKCCompilationUnit, HAKCCompartmentalizationAdjustment
+from hakc.HAKCLogger import LoggingLevelEnum, parse_log_level, HAKCLogger
 
 logging.setLoggerClass(HAKCLogger)
 
 logger: HAKCLogger = logging.getLogger('hakc-static-analysis')
-
 
 
 def yaml_to_kuzu(yaml_dir, kuzu_dir):
@@ -61,7 +49,6 @@ def main():
 
     yaml_to_kuzu(args.yaml_dir, args.kuzu_dir)
 
+
 if __name__ == "__main__":
     main()
-
-
