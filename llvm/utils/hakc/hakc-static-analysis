@@ -151,8 +151,8 @@ def adjust_compartmentalization(db_dir: str, adjustment: HAKCCompartmentalizatio
     nec_division = None
     no_enforcement_compartment = None
     if adjustment.add_no_enforcement_compartment:
-        nec_division = HAKCDivision(HAKCCompartmentalization.kernel_division)
-        no_enforcement_compartment = HAKCCompartment(HAKCCompartmentalization.kernel_compartment_id)
+        nec_division = HAKCDivision(HAKCCompartmentalization.no_enforcement_division)
+        no_enforcement_compartment = HAKCCompartment(HAKCCompartmentalization.no_enforcement_compartment_id)
         compartmentalization.add_division(nec_division, no_enforcement_compartment)
 
     for symbol in logger.progress_bar(iterable=symbols, desc='Adjusting Compartmentalization'):

@@ -20,8 +20,8 @@ logger: HAKCLogger = logging.getLogger('hakc-compartmentalization')
 
 
 class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
-    kernel_compartment_id = 0
-    kernel_division: int = HAKCDivisionEnum.NO_DIVISION.value
+    no_enforcement_compartment_id = 0
+    no_enforcement_division: int = HAKCDivisionEnum.NO_DIVISION.value
     default_division: int = HAKCDivisionEnum.TEAL_DIVISION.value
     DefaultDivisionCount = max(1, len(HAKCDivisionEnum) - 1)
     persisted_attr = 'persisted'
@@ -156,7 +156,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         self.__add_persistent_edge(division, compartment, key=HAKCDivision.relation_compartment)
 
     def add_default_compartmentalization(self, conn: HAKCDatabase, create_schema: bool = False):
-        compartment_id = HAKCCompartmentalization.kernel_compartment_id + 1
+        compartment_id = HAKCCompartmentalization.no_enforcement_compartment_id + 1
         division_id = HAKCCompartmentalization.default_division
         symbols = list(self.get_symbols())
         # first construct all the compartments and divisions
