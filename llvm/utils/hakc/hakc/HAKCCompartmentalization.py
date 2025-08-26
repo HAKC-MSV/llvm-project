@@ -146,7 +146,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             self.__add_global_variable(global_variable)
 
         for function in functions:
-            logger.debug(f"Adding function {function} with defining location {function.definition_location}")
+            # logger.debug(f"Adding function {function} with defining location {function.definition_location}")
             self.__add_function(function)
 
     def add_function(self, function: HAKCFunction) -> None:
@@ -480,19 +480,11 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         for table_name, nodes in logger.progress_bar(iterable=unpersisted_nodes.items(), desc="Persisting to database"):
             data_to_persist = dict()
             for node in nodes:
-                # force hash computation manually
-                # node.recompute_hash()
-                if isinstance(node, HAKCCompartment):
-                    # Note: never persist incomplete objects
-                    logger.debug(f"compartment_hash: {node.computed_hash}")
-
                 db_data = node.get_db_data()
                 if 0 < len(data_to_persist) != len(db_data):
                     logger.error(
                         f'Node {node} does not have all the data needed. Data needed is {" ".join(sorted(data_to_persist.keys()))} and data provided is {" ".join(sorted([column.column_name for column in db_data.keys()]))}')
                 for column, data in db_data.items():
-
-                    logger.debug(f"col, data: {column}, {data}")
                     if data is None:
                         logger.debug(f'Node {node} has None for column {column.column_name}')
                         data = column.column_type.default_value

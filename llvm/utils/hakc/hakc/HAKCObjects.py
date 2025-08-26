@@ -19,9 +19,7 @@ class HAKCDefinitionLocation(HAKCDBNode, yaml.YAMLObject):
         yaml.YAMLObject.__init__(self)
         HAKCDBNode.__init__(self, **kwargs)
         self.defining_file = DefiningFile
-        self.defining_line = DefiningLine
-        if "dl_hash" in kwargs:
-            assert kwargs["dl_hash"] == self.get_computed_hash().final_hash, f"dl_hash ({kwargs['dl_hash']}) =?= hash(self) ({self.get_computed_hash().final_hash}) with DefiningFile: {repr(DefiningFile)} kwargs {kwargs}"
+        self.defining_line = DefiningLine # make defining line an edge in the networkx object
 
     def pretty_print(self):
         return f"{self.get_table_name()}({self.defining_file})"
@@ -47,12 +45,11 @@ class HAKCDefinitionLocation(HAKCDBNode, yaml.YAMLObject):
 
     @staticmethod
     def get_primary_key() -> HAKCDBColumn:
-        return HAKCDBColumn('dl_hash', "UINT64")
+        return HAKCDBColumn('DefiningFile', "STRING")
 
     @classmethod
     def get_data_columns(cls) -> list[HAKCDBColumn]:
-        # HAKCDBColumn('DefiningLine', "STRING")
-        return [HAKCDBColumn('DefiningFile', "STRING")]
+        return []
 
     @staticmethod
     def get_table_name() -> str:
@@ -61,11 +58,8 @@ class HAKCDefinitionLocation(HAKCDBNode, yaml.YAMLObject):
     def get_db_data(self, convert_hash=True) -> dict[HAKCDBColumn, object]:
         schema = HAKCDefinitionLocation.get_db_table_columns()
         return {
-            # schema[0]: hash(self) if convert_hash else self.get_computed_hash(),
-            schema[0]: self.get_computed_hash().final_hash,
-            schema[1]: self.defining_file,
+            schema[0]: self.defining_file,
         }
-
 
 class HAKCDivision(HashedHAKCDBNode, yaml.YAMLObject):
     yaml_tag = "!HAKCDivision"

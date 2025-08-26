@@ -4,6 +4,8 @@ import math
 from typing import Type, Optional, Tuple, cast
 
 import pandas as pd
+import random
+import sys
 
 from .HAKCBase import HAKCDBNode, HAKCDBRelation
 from .HAKCLogger import HAKCLogger
@@ -285,6 +287,10 @@ class HAKCDatabase:
     def get_symbol_by_hash(self, symbol_hashes: list[int], **kwargs) -> set[HAKCSymbol]:
         assert(isinstance(symbol_hashes, list))
         return self._get_symbols(where=f'HAKCSymbol.symbol_hash in [{", ".join([str(sh) for sh in symbol_hashes])}]', **kwargs)
+
+    def get_single_symbol_by_hash(self, symbol_hash: int) -> HAKCSymbol:
+        assert(isinstance(symbol_hash, int))
+        return list(self._get_symbols(symbol_hash=symbol_hash))[0]
 
     def get_symbols_by_name(self, symbol_name: str) -> list[HAKCSymbol]:
         result = self._get_symbols(symbol_name=symbol_name)
@@ -802,8 +808,6 @@ class HAKCDatabase:
         assert(cls in {HAKCType, HAKCScope, HAKCSymbol, HAKCFunction, HAKCDefinitionLocation, HAKCDivision, HAKCCompartment})
         return ", ".join([f"{cls.get_table_name()}.{x.column_name}" for x in cls.get_data_columns()] + [f"{cls.get_table_name()}.{cls.get_primary_key()}"])
 
-    # fix to determinism is using colon on edge for kuzu query
-    # otherwise, I guess the edge is just labeled but not actually matched
     def _get_symbols(self, symbol_name: str = None, symbol_hash: int = None, where: str = None ) -> set[HAKCSymbol]:
         # want to reconstruct the output from the yaml exactly, so the compartmentalization can be rebuilt from the database
         # this [:edge*1..2] which recursively searches is probably not needed
@@ -815,26 +819,11 @@ class HAKCDatabase:
         scope_attrs = HAKCDatabase.get_object_attributes(HAKCScope)
         symbol_attrs = HAKCDatabase.get_object_attributes(HAKCSymbol)
         dl_attrs = HAKCDatabase.get_object_attributes(HAKCDefinitionLocation)
-        # Note: must cast dl_hash to string or 'NONE' or else pandas will coerce the type from int to float (NaN is a float), which loses precision and causes the hashes to not match
-        # e.g., dl_hash = 6.534723912373195e+16, type(dl_hash) = <class 'float'>, int(dl_hash) = 65347239123731952
-        # TODO: should we do two queries, or continue with the optional match?
-        # TODO: figure out why optional match is extremely slow
-        # NOTE: run PROFILE MATCH ... to view the performance cost of query
-        # using optional match seems to significantly degrade the performance, so let's just do two queries instead
-        # cmd = f"""
-        # PROFILE MATCH ({HAKCType.get_table_name()}:{HAKCType.get_table_name()})<-[{HAKCSymbol.relation_type}:{HAKCSymbol.relation_type}]-({HAKCSymbol.get_table_name()}:{HAKCSymbol.get_table_name()})-[{HAKCSymbol.relation_scope}:{HAKCSymbol.relation_scope}]->({HAKCScope.get_table_name()}:{HAKCScope.get_table_name()})
-        # WHERE {f' AND {HAKCSymbol.get_table_name()}.Name IS $symbol_name' if symbol_name else '' } { f' AND {HAKCSymbol.get_table_name()}.{HAKCSymbol.get_primary_key()} IS $symbol_hash' if symbol_hash else '' } { f'{where}' if where else ''}
-        # RETURN DISTINCT {type_attrs}, {scope_attrs}, {symbol_attrs};
-        # """
         cmd = f"""
         MATCH ({HAKCType.get_table_name()}:{HAKCType.get_table_name()})<-[{HAKCSymbol.relation_type}:{HAKCSymbol.relation_type}]-({HAKCSymbol.get_table_name()}:{HAKCSymbol.get_table_name()})-[{HAKCSymbol.relation_scope}:{HAKCSymbol.relation_scope}]->({HAKCScope.get_table_name()}:{HAKCScope.get_table_name()})
-        WHERE TRUE { f' AND {HAKCSymbol.get_table_name()}.Name IS $symbol_name' if symbol_name else '' } { f' AND {HAKCSymbol.get_table_name()}.{HAKCSymbol.get_primary_key()} IS $symbol_hash' if symbol_hash else '' } { f'AND {where}' if where else ''}
+        WHERE TRUE { f' AND {HAKCSymbol.get_table_name()}.Name=$symbol_name' if symbol_name else '' } { f' AND {HAKCSymbol.get_table_name()}.{HAKCSymbol.get_primary_key()}=$symbol_hash' if symbol_hash else '' } { f'AND {where}' if where else ''}
         OPTIONAL MATCH ({HAKCSymbol.get_table_name()})-[{HAKCSymbol.relation_definition_location}:{HAKCSymbol.relation_definition_location}]->({HAKCDefinitionLocation.get_table_name()}:{HAKCDefinitionLocation.get_table_name()})
-        RETURN DISTINCT {type_attrs}, {scope_attrs}, {symbol_attrs}, {dl_attrs}, {HAKCSymbol.relation_definition_location}.DefiningLine AS DefiningLine,
-            COALESCE(
-                CASE WHEN {HAKCDefinitionLocation.get_table_name()}.dl_hash IS NOT NULL THEN
-                    CAST( {HAKCDefinitionLocation.get_table_name()}.dl_hash AS STRING ) ELSE NULL END,
-                    'NONE') AS dl_hash;
+        RETURN DISTINCT {type_attrs}, {scope_attrs}, {symbol_attrs}, {dl_attrs}, {HAKCSymbol.relation_definition_location}.DefiningLine AS DefiningLine;
         """
         # logger.error(f"running command: {cmd}")
 
@@ -862,22 +851,15 @@ class HAKCDatabase:
             for data in info.to_dict(orient='records'):
                 # print(data)
                 # logger.debug(f"Processing symbol {data['HAKCSymbol.Name'] if 'HAKCSymbol.Name' in data else ''}")
-                data["HAKCDefinitionLocation.dl_hash"] = data["dl_hash"]
-                del data["dl_hash"]
+
                 data["HAKCDefinitionLocation.DefiningLine"] = data["DefiningLine"]
                 del data["DefiningLine"]
 
-                if data['HAKCDefinitionLocation.dl_hash'] != 'NONE':
-                    # the definition location was found, so cast value from string to int
-                    data['HAKCDefinitionLocation.dl_hash'] = int(data['HAKCDefinitionLocation.dl_hash'])
-                else:
-                    # if no definition found, then remove empty keys
-                    if 'HAKCDefinitionLocation.dl_hash' in data:
-                        del data['HAKCDefinitionLocation.dl_hash']
-                    if 'HAKCDefinitionLocation.DefiningFile' in data:
-                        del data['HAKCDefinitionLocation.DefiningFile']
-                    if 'HAKCDefinitionLocation.DefiningLine' in data:
-                        del data['HAKCDefinitionLocation.DefiningLine']
+                # if no definition found, then remove empty keys
+                if 'HAKCDefinitionLocation.DefiningFile' in data:
+                    del data['HAKCDefinitionLocation.DefiningFile']
+                if 'HAKCDefinitionLocation.DefiningLine' in data:
+                    del data['HAKCDefinitionLocation.DefiningLine']
 
                 if data["HAKCSymbol.IsFunction"] is True:
                     func = HAKCDatabase.__create_object_from_response(HAKCFunction, **data)
@@ -952,3 +934,64 @@ class HAKCDatabase:
         ret = response.get_as_df()
         logger.debug(ret)
         return ret["comp.CompartmentID"][0]
+
+
+    def set_division_compartment_id_by_symbol(self, _symbol : HAKCSymbol, new_division_id: int, new_compartment_id: int):
+
+        # create new compartment if it does not exist in the database
+        # If MATCH <pattern> then RETURN <pattern> ELSE CREATE <pattern>
+        cmd = f"""
+        MERGE ({HAKCCompartment.get_table_name()}:{HAKCCompartment.get_table_name()} {{CompartmentID: $compartment_id}})  
+        RETURN {HAKCCompartment.get_table_name()}.*;
+        """
+        response = self.execute_prepared_stmt(cmd, compartment_id=new_compartment_id)
+        ret = response.get_as_df()
+        print(ret)
+
+        # check if new division is connected to the new compartment
+        cmd = f"""
+        MATCH ({HAKCDivision.get_table_name()}:{HAKCDivision.get_table_name()})-[:{HAKCDivision.relation_compartment}]->({HAKCCompartment.get_table_name()}:{HAKCCompartment.get_table_name()})
+        WHERE {HAKCCompartment.get_table_name()}.CompartmentID = $compartment_id
+        RETURN {HAKCDivision.get_table_name()}.*; 
+        """
+        response = self.execute_prepared_stmt(cmd, compartment_id=new_compartment_id)
+        ret = response.get_as_df()
+        print(ret)
+        create_division = len(ret) == 0
+
+        if create_division:
+            new_div = HAKCDivision()
+            cmd = f"""
+            MATCH ({HAKCCompartment.get_table_name()}:{HAKCCompartment.get_table_name()})
+            WHERE {HAKCCompartment.get_table_name()}.CompartmentID = $compartment_id
+            CREATE ({HAKCDivision.get_table_name()}:{HAKCDivision.get_table_name()} {{DivisionID: $division_id, Salt: $salt}})-[:{HAKCDivision.relation_compartment}]->({HAKCCompartment.get_table_name()}:{HAKCCompartment.get_table_name()})
+            RETURN {HAKCDivision.get_table_name()}.*; 
+            """
+            response = self.execute_prepared_stmt(cmd, compartment_id=new_compartment_id, division_id=new_division_id, salt=random.randint(0, sys.maxsize))
+            ret = response.get_as_df()
+            print(ret)
+
+
+
+
+        # delete old relationship between symbol and compartment
+        # Note: Assumes that the new compartment id exists in the database, which is true for the time being
+        # cmd = f"""
+        # MATCH (sym:{HAKCSymbol.get_table_name()})-[:{HAKCSymbol.relation_division}]->(div:{HAKCDivision.get_table_name()})-[old_edge:{HAKCDivision.relation_compartment}]->(comp:{HAKCCompartment.get_table_name()})
+        # WHERE sym.{HAKCSymbol.get_primary_key()} = $symbol_hash
+        # DELETE old_edge
+        # RETURN comp.CompartmentID
+        # """
+        # response = self.execute_prepared_stmt(cmd, symbol_hash=hash(_symbol))
+        # ret = response.get_as_df()
+        # logger.debug(ret)
+        # cmd = f"""
+        # MATCH (sym)-[:{HAKCSymbol.relation_division}]->(div:{HAKCDivision.get_table_name()}), (comp:{HAKCCompartment.get_table_name()})
+        # WHERE sym.{HAKCSymbol.get_primary_key()} = $symbol_hash AND comp.CompartmentID = $compartment_id
+        # CREATE (div)-[new_edge:{HAKCDivision.relation_compartment}]->(comp)
+        # RETURN comp.CompartmentID
+        # """
+        # response = self.execute_prepared_stmt(cmd, symbol_hash=int(_symbol.get_computed_hash()), compartment_id=new_compartment_id)
+        # ret = response.get_as_df()
+        # logger.debug(ret)
+        # return ret["comp.CompartmentID"][0]
