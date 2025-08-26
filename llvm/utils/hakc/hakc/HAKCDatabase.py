@@ -938,11 +938,19 @@ class HAKCDatabase:
 
     def set_division_compartment_id_by_symbol(self, _symbol : HAKCSymbol, new_division_id: int, new_compartment_id: int):
 
-        # create new compartment if it does not exist in the database
-        # If MATCH <pattern> then RETURN <pattern> ELSE CREATE <pattern>
+        # delete old relationship between symbol, division, and compartment
         cmd = f"""
-        MERGE ({HAKCCompartment.get_table_name()}:{HAKCCompartment.get_table_name()} {{CompartmentID: $compartment_id}})  
-        RETURN {HAKCCompartment.get_table_name()}.*;
+        MATCH (sym:{HAKCSymbol.get_table_name()})-[old_div_edge:{HAKCSymbol.relation_division}]->(old_div:{HAKCDivision.get_table_name()})-[old_comp_edge:{HAKCDivision.relation_compartment}]->(old_comp:{HAKCCompartment.get_table_name()})
+        WHERE sym.{HAKCSymbol.get_primary_key()} = $symbol_hash
+        DELETE old_div_edge, old_comp_edge;
+        """
+        self.execute_prepared_stmt(cmd, symbol_hash=hash(_symbol))
+
+        # create new compartment if it does not exist in the database
+        # MERGE -> If MATCH <pattern> then RETURN <pattern> ELSE CREATE <pattern>
+        cmd = f"""
+        MERGE (comp:{HAKCCompartment.get_table_name()} {{CompartmentID: $compartment_id}})  
+        RETURN comp.*;
         """
         response = self.execute_prepared_stmt(cmd, compartment_id=new_compartment_id)
         ret = response.get_as_df()
@@ -950,48 +958,37 @@ class HAKCDatabase:
 
         # check if new division is connected to the new compartment
         cmd = f"""
-        MATCH ({HAKCDivision.get_table_name()}:{HAKCDivision.get_table_name()})-[:{HAKCDivision.relation_compartment}]->({HAKCCompartment.get_table_name()}:{HAKCCompartment.get_table_name()})
-        WHERE {HAKCCompartment.get_table_name()}.CompartmentID = $compartment_id
-        RETURN {HAKCDivision.get_table_name()}.*; 
+        MATCH (div:{HAKCDivision.get_table_name()})-[:{HAKCDivision.relation_compartment}]->(comp:{HAKCCompartment.get_table_name()})
+        WHERE comp.CompartmentID = $compartment_id
+        RETURN div.*; 
         """
         response = self.execute_prepared_stmt(cmd, compartment_id=new_compartment_id)
         ret = response.get_as_df()
         print(ret)
         create_division = len(ret) == 0
 
+        # create new division, and connect new division to compartment
         if create_division:
-            new_div = HAKCDivision()
+            new_div = HAKCDivision(new_division_id)
             cmd = f"""
-            MATCH ({HAKCCompartment.get_table_name()}:{HAKCCompartment.get_table_name()})
-            WHERE {HAKCCompartment.get_table_name()}.CompartmentID = $compartment_id
-            CREATE ({HAKCDivision.get_table_name()}:{HAKCDivision.get_table_name()} {{DivisionID: $division_id, Salt: $salt}})-[:{HAKCDivision.relation_compartment}]->({HAKCCompartment.get_table_name()}:{HAKCCompartment.get_table_name()})
-            RETURN {HAKCDivision.get_table_name()}.*; 
+            MATCH (comp:{HAKCCompartment.get_table_name()})
+            WHERE comp.CompartmentID = $compartment_id 
+            CREATE (div:{HAKCDivision.get_table_name()} {{division_hash: $division_hash, DivisionID: $division_id, Salt: $salt}})-[:{HAKCDivision.relation_compartment}]->(comp:{HAKCCompartment.get_table_name()})
+            RETURN div.*, comp.*; 
             """
-            response = self.execute_prepared_stmt(cmd, compartment_id=new_compartment_id, division_id=new_division_id, salt=random.randint(0, sys.maxsize))
+            response = self.execute_prepared_stmt(cmd, compartment_id=new_compartment_id, division_hash=hash(new_div), division_id=new_division_id, salt=new_div.salt)
             ret = response.get_as_df()
             print(ret)
 
-
-
-
-        # delete old relationship between symbol and compartment
-        # Note: Assumes that the new compartment id exists in the database, which is true for the time being
-        # cmd = f"""
-        # MATCH (sym:{HAKCSymbol.get_table_name()})-[:{HAKCSymbol.relation_division}]->(div:{HAKCDivision.get_table_name()})-[old_edge:{HAKCDivision.relation_compartment}]->(comp:{HAKCCompartment.get_table_name()})
-        # WHERE sym.{HAKCSymbol.get_primary_key()} = $symbol_hash
-        # DELETE old_edge
-        # RETURN comp.CompartmentID
-        # """
-        # response = self.execute_prepared_stmt(cmd, symbol_hash=hash(_symbol))
-        # ret = response.get_as_df()
-        # logger.debug(ret)
-        # cmd = f"""
-        # MATCH (sym)-[:{HAKCSymbol.relation_division}]->(div:{HAKCDivision.get_table_name()}), (comp:{HAKCCompartment.get_table_name()})
-        # WHERE sym.{HAKCSymbol.get_primary_key()} = $symbol_hash AND comp.CompartmentID = $compartment_id
-        # CREATE (div)-[new_edge:{HAKCDivision.relation_compartment}]->(comp)
-        # RETURN comp.CompartmentID
-        # """
-        # response = self.execute_prepared_stmt(cmd, symbol_hash=int(_symbol.get_computed_hash()), compartment_id=new_compartment_id)
-        # ret = response.get_as_df()
-        # logger.debug(ret)
+        cmd = f"""
+        MATCH (div:{HAKCDivision.get_table_name()})-[:{HAKCDivision.relation_compartment}]->(comp:{HAKCCompartment.get_table_name()}), 
+              (sym:{HAKCSymbol.get_table_name()})
+        WHERE sym.{HAKCSymbol.get_primary_key()} = $symbol_hash AND comp.CompartmentID = $compartment_id AND div.DivisionID = $division_id
+        CREATE (sym)-[new_div_edge]->(div)
+        RETURN div.*, comp.*, sym.*;
+        """
+        response = self.execute_prepared_stmt(cmd, symbol_hash=int(_symbol.get_computed_hash()), compartment_id=new_compartment_id, division_id=new_division_id)
+        ret = response.get_as_df()
+        print(ret)
+        # TODO: should we remove the old division or compartment nodes if they have no edges?
         # return ret["comp.CompartmentID"][0]
