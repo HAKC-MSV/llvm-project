@@ -184,9 +184,9 @@ public:
 
   static Function *GetOriginalFunctionFromTransferFunction(Function *F);
 
-  StringRef createDagYamlPath(StringRef DagAnalysisRootPath);
+  std::string createDagYamlPath(StringRef DagAnalysisRootPath);
 
-  StringRef createLogPath(StringRef DagAnalysisRootPath);
+  std::string createLogPath(StringRef DagAnalysisRootPath);
 
 private:
   static bool valueHasAttribute(Value *v, Attribute::AttrKind Kind);

@@ -30,10 +30,12 @@ protected:
   std::shared_ptr<raw_ostream> os;
   std::string log_path;
   HAKCLogLevel ConfiguredLogLevel;
+  std::error_code EC;
+  bool disabled;
+
   void CreateLog() { os = std::make_shared<raw_fd_ostream>(log_path, EC); }
 
 public:
-  std::error_code EC;
   explicit HAKCWriter(HAKCLogLevel log_level)
       : os(), log_path(""), ConfiguredLogLevel(log_level) {
     // errs() << "CREATING HAKC WRITER0\n";
@@ -44,18 +46,23 @@ public:
                                         // no-op deleter to prevent delete on
                                         // singleton
                                       });
+    disabled = (log_level == Disabled);
   }
   explicit HAKCWriter(StringRef log_path, HAKCLogLevel log_level)
       : os(), log_path(log_path), ConfiguredLogLevel(log_level) {
     // errs() << "CREATING HAKC WRITER1\n";
     CreateLog();
+    disabled = (log_level == Disabled);
   }
   ~HAKCWriter() {
     // errs() << "DESTROYING HAKC WRITER\n";
   }
 
+  bool IsDisabled() const { return disabled; }
+
   void SetConfiguredLogLevel(HAKCLogLevel log_level) {
     ConfiguredLogLevel = log_level;
+    disabled = (log_level == Disabled);
   }
 
   HAKCLogLevel GetConfiguredLogLevel() const { return ConfiguredLogLevel; }
@@ -63,6 +70,14 @@ public:
   StringRef GetLogPath() const { return log_path; }
 
   raw_ostream &GetOS() const { return *os; }
+
+  explicit operator bool() const {
+    if (EC) {
+      errs() << "Failed to create log file: " << log_path << " \n\twith error: " << EC.message() << "\n";
+      return false;
+    }
+    return true;
+  }
 
   void printDIType(const DIType *type, unsigned indents) const;
 

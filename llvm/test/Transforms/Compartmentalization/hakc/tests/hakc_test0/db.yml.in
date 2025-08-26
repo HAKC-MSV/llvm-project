@@ -1,123 +1,110 @@
 !HAKCCompartmentalization
 directed: true
-division_count: 16
 edges:
-- key: IsType
+- key: has_type
   persisted: true
   source: &id001 !HAKCFunction
-    DefiningFile: null
-    DefiningLine: null
+    IsFunction: true
     Name: bar
-    is_function: true
-    symbol_hash: 730940e254258e31
-  target: &id007 !HAKCType
+    symbol_hash: 63876091302220414
+  target: &id006 !HAKCType
     DebugType: int (struct data_struct*)
     LLVMType: i32 (ptr)
-    type_hash: ed49f6b712e5420
-- key: HasScope
+    type_hash: 4174430841417300
+- key: has_scope
   persisted: true
   source: *id001
-  target: &id008 !HAKCScope
+  target: &id007 !HAKCScope
     LocalScopeName: @HAKC_TEST_DIR@/hakc_test0.c
     Scope: local
-    scope_hash: 76da99af015f5027
-- key: UsedInCompilationUnit
+    scope_hash: 33454400852811600
+- key: has_division
   persisted: true
   source: *id001
-  target: &id003 !HAKCCompilationUnit
-    filename: @HAKC_TEST_DIR@/hakc_test0.c
-- key: InDivision
-  persisted: true
-  source: *id001
-  target: &id005 !HAKCDivision
+  target: &id004 !HAKCDivision
     AccessToken: 73728
     DivisionID: 13
-    division_hash: be7396225c569ba9
-- key: IsType
+    Salt: 2070684765530561140
+- key: has_type
   persisted: true
   source: &id002 !HAKCFunction
-    DefiningFile: @HAKC_TEST_DIR@/hakc_test0.c
-    DefiningLine: 14
+    IsFunction: true
     Name: foo
-    is_function: true
-    symbol_hash: 52a2d25076b14688
+    symbol_hash: 55251444173987653
   target: !HAKCType
     DebugType: int (struct data_struct*)
     LLVMType: i32 (ptr)
-    type_hash: ed49f6b712e5420
-- key: HasScope
+    type_hash: 4174430841417300
+- key: has_scope
   persisted: true
   source: *id002
-  target: &id009 !HAKCScope
+  target: &id008 !HAKCScope
     LocalScopeName: global
     Scope: global
-    scope_hash: 8001c27439650c5c
-- key: UsedInCompilationUnit
+    scope_hash: 36030731704165644
+- DefiningLine: 14
+  key: has_definition_location
   persisted: true
   source: *id002
-  target: *id003
-- key: DefinedIn
-  line: 14
+  target: &id009 !HAKCDefinitionLocation
+    DefiningFile: @HAKC_TEST_DIR@/hakc_test0.c
+    cu_hash: 42843089861405562
+- key: has_symbol
   persisted: true
   source: *id002
-  target: *id003
-- key: UsesSymbol
-  persisted: true
-  source: *id002
-  target: &id004 !HAKCFunction
-    DefiningFile: null
-    DefiningLine: null
+  target: &id003 !HAKCFunction
+    IsFunction: true
     Name: bar
-    is_function: true
-    symbol_hash: 730940e254258e31
-- key: DirectCall
+    symbol_hash: 63876091302220414
+- key: has_direct_calls
   persisted: true
   source: *id002
-  target: *id004
-- key: DagEdge
+  target: *id003
+- key: has_dag
   persisted: true
   source: *id002
-  target: *id004
+  target: *id003
   weight: 2
-- key: InDivision
+- key: has_division
   persisted: true
   source: *id002
-  target: &id006 !HAKCDivision
+  target: &id005 !HAKCDivision
     AccessToken: 139264
     DivisionID: 13
-    division_hash: 4af868d68ac647bc
-- key: InCompartment
+    Salt: 4074598500559590961
+- key: has_compartment
   persisted: true
-  source: *id005
+  source: *id004
   target: &id010 !HAKCCompartment
     CompartmentID: 1
-    EntryToken: 73728
-- key: InCompartment
+    EntryToken: 65536
+- key: has_compartment
   persisted: true
-  source: *id006
+  source: *id005
   target: &id011 !HAKCCompartment
     CompartmentID: 2
-    EntryToken: 139264
+    EntryToken: 131072
 graph: {}
+max_division_count: 16
 multigraph: true
 nodes:
 - id: *id001
   persisted: true
+- id: *id006
+  persisted: true
 - id: *id007
-  persisted: true
-- id: *id008
-  persisted: true
-- id: *id003
   persisted: true
 - id: *id002
   persisted: true
+- id: *id008
+  persisted: true
 - id: *id009
   persisted: true
-- id: *id005
+- id: *id004
   persisted: true
 - id: *id010
   persisted: true
-- id: *id006
+- id: *id005
   persisted: true
 - id: *id011
   persisted: true

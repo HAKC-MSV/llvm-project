@@ -383,7 +383,7 @@ template <> struct yaml::MappingTraits<hakc::HAKCYAMLCustomTransferType> {
 template <> struct yaml::MappingTraits<hakc::HAKCYamlDatabaseConfig> {
   static void mapping(yaml::IO &Io, hakc::HAKCYamlDatabaseConfig &YamlConfig) {
     Io.mapRequired("server-url", YamlConfig.ServerURL);
-    Io.mapOptional("server-timeout", YamlConfig.ServerTimeout, 1000);
+    Io.mapOptional("server-timeout", YamlConfig.ServerTimeout, 10); // timeout in seconds (formerly milliseconds)
     Io.mapOptional("get-compartment-by-id-endpoint",
                    YamlConfig.GetCompartmentEndpoint, "get-compartment-id");
     Io.mapOptional("get-division-by-id-endpoint",

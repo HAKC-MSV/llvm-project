@@ -270,6 +270,13 @@ if (LLVM_ENABLE_HAKC)
         set(HAKC_DAG_ANALYSIS_PATH ${HAKC_BUILD_DIR}/dag-analysis)
         set(HAKC_PYTHON_POLICY_PROCESS ${LLVM_MAIN_SRC_DIR}/utils/hakc/hakc-policy-process)
         set(HAKC_SOCKET_PATH ${socket_path}.${db_type})
+        # TODO: parameterize this?
+        set(HAKC_PASS_MODE RunCompartmentalization)
+        if(NAME MATCHES ".*temporal.*")
+            set(HAKC_TEMPORAL_ANALYSIS True)
+        else()
+            set(HAKC_TEMPORAL_ANALYSIS False)
+        endif()
 
         create_hakc_config_file(${HAKC_CONFIG_DIR}/hakc_policy_config.yml.in ${HAKC_POLICY_CONFIG})
         create_hakc_config_file(${HAKC_CONFIG_DIR}/hakc_comp_config.yml.in ${HAKC_PASS_CONFIG})
@@ -301,6 +308,7 @@ if (LLVM_ENABLE_HAKC)
 
     add_custom_target(check-hakc
             COMMAND "${Python3_EXECUTABLE}" ${LIT_BASE_DIR}/${LIT_FILE_NAME} -a ${LLVM_MAIN_SRC_DIR}/${HAKC_TEST_ROOT_DIR}
+            COMMENT "Running check-hakc"
     )
     # run specific test (rather than all tests)
     # using build_llvm.sh script:
@@ -309,6 +317,7 @@ if (LLVM_ENABLE_HAKC)
     #   cmake --build . --target check-hakc-test
     add_custom_target(check-hakc-test
             COMMAND "${Python3_EXECUTABLE}" ${LIT_BASE_DIR}/${LIT_FILE_NAME} -a ${LLVM_MAIN_SRC_DIR}/${HAKC_TEST_ROOT_DIR}/tests/${HAKC_TEST_CASE}/
+            COMMENT "Running check-hakc-test"
     )
     # TODO: update this so that the tests depend on hakc being built
     add_dependencies(check-hakc hakc_test_configs_gen)

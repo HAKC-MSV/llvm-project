@@ -122,7 +122,7 @@ CommonHAKCAnalysis::CommonHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM,
   InitConfig(ConfigPath);
 }
 
-StringRef CommonHAKCAnalysis::createDagYamlPath(StringRef DagAnalysisRootPath) {
+std::string CommonHAKCAnalysis::createDagYamlPath(StringRef DagAnalysisRootPath) {
   SmallString<256> Path;
   SmallString<256> ModulePath;
   GetModuleFullPath(M, ModulePath);
@@ -130,10 +130,10 @@ StringRef CommonHAKCAnalysis::createDagYamlPath(StringRef DagAnalysisRootPath) {
   sys::path::append(Path, ModulePath);
   sys::path::replace_extension(Path, ".dag.yml");
   sys::path::make_preferred(Path);
-  return Path;
+  return std::string(Path);
 }
 
-StringRef CommonHAKCAnalysis::createLogPath(StringRef DagAnalysisRootPath) {
+std::string CommonHAKCAnalysis::createLogPath(StringRef DagAnalysisRootPath) {
   SmallString<256> Path;
   SmallString<256> ModulePath;
   GetModuleFullPath(M, ModulePath);
@@ -141,7 +141,7 @@ StringRef CommonHAKCAnalysis::createLogPath(StringRef DagAnalysisRootPath) {
   sys::path::append(Path, ModulePath);
   sys::path::replace_extension(Path, ".log");
   sys::path::make_preferred(Path);
-  return Path;
+  return std::string(Path);
 }
 
 Module &CommonHAKCAnalysis::GetModule() const { return M; }

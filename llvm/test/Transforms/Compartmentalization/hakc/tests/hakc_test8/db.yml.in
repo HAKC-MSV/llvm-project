@@ -1,237 +1,121 @@
 !HAKCCompartmentalization
 directed: true
-division_count: 16
 edges:
-  - key: IsType
-    persisted: true
-    source: &id001 !HAKCFunction
-      DefiningFile: @HAKC_TEST_DIR@/hakc_test8.c
-      DefiningLine: 32
-      Name: bar
-      is_function: true
-      symbol_hash: e6ddbcd69f68b74c
-    target: &id010 !HAKCType
-      DebugType: int ()
-      LLVMType: i32 ()
-      type_hash: f9f75dcecd5a8cb7
-  - key: HasScope
-    persisted: true
-    source: *id001
-    target: &id011 !HAKCScope
-      LocalScopeName: global
-      Scope: global
-      scope_hash: 8001c27439650c5c
-  - key: UsedInCompilationUnit
-    persisted: true
-    source: *id001
-    target: &id002 !HAKCCompilationUnit
-      filename: @HAKC_TEST_DIR@/hakc_test8.c
-  - key: DefinedIn
-    line: 32
-    persisted: true
-    source: *id001
-    target: *id002
-  - key: UsesSymbol
-    persisted: true
-    source: *id001
-    target: &id003 !HAKCGlobalVariable
-      DefiningFile: @HAKC_TEST_DIR@/hakc_test8.c
-      DefiningLine: 10
-      Name: kmalloc_caches
-      is_function: false
-      symbol_hash: dbdced7a45ff2d65
-  - key: DagEdge
-    persisted: true
-    source: *id001
-    target: *id003
-    weight: 1
-  - key: UsesSymbol
-    persisted: true
-    source: *id001
-    target: &id004 !HAKCGlobalVariable
-      DefiningFile: @HAKC_TEST_DIR@/hakc_test8.c
-      DefiningLine: 11
-      Name: somevar
-      is_function: false
-      symbol_hash: 5631132bb7aef786
-  - key: DagEdge
-    persisted: true
-    source: *id001
-    target: *id004
-    weight: 1
-  - key: UsesSymbol
-    persisted: true
-    source: *id001
-    target: &id005 !HAKCFunction
-      DefiningFile: @HAKC_TEST_DIR@/hakc_test8.c
-      DefiningLine: 21
-      Name: foo
-      is_function: true
-      symbol_hash: a75946d7048f391e
-  - key: DirectCall
-    persisted: true
-    source: *id001
-    target: *id005
-  - key: DagEdge
-    persisted: true
-    source: *id001
-    target: *id005
-    weight: 2
-  - key: InDivision
-    persisted: true
-    source: *id001
-    target: &id006 !HAKCDivision
-      AccessToken: 73728
-      DivisionID: 13
-      division_hash: be7396225c569ba9
-  - key: IsType
-    persisted: true
-    source: *id003
-    target: &id013 !HAKCType
-      DebugType: int
-      LLVMType: i32
-      type_hash: 6da88c34ba124c41
-  - key: HasScope
-    persisted: true
-    source: *id003
-    target: !HAKCScope
-      LocalScopeName: global
-      Scope: global
-      scope_hash: 8001c27439650c5c
-  - key: UsedInCompilationUnit
-    persisted: true
-    source: *id003
-    target: *id002
-  - key: DefinedIn
-    line: 10
-    persisted: true
-    source: *id003
-    target: *id002
-  - key: InDivision
-    persisted: true
-    source: *id003
-    target: &id007 !HAKCDivision
-      AccessToken: 139264
-      DivisionID: 13
-      division_hash: 4af868d68ac647bc
-  - key: IsType
-    persisted: true
-    source: *id004
-    target: !HAKCType
-      DebugType: int
-      LLVMType: i32
-      type_hash: 6da88c34ba124c41
-  - key: HasScope
-    persisted: true
-    source: *id004
-    target: !HAKCScope
-      LocalScopeName: global
-      Scope: global
-      scope_hash: 8001c27439650c5c
-  - key: UsedInCompilationUnit
-    persisted: true
-    source: *id004
-    target: *id002
-  - key: DefinedIn
-    line: 11
-    persisted: true
-    source: *id004
-    target: *id002
-  - key: InDivision
-    persisted: true
-    source: *id004
-    target: &id008 !HAKCDivision
-      AccessToken: 204800
-      DivisionID: 13
-      division_hash: 52437522d301286c
-  - key: IsType
-    persisted: true
-    source: *id005
-    target: &id012 !HAKCType
-      DebugType: int (struct data_struct2*, int*, int*)
-      LLVMType: i32 (ptr, ptr, ptr)
-      type_hash: b9bd5a6310a2295f
-  - key: HasScope
-    persisted: true
-    source: *id005
-    target: !HAKCScope
-      LocalScopeName: global
-      Scope: global
-      scope_hash: 8001c27439650c5c
-  - key: UsedInCompilationUnit
-    persisted: true
-    source: *id005
-    target: *id002
-  - key: DefinedIn
-    line: 21
-    persisted: true
-    source: *id005
-    target: *id002
-  - key: InDivision
-    persisted: true
-    source: *id005
-    target: &id009 !HAKCDivision
-      AccessToken: 270336
-      DivisionID: 13
-      division_hash: 976da0fe7b28592c
-  - key: InCompartment
-    persisted: true
-    source: *id006
-    target: &id014 !HAKCCompartment
-      CompartmentID: 1
-      EntryToken: 73728
-  - key: InCompartment
-    persisted: true
-    source: *id007
-    target: &id015 !HAKCCompartment
-      CompartmentID: 2
-      EntryToken: 139264
-  - key: InCompartment
-    persisted: true
-    source: *id008
-    target: &id016 !HAKCCompartment
-      CompartmentID: 3
-      EntryToken: 204800
-  - key: InCompartment
-    persisted: true
-    source: *id009
-    target: &id017 !HAKCCompartment
-      CompartmentID: 4
-      EntryToken: 270336
-graph: { }
+- key: has_type
+  persisted: true
+  source: &id001 !HAKCGlobalVariable
+    IsFunction: false
+    Name: kmalloc_caches
+    symbol_hash: 17478629311797491
+  target: &id007 !HAKCType
+    DebugType: int*
+    LLVMType: ptr
+    type_hash: 29349049320289013
+- key: has_scope
+  persisted: true
+  source: *id001
+  target: &id008 !HAKCScope
+    LocalScopeName: global
+    Scope: global
+    scope_hash: 36030731704165644
+- key: has_division
+  persisted: true
+  source: *id001
+  target: &id004 !HAKCDivision
+    AccessToken: 73728
+    DivisionID: 13
+    Salt: 2326630189450831425
+- key: has_type
+  persisted: true
+  source: &id002 !HAKCGlobalVariable
+    IsFunction: false
+    Name: somevar
+    symbol_hash: 32847396734032598
+  target: !HAKCType
+    DebugType: int*
+    LLVMType: ptr
+    type_hash: 29349049320289013
+- key: has_scope
+  persisted: true
+  source: *id002
+  target: !HAKCScope
+    LocalScopeName: global
+    Scope: global
+    scope_hash: 36030731704165644
+- key: has_division
+  persisted: true
+  source: *id002
+  target: &id005 !HAKCDivision
+    AccessToken: 139264
+    DivisionID: 13
+    Salt: 3915810659815601877
+- key: has_type
+  persisted: true
+  source: &id003 !HAKCFunction
+    IsFunction: true
+    Name: foo
+    symbol_hash: 24346991618265989
+  target: &id009 !HAKCType
+    DebugType: int (struct data_struct2*, int*, int*)
+    LLVMType: i32 (ptr, ptr, ptr)
+    type_hash: 52281066598212137
+- key: has_scope
+  persisted: true
+  source: *id003
+  target: !HAKCScope
+    LocalScopeName: global
+    Scope: global
+    scope_hash: 36030731704165644
+- key: has_division
+  persisted: true
+  source: *id003
+  target: &id006 !HAKCDivision
+    AccessToken: 204800
+    DivisionID: 13
+    Salt: 6900230862792164914
+- key: has_compartment
+  persisted: true
+  source: *id004
+  target: &id010 !HAKCCompartment
+    CompartmentID: 1
+    EntryToken: 65536
+- key: has_compartment
+  persisted: true
+  source: *id005
+  target: &id011 !HAKCCompartment
+    CompartmentID: 2
+    EntryToken: 131072
+- key: has_compartment
+  persisted: true
+  source: *id006
+  target: &id012 !HAKCCompartment
+    CompartmentID: 3
+    EntryToken: 196608
+graph: {}
+max_division_count: 16
 multigraph: true
 nodes:
-  - id: *id001
-    persisted: true
-  - id: *id010
-    persisted: true
-  - id: *id011
-    persisted: true
-  - id: *id002
-    persisted: true
-  - id: *id003
-    persisted: true
-  - id: *id004
-    persisted: true
-  - id: *id005
-    persisted: true
-  - id: *id012
-    persisted: true
-  - id: *id013
-    persisted: true
-  - id: *id006
-    persisted: true
-  - id: *id014
-    persisted: true
-  - id: *id007
-    persisted: true
-  - id: *id015
-    persisted: true
-  - id: *id008
-    persisted: true
-  - id: *id016
-    persisted: true
-  - id: *id009
-    persisted: true
-  - id: *id017
-    persisted: true
+- id: *id001
+  persisted: true
+- id: *id007
+  persisted: true
+- id: *id008
+  persisted: true
+- id: *id002
+  persisted: true
+- id: *id003
+  persisted: true
+- id: *id009
+  persisted: true
+- id: *id004
+  persisted: true
+- id: *id010
+  persisted: true
+- id: *id005
+  persisted: true
+- id: *id011
+  persisted: true
+- id: *id006
+  persisted: true
+- id: *id012
+  persisted: true

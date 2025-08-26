@@ -158,5 +158,6 @@ void __init do_initcall_level(int level, char *command_line)
 // CHECK-LABEL: initcall_from_entry
 
 // CHECK-LABEL: HAKC_XFER_ignore_unknown_bootoption
+// TODO: line below fails since output has changed - is it correct?
 // CHECK: call ptr @hakc_transfer_to_clique(ptr %3, i64 1, i64 4, i64 13, i1 false)
 // CHECK: call void @hakc_color_address(ptr %3, i32 %10, i64 1)

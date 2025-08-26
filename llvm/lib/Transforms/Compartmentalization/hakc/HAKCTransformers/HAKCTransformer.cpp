@@ -1728,7 +1728,7 @@ HAKCTransformer::CreateNewManagedPointer(Value *BaseDefinition) const {
   auto HAKCTy = ModuleAnalysis.GetTypeIdentifier().FindType(*ManagedPtr);
   if (!HAKCTy) {
     CommonHAKCAnalysis::getLogger(Fatal)
-        << "Could not find valid HAKCTy for value: " << *BaseDefinition << "\n";
+        << "Could not find valid HAKCTy for value: " << *BaseDefinition << " with type: " << *ManagedPtr << "\n";
     throw std::exception();
   } else {
     ManagedPtr->SetType(HAKCTy);

@@ -4,6 +4,7 @@
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCLogger.h"
 
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/yaml/HAKCYaml.h"
+#include <filesystem>
 
 using namespace llvm;
 
@@ -20,12 +21,22 @@ void hakc::HAKCLogger::addStream(StringRef log_path,
   if (log_level == Disabled) {
     disabled = true;
   } else {
-    auto writer = std::make_shared<HAKCWriter>(log_path, log_level);
-    if (writer->EC) {
-      errs() << "Failed to create log file: " << writer->EC.message() << "\n";
-      return;
+    auto log_dir = sys::path::parent_path(log_path).str();
+    // create directory if it does not exist
+    if (!std::filesystem::exists(log_dir)) {
+      std::error_code err;
+      err = sys::fs::create_directories(log_dir);
+      if (err) {
+        errs() << "Failed to create " << sys::path::parent_path(log_path) << "\n";
+        // should we crash here?
+        // throw std::exception();
+      }
     }
-    HAKCStreams.push_back(writer);
+
+    auto writer = std::make_shared<HAKCWriter>(log_path, log_level);
+    if (*writer) {
+      HAKCStreams.push_back(writer);
+    }
   }
 }
 
