@@ -283,11 +283,8 @@ class HAKCDatabase:
         return ret
 
     def get_symbol_by_hash(self, symbol_hashes: list[int], **kwargs) -> set[HAKCSymbol]:
-        logger.error(f"get_symbol_by_hash: {symbol_hashes} of type: {type(symbol_hashes)}")
-        logger.error(f"Type of symbol_hash: {type(symbol_hashes)}, symbol_hash[0]: {type(symbol_hashes[0])}")
-        # assert(isinstance(symbol_hashes, list))
-        result = self._get_symbols(where=f'HAKCSymbol.symbol_hash in [{", ".join([str(sh) for sh in symbol_hashes])}]', **kwargs)
-        return result
+        assert(isinstance(symbol_hashes, list))
+        return self._get_symbols(where=f'HAKCSymbol.symbol_hash in [{", ".join([str(sh) for sh in symbol_hashes])}]', **kwargs)
 
     def get_symbols_by_name(self, symbol_name: str) -> list[HAKCSymbol]:
         result = self._get_symbols(symbol_name=symbol_name)
@@ -582,13 +579,11 @@ class HAKCDatabase:
         return types
 
     def get_direct_calls(self, symbol: HAKCSymbol) -> list[HAKCType]:
-        #
         cmd = f"""
                 MATCH (head: {HAKCSymbol.get_table_name()})-[:{HAKCFunction.relation_direct_calls}]->(tail: {HAKCSymbol.get_table_name()})-[:{HAKCSymbol.relation_type}]->(ty:{HAKCType.get_table_name()}),
                 (tail)-[{HAKCSymbol.relation_scope}]->(scope:{HAKCScope.get_table_name()})
-                OPTIONAL MATCH (head)-[def:{HAKCSymbol.relation_definition_location}]->(dl:{HAKCDefinitionLocation.get_table_name()})
                 WHERE head.symbol_hash = $symbol_hash and head.symbol_hash <> tail.symbol_hash
-                RETURN DISTINCT head.*, tail.*, ty.*, def.*, dl.*, scope.*;
+                RETURN DISTINCT head.*, tail.*, ty.*, scope.*;
             """
         try:
             response = self.execute_prepared_stmt(cmd, symbol_hash=hash(symbol))
@@ -695,7 +690,6 @@ class HAKCDatabase:
         elif cls == HAKCFunction or cls == HAKCGlobalVariable:
             data["HAKCSymbol.Scope"] = HAKCDatabase.__create_object_from_response(HAKCScope, **data)
             data["HAKCSymbol.Type"] = HAKCDatabase.__create_object_from_response(HAKCType, **data)
-
             if "HAKCDefinitionLocation.DefiningLine" in data:
                 data["HAKCSymbol.DefinitionLocation"] = HAKCDatabase.__create_object_from_response(HAKCDefinitionLocation, **data)
             cls_data = {key.removeprefix(f"{cls.get_table_name()}."): val for key, val in data.items()}
@@ -703,7 +697,6 @@ class HAKCDatabase:
                 return HAKCFunction(**cls_data)
             if cls == HAKCGlobalVariable:
                 return HAKCGlobalVariable(**cls_data)
-
         elif cls == HAKCDivision:
             compartment = HAKCDatabase.__create_object_from_response(HAKCCompartment, **data)
             div_data = {key.removeprefix(f"{cls.get_table_name()}."): val for key, val in data.items() if key.startswith(cls.get_table_name())}
@@ -736,26 +729,11 @@ class HAKCDatabase:
         type_attrs = HAKCDatabase.get_object_attributes(HAKCType)
         scope_attrs = HAKCDatabase.get_object_attributes(HAKCScope)
         symbol_attrs = HAKCDatabase.get_object_attributes(HAKCSymbol)
-        dl_attrs = HAKCDatabase.get_object_attributes(HAKCDefinitionLocation)
-        # todo: refine command
-        # cmd = f"""
-        # MATCH (sym:{HAKCSymbol.get_table_name()})<-[{HAKCSymbol.relation_dag}]-({HAKCSymbol.get_table_name()})-[:{HAKCSymbol.relation_type}]->({HAKCType.get_table_name()}),
-        #       ({HAKCSymbol.get_table_name()})-[{HAKCSymbol.relation_scope}]->(scope:{HAKCScope.get_table_name()})
-        # WHERE sym.{HAKCSymbol.get_primary_key()} = $symbol_hash AND {HAKCType.get_table_name()}.{HAKCType.get_primary_key()} IS NOT NULL
-        #         AND scope.{HAKCScope.get_primary_key()} IS NOT NULL AND {HAKCSymbol.relation_dag}.weight IS NOT NULL
-        # OPTIONAL MATCH (sym)-[{HAKCSymbol.relation_definition_location}]-({HAKCDefinitionLocation.get_table_name()})
-        # RETURN DISTINCT {type_attrs}, {scope_attrs}, {symbol_attrs}, {dl_attrs}, ;
-        # """
         cmd = f"""
         MATCH ({HAKCType.get_table_name()}:{HAKCType.get_table_name()})<-[{HAKCSymbol.relation_type}:{HAKCSymbol.relation_type}]-({HAKCSymbol.get_table_name()}:{HAKCSymbol.get_table_name()})-[{HAKCSymbol.relation_scope}:{HAKCSymbol.relation_scope}]->({HAKCScope.get_table_name()}:{HAKCScope.get_table_name()}), 
         (sym:{HAKCSymbol.get_table_name()})<-[{HAKCSymbol.relation_dag}:{HAKCSymbol.relation_dag}]-({HAKCSymbol.get_table_name()})
         WHERE sym.{HAKCSymbol.get_primary_key()} = $symbol_hash  
-        OPTIONAL MATCH (sym)-[{HAKCSymbol.relation_definition_location}]-({HAKCDefinitionLocation.get_table_name()})
-        RETURN DISTINCT {type_attrs}, {scope_attrs}, {symbol_attrs}, {dl_attrs}, {HAKCSymbol.relation_dag}.weight, {HAKCSymbol.relation_definition_location}.DefiningLine AS DefiningLine,
-            COALESCE(
-                CASE WHEN {HAKCDefinitionLocation.get_table_name()}.dl_hash IS NOT NULL THEN
-                    CAST( {HAKCDefinitionLocation.get_table_name()}.dl_hash AS STRING ) ELSE NULL END, 
-                    'NONE') AS dl_hash;
+        RETURN DISTINCT {type_attrs}, {scope_attrs}, {symbol_attrs}, {HAKCSymbol.relation_dag}.weight;
         """
 
         # print(cmd)
@@ -768,23 +746,7 @@ class HAKCDatabase:
             # print(info)
             for data in info.to_dict(orient='records'):
                 # logger.fatal(f"Processing symbol {data['HAKCSymbol.Name'] if 'HAKCSymbol.Name' in data else ''}")
-                # print(data)
-                data["HAKCDefinitionLocation.dl_hash"] = data["dl_hash"]
-                del data["dl_hash"]
-                data["HAKCDefinitionLocation.DefiningLine"] = data["DefiningLine"]
-                del data["DefiningLine"]
 
-                if data['HAKCDefinitionLocation.dl_hash'] != 'NONE':
-                    # the definition location was found, so cast value from string to int
-                    data['HAKCDefinitionLocation.dl_hash'] = int(data['HAKCDefinitionLocation.dl_hash'])
-                else:
-                    # if no definition found, then remove empty keys
-                    if 'HAKCDefinitionLocation.dl_hash' in data:
-                        del data['HAKCDefinitionLocation.dl_hash']
-                    if 'HAKCDefinitionLocation.DefiningFile' in data:
-                        del data['HAKCDefinitionLocation.DefiningFile']
-                    if 'HAKCDefinitionLocation.DefiningLine' in data:
-                        del data['HAKCDefinitionLocation.DefiningLine']
                 if data["HAKCSymbol.IsFunction"] is True:
                     func = HAKCDatabase.__create_object_from_response(HAKCFunction, **data)
                     dag_edge = (func, data[f"{HAKCSymbol.relation_symbol}.weight"])
@@ -820,7 +782,7 @@ class HAKCDatabase:
             info = response.get_as_df()
             # print(info)
             assert len(info) == 1, print(f"get_division_compartment response is empty: {info}")
-            logger.error(info)
+
             for data in info.to_dict(orient='records'):
 
                 # print(f"Division and Compartment data: {data}")
@@ -843,8 +805,6 @@ class HAKCDatabase:
     # fix to determinism is using colon on edge for kuzu query
     # otherwise, I guess the edge is just labeled but not actually matched
     def _get_symbols(self, symbol_name: str = None, symbol_hash: int = None, where: str = None ) -> set[HAKCSymbol]:
-        logger.error(f"_get_symbols with where: {where}")
-
         # want to reconstruct the output from the yaml exactly, so the compartmentalization can be rebuilt from the database
         # this [:edge*1..2] which recursively searches is probably not needed
         # cmd = "CALL show_tables() RETURN *;"
@@ -857,16 +817,23 @@ class HAKCDatabase:
         dl_attrs = HAKCDatabase.get_object_attributes(HAKCDefinitionLocation)
         # Note: must cast dl_hash to string or 'NONE' or else pandas will coerce the type from int to float (NaN is a float), which loses precision and causes the hashes to not match
         # e.g., dl_hash = 6.534723912373195e+16, type(dl_hash) = <class 'float'>, int(dl_hash) = 65347239123731952
+        # TODO: should we do two queries, or continue with the optional match?
         # TODO: figure out why optional match is extremely slow
         # NOTE: run PROFILE MATCH ... to view the performance cost of query
+        # using optional match seems to significantly degrade the performance, so let's just do two queries instead
+        # cmd = f"""
+        # PROFILE MATCH ({HAKCType.get_table_name()}:{HAKCType.get_table_name()})<-[{HAKCSymbol.relation_type}:{HAKCSymbol.relation_type}]-({HAKCSymbol.get_table_name()}:{HAKCSymbol.get_table_name()})-[{HAKCSymbol.relation_scope}:{HAKCSymbol.relation_scope}]->({HAKCScope.get_table_name()}:{HAKCScope.get_table_name()})
+        # WHERE {f' AND {HAKCSymbol.get_table_name()}.Name IS $symbol_name' if symbol_name else '' } { f' AND {HAKCSymbol.get_table_name()}.{HAKCSymbol.get_primary_key()} IS $symbol_hash' if symbol_hash else '' } { f'{where}' if where else ''}
+        # RETURN DISTINCT {type_attrs}, {scope_attrs}, {symbol_attrs};
+        # """
         cmd = f"""
-        PROFILE MATCH ({HAKCType.get_table_name()}:{HAKCType.get_table_name()})<-[{HAKCSymbol.relation_type}:{HAKCSymbol.relation_type}]-({HAKCSymbol.get_table_name()}:{HAKCSymbol.get_table_name()})-[{HAKCSymbol.relation_scope}:{HAKCSymbol.relation_scope}]->({HAKCScope.get_table_name()}:{HAKCScope.get_table_name()})
+        MATCH ({HAKCType.get_table_name()}:{HAKCType.get_table_name()})<-[{HAKCSymbol.relation_type}:{HAKCSymbol.relation_type}]-({HAKCSymbol.get_table_name()}:{HAKCSymbol.get_table_name()})-[{HAKCSymbol.relation_scope}:{HAKCSymbol.relation_scope}]->({HAKCScope.get_table_name()}:{HAKCScope.get_table_name()})
         WHERE TRUE { f' AND {HAKCSymbol.get_table_name()}.Name IS $symbol_name' if symbol_name else '' } { f' AND {HAKCSymbol.get_table_name()}.{HAKCSymbol.get_primary_key()} IS $symbol_hash' if symbol_hash else '' } { f'AND {where}' if where else ''}
         OPTIONAL MATCH ({HAKCSymbol.get_table_name()})-[{HAKCSymbol.relation_definition_location}:{HAKCSymbol.relation_definition_location}]->({HAKCDefinitionLocation.get_table_name()}:{HAKCDefinitionLocation.get_table_name()})
         RETURN DISTINCT {type_attrs}, {scope_attrs}, {symbol_attrs}, {dl_attrs}, {HAKCSymbol.relation_definition_location}.DefiningLine AS DefiningLine,
             COALESCE(
                 CASE WHEN {HAKCDefinitionLocation.get_table_name()}.dl_hash IS NOT NULL THEN
-                    CAST( {HAKCDefinitionLocation.get_table_name()}.dl_hash AS STRING ) ELSE NULL END, 
+                    CAST( {HAKCDefinitionLocation.get_table_name()}.dl_hash AS STRING ) ELSE NULL END,
                     'NONE') AS dl_hash;
         """
         # logger.error(f"running command: {cmd}")
@@ -880,49 +847,49 @@ class HAKCDatabase:
         # logger.fatal(response)
         functions = set()
         gvs = set()
-        while response.has_next():
-
-            lines = response.get_next()
-            for line in lines:
-                print(line)
-
-            # logger.fatal(str(response.get_next()))
         # if response.has_next():
-        #     info = response.get_as_df()
-        #     logger.fatal(info)
+        #     lines = response.get_next()
+        #     for line in lines:
+        #         print(line)
 
-            # # pd.set_option('display.max_columns', 15)
-            # # logger.fatal(data[['HAKCSymbol.Name', 'HAKCDefinitionLocation.dl_hash']].head(3))
-            # for data in info.to_dict(orient='records'):
-            #     # print(data)
-            #     # logger.debug(f"Processing symbol {data['HAKCSymbol.Name'] if 'HAKCSymbol.Name' in data else ''}")
-            #     data["HAKCDefinitionLocation.dl_hash"] = data["dl_hash"]
-            #     del data["dl_hash"]
-            #     data["HAKCDefinitionLocation.DefiningLine"] = data["DefiningLine"]
-            #     del data["DefiningLine"]
-            #
-            #     if data['HAKCDefinitionLocation.dl_hash'] != 'NONE':
-            #         # the definition location was found, so cast value from string to int
-            #         data['HAKCDefinitionLocation.dl_hash'] = int(data['HAKCDefinitionLocation.dl_hash'])
-            #     else:
-            #         # if no definition found, then remove empty keys
-            #         if 'HAKCDefinitionLocation.dl_hash' in data:
-            #             del data['HAKCDefinitionLocation.dl_hash']
-            #         if 'HAKCDefinitionLocation.DefiningFile' in data:
-            #             del data['HAKCDefinitionLocation.DefiningFile']
-            #         if 'HAKCDefinitionLocation.DefiningLine' in data:
-            #             del data['HAKCDefinitionLocation.DefiningLine']
-            #
-            #     if data["HAKCSymbol.IsFunction"] is True:
-            #         func = HAKCDatabase.__create_object_from_response(HAKCFunction, **data)
-            #         functions.add(func)
-            #         # print(func.debug_print())
-            #     else:
-            #         gv = HAKCDatabase.__create_object_from_response(HAKCGlobalVariable, **data)
-            #         # print(gv.debug_print())
-            #         gvs.add(gv)
+        # logger.fatal(str(response.get_next()))
+        if response.has_next():
+            info = response.get_as_df()
+            # logger.fatal(info)
+
+            # pd.set_option('display.max_columns', 15)
+            # logger.fatal(data[['HAKCSymbol.Name', 'HAKCDefinitionLocation.dl_hash']].head(3))
+            for data in info.to_dict(orient='records'):
+                # print(data)
+                # logger.debug(f"Processing symbol {data['HAKCSymbol.Name'] if 'HAKCSymbol.Name' in data else ''}")
+                data["HAKCDefinitionLocation.dl_hash"] = data["dl_hash"]
+                del data["dl_hash"]
+                data["HAKCDefinitionLocation.DefiningLine"] = data["DefiningLine"]
+                del data["DefiningLine"]
+
+                if data['HAKCDefinitionLocation.dl_hash'] != 'NONE':
+                    # the definition location was found, so cast value from string to int
+                    data['HAKCDefinitionLocation.dl_hash'] = int(data['HAKCDefinitionLocation.dl_hash'])
+                else:
+                    # if no definition found, then remove empty keys
+                    if 'HAKCDefinitionLocation.dl_hash' in data:
+                        del data['HAKCDefinitionLocation.dl_hash']
+                    if 'HAKCDefinitionLocation.DefiningFile' in data:
+                        del data['HAKCDefinitionLocation.DefiningFile']
+                    if 'HAKCDefinitionLocation.DefiningLine' in data:
+                        del data['HAKCDefinitionLocation.DefiningLine']
+
+                if data["HAKCSymbol.IsFunction"] is True:
+                    func = HAKCDatabase.__create_object_from_response(HAKCFunction, **data)
+                    functions.add(func)
+                    # print(func.debug_print())
+                else:
+                    gv = HAKCDatabase.__create_object_from_response(HAKCGlobalVariable, **data)
+                    # print(gv.debug_print())
+                    gvs.add(gv)
 
         # the 'base' HAKCSymbol is now created, now look for all symbols used, direct calls, indirect calls, types used
+        # Note: Speeding up performance by only doing a 'shallow' query of the direct calls, since we only need to know enough to create the symbol hash
         for func in functions:
             # print(func)
             used_symbols = self.get_used_symbols(func)
@@ -942,7 +909,7 @@ class HAKCDatabase:
 
         # print(f"Returning {len(functions)} functions")
         symbols = functions.union(gvs)
-        logger.fatal(f"Returning symbols {symbols}")
+        # logger.fatal(f"Returning symbols {symbols}")
         return symbols
 
     def get_symbol_hash(self, Name, DefiningFile, DefiningLine):
