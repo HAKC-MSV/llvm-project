@@ -41,13 +41,9 @@ class HAKCHashValue:
     def __init__(self, values: list[object]):
         if len(values) > 0:
             h = hashlib.sha256()
-            # print(f"Using values: {values}")
             for value in values:
-                # print(f"\t {type(value)} {value}")
                 h.update(HAKCHashValue.get_bytes(value))
-            self.final_hash = int.from_bytes(h.digest()[:8], byteorder=HAKCHashValue.ByteOrder)
-            print(f"Computed hash {self.final_hash} based on inputs {values}")
-            # print(f"self.final_hash: {int(self.final_hash)}")
+            self.final_hash = int.from_bytes(h.digest()[:7], byteorder=HAKCHashValue.ByteOrder)
 
     @staticmethod
     def get_bytes(value) -> bytes:
@@ -71,8 +67,6 @@ class HAKCHashValue:
         else:
             return False
 
-    # def __str__(self):
-    #     return ""
     def __str__(self):
         # assert(isinstance(self.final_hash, int))
         # Note: loading from dag seems to store the hex value as a string
@@ -80,18 +74,12 @@ class HAKCHashValue:
             return f'{self.final_hash}'
         return f'{self.final_hash:0x}'
 
-    # def __int__(self):
-    #     return 0
-    #     # return int(self)
-
     def __repr__(self):
-        return str(self)
+        return self.final_hash
 
 
 class HAKCPrintableObj:
     def __init__(self, **kwargs):
-        if kwargs.get("name", "") == "do_initcall_level":
-            print("Found it")
         self.computed_hash = None
 
     def __repr__(self):
@@ -120,10 +108,7 @@ class HAKCPrintableObj:
 
     def compute_hash(self):
         if self.computed_hash is None:
-            # print(f"Computing hash with [{self.get_hash_inputs()}]")
-            # print(f"\tComputing hash with inputs: {self.get_hash_inputs()}")
             self.computed_hash = HAKCHashValue(self.get_hash_inputs())
-            # print(f"computed_hash: {self.computed_hash}")
 
     def recompute_hash(self):
         self.computed_hash = HAKCHashValue(self.get_hash_inputs())
@@ -194,10 +179,8 @@ class HAKCDBColumn(HAKCPrintableObj):
 
 class HAKCDBNode(HAKCPrintableObj):
     def __init__(self, **kwargs):
-        # print(f"\tHAKCDBNode kwargs: {kwargs}")
         HAKCPrintableObj.__init__(self, **kwargs)
         for key, value in kwargs.items():
-            # print(f"\t\tkey, val {key}, {value} ")
             if key == self.get_primary_key().column_name and self.uses_hashed_key():
                 self.computed_hash = HAKCHashValue.from_int(value)
 
@@ -228,9 +211,9 @@ class HAKCDBNode(HAKCPrintableObj):
         # assert(len(cls.get_db_data(HAKCDBNode)) == len(columns))
         return columns
 
-    @staticmethod
-    def get_data_columns() -> list[HAKCDBColumn]:
-        raise NotImplementedError
+    @classmethod
+    def get_data_columns(cls) -> list[HAKCDBColumn]:
+        raise NotImplementedError(f"class: {cls.__name__}")
 
     @staticmethod
     def get_db_relations() -> list['HAKCDBRelation']:

@@ -265,7 +265,7 @@ HAKCCompartmentalizationPolicy::GetDivision(GlobalValue *GV) {
   auto DivisionAccessToken = DivisionYAML->getInteger("AccessToken");
   if (!DivisionAccessToken.has_value()) {
     CommonHAKCAnalysis::getLogger(Fatal)
-        << "Received No Entry Token for " << *GV << "\n";
+        << "Received No Access Token for " << *GV << "\n";
     throw std::exception();
   }
   auto CompartmentID = CompartmentYAML->getInteger("CompartmentID");

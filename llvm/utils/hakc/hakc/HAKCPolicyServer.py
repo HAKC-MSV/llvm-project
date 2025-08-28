@@ -19,7 +19,7 @@ logger = logging.getLogger('hakc-policy-server')
 
 
 class TimeoutException(Exception):
-# class TimeoutException(Exception("Timeout!!!!")):
+    # class TimeoutException(Exception("Timeout!!!!")):
     pass
 
 
@@ -67,9 +67,10 @@ class HAKCPolicyProcessConfig:
         self.get_valid_targets_from_compartment_id_endpoint = kwargs.get(
             'get-valid-targets-from-compartment-id-endpoint', "get-valid-targets-from-compartment-id")
 
+
 def kwargs_get(cls, name: str, default: any = None, **kwargs):
     # Function to retrieve and validate function parameter
-    assert(isinstance(name, str))
+    assert (isinstance(name, str))
     val_or_default = kwargs.get(name, default)
     # if value is already of the correct type, just return the value
     if type(val_or_default) == cls:
@@ -77,10 +78,12 @@ def kwargs_get(cls, name: str, default: any = None, **kwargs):
     try:
         if cls in [int, str, float]:
             return cls(val_or_default)
-        logger.warning(f"Unable to cast parameter {name} to type {cls}, so just returning {name} of type {type(val_or_default)}")
+        logger.warning(
+            f"Unable to cast parameter {name} to type {cls}, so just returning {name} of type {type(val_or_default)}")
         return val_or_default
     except Exception:
         raise Exception(f"Failed to get parameter {name} of type {cls} from {kwargs}")
+
 
 class HAKCPolicyDataSource:
     def __init__(self, config: HAKCPolicyProcessConfig, yaml_loader=yaml.Loader, **kwargs):
@@ -89,8 +92,8 @@ class HAKCPolicyDataSource:
                           config.get_division_from_symbol_endpoint: self.get_symbol_division,
                           config.get_valid_targets_from_compartment_id_endpoint: self.get_valid_targets_from_compartment_id}
         self.yaml_loader = yaml_loader
-        self.default_compartment = HAKCCompartment(config.default_compartment_id, config.default_entry_token)
-        self.default_division = HAKCDivision(config.default_division_id, config.default_access_token)
+        self.default_compartment = HAKCCompartment(config.default_compartment_id, EntryToken=0)
+        self.default_division = HAKCDivision(config.default_division_id, AccessToken=0, Salt=0)
         self.socket_path = config.socket_path
         self.test_mode = config.test_mode
 
@@ -132,14 +135,16 @@ class HAKCPolicyDataSource:
         return compartment
 
     def get_symbol_division(self, **kwargs) -> HAKCDivisionCompartmentPayload:
-        _symbol = kwargs_get(object, "object", None, **kwargs)
+        _symbol = kwargs_get(str, "object", None, **kwargs)
         symbol = yaml.load(_symbol, Loader=self.yaml_loader)
         ret = None
 
         found_symbol = self._get_symbol_division_from_backing_store(symbol)
         if not found_symbol:
-            logger.warning(f"Unable to find Compartment and Division from symbol {symbol}, so creating default Compartment and Division! (should we crash here?)")
-            found_symbol = HAKCDivisionCompartmentPayload(division=self._get_default_division(), compartment=self._get_default_compartment())
+            logger.warning(
+                f"Unable to find Compartment and Division from symbol {symbol}, so creating default Compartment and Division! (should we crash here?)")
+            found_symbol = HAKCDivisionCompartmentPayload(division=self._get_default_division(),
+                                                          compartment=self._get_default_compartment())
 
         logger.debug(f"Returning Compartment Division {found_symbol} for symbol {symbol}")
         return found_symbol
@@ -153,7 +158,7 @@ class HAKCPolicyDataSource:
         return payload
 
     def handle_request(self, request: HAKCDataRequest) -> HAKCPrintableObj:
-        assert(isinstance(request, HAKCDataRequest))
+        assert (isinstance(request, HAKCDataRequest))
         logger.debug(f"handle_request processing endpoint: {request.endpoint}")
         # assertion not being printed in other functions
         if request.endpoint not in self.endpoints:
@@ -239,24 +244,27 @@ class KUZUHAKCPolicyDataStore(HAKCPolicyDataSource):
         return HAKCCompartment(compartment_id, EntryToken=entry_token)
 
     def _get_division_from_backing_store(self, division_id: int, compartment_id: int) -> Optional[HAKCDivision]:
-        logger.debug(f"Trying to get division_id: {division_id} from backing store")
-        access_token = self.database.get_division_access_token_from_id(division_id, compartment_id)
-        if access_token is None:
-            logger.error(f"Unable to find access_token for division_id {division_id}, so using default value of {self.default_division.access_token}!")
-            return HAKCDivision(division_id, AccessToken=self.default_division.access_token)
-        return HAKCDivision(division_id, AccessToken=access_token)
+        logger.debug(f"Trying to get division {division_id} in compartment {compartment_id}")
+        division = self.database.get_division(division_id, compartment_id)
+
+        if division is None:
+            logger.error(
+                f"Unable to find access_token for division_id {division_id}, so using default value of {self.default_division}!")
+            division = self.default_division
+        return division
 
     def _get_symbol_division_from_backing_store(self, symbol: HAKCSymbol) -> Optional[HAKCDivisionCompartmentPayload]:
-        assert(isinstance(symbol, HAKCSymbol))
+        assert (isinstance(symbol, HAKCSymbol))
         logger.debug(f"Trying to get HAKCDivision object from backing store with symbol: {symbol}")
-        compartment_id_division_id_tuple = self.database.get_division_compartment(symbol)
+        compartment_id_division_id_tuple = self.database.get_division_id_compartment_id_from_symbol(symbol)
         if compartment_id_division_id_tuple is None:
-            logger.error(f"get_division_compartment returned None for symbol: {symbol}")
+            logger.error(f"get_division_id_compartment_id_from_symbol returned None for symbol: {symbol}")
             return None
-        return HAKCDivisionCompartmentPayload(division=compartment_id_division_id_tuple[0], compartment=compartment_id_division_id_tuple[1])
+        return HAKCDivisionCompartmentPayload(division=compartment_id_division_id_tuple[0],
+                                              compartment=compartment_id_division_id_tuple[1])
 
     def _get_valid_targets_from_compartment_id(self, compartment_id: int) -> Optional[HAKCPayload]:
-        assert(isinstance(compartment_id, int))
+        assert (isinstance(compartment_id, int))
         target_id_entry_token = self.database.get_valid_targets_from_compartment_id(compartment_id)
         if len(target_id_entry_token) == 0:
             logger.fatal(f"Unable to find entry_token for compartment_id = {compartment_id}")
