@@ -5,10 +5,13 @@ add_llvm_component_library(LLVMHAKC
         HAKCAnalysis/HAKCModuleAnalysis.cpp
         HAKCAnalysis/HAKCPointerManager.cpp
         HAKCAnalysis/ManagedHAKCPointer.cpp
+        HAKCAnalysis/HAKCAnalysisClient.cpp
 
         HAKCCompartmentalizationPolicy/HAKCCompartment.cpp
         HAKCCompartmentalizationPolicy/HAKCCompartmentalizationPolicy.cpp
         HAKCCompartmentalizationPolicy/HAKCCompartmentDivision.cpp
+
+        HAKCDatabase/HAKCDatabase.cpp
 
         HAKCFunctionDefinition/HAKCCustomTransfer.cpp
         HAKCFunctionDefinition/HAKCFunctionDefinition.cpp

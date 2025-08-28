@@ -391,10 +391,10 @@ def main():
         profile = cProfile.Profile()
 
     # TODO REMOVE BELOW
-    conn = HAKCDatabase(args.db_dir)
-    sym = conn.get_single_symbol_by_hash(62045420910023733)
-    conn.set_division_compartment_id_by_symbol(sym, 2, 0)
-    return
+    # conn = HAKCDatabase(args.db_dir)
+    # sym = conn.get_single_symbol_by_hash(62045420910023733)
+    # conn.set_division_compartment_id_by_symbol(sym, 2, 0)
+    # return
     # conn.get_symbols()
     # conn.run_query()
     # # compartmentalization = HAKCCompartmentalization()
@@ -422,11 +422,7 @@ def main():
         logger.info("Done")
 
     if args.dump_dag:
-        logger.info(f'Saving compartmentalization to {args.dump_dag}')
-        with open(args.dump_dag, "w") as f:
-            yaml.dump(compartmentalization, f)
-        logger.info("Finished saving compartmentalization")
-
+        compartmentalization.save_as_yaml(args.dump_dag)
 
 if __name__ == "__main__":
     main()

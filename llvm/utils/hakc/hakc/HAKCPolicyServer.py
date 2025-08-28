@@ -13,6 +13,7 @@ from .HAKCBase import HAKCPrintableObj, HAKCPayload
 from .HAKCLogger import HAKCLogger
 from .HAKCObjects import HAKCSymbol, HAKCCompartment, HAKCDivision, HAKCDivisionCompartmentPayload
 from .HAKCCompartmentalization import HAKCCompartmentalization
+from .HAKCServerConfig import HAKCServerConfig, HAKCDataRequest, kwargs_get
 
 logging.setLoggerClass(HAKCLogger)
 
@@ -29,17 +30,6 @@ class SupportedBackingStore(Enum):
     YAML = "yaml"
     KUZU = "kuzu"
 
-
-class HAKCDataRequest:
-    def __init__(self, Endpoint: str, **kwargs):
-        self.endpoint = Endpoint
-        self.parameters = kwargs.get('Parameters', dict())
-
-    def __str__(self):
-        return f"Endpoint: {self.endpoint}\nwith parameters: {self.parameters}"
-
-    def __repr__(self):
-        return self.__str__()
 
 class HAKCPolicyProcessConfig:
     def __init__(self, **kwargs):

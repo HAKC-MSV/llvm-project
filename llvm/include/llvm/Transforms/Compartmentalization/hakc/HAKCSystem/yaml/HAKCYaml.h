@@ -177,6 +177,8 @@ struct HAKCYamlDatabaseConfig {
   HAKCYAMLStringType GetDivisionEndpoint;
   HAKCYAMLStringType GetSymbolDivisionEndpoint;
   HAKCYAMLStringType GetValidTargetsEndpoint;
+  HAKCYAMLStringType AddFunctionEndpoint;
+  HAKCYAMLStringType AddGlobalVariableEndpoint;
   unsigned ServerTimeout;
   unsigned MaxConnectionRetries;
 };
@@ -394,6 +396,12 @@ template <> struct yaml::MappingTraits<hakc::HAKCYamlDatabaseConfig> {
     Io.mapOptional("get-valid-targets-from-compartment-id-endpoint",
                    YamlConfig.GetValidTargetsEndpoint,
                    "get-valid-targets-from-compartment-id");
+    Io.mapOptional("add-function-endpoint",
+                   YamlConfig.AddFunctionEndpoint,
+                   "add-function");
+    Io.mapOptional("add-global-variable-endpoint",
+                   YamlConfig.AddGlobalVariableEndpoint,
+                   "add-global-variable");
     Io.mapOptional("max-connection-retries", YamlConfig.MaxConnectionRetries,
                    5);
   }

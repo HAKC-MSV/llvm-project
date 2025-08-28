@@ -613,3 +613,9 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         yaml.add_constructor(HAKCFunction.yaml_tag, HAKCFunction.from_yaml)
         yaml.add_constructor(HAKCGlobalVariable.yaml_tag, HAKCGlobalVariable.from_yaml)
         yaml.add_constructor(HAKCCompartmentalization.yaml_tag, HAKCCompartmentalization.from_yaml)
+
+    def save_as_yaml(self, fname: str):
+        logger.info(f'Saving compartmentalization to {fname}')
+        with open(fname, "w") as f:
+            yaml.dump(self, f)
+        logger.info(f"Finished saving compartmentalization to {fname}")

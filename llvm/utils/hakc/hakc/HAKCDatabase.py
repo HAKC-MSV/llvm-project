@@ -990,5 +990,3 @@ class HAKCDatabase:
         response = self.execute_prepared_stmt(cmd, symbol_hash=int(_symbol.get_computed_hash()), compartment_id=new_compartment_id, division_id=new_division_id)
         ret = response.get_as_df()
         print(ret)
-        # TODO: should we remove the old division or compartment nodes if they have no edges?
-        # return ret["comp.CompartmentID"][0]

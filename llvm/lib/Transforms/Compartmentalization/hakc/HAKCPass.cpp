@@ -4,6 +4,7 @@
  */
 
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCPass.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/HAKCAnalysisClient.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/HAKCModuleAnalysis.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCSystemInformation.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCTransformer.h"
@@ -98,8 +99,9 @@ static bool runDataAccessGraphAnalysis(CommonHAKCAnalysis &HAKCAnalysis) {
     if (HAKCAnalysis.GetSystemInfo().GetTemporalAnalysisEnabled()) {
       ModuleAnalysis.TemporalAnalysis();
     }
-    ModuleAnalysis.OutputYAML(out);
-    out.close();
+    CommonHAKCAnalysis::getLogger(Fatal) << "Starting Analysis Client " << Path << "\n";
+    HAKCAnalysisClient AnalysisClient(HAKCAnalysis.GetSystemInfo());
+    AnalysisClient.SendSymbolsToAnalysisServer(ModuleAnalysis);
   } else {
     CommonHAKCAnalysis::getLogger(Fatal) << "Failed to open " << Path << "\n";
     throw std::exception();

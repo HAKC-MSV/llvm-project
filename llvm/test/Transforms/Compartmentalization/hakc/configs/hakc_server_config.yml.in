@@ -12,5 +12,7 @@
   "get-compartment-by-id-endpoint": "get-compartment-by-id",
   "get-division-by-id-endpoint": "get-division-by-id",
   "get-division-from-symbol-endpoint": "get-division-from-symbol",
-  "get-valid-targets-from-compartment-id-endpoint": "get-valid-targets-from-compartment-id"
+  "get-valid-targets-from-compartment-id-endpoint": "get-valid-targets-from-compartment-id",
+  "add-function-endpoint": "add-function",
+  "add-global-variable-endpoint": "add-global-variable"
 }

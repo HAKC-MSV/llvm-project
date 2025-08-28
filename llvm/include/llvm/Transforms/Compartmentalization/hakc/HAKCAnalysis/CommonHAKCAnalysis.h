@@ -5,6 +5,7 @@
 #ifndef HAKC_COMMONHAKCANALYSIS_H
 #define HAKC_COMMONHAKCANALYSIS_H
 
+// #include "llvm/Transforms/Compartmentalization/hakc/HAKCDatabase/HAKCDatabase.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartmentalizationPolicy.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCSystemInformation.h"
 

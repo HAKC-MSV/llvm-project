@@ -49,6 +49,10 @@ public:
 
   StringRef GetValidTargetsEndpoint() const;
 
+  StringRef GetAddFunctionEndpoint() const;
+
+  StringRef GetAddGlobalVariableEndpoint() const;
+
   std::chrono::milliseconds GetServerTimeout() const;
 
   unsigned GetMaxRetries() const;
@@ -61,6 +65,8 @@ protected:
   std::string DivisionEndpoint;
   std::string SymbolDivisionEndpoint;
   std::string ValidTargetsEndpoint;
+  std::string AddFunctionEndpoint;
+  std::string AddGlobalVariableEndpoint;
   std::chrono::milliseconds Timeout;
   unsigned MaxConnectionRetries;
 };
