@@ -90,8 +90,7 @@ HAKCAnalysisClient::Execute(StringRef Endpoint,
 
 
 void HAKCAnalysisClient::add_function(const HAKCFunctionInfo &FI) const{
-//TODO
-	CommonHAKCAnalysis::getLogger(Fatal) << "Trying to add function to DAG\n";
+	CommonHAKCAnalysis::getLogger(Fatal) << "Trying to add function " << *FI.GetFunction() << " to DAG\n";
   std::string ObjectYaml;
   raw_string_ostream os(ObjectYaml);
   os << FI.GetYaml(0);
@@ -108,8 +107,22 @@ void HAKCAnalysisClient::add_function(const HAKCFunctionInfo &FI) const{
   }
 }
 
-void HAKCAnalysisClient::add_global_variable(const HAKCGlobalInfo &Global) const{
-//TODO
+void HAKCAnalysisClient::add_global_variable(const HAKCGlobalInfo &GI) const{
+	CommonHAKCAnalysis::getLogger(Fatal) << "Trying to add Global Variable " << *GI.GetGlobalVariable() << " to DAG\n";
+  std::string ObjectYaml;
+  raw_string_ostream os(ObjectYaml);
+  os << GI.GetYaml(0);
+  json::Object Parameters({{"object", ObjectYaml}});
+
+  auto ResponseData = Execute(
+      SystemInformation.GetDatabaseInformation().GetAddGlobalVariableEndpoint(),
+      Parameters);
+  auto Success = ResponseData.getBoolean("Success");
+  if (!Success) {
+    CommonHAKCAnalysis::getLogger(Fatal)
+        << "Invalid Response for " << *GI.GetGlobalVariable() << "\n";
+    throw std::exception();
+  }
 }
 
 void HAKCAnalysisClient::SendSymbolsToAnalysisServer(HAKCModuleAnalysis &ModuleAnalysis) const {
