@@ -35,7 +35,7 @@ class HAKCLogger(logging.Logger):
 
     def progress_bar(self, **kwargs) -> tqdm.tqdm:
         disabled = self.level not in {logging.INFO, logging.DEBUG}
-        kwargs['file'] = output_file = self.console_handler.stream
+        kwargs['file'] = self.console_handler.stream
         if disabled:
             kwargs['file'] = open(os.devnull, 'w')
             kwargs['disable'] = True

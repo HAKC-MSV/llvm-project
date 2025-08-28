@@ -182,7 +182,7 @@ public:
   std::map<CallInst *, HAKCTypeP> IndirectCallsTypes;
   std::map<const DICompositeType *, Type *> AnonymousTypes;
   std::map<Value *, HAKCTypeP> FindHAKCTypeMap;
-  const DIScope *CompilationUnitScope;
+  const DIScope *DefinitionLocationScope;
   const std::vector<StructType *> IdentifiedStructTypes;
 };
 } // namespace llvm::hakc

@@ -5,6 +5,7 @@
 #ifndef HAKC_COMMONHAKCANALYSIS_H
 #define HAKC_COMMONHAKCANALYSIS_H
 
+// #include "llvm/Transforms/Compartmentalization/hakc/HAKCDatabase/HAKCDatabase.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartmentalizationPolicy.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCSystemInformation.h"
 
@@ -184,9 +185,9 @@ public:
 
   static Function *GetOriginalFunctionFromTransferFunction(Function *F);
 
-  StringRef createDagYamlPath(StringRef DagAnalysisRootPath);
+  std::string createDagYamlPath(StringRef DagAnalysisRootPath);
 
-  StringRef createLogPath(StringRef DagAnalysisRootPath);
+  std::string createLogPath(StringRef DagAnalysisRootPath);
 
 private:
   static bool valueHasAttribute(Value *v, Attribute::AttrKind Kind);

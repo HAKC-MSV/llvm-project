@@ -101,8 +101,8 @@ std::string HAKCFunctionInfo::GetYaml(unsigned Indents) const {
     SmallString<256> PathName;
     GetTransformedPathName(DefiningLocation, PathName);
     sstream << "\n";
-    sstream.indent(Indents + EntrySpaces()) << "CompilationUnit:\n";
-    sstream.indent(Indents + EntrySpaces() + 4) << "!HAKCCompilationUnit\n";
+    sstream.indent(Indents + EntrySpaces()) << "DefinitionLocation:\n";
+    sstream.indent(Indents + EntrySpaces() + 4) << "!HAKCDefinitionLocation\n";
     sstream.indent(Indents + EntrySpaces() + 4)
         << "DefiningFile: \"" << PathName << "\"\n";
     sstream.indent(Indents + EntrySpaces() + 4)

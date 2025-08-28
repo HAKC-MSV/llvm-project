@@ -5,17 +5,18 @@ import socketserver
 import struct
 from enum import Enum
 from pathlib import Path
-from typing import Optional
+from typing import Optional, cast
 
 import yaml
 
 from .HAKCBase import HAKCPrintableObj, HAKCPayload
-from .HAKCLogger import setup_logging, LoggingLevelEnum, HAKCLogger
+from .HAKCLogger import HAKCLogger
 from .HAKCObjects import HAKCSymbol, HAKCCompartment, HAKCDivision, HAKCDivisionCompartmentPayload
+from .HAKCCompartmentalization import HAKCCompartmentalization
 
 logging.setLoggerClass(HAKCLogger)
 
-logger = logging.getLogger('hakc-policy-server')
+logger: HAKCLogger = cast(HAKCLogger, logging.getLogger('hakc-policy-server'))
 
 
 class TimeoutException(Exception):
@@ -135,16 +136,16 @@ class HAKCPolicyDataSource:
         return compartment
 
     def get_symbol_division(self, **kwargs) -> HAKCDivisionCompartmentPayload:
+        # get-division-from-symbol endpoint
         _symbol = kwargs_get(str, "object", None, **kwargs)
         symbol = yaml.load(_symbol, Loader=self.yaml_loader)
-        ret = None
+        # if the symbol hash was not set (meaning it wasn't sent with the query) we need to find the correct hash value
+        # if symbol.set_hash == False:
 
         found_symbol = self._get_symbol_division_from_backing_store(symbol)
         if not found_symbol:
-            logger.warning(
-                f"Unable to find Compartment and Division from symbol {symbol}, so creating default Compartment and Division! (should we crash here?)")
-            found_symbol = HAKCDivisionCompartmentPayload(division=self._get_default_division(),
-                                                          compartment=self._get_default_compartment())
+            logger.warning(f"Unable to find Compartment and Division from symbol {symbol}, so creating default Compartment and Division! (should we crash here?)")
+            found_symbol = HAKCDivisionCompartmentPayload(division=self._get_default_division(), compartment=self._get_default_compartment())
 
         logger.debug(f"Returning Compartment Division {found_symbol} for symbol {symbol}")
         return found_symbol
@@ -160,15 +161,12 @@ class HAKCPolicyDataSource:
     def handle_request(self, request: HAKCDataRequest) -> HAKCPrintableObj:
         assert (isinstance(request, HAKCDataRequest))
         logger.debug(f"handle_request processing endpoint: {request.endpoint}")
-        # assertion not being printed in other functions
         if request.endpoint not in self.endpoints:
-            # TODO: assertion instead?
             raise RuntimeError(f'Invalid Endpoint {request.endpoint}, endpoints available: {self.endpoints.keys()}')
         try:
             return self.endpoints[request.endpoint](**request.parameters)
         except Exception as e:
-            logger.fatal(f"Exception: {e}")
-            # return None
+            raise RuntimeError(f"Exception: {e}")
 
 
 class NullHAKCPolicyDataStore(HAKCPolicyDataSource):
@@ -206,7 +204,8 @@ class YAMLHAKCPolicyDataStore(HAKCPolicyDataSource):
         if division is None:
             logger.debug(f'Failed to find division for {symbol}')
             return None
-        compartment = self.compartmentalization.get_compartment_node(division.compartment_id)
+        # compartment = self.compartmentalization.get_compartment_node(division.compartment_id)
+        compartment = self.compartmentalization.get_compartment_from_division(division)
         if compartment is None:
             logger.error(f'Could not find compartment for {division}')
             raise RuntimeError()
@@ -221,9 +220,10 @@ class YAMLHAKCPolicyDataStore(HAKCPolicyDataSource):
     def deserialize_compartmentalization(self, yamlin):
         if yamlin is None:
             raise RuntimeError(f'yamlin is None')
-        from .HAKCCompartmentalization import HAKCCompartmentalization
+        HAKCCompartmentalization.add_yaml_constructors()
+
         with open(yamlin, 'r') as file:
-            self.compartmentalization: HAKCCompartmentalization = yaml.load(file, Loader=self.yaml_loader)
+            self.compartmentalization = yaml.load(file, Loader=self.yaml_loader)
 
         if len(self.compartmentalization) == 0:
             raise RuntimeError(f'{yamlin} does not contain a compartmentalization policy')
@@ -297,7 +297,7 @@ class HAKCRequestHandler(socketserver.StreamRequestHandler):
 
     @property
     def hakc_policy_server(self) -> 'HAKCPolicyServer':
-        return self.server
+        return cast(HAKCPolicyServer, self.server)
 
     def gracefully_terminate_connection(self, e):
         err_msg = {"TERMINATING CONNECTION": e}
@@ -353,14 +353,11 @@ class HAKCRequestHandler(socketserver.StreamRequestHandler):
 
 
 class HAKCPolicyServer(socketserver.ThreadingUnixStreamServer):
-    def __init__(self, data_source: HAKCPolicyDataSource, log_level=LoggingLevelEnum.INFO,
-                 log_file: str = "", log_mode: str = 'w', **kwargs):
+    def __init__(self, data_source: HAKCPolicyDataSource, **kwargs):
         self.data_source = data_source
-        setup_logging(logger, log_level=log_level, log_file=log_file, log_mode=log_mode)
         os.makedirs(os.path.dirname(data_source.socket_path), exist_ok=True)
         logger.debug(f'Starting Socket Server at {data_source.socket_path}')
-        socketserver.ThreadingUnixStreamServer.__init__(self, str(data_source.socket_path),
-                                                        RequestHandlerClass=HAKCRequestHandler)
+        socketserver.ThreadingUnixStreamServer.__init__(self, str(data_source.socket_path), HAKCRequestHandler)
 
     def handle_error(self, _a, _b):
         logger.info(f"Shutting down server")

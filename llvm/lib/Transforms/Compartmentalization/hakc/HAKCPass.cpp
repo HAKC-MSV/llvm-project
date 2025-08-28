@@ -66,7 +66,7 @@ static bool runCompartmentalization(CommonHAKCAnalysis &HAKCAnalysis) {
 
 static bool runDataAccessGraphAnalysis(CommonHAKCAnalysis &HAKCAnalysis) {
   Module &M = HAKCAnalysis.GetModule();
-  SmallString<256> Path = HAKCAnalysis.createDagYamlPath(HAKCAnalysis.GetSystemInfo().GetDagAnalysisRootPath());
+  SmallString<256> Path{HAKCAnalysis.createDagYamlPath(HAKCAnalysis.GetSystemInfo().GetDagAnalysisRootPath())};
 
   StringRef CurrentSourceName(M.getSourceFileName());
   for (auto &path : HAKCAnalysis.GetSystemInfo().HAKCSourcePaths()) {

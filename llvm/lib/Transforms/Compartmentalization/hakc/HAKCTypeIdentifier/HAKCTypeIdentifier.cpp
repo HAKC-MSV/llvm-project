@@ -576,7 +576,7 @@ HAKCTypeIdentifier::HandleGlobal(const DIGlobalVariable *DIGV) {
   if (DIGV->isLocalToUnit()) {
     const auto *Scope = DIGV->getScope();
     if (!Scope) {
-      Scope = CompilationUnitScope;
+      Scope = DefinitionLocationScope;
     }
     GVP->SetLocalScope(Scope);
   }
@@ -714,7 +714,7 @@ HAKCTypeIdentifier::AddNoDebugFunction(Function *F) {
   auto FuncInfo = std::make_shared<HAKCFunctionInfo>(
       AnalysisHelper, F->getName(), !SuppressOutput);
   FuncInfo->SetFunction(F);
-  FuncInfo->SetLocalScope(CompilationUnitScope);
+  FuncInfo->SetLocalScope(DefinitionLocationScope);
   auto HAKCType = FindCalledFunctionType(F->getFunctionType());
   if (!HAKCType) {
     HAKCType = CreateNoDebugType(F->getFunctionType());
@@ -761,7 +761,7 @@ HAKCTypeIdentifier::AddNoDebugGlobal(GlobalObject *GlobalObj) {
 
     GlobalInfo->SetGlobalVariable(GV);
     GlobalInfo->SetType(HAKCType);
-    GlobalInfo->SetLocalScope(CompilationUnitScope);
+    GlobalInfo->SetLocalScope(DefinitionLocationScope);
 
     UnmappedGlobals.insert(GlobalInfo);
     return GlobalInfo;
@@ -2056,7 +2056,7 @@ HAKCTypeP HAKCTypeIdentifier::HandleIndirectCall(CallInst *CallI) {
 HAKCTypeIdentifier::HAKCTypeIdentifier(CommonHAKCAnalysis &AnalysisHelper)
     : AnalysisHelper(AnalysisHelper), DbgInfoFinder(), TypesWithDebugInfo(),
       globals(), functions(), TypesMissingDebugInfo(), IndirectCallsTypes(),
-      AnonymousTypes(), CompilationUnitScope(nullptr),
+      AnonymousTypes(), DefinitionLocationScope(nullptr),
       IdentifiedStructTypes(
           AnalysisHelper.GetModule().getIdentifiedStructTypes()) {}
 
@@ -2079,18 +2079,18 @@ void HAKCTypeIdentifier::ProcessDebugInfo() {
     if (auto *File = dyn_cast<DIFile>(Scope)) {
       auto Filename = File->getFilename();
       if (ModulePath.contains(Filename)) {
-        CompilationUnitScope = Scope;
+        DefinitionLocationScope = Scope;
         break;
       }
     }
   }
 
-  if (!CompilationUnitScope) {
+  if (!DefinitionLocationScope) {
     CommonHAKCAnalysis::getLogger(Verbose)
         << "Could not find Compilation Unit Scope\n";
   } else {
     CommonHAKCAnalysis::getLogger(Verbose)
-        << "Found Compilation Unit Scope " << CompilationUnitScope << "\n";
+        << "Found Compilation Unit Scope " << DefinitionLocationScope << "\n";
   }
 
   CommonHAKCAnalysis::getLogger(Debug) << "!!!! Starting Type Handling !!!!\n";
