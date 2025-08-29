@@ -387,7 +387,7 @@ class HAKCScope(HashedHAKCDBNode, yaml.YAMLObject):
         schema = HAKCScope.get_db_table_columns()
         assert (len(schema) == (len(self.get_data_columns()) + 1))
         return {
-            # schema[0]: hash(self) if convert_hash else self.get_computed_hash(),
+            #schema[0]: hash(self) if convert_hash else self.get_computed_hash(),
             schema[0]: self.get_computed_hash().final_hash,
             schema[1]: self.scope,
             schema[2]: self.local_scope_name
@@ -595,7 +595,7 @@ class HAKCCompartmentalizationAdjustment(yaml.YAMLObject):
     def from_yaml(cls, loader: yaml.Loader, node):
         return cls(**loader.construct_mapping(node, deep=True))
 
-    def get_adjusted_division_and_compartment(self, defining_path: str) -> Optional[
+    def get_adjusted_division_and_compartment(self, defining_path: Optional[str] = None) -> Optional[
         tuple[HAKCDivision, HAKCCompartment]]:
         if defining_path is None:
             return None
