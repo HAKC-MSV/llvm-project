@@ -212,6 +212,19 @@ class HAKCDatabase:
                 divisions.add(HAKCDivision(**data))
         return divisions
 
+    def get_all_compartments(self):
+        cmd = f"""
+        MATCH ({HAKCCompartment.get_table_name()}:{HAKCCompartment.get_table_name()})
+        RETURN {HAKCCompartment.get_table_name()}.CompartmentID as CompartmentID;
+        """
+        compartments = set()
+        response = self.execute_prepared_stmt(cmd)
+        if response.has_next():
+            info = response.get_as_df()
+            for data in info.to_dict(orient='records'):
+                compartments.add(HAKCCompartment(**data))
+        return compartments
+
     def get_symbol_definition_location(self, symbol: HAKCSymbol) -> Optional[HAKCDefinitionLocation]:
         cmd = f"""
         MATCH (sym:{HAKCSymbol.get_table_name()})-[e:{HAKCSymbol.relation_definition_location}]->(dl:{HAKCDefinitionLocation.get_table_name()})

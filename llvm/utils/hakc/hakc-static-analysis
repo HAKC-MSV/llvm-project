@@ -148,6 +148,7 @@ def adjust_compartmentalization(db_dir: str, adjustment: HAKCCompartmentalizatio
     conn = HAKCDatabase(db_dir)
 
     symbols = conn.get_symbols()
+    assert len(symbols) != 0, f"No symbols were returned from database!"
     compartmentalization = HAKCCompartmentalization()
     nec_division = None
     no_enforcement_compartment = None
@@ -157,8 +158,7 @@ def adjust_compartmentalization(db_dir: str, adjustment: HAKCCompartmentalizatio
         compartmentalization.add_division(nec_division, no_enforcement_compartment)
 
     for symbol in logger.progress_bar(iterable=symbols, desc='Adjusting Compartmentalization'):
-        # TODO: figure out if already_persisted is needed here
-        compartmentalization.add_symbol(symbol)
+        compartmentalization.add_symbol(symbol, already_persisted=True)
         adjustments = adjustment.get_adjusted_division_and_compartment(symbol.definition_location.defining_file if symbol.definition_location else None)
         adjusted_division = None
         adjusted_compartment = None
@@ -188,11 +188,7 @@ def adjust_compartmentalization(db_dir: str, adjustment: HAKCCompartmentalizatio
     conn.delete_all_compartments()
     compartmentalization.persist_to_database(conn)
     logger.info(f'Done adjusting compartmentalization')
-    divisions = conn.get_all_divisions()
-    compartments = set()
-    for division in divisions:
-        compartments.add(division.compartment_id)
-    logger.info(f'Compartmentalization now has {len(divisions)} divisions across {len(compartments)} compartments')
+    logger.info(f'Compartmentalization now has {len(conn.get_all_divisions())} divisions across {len(conn.get_all_compartments())} compartments')
     conn.close()
 
 

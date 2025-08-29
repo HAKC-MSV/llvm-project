@@ -152,27 +152,31 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         assert (isinstance(_type, HAKCType))
         self.__add_persistent_node(_type, already_persisted=already_persisted)
 
-    def add_symbol(self, symbol) -> None:
+    def add_symbol(self, symbol, already_persisted: bool = False) -> None:
         # function to allow for external access
-        self.__add_symbol(symbol)
+        self.__add_symbol(symbol, already_persisted)
 
-    def __add_symbol(self, symbol: HAKCSymbol) -> None:
+    def __add_symbol(self, symbol: HAKCSymbol, already_persisted: bool = False) -> None:
         # add 'sanitized' version of the HAKCSymbol (e.g., don't include HAKCTypePerm as a node, since it should be an edge?)
         assert (isinstance(symbol, HAKCSymbol))
 
         # add the symbol node
-        self.__add_persistent_node(symbol)
+        self.__add_persistent_node(symbol, already_persisted=already_persisted)
 
-        # now add all the edges from the symbol node to node (and add the nodes at the same time!)
-        self.__add_persistent_edge(symbol, symbol.type, key=HAKCSymbol.relation_type)
-        self.__add_persistent_edge(symbol, symbol.scope, key=HAKCSymbol.relation_scope)
+        # now add all the edges from the symbol node to node
+        self.__add_persistent_node(symbol.type, already_persisted=already_persisted)
+        self.__add_persistent_edge(symbol, symbol.type, already_persisted=already_persisted, key=HAKCSymbol.relation_type)
+        self.__add_persistent_node(symbol.scope, already_persisted=already_persisted)
+        self.__add_persistent_edge(symbol, symbol.scope, already_persisted=already_persisted, key=HAKCSymbol.relation_scope)
         if symbol.definition_location:
             # logger.fatal(f"Persisting symbol definition location {symbol} -> {symbol.definition_location}")
-            self.__add_persistent_edge(symbol, symbol.definition_location,
+            self.__add_persistent_node(symbol.definition_location, already_persisted=already_persisted)
+            self.__add_persistent_edge(symbol, symbol.definition_location, already_persisted=already_persisted,
                                        key=HAKCSymbol.relation_definition_location,
                                        DefiningLine=symbol.definition_location.defining_line)
         for used_symbol in symbol.used_symbols:
-            self.__add_persistent_edge(symbol, used_symbol, key=HAKCSymbol.relation_symbol)
+            self.__add_persistent_node(used_symbol, already_persisted=already_persisted)
+            self.__add_persistent_edge(symbol, used_symbol, already_persisted=already_persisted, key=HAKCSymbol.relation_symbol)
 
     def add_dag_edge(self, head: HAKCSymbol, tail: HAKCSymbol, dag_edge_weight: int) -> None:
         if dag_edge_weight > 0:
@@ -294,9 +298,9 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             access_token = 0xFFFF
         return access_token
 
-    def __add_persistent_edge(self, u_for_edge: HAKCDBNode, v_for_edge: HAKCDBNode, key, **attr) -> None:
+    def __add_persistent_edge(self, u_for_edge: HAKCDBNode, v_for_edge: HAKCDBNode, key, already_persisted: bool = False, **attr) -> None:
         if not (self.has_edge(u_for_edge, v_for_edge, key)):
-            attr[HAKCCompartmentalization.persisted_attr] = False
+            attr[HAKCCompartmentalization.persisted_attr] = already_persisted
             self.add_edge(u_for_edge, v_for_edge, key, **attr)
 
     def _get_neighbors(self, symbol: HAKCSymbol, edge_key: str) -> list:
