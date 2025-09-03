@@ -31,7 +31,7 @@ void HAKCAnalysisClient::DisconnectFromDatabase() {
 }
 
 void HAKCAnalysisClient::ConnectToDatabase() {
-  CommonHAKCAnalysis::getLogger(Debug)
+  CommonHAKCAnalysis::getLogger(Verbose)
       << "Connecting to "
       << SystemInformation.GetDatabaseInformation().GetServerURL() << "\n";
   Client.connect();
@@ -44,6 +44,20 @@ void HAKCAnalysisClient::CheckConnection() const {
   }
 }
 
+void HAKCAnalysisClient::SendTerminateConnection() const {
+  auto currentTime = std::chrono::system_clock::now();
+  auto milliseconds_since_epoch =
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          currentTime.time_since_epoch());
+  CommonHAKCAnalysis::getLogger(Verbose)
+      << milliseconds_since_epoch.count() << " "
+      << "Executing command \n";
+
+  CheckConnection();
+  json::Object Parameters({{"CLIENT TERMINATING CONNECTION", true}});
+  HAKCDatabaseRequest Request(SystemInformation.GetDatabaseInformation().GetTerminateConnectionEndpoint(), Parameters);
+  Client.SendTerminateConnection(Request);
+}
 
 json::Object
 HAKCAnalysisClient::Execute(StringRef Endpoint,
@@ -71,26 +85,37 @@ HAKCAnalysisClient::Execute(StringRef Endpoint,
     throw std::exception();
   }
   for (auto pair : *ParsedJson->getAsObject()) {
-    if (pair.getFirst() == "TERMINATING CONNECTION") {
+    if (pair.getFirst() == "CLIENT TERMINATING CONNECTION") {
       auto currentTime = std::chrono::system_clock::now();
       auto milliseconds_since_epoch =
           std::chrono::duration_cast<std::chrono::milliseconds>(
               currentTime.time_since_epoch());
       CommonHAKCAnalysis::getLogger(Fatal)
           << milliseconds_since_epoch.count() << " "
-          << "Unrecoverable error on Analysis Client; terminating connection!\n";
+          << "Unrecoverable error on Analysis Server; Analysis Client stopping!!\n";
 
       throw std::runtime_error(
-          "Unrecoverable error on Analysis Client; terminating connection!\n");
+          "Unrecoverable error on Analysis Server; Analysis Client stopping!!\n");
     }
   }
   auto Obj = ParsedJson->getAsObject();
   return *Obj;
 }
 
+void HAKCAnalysisClient::set_dag_filename(StringRef filename) const {
+  json::Object Parameters({{"dag-filename", filename}});
+  auto ResponseData = Execute(
+      SystemInformation.GetDatabaseInformation().GetSetDagFilenameEndpoint(),
+      Parameters);
+  auto Success = ResponseData.getBoolean("Success");
+  if (!Success) {
+    CommonHAKCAnalysis::getLogger(Fatal) << "Invalid Response for set_dag_filename\n";
+    throw std::exception();
+  }
+}
 
 void HAKCAnalysisClient::add_function(const HAKCFunctionInfo &FI) const{
-	CommonHAKCAnalysis::getLogger(Fatal) << "Trying to add function " << *FI.GetFunction() << " to DAG\n";
+  CommonHAKCAnalysis::getLogger(Debug) << "Sending add-function: " << FI.GetFunction()->getName() << " of type " << FI.GetFunction()->getFunctionType() << "\n";
   std::string ObjectYaml;
   raw_string_ostream os(ObjectYaml);
   os << FI.GetYaml(0);
@@ -108,7 +133,7 @@ void HAKCAnalysisClient::add_function(const HAKCFunctionInfo &FI) const{
 }
 
 void HAKCAnalysisClient::add_global_variable(const HAKCGlobalInfo &GI) const{
-	CommonHAKCAnalysis::getLogger(Fatal) << "Trying to add Global Variable " << *GI.GetGlobalVariable() << " to DAG\n";
+	CommonHAKCAnalysis::getLogger(Debug) << "Sending add-global-variable: " << GI.GetGlobalVariable()->getName()  << " of type " << GI.GetGlobalVariable()->getType() << "\n";
   std::string ObjectYaml;
   raw_string_ostream os(ObjectYaml);
   os << GI.GetYaml(0);
@@ -127,6 +152,7 @@ void HAKCAnalysisClient::add_global_variable(const HAKCGlobalInfo &GI) const{
 
 void HAKCAnalysisClient::SendSymbolsToAnalysisServer(HAKCModuleAnalysis &ModuleAnalysis) const {
 
+  CommonHAKCAnalysis::getLogger(Debug) << "Starting to send symbols to analysis server\n";
   auto TypeIdentifier = ModuleAnalysis.GetTypeIdentifier();
 
   std::vector<std::shared_ptr<HAKCGlobalInfo>> SortedGlobals;
@@ -169,7 +195,15 @@ void HAKCAnalysisClient::SendSymbolsToAnalysisServer(HAKCModuleAnalysis &ModuleA
   for (auto &it: SortedFunctions) {
     add_function(*it);
   }
-
+  CommonHAKCAnalysis::getLogger(Debug) << "Finished sending symbols to analysis server\n";
 }
+
+void HAKCAnalysisClient::CloseConnection() {
+  CommonHAKCAnalysis::getLogger(Verbose) << "Closing connection\n";
+  SendTerminateConnection();
+  DisconnectFromDatabase();
+  CommonHAKCAnalysis::getLogger(Verbose) << "Closed connection\n";
+}
+
 
 } // namespace llvm::hakc

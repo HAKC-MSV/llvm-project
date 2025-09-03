@@ -33,12 +33,20 @@ StringRef HAKCDatabaseInformation::GetValidTargetsEndpoint() const {
   return ValidTargetsEndpoint;
 }
 
+StringRef HAKCDatabaseInformation::GetSetDagFilenameEndpoint() const {
+  return SetDagFilenameEndpoint;
+}
+
 StringRef HAKCDatabaseInformation::GetAddFunctionEndpoint() const {
   return AddFunctionEndpoint;
 }
 
 StringRef HAKCDatabaseInformation::GetAddGlobalVariableEndpoint() const {
   return AddGlobalVariableEndpoint;
+}
+
+StringRef HAKCDatabaseInformation::GetTerminateConnectionEndpoint() const {
+  return TerminateConnectionEndpoint;
 }
 
 std::chrono::milliseconds HAKCDatabaseInformation::GetServerTimeout() const {
@@ -57,7 +65,9 @@ void HAKCDatabaseInformation::operator<<(
   SymbolDivisionEndpoint = DatabaseConfig.GetSymbolDivisionEndpoint;
   ValidTargetsEndpoint = DatabaseConfig.GetValidTargetsEndpoint;
   AddFunctionEndpoint = DatabaseConfig.AddFunctionEndpoint;
+  SetDagFilenameEndpoint = DatabaseConfig.SetDagFilenameEndpoint;
   AddGlobalVariableEndpoint = DatabaseConfig.AddGlobalVariableEndpoint;
+  TerminateConnectionEndpoint = DatabaseConfig.TerminateConnectionEndpoint;
   // Note: Timeout is in ms, so multiply by 1000
   Timeout = std::chrono::milliseconds(DatabaseConfig.ServerTimeout * 1000);
   MaxConnectionRetries = DatabaseConfig.MaxConnectionRetries;

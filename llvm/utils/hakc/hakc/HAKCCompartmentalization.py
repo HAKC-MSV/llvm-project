@@ -36,49 +36,19 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             self.load_from_yaml(G)
         self.max_division_count = max_division_count
 
-    def load_from_db_single_thread(self, conn: HAKCDatabase) -> Self:
-        assert(isinstance(conn, HAKCDatabase))
-        cmd = "CALL show_tables() RETURN *;"
-        response = conn.execute_prepared_stmt(cmd)
-        print(response.get_as_df())
-        # TODO: by default, the allowable access is empty (as far as I can tell), so this shouldn't be needed to validate the token hashes yet
-        # get the divisions and compartments first
-        # find all divisions that a symbol can reach via dag edges that are in the same compartment
-        # create the compartments, then the divisions, then calculate the tokens
-        # TODO: make this multithreaded?
-        symbols = conn.get_symbols()
-        logger.debug(f"Loading {len(symbols)} symbols from database")
-        for sym in symbols:
-            if isinstance(sym, HAKCFunction):
-                self.__add_function(sym)
-            elif isinstance(sym, HAKCGlobalVariable):
-                self.__add_global_variable(sym)
-            else:
-                raise RuntimeError(f"Symbol is neither a function nor a global variable: {sym} of type {type(sym)}")
-            division, compartment, = conn.get_division_compartment(sym)
-            self.__add_division_compartment(sym, division, compartment)
-            dag_edges = conn.get_dag_edges(sym)
-            for dag_edge in dag_edges:
-                self.add_dag_edge(dag_edge[0], sym, dag_edge[1])
-
-        logger.debug(self)
-        return self
-
-
-
     def load_from_yaml(self, G: nx.MultiDiGraph) -> Self:
         symbol_mapping = dict()
         symbol_division_mapping = dict()
         division_compartment_mapping = dict()
         for symbol in self.get_filtered_nodes(G, node_filter=lambda n: isinstance(n, HAKCFunction) or isinstance(n, HAKCGlobalVariable)):
             symbol: Union['HAKCFunction', 'HAKCGlobalVariable'] # suppress type warning
-            logger.fatal(f"symbol found: {symbol}")
+            # logger.fatal(f"symbol found: {symbol}")
             new_symbol = HAKCFunction(Name=symbol.name) if isinstance(symbol, HAKCFunction) else HAKCGlobalVariable(Name=symbol.name)
             new_symbol.set_computed_hash(symbol.computed_hash)
             for nbr in G.neighbors(symbol):
                 for edge_data in G.get_edge_data(symbol, nbr):
                     if edge_data == HAKCSymbol.relation_type:
-                        assert(isinstance(nbr, HAKCType))
+                        # assert isinstance(nbr, HAKCType), f"assert(isinstance({nbr}, HAKCType)"
                         new_symbol.type = nbr
                     elif edge_data == HAKCSymbol.relation_scope:
                         new_symbol.scope = nbr
@@ -121,9 +91,11 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
                 self.__add_function(new_symbol)
             else:
                 self.__add_global_variable(new_symbol)
-            division = symbol_division_mapping[symbol]
-            compartment = division_compartment_mapping[division]
-            self.__add_division_compartment(new_symbol, division, compartment)
+            # The yaml outputted from analysis will not have compartments or divisions, meaning the mapping dicts will be empty
+            division = symbol_division_mapping[symbol] if symbol in symbol_division_mapping else None
+            compartment = division_compartment_mapping[division] if division in division_compartment_mapping else None
+            if division and compartment:
+                self.__add_division_compartment(new_symbol, division, compartment)
         return self
 
     @classmethod
@@ -183,27 +155,31 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         assert (isinstance(_type, HAKCType))
         self.__add_persistent_node(_type, already_persisted=already_persisted)
 
-    def add_symbol(self, symbol) -> None:
+    def add_symbol(self, symbol, already_persisted: bool = False) -> None:
         # function to allow for external access
-        self.__add_symbol(symbol)
+        self.__add_symbol(symbol, already_persisted)
 
-    def __add_symbol(self, symbol: HAKCSymbol) -> None:
+    def __add_symbol(self, symbol: HAKCSymbol, already_persisted: bool = False) -> None:
         # add 'sanitized' version of the HAKCSymbol (e.g., don't include HAKCTypePerm as a node, since it should be an edge?)
         assert (isinstance(symbol, HAKCSymbol))
 
         # add the symbol node
-        self.__add_persistent_node(symbol)
+        self.__add_persistent_node(symbol, already_persisted=already_persisted)
 
-        # now add all the edges from the symbol node to node (and add the nodes at the same time!)
-        self.__add_persistent_edge(symbol, symbol.type, key=HAKCSymbol.relation_type)
-        self.__add_persistent_edge(symbol, symbol.scope, key=HAKCSymbol.relation_scope)
+        # now add all the edges from the symbol node to node
+        self.__add_persistent_node(symbol.type, already_persisted=already_persisted)
+        self.__add_persistent_edge(symbol, symbol.type, already_persisted=already_persisted, key=HAKCSymbol.relation_type)
+        self.__add_persistent_node(symbol.scope, already_persisted=already_persisted)
+        self.__add_persistent_edge(symbol, symbol.scope, already_persisted=already_persisted, key=HAKCSymbol.relation_scope)
         if symbol.definition_location:
             # logger.fatal(f"Persisting symbol definition location {symbol} -> {symbol.definition_location}")
-            self.__add_persistent_edge(symbol, symbol.definition_location,
+            self.__add_persistent_node(symbol.definition_location, already_persisted=already_persisted)
+            self.__add_persistent_edge(symbol, symbol.definition_location, already_persisted=already_persisted,
                                        key=HAKCSymbol.relation_definition_location,
                                        DefiningLine=symbol.definition_location.defining_line)
         for used_symbol in symbol.used_symbols:
-            self.__add_persistent_edge(symbol, used_symbol, key=HAKCSymbol.relation_symbol)
+            self.__add_persistent_node(used_symbol, already_persisted=already_persisted)
+            self.__add_persistent_edge(symbol, used_symbol, already_persisted=already_persisted, key=HAKCSymbol.relation_symbol)
 
     def add_dag_edge(self, head: HAKCSymbol, tail: HAKCSymbol, dag_edge_weight: int) -> None:
         if dag_edge_weight > 0:
@@ -325,16 +301,16 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             access_token = 0xFFFF
         return access_token
 
-    def __add_persistent_edge(self, u_for_edge: HAKCDBNode, v_for_edge: HAKCDBNode, key, **attr) -> None:
+    def __add_persistent_edge(self, u_for_edge: HAKCDBNode, v_for_edge: HAKCDBNode, key, already_persisted: bool = False, **attr) -> None:
         if not (self.has_edge(u_for_edge, v_for_edge, key)):
-            attr[HAKCCompartmentalization.persisted_attr] = False
+            attr[HAKCCompartmentalization.persisted_attr] = already_persisted
             self.add_edge(u_for_edge, v_for_edge, key, **attr)
 
     def _get_neighbors(self, symbol: HAKCSymbol, edge_key: str) -> list:
         nbrs = list()
         if symbol not in self.nodes:
             # Note: sometimes a symbol in a query is incompletely defined (thus hashes do not match) and we need to search harder for the correct symbol in our graph
-            logger.fatal(f"Searching for symbol: {symbol}")
+            logger.debug(f"Searching for symbol: {symbol}")
             found_symbols = self.get_symbol_by_name(symbol.name)
             if len(found_symbols) != 1:
                 raise RuntimeError(f'Symbol {symbol} could not be found by hash, but found {len(found_symbols)} symbols when searching by name!')
@@ -439,7 +415,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         for symbol in self.get_symbols():
             if self.get_symbol_compartment_id(symbol) == compartment_id:
                 all_symbols_by_compartment_id.add(symbol)
-        logger.debug(f"Got {len(self.get_symbols())} symbols")
+        # logger.debug(f"Got {len(self.get_symbols())} symbols")
         # now search all valid neighbors
         for caller in all_symbols_by_compartment_id:
             for callee in self.neighbors(caller):
@@ -582,7 +558,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         return symbol_hashes
 
     def get_symbol_by_hash(self, symbol_hash: int) -> Optional[HAKCSymbol]:
-        logger.debug(f"Trying to find symbol for hash {symbol_hash} with symbols {self.get_symbols()}")
+        # logger.debug(f"Trying to find symbol for hash {symbol_hash} with symbols {self.get_symbols()}")
         for symbol in self.get_symbols():
             assert(isinstance(symbol, HAKCSymbol))
             logger.error(symbol)
@@ -615,7 +591,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         yaml.add_constructor(HAKCCompartmentalization.yaml_tag, HAKCCompartmentalization.from_yaml)
 
     def save_as_yaml(self, fname: str):
-        logger.info(f'Saving compartmentalization to {fname}')
+        logger.debug(f'Saving compartmentalization to {fname}')
         with open(fname, "w") as f:
             yaml.dump(self, f)
-        logger.info(f"Finished saving compartmentalization to {fname}")
+        logger.debug(f"Finished saving compartmentalization to {fname}")

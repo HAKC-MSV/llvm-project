@@ -422,7 +422,7 @@ class HAKCSymbol(HashedHAKCDBNode, yaml.YAMLObject):
                        "type_hash"] == self.get_computed_hash(), f"type_hash ({kwargs['type_hash']}) =?= hash(self) ({self.get_computed_hash()})"
 
     def debug_print(self, root=True, whitespace=""):
-        out = f"{whitespace}{self.name} of {self.type.debug_print()} in {self.scope.debug_print()}" + (
+        out = f"{whitespace}{self.name} of {self.type.debug_print() if self.type else 'NOT FOUND'} in {self.scope.debug_print() if self.scope else 'NOT FOUND'}" + (
             f" with {self.definition_location.debug_print()}" if self.definition_location else '\n')
 
         if root:
@@ -434,7 +434,7 @@ class HAKCSymbol(HashedHAKCDBNode, yaml.YAMLObject):
 
     @classmethod
     def from_yaml(cls, loader: yaml.Loader, node):
-        logger.fatal(f"Constructing symbol with: {node}")
+        # logger.fatal(f"Constructing symbol with: {node}")
         return cls(**loader.construct_mapping(node, deep=True))
 
     def __eq__(self, other):
@@ -532,6 +532,7 @@ class HAKCFunction(HAKCSymbol):
 
     @classmethod
     def from_yaml(cls, loader: yaml.Loader, node):
+        # logger.fatal(f"Constructing symbol with: {node}")
         return cls(**loader.construct_mapping(node, deep=True))
 
     @staticmethod

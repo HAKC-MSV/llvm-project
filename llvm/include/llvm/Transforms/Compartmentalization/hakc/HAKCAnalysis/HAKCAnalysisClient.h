@@ -24,11 +24,15 @@ public:
 
   virtual ~HAKCAnalysisClient();
 
+  void set_dag_filename(StringRef filename) const;
+
   void add_function(const HAKCFunctionInfo &Function) const;
 
   void add_global_variable(const HAKCGlobalInfo &Global) const;
 
   void SendSymbolsToAnalysisServer(HAKCModuleAnalysis &ModuleAnalysis) const;
+
+  void CloseConnection();
 
 protected:
   HAKCSystemInformation &SystemInformation;
@@ -41,6 +45,8 @@ protected:
   void DisconnectFromDatabase();
 
   json::Object Execute(StringRef Endpoint, json::Object &Parameters) const;
+
+  void SendTerminateConnection() const;
 
 };
 

@@ -89,6 +89,12 @@ HAKCDatabaseResponse HAKCDatabaseConnection::HandleRequest(
   return Response;
 }
 
+void HAKCDatabaseConnection::SendTerminateConnection(
+    const HAKCDatabaseRequest &Request) const {
+  Request >> *Socket;
+}
+
+
 HAKCDatabaseConnection::operator bool() const { return CheckConnection(); }
 
 void HAKCDatabaseConnection::close() {
@@ -110,8 +116,10 @@ void HAKCDatabaseConnection::connect() {
   if (TimeoutInSeconds == 0) {
     TimeoutInSeconds = 1;
   }
+  CommonHAKCAnalysis::getLogger(Debug) << "Connecting...";
   while (true) {
     try {
+      CommonHAKCAnalysis::getLogger(Debug) << "...";
       auto NewConnection = raw_socket_stream::createConnectedUnix(
           DatabaseInformation.GetServerURL());
       if (!NewConnection) {
@@ -119,8 +127,8 @@ void HAKCDatabaseConnection::connect() {
          * Expected object to be properly destructed. llvm::toString does
          * this.
          */
-        CommonHAKCAnalysis::getLogger(Debug)
-            << "Error connecting to " << DatabaseInformation.GetServerURL()
+        CommonHAKCAnalysis::getLogger(Verbose)
+            << "\nError connecting to " << DatabaseInformation.GetServerURL()
             << ": " << llvm::toString(NewConnection.takeError()) << "\n";
         throw std::exception();
       }

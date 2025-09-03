@@ -13,7 +13,7 @@ import shutil
 import sys
 import time
 from typing import cast
-
+import networkx as nx
 import yaml
 
 from hakc.HAKCCompartmentalization import HAKCCompartmentalization
@@ -35,31 +35,18 @@ def batched(iterable, n):
 
 
 def parse_yaml(filename: str, debug = False):
-    logger.add_file_handler(filename.replace(".dag.yml",".analysis.log"))
+    logger.add_file_handler(filename.replace(".dag.yml",".static-analysis.log"))
     # parse_yaml needed here instead of in compartmentalization for use in multithreading
-    HAKCCompartmentalization.add_yaml_constructors()
+    # HAKCCompartmentalization.add_yaml_constructors()
+    # logger.error(f"parsing {filename}")
     with open(filename, 'rb') as f:
         try:
-            parsed_yaml = yaml.load(f, Loader=yaml.Loader)
+            compartmentalization = yaml.load(f, Loader=yaml.Loader)
+            logger.debug(f"Loaded {compartmentalization} from {filename}")
+            return compartmentalization
         except Exception as e:
-            logger.fatal(f"Failed to load yaml with error: {str(e)}")
-        if parsed_yaml is None:
-            functions = list()
-            global_variables = list()
-        else:
-            functions = parsed_yaml['functions'] if 'functions' in parsed_yaml else list()
-            global_variables = parsed_yaml['globals'] if 'globals' in parsed_yaml else list()
+            logger.fatal(f"Failed to load yaml with error: {str(e)} in {filename}")
 
-    if debug:
-        print(f"debugging yaml parsing of {filename}")
-        for global_variable in global_variables:
-            assert (isinstance(global_variable, HAKCGlobalVariable))
-            print(HAKCGlobalVariable.debug_print(global_variable))
-        for function in functions:
-            assert (isinstance(function, HAKCFunction))
-            print(HAKCFunction.debug_print(function))
-
-    return functions, global_variables
 
 
 def compute_dag_edge_weight(**kwargs) -> int:
@@ -118,11 +105,9 @@ def compute_dag_edges_for_symbol(symbol_hashes):
 def create_compartmentalization_single_thread(files: set[str], conn: HAKCDatabase) -> HAKCCompartmentalization:
     compartmentalization = HAKCCompartmentalization()
     for filename in logger.progress_bar(iterable=sorted(files), desc='Parsing YAML'):
-        functions, global_variables = parse_yaml(filename, True)
-        logger.debug(
-            f'{filename} found {len(functions)} functions and {len(global_variables)} globals: {functions}')
-        compartmentalization.add_symbols(functions, global_variables)
-
+        subG = parse_yaml(filename, True)
+        logger.debug(f'Found {subG}')
+        compartmentalization = nx.compose(compartmentalization, subG)
     logger.info(f'Adding compartmentalization')
     compartmentalization.add_default_compartmentalization(conn)
     compartmentalization.persist_to_database(conn, create_schema=True)
@@ -155,6 +140,7 @@ def adjust_compartmentalization(db_dir: str, adjustment: HAKCCompartmentalizatio
     conn = HAKCDatabase(db_dir)
 
     symbols = conn.get_symbols()
+    assert len(symbols) != 0, f"No symbols were returned from database!"
     compartmentalization = HAKCCompartmentalization()
     nec_division = None
     no_enforcement_compartment = None
@@ -164,9 +150,8 @@ def adjust_compartmentalization(db_dir: str, adjustment: HAKCCompartmentalizatio
         compartmentalization.add_division(nec_division, no_enforcement_compartment)
 
     for symbol in logger.progress_bar(iterable=symbols, desc='Adjusting Compartmentalization'):
-        # TODO: figure out if already_persisted is needed here
-        compartmentalization.add_symbol(symbol)
-        adjustments = adjustment.get_adjusted_division_and_compartment(symbol.defining_file)
+        compartmentalization.add_symbol(symbol, already_persisted=True)
+        adjustments = adjustment.get_adjusted_division_and_compartment(symbol.definition_location.defining_file if symbol.definition_location else None)
         adjusted_division = None
         adjusted_compartment = None
         if adjustments is None:
@@ -195,11 +180,7 @@ def adjust_compartmentalization(db_dir: str, adjustment: HAKCCompartmentalizatio
     conn.delete_all_compartments()
     compartmentalization.persist_to_database(conn)
     logger.info(f'Done adjusting compartmentalization')
-    divisions = conn.get_all_divisions()
-    compartments = set()
-    for division in divisions:
-        compartments.add(division.compartment_id)
-    logger.info(f'Compartmentalization now has {len(divisions)} divisions across {len(compartments)} compartments')
+    logger.info(f'Compartmentalization now has {len(conn.get_all_divisions())} divisions across {len(conn.get_all_compartments())} compartments')
     conn.close()
 
 
@@ -219,7 +200,9 @@ def node_with_max_edges(graph):
 
 def create_compartmentalization_multithread(files: set[str], core_count: int, conn: HAKCDatabase) -> HAKCCompartmentalization:
     import traceback
+
     logger.info(f'Starting multiprocess HAKCCompartmentalization creation using {core_count} cores')
+
     with concurrent.futures.ProcessPoolExecutor(max_workers=core_count) as executor:
         futures_to_files = {}
         for file in logger.progress_bar(iterable=sorted(files), desc="YAML parsing scheduling"):
@@ -227,17 +210,17 @@ def create_compartmentalization_multithread(files: set[str], core_count: int, co
         compartmentalization = HAKCCompartmentalization()
         compartmentalization.create_schema(conn)
         with logger.progress_bar(total=len(files), desc='YAML parsing results') as pbar:
-            for future in concurrent.futures.as_completed(futures_to_files):
+            for future in list(concurrent.futures.as_completed(futures_to_files)):
                 pbar.update(1)
                 file = futures_to_files[future]
                 try:
-                    functions, global_variables = future.result()
-                    logger.debug(
-                        f'found {len(functions)} functions and {len(global_variables)} globals for file {file}')
-                    compartmentalization.add_symbols(functions, global_variables)
+                    subG = future.result()
+                    # Note: nx.union requires graphs be disjoint, so use nx.compose instead
+                    compartmentalization = nx.compose(compartmentalization, subG)
+
                 except Exception as e:
                     traceback.print_exc()
-                    logger.error(f'Error parsing {file}: {str(e)} with functions: {functions}, global_variables: {global_variables}')
+                    logger.error(f'Error parsing {file}: {str(e)} with {subG}')
 
     logger.info(f'Adding compartmentalization')
     compartmentalization.add_default_compartmentalization(conn)
@@ -379,7 +362,6 @@ def main():
     root_logger: HAKCLogger = cast(HAKCLogger, logging.getLogger()) # cast suppresses type hint warning
     setup_logging(root_logger, log_level=args.log_level, log_file=args.log_path, log_mode=args.log_mode)
     profile = None
-    # setup_logging(logger, log_file=args.log_path, log_level=args.log_level, log_mode=args.log_mode)
 
     if args.db_dir is None or len(args.db_dir) == 0:
         raise RuntimeError(f'Must specify a database directory')

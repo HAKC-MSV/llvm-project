@@ -10,6 +10,9 @@ logger: HAKCLogger = cast(HAKCLogger, logging.getLogger('hakc-policy-server'))
 class TimeoutException(Exception):
     pass
 
+class TerminateConnectionException(Exception):
+    pass
+
 
 class SupportedBackingStore(Enum):
     NULL = "null"
@@ -23,7 +26,24 @@ class HAKCDataRequest:
         self.parameters = kwargs.get('Parameters', dict())
 
     def __str__(self):
-        return f"Endpoint: {self.endpoint}\nwith parameters: {self.parameters}"
+        # TODO: update these if the default endpoints are changed
+        # Note: be careful here because if there is an error or exception the thread will crash without any debug information
+        if self.endpoint == 'terminate-connection':
+            return 'Request to terminate-connection'
+        elif self.endpoint == 'add-function' or self.endpoint == 'add-global-variable':
+            out = f'Request to {self.endpoint} '
+            if isinstance(self.parameters, dict):
+                for key, value in self.parameters.items():
+                    if key == 'object':
+                        out += f'\n{value}'
+                    else:
+                        out += f'\n\t{key}:\n{value}'
+            return out
+        elif self.endpoint == 'set-dag-filename':
+            return f'Request set-dag-filename to {self.parameters["dag-filename"] if "dag-filename" in self.parameters else "NULL"}'
+        elif self.endpoint in ['get-compartment-by-id','get-division-by-id','get-division-from-symbol','get-valid-targets-from-compartment-id']:
+            return f'Request query {self.endpoint} {self.parameters}'
+        return f'Request unknown endpoint {self.endpoint} with parameters {self.parameters}'
 
     def __repr__(self):
         return self.__str__()
@@ -59,9 +79,10 @@ class HAKCServerConfig:
                                                             "get-division-from-symbol")
         self.get_valid_targets_from_compartment_id_endpoint = kwargs.get(
             'get-valid-targets-from-compartment-id-endpoint', "get-valid-targets-from-compartment-id")
+        self.set_dag_filename_endpoint = kwargs.get('set-dag-filename-endpoint', "set-dag-filename")
         self.add_function_endpoint = kwargs.get('add-function-endpoint', "add-function")
-        self.add_global_variable = kwargs.get('add-global-variable-endpoint', "add-global-variable")
-
+        self.add_global_variable_endpoint = kwargs.get('add-global-variable-endpoint', "add-global-variable")
+        self.terminate_connection_endpoint = kwargs.get('terminate-connection-endpoint', "terminate-connection")
 
 def kwargs_get(cls, name: str, default: any = None, **kwargs):
     # Function to retrieve and validate function parameter

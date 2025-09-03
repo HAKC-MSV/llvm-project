@@ -3,6 +3,7 @@ import logging
 import os
 import socketserver
 import struct
+import signal
 from enum import Enum
 from pathlib import Path
 from typing import Optional, cast
@@ -13,17 +14,11 @@ from .HAKCBase import HAKCPrintableObj, HAKCPayload
 from .HAKCLogger import HAKCLogger
 from .HAKCObjects import HAKCSymbol, HAKCCompartment, HAKCDivision, HAKCDivisionCompartmentPayload
 from .HAKCCompartmentalization import HAKCCompartmentalization
-from .HAKCServerConfig import HAKCServerConfig, HAKCDataRequest, kwargs_get
-
+from .HAKCServerConfig import HAKCServerConfig, HAKCDataRequest, kwargs_get, TimeoutException, TerminateConnectionException
+from .HAKCServerThread import HAKCServerThread
 logging.setLoggerClass(HAKCLogger)
 
 logger: HAKCLogger = cast(HAKCLogger, logging.getLogger('hakc-policy-server'))
-
-
-class TimeoutException(Exception):
-    # class TimeoutException(Exception("Timeout!!!!")):
-    pass
-
 
 class SupportedBackingStore(Enum):
     NULL = "null"
@@ -31,58 +26,8 @@ class SupportedBackingStore(Enum):
     KUZU = "kuzu"
 
 
-class HAKCPolicyProcessConfig:
-    def __init__(self, **kwargs):
-        self.socket_path = kwargs.get('socket_path', None)
-        if self.socket_path is None:
-            raise RuntimeError("ERROR: socket_path is missing from policy_config.yml")
-        self.socket_path = Path(self.socket_path)
-        self.reuse_path = kwargs.get('reuse_path', False)
-        self.log_path = kwargs.get('log_path', None)
-        self.test_mode = kwargs.get("test-mode", False)
-        self.server_timeout = int(kwargs.get('server_timeout', -1))
-        if self.reuse_path and self.socket_path.exists():
-            self.socket_path.unlink()
-        backing_store_config = kwargs.get('backing_policy_config', dict())
-        if len(backing_store_config) == 0:
-            raise RuntimeError(f'Missing backing store configuration')
-        self.type = backing_store_config.get("type", None)
-        if self.type is None:
-            raise RuntimeError("ERROR: type (for data store) is missing")
-        self.data_path = backing_store_config.get("path", None)
-        if self.data_path is None and self.type != SupportedBackingStore.NULL.value:
-            raise RuntimeError("ERROR: path (for data store) is missing")
-        self.default_compartment_id = backing_store_config.get("default_compartment", 0)
-        self.default_division_id = backing_store_config.get("default_division", 53)
-        self.default_access_token = backing_store_config.get("default_access_token", 5353)
-        self.default_entry_token = backing_store_config.get("default_entry_token", 3535)
-        self.get_compartment_endpoint = kwargs.get('get-compartment-by-id-endpoint', "get-compartment-by-id")
-        self.get_division_endpoint = kwargs.get('get-division-by-id-endpoint', "get-division-by-id")
-        self.get_division_from_symbol_endpoint = kwargs.get('get-division-from-symbol-endpoint',
-                                                            "get-division-from-symbol")
-        self.get_valid_targets_from_compartment_id_endpoint = kwargs.get(
-            'get-valid-targets-from-compartment-id-endpoint', "get-valid-targets-from-compartment-id")
-
-
-def kwargs_get(cls, name: str, default: any = None, **kwargs):
-    # Function to retrieve and validate function parameter
-    assert (isinstance(name, str))
-    val_or_default = kwargs.get(name, default)
-    # if value is already of the correct type, just return the value
-    if type(val_or_default) == cls:
-        return val_or_default
-    try:
-        if cls in [int, str, float]:
-            return cls(val_or_default)
-        logger.warning(
-            f"Unable to cast parameter {name} to type {cls}, so just returning {name} of type {type(val_or_default)}")
-        return val_or_default
-    except Exception:
-        raise Exception(f"Failed to get parameter {name} of type {cls} from {kwargs}")
-
-
 class HAKCPolicyDataSource:
-    def __init__(self, config: HAKCPolicyProcessConfig, yaml_loader=yaml.Loader, **kwargs):
+    def __init__(self, config: HAKCServerConfig, yaml_loader=yaml.Loader, **kwargs):
         self.endpoints = {config.get_compartment_endpoint: self.get_compartment_by_id,
                           config.get_division_endpoint: self.get_division_by_id,
                           config.get_division_from_symbol_endpoint: self.get_symbol_division,
@@ -112,6 +57,7 @@ class HAKCPolicyDataSource:
         raise NotImplementedError
 
     def get_division_by_id(self, **kwargs) -> HAKCDivision:
+        # get-division-by-id endpoint
         # no need to do try except block because the caller of this function does that, and will accept an exception raised here
         compartment_id = kwargs_get(int, "compartment-id", None, **kwargs)
         division_id = kwargs_get(int, "division-id", None, **kwargs)
@@ -123,6 +69,7 @@ class HAKCPolicyDataSource:
         return division
 
     def get_compartment_by_id(self, **kwargs) -> HAKCCompartment:
+        # get-compartment-by-id endpoint
         compartment_id = kwargs_get(int, "compartment-id", None, **kwargs)
         compartment = self._get_compartment_from_backing_store(compartment_id)
         if compartment is None:
@@ -147,6 +94,7 @@ class HAKCPolicyDataSource:
         return found_symbol
 
     def get_valid_targets_from_compartment_id(self, **kwargs) -> HAKCPayload:
+        # get-valid-targets-from-compartment-id"
         compartment_id = kwargs_get(int, "compartment-id", None, **kwargs)
         logger.debug(f'Calling _get_valid_targets_from_compartment_id with compartment_id = {compartment_id}')
         payload = self._get_valid_targets_from_compartment_id(compartment_id)
@@ -166,7 +114,7 @@ class HAKCPolicyDataSource:
 
 
 class NullHAKCPolicyDataStore(HAKCPolicyDataSource):
-    def __init__(self, config: HAKCPolicyProcessConfig, **kwargs):
+    def __init__(self, config: HAKCServerConfig, **kwargs):
         HAKCPolicyDataSource.__init__(self, config, **kwargs)
 
     def _get_compartment_from_backing_store(self, compartment_id: int) -> Optional[HAKCCompartment]:
@@ -184,7 +132,7 @@ class NullHAKCPolicyDataStore(HAKCPolicyDataSource):
 
 
 class YAMLHAKCPolicyDataStore(HAKCPolicyDataSource):
-    def __init__(self, config: HAKCPolicyProcessConfig, **kwargs):
+    def __init__(self, config: HAKCServerConfig, **kwargs):
         HAKCPolicyDataSource.__init__(self, config, yaml_loader=yaml.Loader, **kwargs)
         self.compartmentalization = None
         self.deserialize_compartmentalization(config.data_path)
@@ -230,7 +178,7 @@ class YAMLHAKCPolicyDataStore(HAKCPolicyDataSource):
 
 
 class KUZUHAKCPolicyDataStore(HAKCPolicyDataSource):
-    def __init__(self, config: HAKCPolicyProcessConfig, **kwargs):
+    def __init__(self, config: HAKCServerConfig, **kwargs):
         HAKCPolicyDataSource.__init__(self, config, **kwargs)
         self.database = None
         self.connect(config.data_path)
@@ -245,20 +193,11 @@ class KUZUHAKCPolicyDataStore(HAKCPolicyDataSource):
     def _get_division_from_backing_store(self, division_id: int, compartment_id: int) -> Optional[HAKCDivision]:
         logger.debug(f"Trying to get division {division_id} in compartment {compartment_id}")
         division = self.database.get_division(division_id, compartment_id)
-
         if division is None:
             logger.error(
                 f"Unable to find access_token for division_id {division_id}, so using default value of {self.default_division}!")
             division = self.default_division
         return division
-
-    # def _get_division_from_backing_store(self, division_id: int, compartment_id: int) -> Optional[HAKCDivision]:
-    #     logger.debug(f"Trying to get division_id: {division_id} from backing store")
-    #     access_token = self.database.get_division_access_token_from_id(division_id, compartment_id)
-    #     if access_token is None:
-    #         logger.error(f"Unable to find access_token for division_id {division_id}, so using default value of {self.default_division.access_token}!")
-    #         return HAKCDivision(division_id, AccessToken=self.default_division.access_token)
-    #     return HAKCDivision(division_id, AccessToken=access_token)
 
     def _get_symbol_division_from_backing_store(self, symbol: HAKCSymbol) -> Optional[HAKCDivisionCompartmentPayload]:
         assert (isinstance(symbol, HAKCSymbol))
@@ -285,92 +224,35 @@ class KUZUHAKCPolicyDataStore(HAKCPolicyDataSource):
         self.database = HAKCDatabase(kuzu_in, True)
         self.database.open(True)
 
-
-class HAKCRequestHandler(socketserver.StreamRequestHandler):
-    size_fmt = "@L"
-
-    # TODO: do I need init here?
-    # def __init__(self):
-    #     socketserver.StreamRequestHandler(self)
-
-    def read_raw_bytes(self, size: int) -> bytes:
-        logger.debug(f'Trying to read {size} bytes')
-        raw_bytes = self.rfile.read(size)
-        if len(raw_bytes) != size:
-            raise ConnectionAbortedError
-        return raw_bytes
-
-    def write_raw_bytes(self, raw_bytes: bytes):
-        try:
-            return self.wfile.write(raw_bytes)
-        except OSError:
-            raise ConnectionAbortedError
+# noinspection PyTypeChecker
+class HAKCPolicyServerThread(HAKCServerThread):
+    def init(self):
+        # Note: handler() can be called before the actual __init__() function is called, so make a custom blocking init() for use in handler()
+        HAKCServerThread.init(self)
+        logger.debug(f"Spinning up Policy Server Thread")
+        self.endpoints = self.hakc_server.data_source.endpoints
 
     @property
-    def hakc_policy_server(self) -> 'HAKCPolicyServer':
+    def hakc_server(self) -> 'HAKCPolicyServer':
         return cast(HAKCPolicyServer, self.server)
 
-    def gracefully_terminate_connection(self, e):
-        err_msg = {"TERMINATING CONNECTION": e}
-        err_data = json.dumps(err_msg, default=str).encode('utf-8')
-        logger.fatal(f"Sending termination message to client with error: {e}")
-        self.write_raw_bytes(struct.pack(HAKCRequestHandler.size_fmt, len(err_data)))
-        self.write_raw_bytes(err_data)
-
-    def handle(self):
-        logger.debug(f'Handling request')
-        hakc_request = None
-        size_in_bytes = struct.calcsize(HAKCRequestHandler.size_fmt)
-        try:
-            while True:
-                raw_size_bytes = self.read_raw_bytes(size_in_bytes)
-                msg_size = struct.unpack(HAKCRequestHandler.size_fmt, raw_size_bytes)[0]
-                raw_msg_bytes = self.read_raw_bytes(msg_size)
-                logger.debug(f'Received message of length {len(raw_msg_bytes)} bytes, contains {raw_msg_bytes}')
-                json_request = json.loads(raw_msg_bytes)
-                logger.debug(f"loaded json")
-                hakc_request = HAKCDataRequest(**json_request)
-                data = self.hakc_policy_server.data_source.handle_request(hakc_request)
-
-                if not (isinstance(data, HAKCPrintableObj)):
-                    logger.error(
-                        f"Generated response to request is not a HAKCPrintableObj and is invalid: {data}")
-                    raise Exception
-                logger.debug(f"data got from handle request: {data}")
-                response_data = json.dumps(data.to_yaml_dict(), default=str)
-                encoded_data = response_data.encode('utf-8')
-                logger.debug(f"dumping json {encoded_data}")
-
-                bytes_written = self.write_raw_bytes(struct.pack(
-                    HAKCRequestHandler.size_fmt, len(encoded_data)))
-                bytes_written += self.write_raw_bytes(encoded_data)
-                logger.debug(f'dumped {bytes_written} bytes')
-        # the 'raise' will call 'handle_error' in HAKCPolicyServer 
-        except ConnectionAbortedError:
-            logger.fatal(f'Client Aborted Connection while handling request: {hakc_request}')
-            if self.hakc_policy_server.data_source.test_mode:
-                raise TimeoutException
-            return
-        except ConnectionResetError:
-            logger.fatal(f'Client Reset Connection while handling request: {hakc_request}')
-            return
-        except TimeoutException:
-            logger.fatal(f'Timeout received while handling request: {hakc_request}')
-            return
-        except Exception as e:
-            logger.fatal(f"Error handling request: {hakc_request} with error: {e}")
-            self.gracefully_terminate_connection(e)
-            raise e
-
-
+# noinspection PyTypeChecker
 class HAKCPolicyServer(socketserver.ThreadingUnixStreamServer):
-    def __init__(self, data_source: HAKCPolicyDataSource, **kwargs):
+    def __init__(self, config: HAKCServerConfig, data_source: HAKCPolicyDataSource, **kwargs):
+        # TODO: maybe put config in data_source
+        self.config = config
         self.data_source = data_source
-        os.makedirs(os.path.dirname(data_source.socket_path), exist_ok=True)
-        logger.debug(f'Starting Socket Server at {data_source.socket_path}')
-        socketserver.ThreadingUnixStreamServer.__init__(self, str(data_source.socket_path), HAKCRequestHandler)
+        os.makedirs(os.path.dirname(config.socket_path), exist_ok=True)
+        logger.debug(f'Starting Socket Server at {config.socket_path}')
+        socketserver.ThreadingUnixStreamServer.__init__(self, str(config.socket_path), HAKCPolicyServerThread)
 
     def handle_error(self, _a, _b):
         logger.info(f"Shutting down server")
         # do a server shutdown, rather than a server_close()
         self.shutdown()
+
+    def reset_alarm(self):
+        # cancel existing alarm
+        signal.alarm(0)
+        if self.config.server_timeout > 0:
+            signal.alarm(self.config.server_timeout)

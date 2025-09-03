@@ -49,9 +49,13 @@ public:
 
   StringRef GetValidTargetsEndpoint() const;
 
+  StringRef GetSetDagFilenameEndpoint() const;
+
   StringRef GetAddFunctionEndpoint() const;
 
   StringRef GetAddGlobalVariableEndpoint() const;
+
+  StringRef GetTerminateConnectionEndpoint() const;
 
   std::chrono::milliseconds GetServerTimeout() const;
 
@@ -65,8 +69,10 @@ protected:
   std::string DivisionEndpoint;
   std::string SymbolDivisionEndpoint;
   std::string ValidTargetsEndpoint;
+  std::string SetDagFilenameEndpoint;
   std::string AddFunctionEndpoint;
   std::string AddGlobalVariableEndpoint;
+  std::string TerminateConnectionEndpoint;
   std::chrono::milliseconds Timeout;
   unsigned MaxConnectionRetries;
 };

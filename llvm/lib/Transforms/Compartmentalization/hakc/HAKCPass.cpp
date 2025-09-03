@@ -101,7 +101,9 @@ static bool runDataAccessGraphAnalysis(CommonHAKCAnalysis &HAKCAnalysis) {
     }
     CommonHAKCAnalysis::getLogger(Fatal) << "Starting Analysis Client " << Path << "\n";
     HAKCAnalysisClient AnalysisClient(HAKCAnalysis.GetSystemInfo());
+    AnalysisClient.set_dag_filename(Path);
     AnalysisClient.SendSymbolsToAnalysisServer(ModuleAnalysis);
+    AnalysisClient.CloseConnection();
   } else {
     CommonHAKCAnalysis::getLogger(Fatal) << "Failed to open " << Path << "\n";
     throw std::exception();

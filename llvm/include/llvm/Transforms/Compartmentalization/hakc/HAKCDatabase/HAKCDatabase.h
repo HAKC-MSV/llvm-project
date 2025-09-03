@@ -56,6 +56,8 @@ public:
 
   HAKCDatabaseResponse HandleRequest(const HAKCDatabaseRequest &Request) const;
 
+  void SendTerminateConnection(const HAKCDatabaseRequest &Request) const;
+
   operator bool() const;
 
   void close();

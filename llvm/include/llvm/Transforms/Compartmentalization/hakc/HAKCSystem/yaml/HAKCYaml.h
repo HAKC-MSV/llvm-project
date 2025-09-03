@@ -177,8 +177,10 @@ struct HAKCYamlDatabaseConfig {
   HAKCYAMLStringType GetDivisionEndpoint;
   HAKCYAMLStringType GetSymbolDivisionEndpoint;
   HAKCYAMLStringType GetValidTargetsEndpoint;
+  HAKCYAMLStringType SetDagFilenameEndpoint;
   HAKCYAMLStringType AddFunctionEndpoint;
   HAKCYAMLStringType AddGlobalVariableEndpoint;
+  HAKCYAMLStringType TerminateConnectionEndpoint;
   unsigned ServerTimeout;
   unsigned MaxConnectionRetries;
 };
@@ -396,12 +398,18 @@ template <> struct yaml::MappingTraits<hakc::HAKCYamlDatabaseConfig> {
     Io.mapOptional("get-valid-targets-from-compartment-id-endpoint",
                    YamlConfig.GetValidTargetsEndpoint,
                    "get-valid-targets-from-compartment-id");
+    Io.mapOptional("set-dag-filename-endpoint",
+                   YamlConfig.SetDagFilenameEndpoint,
+                   "set-dag-filename");
     Io.mapOptional("add-function-endpoint",
                    YamlConfig.AddFunctionEndpoint,
                    "add-function");
     Io.mapOptional("add-global-variable-endpoint",
                    YamlConfig.AddGlobalVariableEndpoint,
                    "add-global-variable");
+    Io.mapOptional("terminate-connection-endpoint",
+                   YamlConfig.TerminateConnectionEndpoint,
+                   "terminate-connection");
     Io.mapOptional("max-connection-retries", YamlConfig.MaxConnectionRetries,
                    5);
   }

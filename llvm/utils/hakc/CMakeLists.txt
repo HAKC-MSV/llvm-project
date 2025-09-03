@@ -1,6 +1,7 @@
     set(BinFiles
             "hakc-static-analysis"
             "hakc-policy-process"
+            "hakc-analysis-server-process"
     )
 
     set(HAKC_CC $<TARGET_FILE:clang>)
