@@ -34,7 +34,7 @@ template <
                      !std::is_same_v<T, const std::string>> * = nullptr>
 HAKCLogger &operator<<(HAKCLogger &Logger, T &T_) {
   for (std::shared_ptr<HAKCWriter> &stream : Logger.Streams()) {
-    if (!Logger.IsDisabled() &&
+    if (!Logger.IsDisabled() && !stream->IsDisabled() &&
         (Logger.GetLogLevel() >= stream->GetConfiguredLogLevel())) {
       *stream << T_;
     }
@@ -44,7 +44,7 @@ HAKCLogger &operator<<(HAKCLogger &Logger, T &T_) {
 
 template <typename T> HAKCLogger &operator<<(HAKCLogger &Logger, T *T_) {
   for (std::shared_ptr<HAKCWriter> &stream : Logger.Streams()) {
-    if (!Logger.IsDisabled() &&
+    if (!Logger.IsDisabled() && !stream->IsDisabled() &&
         (Logger.GetLogLevel() >= stream->GetConfiguredLogLevel())) {
       *stream << T_;
     }
@@ -59,7 +59,7 @@ template <
                      std::is_same_v<T, const std::string>> * = nullptr>
 HAKCLogger &operator<<(HAKCLogger &Logger, T T_) {
   for (std::shared_ptr<HAKCWriter> &stream : Logger.Streams()) {
-    if (!Logger.IsDisabled() &&
+    if (!Logger.IsDisabled() && !stream->IsDisabled() &&
         (Logger.GetLogLevel() >= stream->GetConfiguredLogLevel())) {
       *stream << T_;
     }

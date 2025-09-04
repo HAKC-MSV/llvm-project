@@ -1,7 +1,6 @@
 import hashlib
 from enum import Enum
-from typing import Type
-
+from typing import Type, Literal
 import yaml
 
 
@@ -30,10 +29,11 @@ class HAKCDivisionEnum(Enum):
 
 
 class HAKCHashValue:
-    ByteOrder = 'big'
+    ByteOrder: Literal['little', 'big'] = 'big'
 
     @classmethod
     def from_int(cls, hash_value: int):
+        assert(isinstance(hash_value, int))
         result = cls([])
         result.final_hash = hash_value
         return result
@@ -43,7 +43,9 @@ class HAKCHashValue:
             h = hashlib.sha256()
             for value in values:
                 h.update(HAKCHashValue.get_bytes(value))
-            self.final_hash = int.from_bytes(h.digest()[:7], byteorder=HAKCHashValue.ByteOrder)
+            # Note: [:7] is the first 8 bytes
+            self.final_hash = int.from_bytes(h.digest()[:7], byteorder=HAKCHashValue.ByteOrder, signed=False)
+            assert(isinstance(self.final_hash, int))
 
     @staticmethod
     def get_bytes(value) -> bytes:
@@ -55,12 +57,12 @@ class HAKCHashValue:
             return hash(value).to_bytes(8, byteorder=HAKCHashValue.ByteOrder)
 
     def __hash__(self):
-        return self.final_hash
+        return int(self.final_hash)
 
     def __eq__(self, other):
         if isinstance(other, int):
             return self.final_hash == other
-        if isinstance(other, str):
+        elif isinstance(other, str):
             return str(self.final_hash) == other
         elif isinstance(other, HAKCHashValue):
             return self.final_hash == other.final_hash
@@ -68,11 +70,10 @@ class HAKCHashValue:
             return False
 
     def __str__(self):
-        # assert(isinstance(self.final_hash, int))
-        # Note: loading from dag seems to store the hex value as a string
-        if isinstance(self.final_hash, str):
-            return f'{self.final_hash}'
-        return f'{self.final_hash:0x}'
+        return str(self.final_hash)
+
+    def __int__(self):
+        return int(self.final_hash)
 
     def __repr__(self):
         return self.final_hash
@@ -101,7 +102,7 @@ class HAKCPrintableObj:
             if isinstance(value, HAKCPrintableObj):
                 result[key] = value.to_yaml_dict()
             elif isinstance(value, HAKCHashValue):
-                result[key] = str(value)
+                result[key] = int(value)
             else:
                 result[key] = value
         return result
@@ -115,13 +116,13 @@ class HAKCPrintableObj:
 
     def get_computed_hash(self) -> HAKCHashValue:
         # note: moving none check here breaks the kuzu db for some reason
-        # if self.computed_hash is None:
-        self.compute_hash()
+        if self.computed_hash is None:
+            self.compute_hash()
         return self.computed_hash
 
     def __hash__(self):
-        self.compute_hash()
-        return hash(self.computed_hash)
+        return int(self.get_computed_hash())
+
 
     def get_hash_inputs(self) -> list[object]:
         raise NotImplementedError
@@ -183,6 +184,15 @@ class HAKCDBNode(HAKCPrintableObj):
         for key, value in kwargs.items():
             if key == self.get_primary_key().column_name and self.uses_hashed_key():
                 self.computed_hash = HAKCHashValue.from_int(value)
+        self.set_hash = False
+
+    def __hash__(self):
+        return int(self.get_computed_hash())
+
+    def set_computed_hash(self, computed_hash):
+        assert(isinstance(computed_hash, HAKCHashValue))
+        self.computed_hash = computed_hash
+        self.set_hash = True
 
     @classmethod
     def to_yaml(cls, dumper: yaml.Dumper, data):

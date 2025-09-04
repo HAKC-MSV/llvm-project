@@ -1,22 +1,24 @@
 import logging
 import re
-from typing import Type, Optional
+from typing import Type, Optional, cast, Union, Hashable, Tuple
+from typing_extensions import Self
 
 import networkx as nx
 import pandas as pd
 import yaml
+from networkx.classes.reportviews import NodeView
 from networkx.readwrite import json_graph
+from yaml import MappingNode
 
-from .HAKCBase import HAKCDivisionEnum, HAKCDBNode
+from .HAKCBase import HAKCDivisionEnum, HAKCDBNode, HAKCDBRelation
 from .HAKCDatabase import HAKCDatabase
 from .HAKCLogger import HAKCLogger
-from .HAKCObjects import HAKCSymbol, HAKCDefinitionLocation, HAKCFunction, HAKCType, HAKCTypePerm, HAKCCompartment, \
-    HAKCDivision, \
-    HAKCScope, HAKCGlobalVariable
+from .HAKCObjects import HAKCSymbol, HAKCDefinitionLocation, HAKCFunction, HAKCType, HAKCCompartment, HAKCDivision, \
+    HAKCScope, HAKCGlobalVariable, HAKCIndirectCallSource
 
 logging.setLoggerClass(HAKCLogger)
 
-logger: HAKCLogger = logging.getLogger('hakc-compartmentalization')
+logger: HAKCLogger = cast(HAKCLogger, logging.getLogger('hakc-compartmentalization'))
 
 
 class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
@@ -27,43 +29,103 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
     persisted_attr = 'persisted'
     yaml_tag = "!HAKCCompartmentalization"
 
-    def __init__(self, max_division_count: Optional[int] = 16):
+    def __init__(self, max_division_count: Optional[int] = 16, G: Optional[nx.MultiDiGraph] = None):
         yaml.YAMLObject.__init__(self)
         nx.MultiDiGraph.__init__(self)
+        if G:
+            self.load_from_yaml(G)
         self.max_division_count = max_division_count
 
+    def load_from_yaml(self, G: nx.MultiDiGraph) -> Self:
+        symbol_mapping = dict()
+        symbol_division_mapping = dict()
+        division_compartment_mapping = dict()
+        for symbol in self.get_filtered_nodes(G, node_filter=lambda n: isinstance(n, HAKCFunction) or isinstance(n, HAKCGlobalVariable)):
+            symbol: Union['HAKCFunction', 'HAKCGlobalVariable'] # suppress type warning
+            logger.fatal(f"symbol found: {symbol}")
+            new_symbol = HAKCFunction(Name=symbol.name) if isinstance(symbol, HAKCFunction) else HAKCGlobalVariable(Name=symbol.name)
+            new_symbol.set_computed_hash(symbol.computed_hash)
+            for nbr in G.neighbors(symbol):
+                for edge_data in G.get_edge_data(symbol, nbr):
+                    if edge_data == HAKCSymbol.relation_type:
+                        assert(isinstance(nbr, HAKCType))
+                        new_symbol.type = nbr
+                    elif edge_data == HAKCSymbol.relation_scope:
+                        new_symbol.scope = nbr
+                    elif edge_data == HAKCSymbol.relation_definition_location:
+                        defining_line = G.get_edge_data(symbol, nbr, HAKCSymbol.relation_definition_location)["DefiningLine"]
+                        new_symbol.definition_location = nbr
+                        new_symbol.definition_location.defining_line = defining_line
+                    elif edge_data == HAKCSymbol.relation_division:
+                        division = nbr
+                        for comp_nbr in G.neighbors(division):
+                            for comp_edge_data in G.get_edge_data(division, comp_nbr):
+                                if comp_edge_data == HAKCDivision.relation_compartment:
+                                    division_compartment_mapping[division] = comp_nbr
+                                    break
+                        symbol_division_mapping[symbol] = division
+            symbol_mapping[symbol] = new_symbol
+        # now that all the HACKSymbols have been created, add the HAKCFunction info using new_symbols
+        for symbol, new_symbol in symbol_mapping.items():
+            for nbr in G.neighbors(symbol):
+                for edge_data in G.get_edge_data(symbol, nbr):
+                    if edge_data == HAKCFunction.relation_direct_calls:
+                        # need to add the new_symbol created which has all the required fields set
+                        assert(isinstance(nbr, HAKCSymbol))
+                        new_symbol.direct_calls.append(symbol_mapping[nbr])
+                    elif edge_data == HAKCFunction.relation_indirect_calls:
+                        assert(isinstance(nbr, HAKCType))
+                        new_symbol.indirect_calls.append(nbr)
+                    elif edge_data == HAKCSymbol.relation_dag:
+                        dag_weight = G.get_edge_data(symbol, nbr, HAKCSymbol.relation_dag)["weight"]
+                        # logger.error(f"Adding DAG Edge from {new_symbol} to {symbol_mapping[symbol]} with weight {dag_weight}")
+                        self.add_dag_edge(new_symbol, symbol_mapping[nbr], dag_weight)
+                    elif edge_data == HAKCSymbol.relation_symbol:
+                        new_symbol.used_symbols.append(symbol_mapping[nbr])
+
+            symbol_mapping[symbol] = new_symbol
+
+        # now add all the functions
+        for symbol, new_symbol in symbol_mapping.items():
+            if isinstance(symbol, HAKCFunction):
+                self.__add_function(new_symbol)
+            else:
+                self.__add_global_variable(new_symbol)
+            division = symbol_division_mapping[symbol]
+            compartment = division_compartment_mapping[division]
+            self.__add_division_compartment(new_symbol, division, compartment)
+        return self
     @classmethod
-    def to_yaml(cls, dumper: yaml.Dumper, data):
+    def to_yaml(cls, dumper: yaml.Dumper, data) -> MappingNode:
         compartmentalization_data = json_graph.node_link_data(data, edges='edges')
         compartmentalization_data['max_division_count'] = data.max_division_count
         return dumper.represent_mapping(cls.yaml_tag, compartmentalization_data)
 
     @classmethod
     def from_yaml(cls, loader: yaml.Loader, node):
-        # TODO: implement
-        # print(node)
-        data = loader.construct_mapping(node)
-        max_division_count = data.pop('max_division_count', 0)
-        graph = json_graph.node_link_graph(data, directed=True)
-        new_graph = cls(max_division_count=max_division_count)
-        new_graph.add_nodes_from(graph.nodes(data=True))
-        new_graph.add_edges_from(graph.edges(data=True))
-        return new_graph
+        graph_data = loader.construct_mapping(node, deep=True)
+        graph = json_graph.node_link_graph(graph_data, edges='edges')
+        return cls(max_division_count=graph_data.get('division_count', 16), G=graph)
 
-    def add_symbols(self, functions: list[HAKCFunction], global_variables: list[HAKCGlobalVariable]):
+    def __str__(self):
+        return f"HAKCCompartmentalization with {len(self.nodes)} nodes and {len(self.edges)} edges!"
+
+    def add_symbols(self, functions: list[HAKCFunction], global_variables: list[HAKCGlobalVariable]) -> None:
         for global_variable in global_variables:
             self.__add_global_variable(global_variable)
 
         for function in functions:
+            # logger.debug(f"Adding function {function} with defining location {function.definition_location}")
             self.__add_function(function)
 
-    def __add_function(self, function: HAKCFunction):
+    def add_function(self, function: HAKCFunction) -> None:
+        return self.__add_function(function)
+
+    def __add_function(self, function: HAKCFunction) -> None:
         assert (isinstance(function, HAKCFunction))
 
         # add symbol with all its attributes
         self.__add_symbol(function)
-        # print(self)
-
         # add function specific attributes,
         for direct_call in function.direct_calls:
             assert (isinstance(direct_call, HAKCFunction))
@@ -80,46 +142,47 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
                 self.__add_type(indirect_call)
                 self.__add_persistent_edge(function, indirect_call, key=HAKCFunction.relation_indirect_calls)
 
-        for type_used in function.types_used:
-            assert (isinstance(type_used, HAKCTypePerm))
-            self.__add_persistent_edge(function, type_used.perm_type, key=HAKCFunction.relation_types_used,
-                                       R=(type_used.RWX & 0b100) >> 2, W=(type_used.RWX & 0b010) >> 1,
-                                       X=(type_used.RWX & 0b001))
+    def add_global_variable(self, global_variable: HAKCGlobalVariable) -> None:
+        return self.__add_global_variable(global_variable)
+    def __add_global_variable(self, global_variable: HAKCGlobalVariable) -> None:
+        assert(isinstance(global_variable, HAKCGlobalVariable))
+        self.__add_symbol(global_variable)
 
-    def __add_type(self, _type: HAKCType, already_persisted: bool = False):
+    def __add_type(self, _type: HAKCType, already_persisted: bool = False) -> None:
         assert (isinstance(_type, HAKCType))
         self.__add_persistent_node(_type, already_persisted=already_persisted)
 
-    def add_symbol(self, symbol):
+    def add_symbol(self, symbol, already_persisted: bool = False) -> None:
         # function to allow for external access
-        self.__add_symbol(symbol)
+        self.__add_symbol(symbol, already_persisted)
 
-    def __add_symbol(self, symbol: HAKCSymbol):
+    def __add_symbol(self, symbol: HAKCSymbol, already_persisted: bool = False) -> None:
         # add 'sanitized' version of the HAKCSymbol (e.g., don't include HAKCTypePerm as a node, since it should be an edge?)
         assert (isinstance(symbol, HAKCSymbol))
 
         # add the symbol node
-        self.__add_persistent_node(symbol)
+        self.__add_persistent_node(symbol, already_persisted=already_persisted)
 
-        # now add all the edges from the symbol node to node (and add the nodes at the same time!)
-        self.__add_persistent_edge(symbol, symbol.type, key=HAKCSymbol.relation_type)
-        self.__add_persistent_edge(symbol, symbol.scope, key=HAKCSymbol.relation_scope)
+        # now add all the edges from the symbol node to node
+        self.__add_persistent_node(symbol.type, already_persisted=already_persisted)
+        self.__add_persistent_edge(symbol, symbol.type, already_persisted=already_persisted, key=HAKCSymbol.relation_type)
+        self.__add_persistent_node(symbol.scope, already_persisted=already_persisted)
+        self.__add_persistent_edge(symbol, symbol.scope, already_persisted=already_persisted, key=HAKCSymbol.relation_scope)
         if symbol.definition_location:
-            self.__add_persistent_edge(symbol, symbol.definition_location,
-                                       key=HAKCSymbol.relation_compilation_unit,
+            # logger.fatal(f"Persisting symbol definition location {symbol} -> {symbol.definition_location}")
+            self.__add_persistent_node(symbol.definition_location, already_persisted=already_persisted)
+            self.__add_persistent_edge(symbol, symbol.definition_location, already_persisted=already_persisted,
+                                       key=HAKCSymbol.relation_definition_location,
                                        DefiningLine=symbol.definition_location.defining_line)
         for used_symbol in symbol.used_symbols:
-            self.__add_persistent_edge(symbol, used_symbol, key=HAKCSymbol.relation_symbol)
+            self.__add_persistent_node(used_symbol, already_persisted=already_persisted)
+            self.__add_persistent_edge(symbol, used_symbol, already_persisted=already_persisted, key=HAKCSymbol.relation_symbol)
 
-    def __add_global_variable(self, global_variable: HAKCGlobalVariable):
-        assert (isinstance(global_variable, HAKCGlobalVariable))
-        self.__add_symbol(global_variable)
-
-    def add_dag_edge(self, head: HAKCSymbol, tail: HAKCSymbol, dag_edge_weight: int):
+    def add_dag_edge(self, head: HAKCSymbol, tail: HAKCSymbol, dag_edge_weight: int) -> None:
         if dag_edge_weight > 0:
             self.__add_persistent_edge(head, tail, key=HAKCSymbol.relation_dag, weight=dag_edge_weight)
 
-    def __add_persistent_node(self, node: HAKCDBNode, already_persisted: bool = False):
+    def __add_persistent_node(self, node: HAKCDBNode, already_persisted: bool = False) -> HAKCDBNode:
         # Note: networkx determines if a node is already in the graph if the id(node) exists, meaning the memory address, not the actual hash
         # need to maintain internal map of object hashes to the actual networkx node (prevent duplicates, ensure data normalcy)
         assert (isinstance(node, HAKCDBNode))
@@ -132,7 +195,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         # return self.node_map[node_hash]
         return node
 
-    def get_compartment_from_division(self, division: HAKCDivision):
+    def get_compartment_from_division(self, division: HAKCDivision) -> HAKCCompartment:
         assert (isinstance(division, HAKCDivision))
         for edge in self.edges(division):
             compartment = edge[1]
@@ -140,14 +203,16 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
                 return compartment
         assert False, f"Division {division} should always return a HAKCCompartment!"
 
-    def get_divisions_compartments(self):
+    def get_divisions_compartments(self) -> set[Tuple[HAKCDivision, HAKCCompartment]]:
         nodes = set()
         for division in self.get_filtered_nodes(self, node_filter=lambda n: isinstance(n, HAKCDivision)):
             compartment = self.get_compartment_from_division(division)
             nodes.add((division, compartment))
         return nodes
 
-    def __add_division_compartment(self, symbol: HAKCSymbol, division: HAKCDivision, compartment: HAKCCompartment):
+    def add_division_compartment(self, symbol: HAKCSymbol, division: HAKCDivision, compartment: HAKCCompartment) -> None:
+        return self.__add_division_compartment(symbol, division, compartment)
+    def __add_division_compartment(self, symbol: HAKCSymbol, division: HAKCDivision, compartment: HAKCCompartment) -> None:
         assert (isinstance(symbol, HAKCSymbol))
         assert (isinstance(division, HAKCDivision))
         assert (isinstance(compartment, HAKCCompartment))
@@ -155,7 +220,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         self.__add_persistent_edge(symbol, division, key=HAKCSymbol.relation_division)
         self.__add_persistent_edge(division, compartment, key=HAKCDivision.relation_compartment)
 
-    def add_default_compartmentalization(self, conn: HAKCDatabase, create_schema: bool = False):
+    def add_default_compartmentalization(self, conn: HAKCDatabase, create_schema: bool = False) -> None:
         compartment_id = HAKCCompartmentalization.no_enforcement_compartment_id + 1
         division_id = HAKCCompartmentalization.default_division
         symbols = list(self.get_symbols())
@@ -233,20 +298,20 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             access_token = 0xFFFF
         return access_token
 
-    def __add_persistent_edge(self, u_for_edge: HAKCDBNode, v_for_edge: HAKCDBNode, key, **attr):
+    def __add_persistent_edge(self, u_for_edge: HAKCDBNode, v_for_edge: HAKCDBNode, key, already_persisted: bool = False, **attr) -> None:
         if not (self.has_edge(u_for_edge, v_for_edge, key)):
-            attr[HAKCCompartmentalization.persisted_attr] = False
+            attr[HAKCCompartmentalization.persisted_attr] = already_persisted
             self.add_edge(u_for_edge, v_for_edge, key, **attr)
 
     def _get_neighbors(self, symbol: HAKCSymbol, edge_key: str) -> list:
         nbrs = list()
         if symbol not in self.nodes:
-            for existing_symbol in self.get_symbols():
-                if existing_symbol.name == symbol.name:
-                    symbol.computed_hash = None
-                    existing_symbol.computed_hash = None
-                    break
-            raise RuntimeError(f'Symbol {symbol} could not be found')
+            # Note: sometimes a symbol in a query is incompletely defined (thus hashes do not match) and we need to search harder for the correct symbol in our graph
+            logger.debug(f"Searching for symbol: {symbol}")
+            found_symbols = self.get_symbol_by_name(symbol.name)
+            if len(found_symbols) != 1:
+                raise RuntimeError(f'Symbol {symbol} could not be found by hash, but found {len(found_symbols)} symbols when searching by name!')
+            symbol = list(found_symbols)[0]
         for nbr, edges in self.adj[symbol].items():
             if edge_key in edges:
                 nbrs.append(nbr)
@@ -255,38 +320,41 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
     def get_indirect_calls(self, symbol: HAKCSymbol) -> list[HAKCType]:
         return self._get_neighbors(symbol, HAKCFunction.relation_indirect_calls)
 
-    def get_compartment_node(self, compartment_id: int):
+    def get_compartment_node(self, compartment_id: int) -> Optional[HAKCCompartment]:
         for compartment in self.get_filtered_nodes(self, node_filter=lambda
                 n: isinstance(n, HAKCCompartment)):
             if compartment.compartment_id == compartment_id:
                 return compartment
         return None
 
-    def get_division_node(self, division_id: int, compartment_id: int):
+    def get_division_node(self, division_id: int, compartment_id: int) -> Optional[HAKCDivision]:
         for division in self.get_filtered_nodes(self, node_filter=lambda n: isinstance(n, HAKCDivision)):
-            if division_id == division.division_id and division.compartment_id == compartment_id:
-                return division
+            if division_id == division.division_id:
+                compartments = self._get_neighbors(division, HAKCDivision.relation_compartment)
+                # A division can only be part of a single compartment, no more and no less
+                assert(len(compartments) == 0)
+                if compartment_id == compartments[0].compartment_id:
+                    return division
         return None
 
-    # def set_division(self, symbol: HAKCSymbol, division_id: int, compartment_id: int):
-    #     division = self.get_division_node(division_id, compartment_id)
-    #     compartment = self.get_compartment_node(compartment_id)
-    #     if compartment is None:
-    #         compartment = HAKCCompartment(compartment_id, max_division_count=self.max_division_count)
-    #     if division is None:
-    #         division = HAKCDivision(division_id, compartment_id, max_division_count=compartment.max_division_count)
-    #     self.set_symbol_division(symbol, division, compartment)
+    def set_symbol_division_by_id(self, symbol: HAKCSymbol, division_id: int, compartment_id: int) -> None:
+        division = self.get_division_node(division_id, compartment_id)
+        compartment = self.get_compartment_node(compartment_id)
+        if compartment is None:
+            compartment = HAKCCompartment(compartment_id)
+        if division is None:
+            division = HAKCDivision(division_id)
+        self.set_symbol_division_by_object(symbol, division, compartment)
 
-    def add_division(self, division: HAKCDivision, compartment: HAKCCompartment):
+    def add_division(self, division: HAKCDivision, compartment: HAKCCompartment) -> None:
         self.__add_persistent_edge(division, compartment, key=HAKCDivision.relation_compartment)
 
-    #
-    # def set_symbol_division(self, symbol: HAKCSymbol, division: HAKCDivision, compartment: HAKCCompartment):
-    #     # print(f"Adding symbol division for {symbol} in division {division} with compartment {compartment}")
-    #     self.add_division(division, compartment)
-    #     self.__add_persistent_edge(symbol, division, key=HAKCSymbol.relation_division)
+    def set_symbol_division_by_object(self, symbol: HAKCSymbol, division: HAKCDivision, compartment: HAKCCompartment) -> None:
+        # print(f"Adding symbol division for {symbol} in division {division} with compartment {compartment}")
+        self.add_division(division, compartment)
+        self.__add_persistent_edge(symbol, division, key=HAKCSymbol.relation_division)
 
-    def get_division(self, symbol: HAKCSymbol) -> HAKCDivision | None:
+    def get_division(self, symbol: HAKCSymbol) -> Optional[HAKCDivision]:
         nbrs = self._get_neighbors(symbol, HAKCSymbol.relation_division)
         if len(nbrs) == 0:
             return None
@@ -298,34 +366,33 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             return nbrs[0]
 
     @staticmethod
-    def get_filtered_nodes(G: nx.MultiDiGraph, node_filter):
+    def get_filtered_nodes(G: nx.MultiDiGraph, node_filter) -> 'NodeView[Union[HAKCType, HAKCScope, HAKCSymbol, HAKCCompartment, HAKCDivision, HAKCDefinitionLocation, HAKCFunction, HAKCGlobalVariable, HAKCCompartmentalization, Hashable]]':
         return nx.subgraph_view(G, filter_node=node_filter).nodes
 
-    def get_types(self):
+    def get_types(self) -> 'NodeView[HAKCType | Hashable]':
         return self.get_filtered_nodes(self, node_filter=lambda n: isinstance(n, HAKCType))
 
-    def get_functions(self):
+    def get_functions(self) -> 'NodeView[HAKCFunction | Hashable]':
         return self.get_filtered_nodes(self, node_filter=lambda n: isinstance(n, HAKCFunction))
 
-    def get_global_variables(self):
+    def get_global_variables(self) -> 'NodeView[HAKCGlobalVariable | Hashable]':
         return self.get_filtered_nodes(self, node_filter=lambda n: isinstance(n, HAKCGlobalVariable))
 
-    def get_symbols(self):
+    def get_symbols(self) -> 'NodeView[Union[HAKCFunction, HAKCGlobalVariable, Hashable]]':
         return self.get_filtered_nodes(self, node_filter=lambda n: isinstance(n, HAKCFunction) or isinstance(n,
                                                                                                              HAKCGlobalVariable))
-
-    def get_scopes(self):
+    def get_scopes(self) -> 'NodeView[HAKCScope | Hashable]':
         return self.get_filtered_nodes(self, node_filter=lambda n: isinstance(n, HAKCScope))
 
-    def get_compilation_units(self):
+    def get_definition_locations(self) -> 'NodeView[HAKCDefinitionLocation | Hashable]':
         return self.get_filtered_nodes(self, node_filter=lambda n: isinstance(n, HAKCDefinitionLocation))
 
-    def get_divisions(self):
+    def get_divisions(self) -> 'NodeView[HAKCDivision | Hashable]':
         return self.get_filtered_nodes(self, node_filter=lambda n: isinstance(n, HAKCDivision))
 
-    def get_symbol_by_name(self, symbol_name):
-        return self.get_filtered_nodes(self, node_filter=lambda n: (isinstance(n, HAKCFunction) or isinstance(n,
-                                                                                                              HAKCGlobalVariable)) and n.name == symbol_name)
+    def get_symbol_by_name(self, symbol_name: str) -> 'NodeView[Union[HAKCFunction, HAKCGlobalVariable, Hashable]]':
+        assert(isinstance(symbol_name, str))
+        return self.get_filtered_nodes(self, node_filter=lambda n: (isinstance(n, HAKCFunction) or isinstance(n, HAKCGlobalVariable)) and n.name == symbol_name)
 
     def get_symbol_compartment_id(self, symbol: HAKCSymbol) -> int:
         for neighbor in self.neighbors(symbol):
@@ -345,7 +412,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         for symbol in self.get_symbols():
             if self.get_symbol_compartment_id(symbol) == compartment_id:
                 all_symbols_by_compartment_id.add(symbol)
-
+        # logger.debug(f"Got {len(self.get_symbols())} symbols")
         # now search all valid neighbors
         for caller in all_symbols_by_compartment_id:
             for callee in self.neighbors(caller):
@@ -386,19 +453,11 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         for table_name, nodes in logger.progress_bar(iterable=unpersisted_nodes.items(), desc="Persisting to database"):
             data_to_persist = dict()
             for node in nodes:
-                # force hash computation manually
-                # node.recompute_hash()
-                if isinstance(node, HAKCCompartment):
-                    # Note: never persist incomplete objects
-                    logger.debug(f"compartment_hash: {node.computed_hash}")
-
                 db_data = node.get_db_data()
                 if 0 < len(data_to_persist) != len(db_data):
                     logger.error(
                         f'Node {node} does not have all the data needed. Data needed is {" ".join(sorted(data_to_persist.keys()))} and data provided is {" ".join(sorted([column.column_name for column in db_data.keys()]))}')
                 for column, data in db_data.items():
-
-                    logger.debug(f"col, data: {column}, {data}")
                     if data is None:
                         logger.debug(f'Node {node} has None for column {column.column_name}')
                         data = column.column_type.default_value
@@ -468,7 +527,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
                     logger.error(f'Failed to persist to {table_name}: {str(e)}')
                 raise e
 
-    def persist_to_database(self, conn: HAKCDatabase, create_schema: bool = False):
+    def persist_to_database(self, conn: HAKCDatabase, create_schema: bool = False) -> None:
         if create_schema:
             logger.info(f'Creating schema')
             self.create_schema(conn)
@@ -476,8 +535,10 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         self._persist_nodes(conn)
         logger.info('Persisting new edges to database')
         self._persist_edges(conn)
+        logger.info(f"Finished persisting nodes and edges to database")
 
-    def create_schema(self, conn: HAKCDatabase):
+    @staticmethod
+    def create_schema(conn: HAKCDatabase) -> None:
         node_tables = HAKCCompartmentalization.get_table_classes()
         for cls in logger.progress_bar(iterable=node_tables, desc='Creating data tables'):
             conn.create_node_table(node_type=cls)
@@ -494,11 +555,14 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         return symbol_hashes
 
     def get_symbol_by_hash(self, symbol_hash: int) -> Optional[HAKCSymbol]:
+        # logger.debug(f"Trying to find symbol for hash {symbol_hash} with symbols {self.get_symbols()}")
         for symbol in self.get_symbols():
-            if hash(symbol) == symbol_hash:
+            assert(isinstance(symbol, HAKCSymbol))
+            logger.error(symbol)
+            # if hash(symbol) == symbol_hash:
+            if symbol.get_computed_hash().final_hash == symbol_hash:
                 return symbol
-
-        return None
+        raise RuntimeError(f"Unable to find HAKCSymbol for symbol_hash = {symbol_hash}")
 
     @staticmethod
     def get_table_classes() -> list[Type[HAKCDBNode]]:
@@ -511,113 +575,20 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             HAKCDefinitionLocation,
             HAKCFunction
         ]
-
     @staticmethod
-    def show_top_n_degrees(G, n):
-        """
-        Returns a list of the top n nodes with the highest degrees of freedom.
+    def add_yaml_constructors() -> None:
+        yaml.add_constructor(HAKCType.yaml_tag, HAKCType.from_yaml)
+        yaml.add_constructor(HAKCScope.yaml_tag, HAKCScope.from_yaml)
+        yaml.add_constructor(HAKCSymbol.yaml_tag, HAKCSymbol.from_yaml)
+        yaml.add_constructor(HAKCCompartment.yaml_tag, HAKCCompartment.from_yaml)
+        yaml.add_constructor(HAKCDivision.yaml_tag, HAKCDivision.from_yaml)
+        yaml.add_constructor(HAKCDefinitionLocation.yaml_tag, HAKCDefinitionLocation.from_yaml)
+        yaml.add_constructor(HAKCFunction.yaml_tag, HAKCFunction.from_yaml)
+        yaml.add_constructor(HAKCGlobalVariable.yaml_tag, HAKCGlobalVariable.from_yaml)
+        yaml.add_constructor(HAKCCompartmentalization.yaml_tag, HAKCCompartmentalization.from_yaml)
 
-        Args:
-        graph: A NetworkX graph object.
-        n: The number of top nodes to return.
-
-        Returns:
-        A list of node IDs sorted by degree in descending order.
-        """
-        degrees = dict(nx.degree(G))
-
-        # Sort the degrees in descending order
-        sorted_degrees = sorted(degrees.items(), key=lambda item: item[1], reverse=True)
-
-        return [node for node, degree in sorted_degrees[:n]]
-
-    def save_graph(self, fname, symbol_name=None, prune=False, N=50, filter_symbols=False, debug=False):
-        pass
-        # from networkx.drawing.nx_pydot import to_pydot
-        # if debug:
-        #     logger.debug(f"Trying to save {self} to {fname}")
-        #
-        # if filter_symbols:
-        #     # sorted(list(filter(lambda x: isinstance(x, HAKCFunction), successor[1])))
-        #     G = self.subgraph(list(filter(lambda x: isinstance(x, HAKCSymbol) or isinstance(x, HAKCType), self.nodes)))
-        # else:
-        #     G = self.subgraph(self.nodes)
-        #
-        # # node_filter = lambda n: (isinstance(n, HAKCFunction) or isinstance(n, HAKCGlobalVariable)) and n.name == symbol_name
-        # # _symbol = nx.subgraph_view(G, filter_node=node_filter).nodes()
-        # functions = self.get_functions()
-        # # logger.debug(functions)
-        # if symbol_name:
-        #     symbol = [n for n in functions if n.name == symbol_name]
-        #     if debug:
-        #         logger.debug(f"Found {symbol} of type {type(symbol)}")
-        #     # symbol = self.nodes[_symbol]
-        #
-        #     # symbol = self.get_symbol_by_name(symbol_name)
-        #     # logger.debug(f"Found symbol {symbol} in {len(symbol)}")
-        #     symbol_descendents = nx.descendants(G, symbol[0])
-        #     # logger.debug(f"{symbol} has {symbol_descendents} descendents!")
-        #     G = G.subgraph(symbol_descendents)
-        #
-        # if prune:
-        #     top_n_node_ids = HAKCCompartmentalization.show_top_n_degrees(G, N)
-        #     subgraph = G.subgraph(top_n_node_ids)
-        #     # logger.debug(G.nodes)
-        #     G = subgraph
-        # # remove self loops
-        # # subgraph = G.subgraph(G.nodes)
-        # # self_loops = list(nx.selfloop_edges(subgraph))  # Convert generator to list to avoid RuntimeError
-        # # subgraph.remove_edges_from(self_loops)
-        # # G = subgraph
-        #
-        # # G = nx.relabel_nodes(G, self.relabel_nodes)
-        #
-        # dot = to_pydot(G)
-        # dot.set_splines("true")
-        # dot.set("overlap", "false")
-        # dot.set("rankdir", "LR")
-        # colors = ["lightblue", "green", "aquamarine", "yellow", "orange"]
-        # for node in dot.get_nodes():
-        #     node.set("shape", "box")
-        #     # Change color of box to show nodes that have been coalesced
-        #     # logger.debug(self.coalesced_epochs[ty])
-        #     # logger.debug(node.get("epoch"))
-        #     epoch = node.get("epoch")
-        #     # Note: Displaying the color of merged nodes only works if a root is specified
-        #     if epoch:
-        #         if int(epoch) in self.coalesced_epochs.keys():
-        #             node.set("style", "filled")
-        #             node.set("fillcolor", colors[int(epoch) % len(colors)])
-        #
-        # # set edge labels
-        # for edge in dot.get_edges():
-        #     # logger.debug(edge.obj_dict)
-        #     # ignore all 'persisted' attributes
-        #     if "persisted" in edge.obj_dict["attributes"]:
-        #         del edge.obj_dict["attributes"]["persisted"]
-        #
-        #     edge.set_label(str(edge.obj_dict["attributes"]))
-        #
-        # # dot.write_png(fname)
-        # dot.write_svg(fname)
-        #
-        # logger.debug(f"Saved {self} to {fname}")
-
-    def save_graph_alt(self, fname, debug=False):
-        pass
-        # import matplotlib.pyplot as plt
-        # from networkx.drawing.nx_agraph import graphviz_layout
-        #
-        # G = self.subgraph(self.nodes)
-        # G = nx.relabel_nodes(G, lambda x: x.pretty_print())
-        #
-        # pos = graphviz_layout(G, prog='dot', args='-Grankdir="LR" -Gminlen="1"')
-        #
-        # plt.figure(figsize=(16, 9))
-        # nx.draw(G, pos, with_labels=True, node_shape="o", node_color='none', edgecolors='black')
-        # nx.draw_networkx_edge_labels(G, pos)
-        # # logger.debug(G.edges)
-        # plt.savefig(fname)
-        # plt.close()
-        # if debug:
-        #     logger.debug(f"Saved {self} to {fname}")
+    def save_as_yaml(self, fname: str):
+        logger.info(f'Saving compartmentalization to {fname}')
+        with open(fname, "w") as f:
+            yaml.dump(self, f)
+        logger.info(f"Finished saving compartmentalization to {fname}")

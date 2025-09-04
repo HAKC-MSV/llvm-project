@@ -2,20 +2,20 @@ import logging
 import random
 import re
 import sys
-from typing import Optional
+from typing import Optional, cast
 
 import yaml
 
 from .HAKCBase import HAKCDBColumn, HAKCDBRelation, HAKCDBNode, HAKCPrintableObj, HashedHAKCDBNode, \
     HAKCPayload
-
-logger = logging.getLogger('hakc-dag')
+from .HAKCLogger import HAKCLogger
+logger: HAKCLogger = cast(HAKCLogger, logging.getLogger('hakc-dag'))
 
 
 class HAKCDefinitionLocation(HAKCDBNode, yaml.YAMLObject):
-    yaml_tag = "!HAKCCompilationUnit"
+    yaml_tag = "!HAKCDefinitionLocation"
 
-    def __init__(self, DefiningFile: str, DefiningLine: int, **kwargs):
+    def __init__(self, DefiningFile: str, DefiningLine: Optional[int] = None, **kwargs):
         yaml.YAMLObject.__init__(self)
         HAKCDBNode.__init__(self, **kwargs)
         self.defining_file = DefiningFile
@@ -45,12 +45,11 @@ class HAKCDefinitionLocation(HAKCDBNode, yaml.YAMLObject):
 
     @staticmethod
     def get_primary_key() -> HAKCDBColumn:
-        return HAKCDBColumn('cu_hash', "UINT64")
+        return HAKCDBColumn('DefiningFile', "STRING")
 
     @classmethod
     def get_data_columns(cls) -> list[HAKCDBColumn]:
-        # HAKCDBColumn('DefiningLine', "STRING")
-        return [HAKCDBColumn('DefiningFile', "STRING")]
+        return []
 
     @staticmethod
     def get_table_name() -> str:
@@ -59,10 +58,8 @@ class HAKCDefinitionLocation(HAKCDBNode, yaml.YAMLObject):
     def get_db_data(self, convert_hash=True) -> dict[HAKCDBColumn, object]:
         schema = HAKCDefinitionLocation.get_db_table_columns()
         return {
-            schema[0]: hash(self) if convert_hash else self.get_computed_hash(),
-            schema[1]: self.defining_file,
+            schema[0]: self.defining_file,
         }
-
 
 class HAKCDivision(HashedHAKCDBNode, yaml.YAMLObject):
     yaml_tag = "!HAKCDivision"
@@ -309,54 +306,11 @@ class HAKCType(HashedHAKCDBNode, yaml.YAMLObject):
         schema = HAKCType.get_db_table_columns()
         assert (len(schema) == (len(self.get_data_columns()) + 1))
         return {
-            schema[0]: hash(self) if convert_hash else self.get_computed_hash(),
+            # schema[0]: hash(self) if convert_hash else self.get_computed_hash(),
+            schema[0]: self.get_computed_hash().final_hash,
             schema[1]: self.debug_type,
             schema[2]: self.llvm_type
         }
-
-
-class HAKCTypePerm(HAKCPrintableObj, yaml.YAMLObject):
-    # purely an edge between function and type
-    yaml_tag = "!HAKCTypePerm"
-
-    # note: the yaml keys seem to line up with exactly the parameters in __init__
-    def __init__(self, Type: HAKCType, R: bool = False, W: bool = False, X: bool = False, **kwargs):
-        yaml.YAMLObject.__init__(self)
-        HAKCPrintableObj.__init__(**kwargs)
-        self.R = R
-        self.W = W
-        self.X = X
-        self.perm_type = Type
-        assert (isinstance(self.perm_type, HAKCType))
-
-    def __repr__(self):
-        return self.__str__()
-
-    @property
-    def RWX(self):
-        return f"{1 if self.R else 0}{1 if self.W else 0}{1 if self.X else 0}"
-
-    def __str__(self):
-        return f"{self.yaml_tag[1:]}(RWX({self.RWX} of {self.perm_type.debug_type})"
-
-    def pretty_print(self):
-        return f"{self.yaml_tag[1:]}(RWX({self.RWX}) of {self.perm_type.debug_type})"
-
-    def debug_print(self):
-        return f"""\t{self.yaml_tag} [:- {self.RWX} -> {self.perm_type.debug_print()}\n"""
-
-    @classmethod
-    def from_yaml(cls, loader: yaml.Loader, node):
-        return cls(**loader.construct_mapping(node, deep=True))
-
-    def get_hash_inputs(self) -> list[object]:
-        return [self.R, self.W, self.X, self.perm_type]
-
-    def __eq__(self, other):
-        if isinstance(other, HAKCTypePerm):
-            return (self.RWX == other.RWX) and (self.perm_type == other.perm_type)
-        return False
-
 
 class HAKCScope(HashedHAKCDBNode, yaml.YAMLObject):
     yaml_tag = "!HAKCScope"
@@ -365,9 +319,9 @@ class HAKCScope(HashedHAKCDBNode, yaml.YAMLObject):
 
     def __init__(self, Scope: str, LocalScopeName: Optional[str] = None, **kwargs):
         yaml.YAMLObject.__init__(self)
+        HashedHAKCDBNode.__init__(self, **kwargs)
         self.scope = Scope
         # kwargs["Name"] = LocalScopeName if LocalScopeName is not None else self.scope
-        HashedHAKCDBNode.__init__(self, **kwargs)
         self.local_scope_name = LocalScopeName if LocalScopeName is not None else HAKCScope.global_scope
         self.is_global_scope = self.scope == HAKCScope.global_scope
         self.is_local_scope = self.scope == HAKCScope.local_scope
@@ -433,7 +387,8 @@ class HAKCScope(HashedHAKCDBNode, yaml.YAMLObject):
         schema = HAKCScope.get_db_table_columns()
         assert (len(schema) == (len(self.get_data_columns()) + 1))
         return {
-            schema[0]: hash(self) if convert_hash else self.get_computed_hash(),
+            #schema[0]: hash(self) if convert_hash else self.get_computed_hash(),
+            schema[0]: self.get_computed_hash().final_hash,
             schema[1]: self.scope,
             schema[2]: self.local_scope_name
         }
@@ -445,23 +400,23 @@ class HAKCSymbol(HashedHAKCDBNode, yaml.YAMLObject):
     relation_scope = "has_scope"
     relation_division = "has_division"
     relation_dag = "has_dag"
-    relation_compilation_unit = "has_compilation_unit"
+    relation_definition_location = "has_definition_location"
 
     # Init takes the attributes directly from the original dag.yml file the pass creates
     # Also, enforcing that some minimum amount of data is present (e.g., symbol needs a name and a type)
     def __init__(self, Name: str, Type: HAKCType = None, Scope: HAKCScope = None,
-                 Definition: Optional[HAKCDefinitionLocation] = None,
+                 DefinitionLocation: Optional[HAKCDefinitionLocation] = None,
                  UsedSymbols: Optional[list] = None, **kwargs):
         yaml.YAMLObject.__init__(self)
         HashedHAKCDBNode.__init__(self, **kwargs)
         self.name = Name
         self.type = Type
         self.scope = Scope
-        self.definition_location = Definition
+        self.definition_location = DefinitionLocation
         self.used_symbols = UsedSymbols if UsedSymbols else list()
         assert len(self.name) != 0, "Name cannot be empty"
-        assert isinstance(self.type, HAKCType), f"{self.type} is not a HAKCType"
-        assert isinstance(self.scope, HAKCScope), f"{self.scope} is not a HAKCScope"
+        # assert isinstance(self.type, HAKCType), f"{self.type} is not a HAKCType"
+        # assert isinstance(self.scope, HAKCScope), f"{self.scope} is not a HAKCScope"
         if "type_hash" in kwargs:
             assert kwargs[
                        "type_hash"] == self.get_computed_hash(), f"type_hash ({kwargs['type_hash']}) =?= hash(self) ({self.get_computed_hash()})"
@@ -493,7 +448,7 @@ class HAKCSymbol(HashedHAKCDBNode, yaml.YAMLObject):
         return HAKCDBNode.__hash__(self)
 
     def get_hash_inputs(self) -> list[object]:
-        result = [self.name]
+        result: list[object] = [self.name]
         if self.type:
             result.append(self.type)
         if self.scope:
@@ -519,7 +474,7 @@ class HAKCSymbol(HashedHAKCDBNode, yaml.YAMLObject):
             HAKCDBRelation(HAKCSymbol.relation_type, HAKCSymbol, HAKCType),
             HAKCDBRelation(HAKCSymbol.relation_scope, HAKCSymbol, HAKCScope),
             HAKCDBRelation(HAKCSymbol.relation_symbol, HAKCSymbol, HAKCSymbol),
-            HAKCDBRelation(HAKCSymbol.relation_compilation_unit, HAKCSymbol, HAKCDefinitionLocation,
+            HAKCDBRelation(HAKCSymbol.relation_definition_location, HAKCSymbol, HAKCDefinitionLocation,
                            DefiningLine="UINT64"),
             HAKCDBRelation(HAKCSymbol.relation_division, HAKCSymbol, HAKCDivision),
             HAKCDBRelation(HAKCSymbol.relation_dag, HAKCSymbol, HAKCSymbol, weight="INT32")
@@ -529,7 +484,8 @@ class HAKCSymbol(HashedHAKCDBNode, yaml.YAMLObject):
         schema = HAKCSymbol.get_db_table_columns()
         assert (len(schema) == (len(self.get_data_columns()) + 1))
         return {
-            schema[0]: hash(self) if convert_hash else self.get_computed_hash(),
+            # schema[0]: hash(self) if convert_hash else self.get_computed_hash(),
+            schema[0]: self.get_computed_hash().final_hash,
             schema[1]: isinstance(self, HAKCFunction),
             schema[2]: self.name
         }
@@ -539,7 +495,6 @@ class HAKCFunction(HAKCSymbol):
     yaml_tag = "!HAKCFunction"
     relation_direct_calls = "has_direct_calls"
     relation_indirect_calls = "has_indirect_calls"
-    relation_types_used = "has_types_used"
 
     def __init__(self, DirectCalls: Optional[list] = None, IndirectCalls: Optional[list] = None,
                  TypesUsed: Optional[list] = None, **kwargs):
@@ -547,7 +502,6 @@ class HAKCFunction(HAKCSymbol):
         # assert that none of these are none
         self.direct_calls = DirectCalls if DirectCalls is not None else list()
         self.indirect_calls = IndirectCalls if IndirectCalls is not None else list()
-        self.types_used = TypesUsed if TypesUsed is not None else list()
 
     def pretty_print(self, epoch=None):
         if epoch != -1 and epoch is not None:
@@ -556,6 +510,9 @@ class HAKCFunction(HAKCSymbol):
 
     def __str__(self):
         return f"HAKCFunction({self.name})"
+
+    def __repr__(self):
+        return self.__str__()
 
     # need non_recursive parameter or else this will cause infinite recursion
     def debug_print(self, root=True, whitespace=""):
@@ -570,14 +527,7 @@ class HAKCFunction(HAKCSymbol):
                 out += f"{whitespace}    InDirectCalls:\n"
                 for indirect_call in self.indirect_calls:
                     out += f"{whitespace}    {indirect_call.debug_print(False, f'{whitespace}')}\n" if indirect_call else ''
-            if len(self.types_used) > 0:
-                out += f"{whitespace}    TypesUsed:\n"
-                for type_used in self.types_used:
-                    out += f"{whitespace}    {type_used.debug_print()}\n" if type_used else ''
         return out
-
-    # def get_hash_inputs(self) -> list[object]:
-    # return [HAKCSymbol.get_hash_inputs(self), self.direct_calls, self.indirect_calls, self.types_used]
 
     @classmethod
     def from_yaml(cls, loader: yaml.Loader, node):
@@ -587,14 +537,11 @@ class HAKCFunction(HAKCSymbol):
     def get_db_relations() -> list[HAKCDBRelation]:
         return [
             HAKCDBRelation(HAKCFunction.relation_indirect_calls, HAKCFunction, HAKCType),
-            HAKCDBRelation(HAKCFunction.relation_direct_calls, HAKCFunction, HAKCSymbol),
-            HAKCDBRelation(HAKCFunction.relation_types_used, HAKCFunction, HAKCType, R="UINT64", W="UINT64", X="UINT64")
+            HAKCDBRelation(HAKCFunction.relation_direct_calls, HAKCFunction, HAKCSymbol)
         ]
 
     def get_db_data(self, convert_hash=True) -> dict[HAKCDBColumn, object]:
-        # TODO: add assert
         return HAKCSymbol.get_db_data(self, convert_hash)
-
 
 class HAKCGlobalVariable(HAKCSymbol):
     yaml_tag = "!HAKCGlobalVariable"
@@ -613,7 +560,6 @@ class HAKCGlobalVariable(HAKCSymbol):
         return cls(**loader.construct_mapping(node, deep=True))
 
     def get_db_data(self, convert_hash=True) -> dict[HAKCDBColumn, object]:
-        # TODO add assert
         return HAKCSymbol.get_db_data(self, convert_hash)
 
 
@@ -649,7 +595,7 @@ class HAKCCompartmentalizationAdjustment(yaml.YAMLObject):
     def from_yaml(cls, loader: yaml.Loader, node):
         return cls(**loader.construct_mapping(node, deep=True))
 
-    def get_adjusted_division_and_compartment(self, defining_path: str) -> Optional[
+    def get_adjusted_division_and_compartment(self, defining_path: Optional[str] = None) -> Optional[
         tuple[HAKCDivision, HAKCCompartment]]:
         if defining_path is None:
             return None
@@ -689,7 +635,7 @@ class HAKCIndirectSourceLink(HAKCPrintableObj, yaml.YAMLObject):
         return cls(**loader.construct_mapping(node, deep=True))
 
     def get_hash_inputs(self) -> list[object]:
-        result = [self.link_type]
+        result: list[object] = [self.link_type]
         if self.source_type:
             result.append(self.source_type)
         if self.global_name:
@@ -743,7 +689,7 @@ class HAKCIndirectCallSource(HAKCPrintableObj, yaml.YAMLObject):
         return out
 
     def get_hash_inputs(self) -> list[object]:
-        result = []
+        result: list[object] = []
         if self.type:
             result.append(self.type)
         for link in self.source:

@@ -35,7 +35,7 @@ class HAKCLogger(logging.Logger):
 
     def progress_bar(self, **kwargs) -> tqdm.tqdm:
         disabled = self.level not in {logging.INFO, logging.DEBUG}
-        kwargs['file'] = output_file = self.console_handler.stream
+        kwargs['file'] = self.console_handler.stream
         if disabled:
             kwargs['file'] = open(os.devnull, 'w')
             kwargs['disable'] = True
@@ -53,4 +53,10 @@ def setup_logging(logger: HAKCLogger, log_file: str = "", log_level: LoggingLeve
     logger.setLevel(log_level.value)
     if log_file and len(log_file) > 0:
         os.makedirs(os.path.dirname(log_file), exist_ok=True)
-        logger.add_file_handler(log_file, log_mode)
+        # RootLogger does not inherit add_file_handler from HAKCLogger or something
+        if isinstance(logger, logging.RootLogger):
+            file_handler = logging.FileHandler(log_file, mode=log_mode)
+            file_handler.setFormatter(HAKCLogger.get_formatter())
+            logger.addHandler(file_handler)
+        else:
+            logger.add_file_handler(log_file, log_mode)
