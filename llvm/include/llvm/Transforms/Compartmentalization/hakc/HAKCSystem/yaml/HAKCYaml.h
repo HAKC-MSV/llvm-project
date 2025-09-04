@@ -178,6 +178,7 @@ struct HAKCYamlDatabaseConfig {
   HAKCYAMLStringType GetSymbolDivisionEndpoint;
   HAKCYAMLStringType GetValidTargetsEndpoint;
   HAKCYAMLStringType SetDagFilenameEndpoint;
+  HAKCYAMLStringType AddSymbolsEndpoint;
   HAKCYAMLStringType AddFunctionEndpoint;
   HAKCYAMLStringType AddGlobalVariableEndpoint;
   HAKCYAMLStringType TerminateConnectionEndpoint;
@@ -404,6 +405,9 @@ template <> struct yaml::MappingTraits<hakc::HAKCYamlDatabaseConfig> {
     Io.mapOptional("add-function-endpoint",
                    YamlConfig.AddFunctionEndpoint,
                    "add-function");
+    Io.mapOptional("add-symbols-endpoint",
+                   YamlConfig.AddSymbolsEndpoint,
+                   "add-symbols");
     Io.mapOptional("add-global-variable-endpoint",
                    YamlConfig.AddGlobalVariableEndpoint,
                    "add-global-variable");

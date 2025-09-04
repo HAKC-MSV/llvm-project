@@ -8,8 +8,10 @@ from typing import Optional, cast
 import threading
 import yaml
 
+
 from .HAKCBase import HAKCPrintableObj, HAKCPayload
 from .HAKCLogger import HAKCLogger
+from .HAKCObjects import HAKCSymbol, HAKCFunction, HAKCGlobalVariable
 from .HAKCCompartmentalization import HAKCCompartmentalization
 from .HAKCServerConfig import HAKCServerConfig, HAKCDataRequest, kwargs_get, TimeoutException, TerminateConnectionException
 from .HAKCServerThread import HAKCServerThread
@@ -25,21 +27,43 @@ class HAKCAnalysisServerThread(HAKCServerThread):
         # Note: handler() can be called before the actual __init__() function is called, so make a custom blocking init() for use in handler()
         logger.debug(f"Spinning up Analysis Server Thread")
         self.endpoints = {self.hakc_server.config.set_dag_filename_endpoint: self.set_dag_filename,
+                          self.hakc_server.config.add_symbols_endpoint: self.add_symbols,
                           self.hakc_server.config.add_function_endpoint: self.add_function,
                           self.hakc_server.config.add_global_variable_endpoint: self.add_global_variable,
                           self.hakc_server.config.terminate_connection_endpoint: self.terminate_connection}
         # Initialize thread specific data
         self.compartmentalization = HAKCCompartmentalization()
+        self.compartmentalization.add_yaml_constructors()
         self.dag_filename = None
 
     @property
     def hakc_server(self) -> 'HAKCAnalysisServer':
         return cast(HAKCAnalysisServer, self.server)
 
+    def terminate_connection(self, **kwargs):
+        # override terminate_connection function to save graph
+        if self.dag_filename:
+            self.compartmentalization.save_as_yaml(self.dag_filename)
+        HAKCServerThread.terminate_connection(self)
+
     def set_dag_filename(self, **kwargs):
         self.dag_filename = kwargs_get(str, "dag-filename", None, **kwargs)
         self.file_handler = self.logger.add_file_handler(self.dag_filename.replace(".dag.yml", ".analysis-server.log"))
         logger.debug(f"Processing {self.dag_filename}")
+        return HAKCPayload({'Success': True})
+
+    def add_symbols(self, **kwargs):
+        symbols = kwargs_get(list[str], "allSymbols", None, **kwargs)
+        logger.debug(f"Adding {len(symbols)}\t symbols")
+        for sym in symbols:
+            symbol = yaml.load(sym, Loader=self.yaml_loader)
+            # logger.debug(f"symbol: {symbol}")
+            if isinstance(symbol, HAKCFunction):
+                self.compartmentalization.add_function(symbol)
+            elif isinstance(symbol, HAKCGlobalVariable):
+                self.compartmentalization.add_global_variable(symbol)
+            else:
+                logger.fatal(f"Invalid symbol: {symbol}")
         return HAKCPayload({'Success': True})
 
     def add_function(self, **kwargs):

@@ -37,6 +37,10 @@ StringRef HAKCDatabaseInformation::GetSetDagFilenameEndpoint() const {
   return SetDagFilenameEndpoint;
 }
 
+StringRef HAKCDatabaseInformation::GetAddSymbolsEndpoint() const {
+  return AddSymbolsEndpoint;
+}
+
 StringRef HAKCDatabaseInformation::GetAddFunctionEndpoint() const {
   return AddFunctionEndpoint;
 }
@@ -64,6 +68,7 @@ void HAKCDatabaseInformation::operator<<(
   DivisionEndpoint = DatabaseConfig.GetDivisionEndpoint;
   SymbolDivisionEndpoint = DatabaseConfig.GetSymbolDivisionEndpoint;
   ValidTargetsEndpoint = DatabaseConfig.GetValidTargetsEndpoint;
+  AddSymbolsEndpoint = DatabaseConfig.AddSymbolsEndpoint;
   AddFunctionEndpoint = DatabaseConfig.AddFunctionEndpoint;
   SetDagFilenameEndpoint = DatabaseConfig.SetDagFilenameEndpoint;
   AddGlobalVariableEndpoint = DatabaseConfig.AddGlobalVariableEndpoint;

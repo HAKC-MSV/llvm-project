@@ -43,6 +43,11 @@ class HAKCDataRequest:
             return f'Request set-dag-filename to {self.parameters["dag-filename"] if "dag-filename" in self.parameters else "NULL"}'
         elif self.endpoint in ['get-compartment-by-id','get-division-by-id','get-division-from-symbol','get-valid-targets-from-compartment-id']:
             return f'Request query {self.endpoint} {self.parameters}'
+        elif self.endpoint == 'add-symbols':
+            out = f"Request to {self.endpoint} "
+            for symbol in self.parameters['allSymbols']:
+                out += f'{symbol}\n'
+            return out
         return f'Request unknown endpoint {self.endpoint} with parameters {self.parameters}'
 
     def __repr__(self):
@@ -80,6 +85,7 @@ class HAKCServerConfig:
         self.get_valid_targets_from_compartment_id_endpoint = kwargs.get(
             'get-valid-targets-from-compartment-id-endpoint', "get-valid-targets-from-compartment-id")
         self.set_dag_filename_endpoint = kwargs.get('set-dag-filename-endpoint', "set-dag-filename")
+        self.add_symbols_endpoint = kwargs.get('add-symbols-endpoint', "add-symbols")
         self.add_function_endpoint = kwargs.get('add-function-endpoint', "add-function")
         self.add_global_variable_endpoint = kwargs.get('add-global-variable-endpoint', "add-global-variable")
         self.terminate_connection_endpoint = kwargs.get('terminate-connection-endpoint', "terminate-connection")
@@ -94,8 +100,7 @@ def kwargs_get(cls, name: str, default: any = None, **kwargs):
     try:
         if cls in [int, str, float]:
             return cls(val_or_default)
-        logger.warning(
-            f"Unable to cast parameter {name} to type {cls}, so just returning {name} of type {type(val_or_default)}")
+        # logger.warning(f"Unable to cast parameter {name} to type {cls}, so just returning {name} of type {type(val_or_default)}")
         return val_or_default
     except Exception:
         raise Exception(f"Failed to get parameter {name} of type {cls} from {kwargs}")

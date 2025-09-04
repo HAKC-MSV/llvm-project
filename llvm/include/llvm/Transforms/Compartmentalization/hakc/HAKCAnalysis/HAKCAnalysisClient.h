@@ -26,6 +26,8 @@ public:
 
   void set_dag_filename(StringRef filename) const;
 
+  void add_symbols(std::vector<std::shared_ptr<HAKCFunctionInfo>> &FIs, std::vector<std::shared_ptr<HAKCGlobalInfo>> &GIs) const;
+
   void add_function(const HAKCFunctionInfo &Function) const;
 
   void add_global_variable(const HAKCGlobalInfo &Global) const;

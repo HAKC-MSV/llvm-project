@@ -434,7 +434,7 @@ class HAKCSymbol(HashedHAKCDBNode, yaml.YAMLObject):
 
     @classmethod
     def from_yaml(cls, loader: yaml.Loader, node):
-        # logger.fatal(f"Constructing symbol with: {node}")
+        logger.fatal(f"Constructing symbol with: {node}")
         return cls(**loader.construct_mapping(node, deep=True))
 
     def __eq__(self, other):
@@ -576,6 +576,7 @@ class HAKCAdjustment(yaml.YAMLObject):
 
     @classmethod
     def from_yaml(cls, loader: yaml.Loader, node):
+        # return cls(loader.construct_mapping(node, deep=True)[''])
         return cls(**loader.construct_mapping(node, deep=True))
 
 
@@ -595,6 +596,7 @@ class HAKCCompartmentalizationAdjustment(yaml.YAMLObject):
 
     @classmethod
     def from_yaml(cls, loader: yaml.Loader, node):
+        logger.fatal(f"node: {node}")
         return cls(**loader.construct_mapping(node, deep=True))
 
     def get_adjusted_division_and_compartment(self, defining_path: str) -> Optional[

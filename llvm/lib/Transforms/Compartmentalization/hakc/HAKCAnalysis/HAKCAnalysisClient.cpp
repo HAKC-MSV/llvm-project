@@ -4,6 +4,8 @@
 
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/HAKCAnalysisClient.h"
 
+#include "../../../../../../lld/MachO/Config.h"
+
 #include "llvm/Support/Timer.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/CommonHAKCAnalysis.h"
@@ -114,6 +116,36 @@ void HAKCAnalysisClient::set_dag_filename(StringRef filename) const {
   }
 }
 
+
+void HAKCAnalysisClient::add_symbols(std::vector<std::shared_ptr<HAKCFunctionInfo>> &FIs, std::vector<std::shared_ptr<HAKCGlobalInfo>> &GIs) const{
+  CommonHAKCAnalysis::getLogger(Debug) << "Sending add-symbols with " << FIs.size() << " functions and " << GIs.size() << " global variables\n";
+
+  std::vector<std::string> AllSymbols;
+
+  for (auto &it: FIs) {
+    std::string ObjectYaml;
+    raw_string_ostream os(ObjectYaml);
+    os << it->GetYaml(0);
+    AllSymbols.push_back(ObjectYaml);
+  }
+  for (auto &it: GIs) {
+    std::string ObjectYaml;
+    raw_string_ostream os(ObjectYaml);
+    os << it->GetYaml(0);
+    AllSymbols.push_back(ObjectYaml);
+  }
+
+  json::Object Parameters({{"allSymbols", AllSymbols}});
+
+  auto ResponseData = Execute(
+  SystemInformation.GetDatabaseInformation().GetAddSymbolsEndpoint(), Parameters);
+  auto Success = ResponseData.getBoolean("Success");
+  if (!Success) {
+    CommonHAKCAnalysis::getLogger(Fatal) << "Invalid Response for AllSymbols\n";
+    throw std::exception();
+  }
+}
+
 void HAKCAnalysisClient::add_function(const HAKCFunctionInfo &FI) const{
   CommonHAKCAnalysis::getLogger(Debug) << "Sending add-function: " << FI.GetFunction()->getName() << " of type " << FI.GetFunction()->getFunctionType() << "\n";
   std::string ObjectYaml;
@@ -171,9 +203,9 @@ void HAKCAnalysisClient::SendSymbolsToAnalysisServer(HAKCModuleAnalysis &ModuleA
                return LHS->GetName() < RHS->GetName();
              });
 
-  for (auto &it: SortedGlobals) {
-    add_global_variable(*it);
-  }
+  // for (auto &it: SortedGlobals) {
+  //   add_global_variable(*it);
+  // }
 
   auto FunctionCount = TypeIdentifier.GetFunctions().size() +
                        TypeIdentifier.GetUnmappedFunctions().size();
@@ -192,9 +224,10 @@ void HAKCAnalysisClient::SendSymbolsToAnalysisServer(HAKCModuleAnalysis &ModuleA
                return LHS->GetName() < RHS->GetName();
              });
 
-  for (auto &it: SortedFunctions) {
-    add_function(*it);
-  }
+  // for (auto &it: SortedFunctions) {
+  //   add_function(*it);
+  // }
+  add_symbols(SortedFunctions, SortedGlobals);
   CommonHAKCAnalysis::getLogger(Debug) << "Finished sending symbols to analysis server\n";
 }
 

@@ -15,7 +15,6 @@ logging.setLoggerClass(HAKCLogger)
 
 logger: HAKCLogger = cast(HAKCLogger, logging.getLogger('hakc-server'))
 
-
 # noinspection PyTypeChecker
 class HAKCServerThread(socketserver.StreamRequestHandler):
     size_fmt = "@L"
@@ -25,6 +24,8 @@ class HAKCServerThread(socketserver.StreamRequestHandler):
         logger.debug(f"Spinning up Server Thread")
         # Initialize thread specific data
         self.logger = cast(HAKCLogger, logging.getLogger(str(threading.get_ident())))
+        # Maybe use CLoader because it's faster (but may have some compatability issues)
+
         self.yaml_loader = yaml.Loader
         self.file_handler = None
         self.size_in_bytes = struct.calcsize(HAKCServerThread.size_fmt)

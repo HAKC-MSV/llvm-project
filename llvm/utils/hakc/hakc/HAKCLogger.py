@@ -20,7 +20,7 @@ def parse_log_level(level_string: str) -> LoggingLevelEnum:
     raise RuntimeError(f'Invalid log level {level_string}')
 
 class HAKCLogger(logging.Logger):
-    log_fmt = "%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s"
+    log_fmt = "%(asctime)s [%(threadName)-11.11s] [%(levelname)-3.3s] %(message)s"
 
     @staticmethod
     def get_formatter() -> logging.Formatter:

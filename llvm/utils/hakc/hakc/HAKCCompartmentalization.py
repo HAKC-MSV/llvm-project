@@ -14,7 +14,7 @@ from .HAKCBase import HAKCDivisionEnum, HAKCDBNode, HAKCDBRelation
 from .HAKCDatabase import HAKCDatabase
 from .HAKCLogger import HAKCLogger
 from .HAKCObjects import HAKCSymbol, HAKCDefinitionLocation, HAKCFunction, HAKCType, HAKCCompartment, HAKCDivision, \
-    HAKCScope, HAKCGlobalVariable, HAKCIndirectCallSource
+    HAKCScope, HAKCGlobalVariable, HAKCIndirectCallSource, HAKCAdjustment, HAKCCompartmentalizationAdjustment
 
 logging.setLoggerClass(HAKCLogger)
 
@@ -106,12 +106,13 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
 
     @classmethod
     def from_yaml(cls, loader: yaml.Loader, node):
+        # HAKCCompartmentalization.add_yaml_constructors()
         graph_data = loader.construct_mapping(node, deep=True)
         graph = json_graph.node_link_graph(graph_data, edges='edges')
         return cls(max_division_count=graph_data.get('division_count', 16), G=graph)
 
     def __str__(self):
-        return f"HAKCCompartmentalization with {len(self.nodes)} nodes and {len(self.edges)} edges!"
+        return f"HAKCCompartmentalization with {len(self.nodes)} nodes and {len(self.edges)} edges"
 
     def add_symbols(self, functions: list[HAKCFunction], global_variables: list[HAKCGlobalVariable]) -> None:
         for global_variable in global_variables:
@@ -580,18 +581,21 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         ]
     @staticmethod
     def add_yaml_constructors() -> None:
-        yaml.add_constructor(HAKCType.yaml_tag, HAKCType.from_yaml)
-        yaml.add_constructor(HAKCScope.yaml_tag, HAKCScope.from_yaml)
-        yaml.add_constructor(HAKCSymbol.yaml_tag, HAKCSymbol.from_yaml)
-        yaml.add_constructor(HAKCCompartment.yaml_tag, HAKCCompartment.from_yaml)
-        yaml.add_constructor(HAKCDivision.yaml_tag, HAKCDivision.from_yaml)
-        yaml.add_constructor(HAKCDefinitionLocation.yaml_tag, HAKCDefinitionLocation.from_yaml)
-        yaml.add_constructor(HAKCFunction.yaml_tag, HAKCFunction.from_yaml)
-        yaml.add_constructor(HAKCGlobalVariable.yaml_tag, HAKCGlobalVariable.from_yaml)
-        yaml.add_constructor(HAKCCompartmentalization.yaml_tag, HAKCCompartmentalization.from_yaml)
+        yaml.add_constructor(HAKCType.yaml_tag, HAKCType.from_yaml, Loader=yaml.Loader)
+        yaml.add_constructor(HAKCScope.yaml_tag, HAKCScope.from_yaml, Loader=yaml.Loader)
+        yaml.add_constructor(HAKCSymbol.yaml_tag, HAKCSymbol.from_yaml, Loader=yaml.Loader)
+        yaml.add_constructor(HAKCCompartment.yaml_tag, HAKCCompartment.from_yaml, Loader=yaml.Loader)
+        yaml.add_constructor(HAKCDivision.yaml_tag, HAKCDivision.from_yaml, Loader=yaml.Loader)
+        yaml.add_constructor(HAKCDefinitionLocation.yaml_tag, HAKCDefinitionLocation.from_yaml, Loader=yaml.Loader)
+        yaml.add_constructor(HAKCFunction.yaml_tag, HAKCFunction.from_yaml, Loader=yaml.Loader)
+        yaml.add_constructor(HAKCGlobalVariable.yaml_tag, HAKCGlobalVariable.from_yaml, Loader=yaml.Loader)
+        yaml.add_constructor(HAKCCompartmentalization.yaml_tag, HAKCCompartmentalization.from_yaml, Loader=yaml.Loader)
+        yaml.add_constructor(HAKCAdjustment.yaml_tag, HAKCAdjustment.from_yaml, Loader=yaml.Loader)
+        yaml.add_constructor(HAKCCompartmentalizationAdjustment.yaml_tag, HAKCCompartmentalizationAdjustment.from_yaml, Loader=yaml.Loader)
 
-    def save_as_yaml(self, fname: str):
-        logger.debug(f'Saving compartmentalization to {fname}')
-        with open(fname, "w") as f:
-            yaml.dump(self, f)
-        logger.debug(f"Finished saving compartmentalization to {fname}")
+    def save_as_yaml(self, filename: str):
+        logger.debug(f'Saving compartmentalization to {filename}')
+        with open(filename, "w") as f:
+            # Note: Don't use yaml.CDumper, it does something that breaks the loader
+            yaml.dump(self, f, Dumper=yaml.Dumper)
+        logger.info(f"Saved {self} to {filename}")

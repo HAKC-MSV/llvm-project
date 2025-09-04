@@ -15,6 +15,7 @@ import time
 from typing import cast
 import networkx as nx
 import yaml
+import traceback
 
 from hakc.HAKCCompartmentalization import HAKCCompartmentalization
 from hakc.HAKCDatabase import HAKCDatabase
@@ -39,6 +40,7 @@ def parse_yaml(filename: str, debug = False):
     # parse_yaml needed here instead of in compartmentalization for use in multithreading
     # HAKCCompartmentalization.add_yaml_constructors()
     # logger.error(f"parsing {filename}")
+    HAKCCompartmentalization.add_yaml_constructors()
     with open(filename, 'rb') as f:
         try:
             compartmentalization = yaml.load(f, Loader=yaml.Loader)
@@ -46,6 +48,7 @@ def parse_yaml(filename: str, debug = False):
             return compartmentalization
         except Exception as e:
             logger.fatal(f"Failed to load yaml with error: {str(e)} in {filename}")
+            traceback.print_exc()
 
 
 
@@ -106,8 +109,11 @@ def create_compartmentalization_single_thread(files: set[str], conn: HAKCDatabas
     compartmentalization = HAKCCompartmentalization()
     for filename in logger.progress_bar(iterable=sorted(files), desc='Parsing YAML'):
         subG = parse_yaml(filename, True)
-        logger.debug(f'Found {subG}')
-        compartmentalization = nx.compose(compartmentalization, subG)
+        # logger.debug(f'Found {subG}')
+        if subG:
+            compartmentalization = nx.compose(compartmentalization, subG)
+        else:
+            logger.error(f"Loaded compartmentalization is None!")
     logger.info(f'Adding compartmentalization')
     compartmentalization.add_default_compartmentalization(conn)
     compartmentalization.persist_to_database(conn, create_schema=True)
@@ -216,7 +222,10 @@ def create_compartmentalization_multithread(files: set[str], core_count: int, co
                 try:
                     subG = future.result()
                     # Note: nx.union requires graphs be disjoint, so use nx.compose instead
-                    compartmentalization = nx.compose(compartmentalization, subG)
+                    if subG:
+                        compartmentalization = nx.compose(compartmentalization, subG)
+                    else:
+                        logger.error(f"Loaded compartmentalization is None!")
 
                 except Exception as e:
                     traceback.print_exc()
@@ -227,7 +236,6 @@ def create_compartmentalization_multithread(files: set[str], core_count: int, co
     compartmentalization.persist_to_database(conn)
     # logger.info(f'Total symbols {len(conn.get_symbols())}')
     return compartmentalization
-
 
 
 def create_dag_multithread(files: set[str], core_count: int, conn: HAKCDatabase) -> HAKCCompartmentalization:
@@ -280,8 +288,6 @@ def create_dag_multithread(files: set[str], core_count: int, conn: HAKCDatabase)
     logger.info(f'Adding {dag_edges_added} DAG edges to compartmentalization')
     conn.open(max_num_threads=core_count)
     conn.persist_dag_edges(dag_edges)
-    # logger.info(f'Adding compartmentalization')
-    # compartmentalization.add_default_compartmentalization(conn)
     if conn:
         conn.close()
     return compartmentalization
@@ -355,7 +361,6 @@ def main():
     parser.add_argument('--delete-existing-db', help='Deletes existing database when creating a new compartmentalization', dest='delete_db', action='store_true')
     parser.add_argument('--dump-dag', dest='dump_dag', help='dump DAG to yaml')
     parser.add_argument('--load-dag', dest='load_dag', help='load DAG from yaml')
-    parser.add_argument('--save-graph', dest='save_g', help='save graph to png')
 
     args = parser.parse_args()
 
@@ -372,19 +377,7 @@ def main():
     if args.profile:
         profile = cProfile.Profile()
 
-    # TODO REMOVE BELOW
-    # conn = HAKCDatabase(args.db_dir)
-    # sym = conn.get_single_symbol_by_hash(62045420910023733)
-    # conn.set_division_compartment_id_by_symbol(sym, 2, 0)
-    # return
-    # conn.get_symbols()
-    # conn.run_query()
-    # # compartmentalization = HAKCCompartmentalization()
-    # # compartmentalization.load_from_db(conn)
-    # return
-    # TODO REMOVE ABOVE
-
-
+    HAKCCompartmentalization.add_yaml_constructors()
     if args.create_dag:
         if profile:
             profile.enable()
@@ -392,9 +385,6 @@ def main():
         if profile:
             profile.disable()
             output_profile_stats(profile)
-        if args.save_g:
-            pass
-            # compartmentalization.save_graph(args.save_g)
 
     if args.adjust:
         logger.info(f'Adjusting compartmentalization based on {args.adjust_path}')

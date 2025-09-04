@@ -51,6 +51,8 @@ public:
 
   StringRef GetSetDagFilenameEndpoint() const;
 
+  StringRef GetAddSymbolsEndpoint() const;
+
   StringRef GetAddFunctionEndpoint() const;
 
   StringRef GetAddGlobalVariableEndpoint() const;
@@ -70,6 +72,7 @@ protected:
   std::string SymbolDivisionEndpoint;
   std::string ValidTargetsEndpoint;
   std::string SetDagFilenameEndpoint;
+  std::string AddSymbolsEndpoint;
   std::string AddFunctionEndpoint;
   std::string AddGlobalVariableEndpoint;
   std::string TerminateConnectionEndpoint;
