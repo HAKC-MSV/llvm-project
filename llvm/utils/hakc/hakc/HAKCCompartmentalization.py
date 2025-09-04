@@ -307,7 +307,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         nbrs = list()
         if symbol not in self.nodes:
             # Note: sometimes a symbol in a query is incompletely defined (thus hashes do not match) and we need to search harder for the correct symbol in our graph
-            logger.fatal(f"Searching for symbol: {symbol}")
+            logger.debug(f"Searching for symbol: {symbol}")
             found_symbols = self.get_symbol_by_name(symbol.name)
             if len(found_symbols) != 1:
                 raise RuntimeError(f'Symbol {symbol} could not be found by hash, but found {len(found_symbols)} symbols when searching by name!')

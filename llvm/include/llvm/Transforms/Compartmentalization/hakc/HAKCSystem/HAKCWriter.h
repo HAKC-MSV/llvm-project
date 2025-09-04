@@ -73,7 +73,6 @@ public:
 
   explicit operator bool() const {
     if (EC) {
-      errs() << "Failed to create log file: " << log_path << " \n\twith error: " << EC.message() << "\n";
       return false;
     }
     return true;
