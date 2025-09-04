@@ -225,19 +225,7 @@ def create_compartmentalization_multithread(files: set[str], core_count: int, co
                     # - g1.update(g2.edges, g2.nodes) updates g1 with the nodes and edges of g2 (no copy returned)
                     # Update: I guess none of the methods above work quite right, so manually add the edges and data
                     if subG:
-                        # compartmentalization = nx.compose(compartmentalization, subG)
-                        # logger.info(f"subG nodes: {subG.nodes(data=True)}")
-                        # logger.info(f"subG edges: {subG.edges(data=True)}")
-                        # compartmentalization.update(nodes=subG.nodes(data=True)
-                        # compartmentalization.update(nodes=subG.nodes(data=True)
                         compartmentalization.update(edges=subG.edges(data=True, keys=True), nodes=subG.nodes(data=True))
-                        # for node, data in subG.nodes(data=True):
-                        #     compartmentalization.add_node(node, **data)
-                        #     logger.info(f"node {node} with data {data} -> {compartmentalization.nodes[node]}")
-                        #
-                        # for u, v, key, data in subG.edges(keys=True, data=True):
-                        #     logger.info(f"{u} -{key}> {v} ; {data}")
-                        #     compartmentalization.add_edge(u, v, key, **data)
                     else:
                         logger.error(f"Loaded compartmentalization is None!")
 

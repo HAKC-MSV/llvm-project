@@ -269,6 +269,12 @@ class HAKCPayload(HAKCPrintableObj):
         if key not in self.payload:
             self.payload[key] = val
 
+class HAKCResult(HAKCPayload):
+    def __init__(self, success: bool = True, **kwargs):
+        HAKCPayload.__init__(self, payload={'Success': success}, **kwargs)
+
+
+
 
 class HashedHAKCDBNode(HAKCDBNode):
     def __init__(self, **kwargs):

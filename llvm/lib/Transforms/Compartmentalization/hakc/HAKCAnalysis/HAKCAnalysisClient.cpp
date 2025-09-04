@@ -114,7 +114,7 @@ void HAKCAnalysisClient::set_dag_filename(StringRef filename) const {
 }
 
 
-void HAKCAnalysisClient::add_symbols(std::vector<std::shared_ptr<HAKCFunctionInfo>> &FIs, std::vector<std::shared_ptr<HAKCGlobalInfo>> &GIs) const{
+void HAKCAnalysisClient::add_symbols(ArrayRef<std::shared_ptr<HAKCFunctionInfo>> FIs, ArrayRef<std::shared_ptr<HAKCGlobalInfo>> GIs) const{
   CommonHAKCAnalysis::getLogger(Debug) << "Sending add-symbols with " << FIs.size() << " functions and " << GIs.size() << " global variables\n";
 
   std::vector<std::string> AllSymbols;
@@ -188,7 +188,6 @@ void HAKCAnalysisClient::SendSymbolsToAnalysisServer(HAKCModuleAnalysis &ModuleA
   auto FunctionCount = TypeIdentifier.GetFunctions().size() + TypeIdentifier.GetUnmappedFunctions().size();
   std::vector<std::shared_ptr<HAKCFunctionInfo>> Functions;
   if (FunctionCount > 0) {
-    Functions.reserve(FunctionCount);
     for (auto &it : TypeIdentifier.GetFunctions()) {
       Functions.push_back(it.second);
     }
@@ -200,7 +199,6 @@ void HAKCAnalysisClient::SendSymbolsToAnalysisServer(HAKCModuleAnalysis &ModuleA
   auto GlobalCount = TypeIdentifier.GetGlobals().size() + TypeIdentifier.GetUnmappedGlobals().size();
   std::vector<std::shared_ptr<HAKCGlobalInfo>> Globals;
   if (GlobalCount > 0){
-    Globals.reserve(GlobalCount);
     for (auto &it : TypeIdentifier.GetGlobals()) {
       Globals.push_back(it.second);
     }

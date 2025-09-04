@@ -86,13 +86,13 @@ static bool runDataAccessGraphAnalysis(CommonHAKCAnalysis &HAKCAnalysis) {
     }
   }
 
-  std::error_code err;
-  err = sys::fs::create_directories(sys::path::parent_path(Path));
-  if (err) {
-    CommonHAKCAnalysis::getLogger(Fatal)
-        << "Failed to create " << sys::path::parent_path(Path) << "\n";
-    throw std::exception();
-  }
+  // std::error_code err;
+  // err = sys::fs::create_directories(sys::path::parent_path(Path));
+  // if (err) {
+  //   CommonHAKCAnalysis::getLogger(Fatal)
+  //       << "Failed to create " << sys::path::parent_path(Path) << "\n";
+  //   throw std::exception();
+  // }
   // Note: not going to create file if it will be empty
   // raw_fd_ostream out(Path, err);
   // if (!err) {

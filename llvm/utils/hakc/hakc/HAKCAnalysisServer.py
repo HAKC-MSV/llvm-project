@@ -9,7 +9,7 @@ import threading
 import yaml
 
 
-from .HAKCBase import HAKCPrintableObj, HAKCPayload
+from .HAKCBase import HAKCPrintableObj, HAKCPayload, HAKCResult
 from .HAKCLogger import HAKCLogger
 from .HAKCObjects import HAKCSymbol, HAKCFunction, HAKCGlobalVariable
 from .HAKCCompartmentalization import HAKCCompartmentalization
@@ -50,7 +50,7 @@ class HAKCAnalysisServerThread(HAKCServerThread):
         self.dag_filename = kwargs_get(str, "dag-filename", None, **kwargs)
         self.file_handler = self.logger.add_file_handler(self.dag_filename.replace(".dag.yml", ".analysis-server.log"))
         logger.debug(f"Processing {self.dag_filename}")
-        return HAKCPayload({'Success': True})
+        return HAKCResult()
 
     def add_symbols(self, **kwargs):
         symbols = kwargs_get(list[str], "allSymbols", None, **kwargs)
@@ -64,17 +64,18 @@ class HAKCAnalysisServerThread(HAKCServerThread):
                 self.compartmentalization.add_global_variable(symbol)
             else:
                 logger.fatal(f"Invalid symbol: {symbol}")
-        return HAKCPayload({'Success': True})
+                return HAKCResult(success=False)
+        return HAKCResult()
 
     def add_function(self, **kwargs):
         func = yaml.load(kwargs_get(str, "object", None, **kwargs), Loader=self.yaml_loader)
         self.compartmentalization.add_function(func)
-        return HAKCPayload({'Success': True})
+        return HAKCResult()
 
     def add_global_variable(self, **kwargs):
         gv = yaml.load(kwargs_get(str, "object", None, **kwargs), Loader=self.yaml_loader)
         self.compartmentalization.add_global_variable(gv)
-        return HAKCPayload({'Success': True})
+        return HAKCResult()
 
 # noinspection PyTypeChecker
 class HAKCAnalysisServer(socketserver.ThreadingUnixStreamServer):
