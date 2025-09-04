@@ -38,18 +38,16 @@ def batched(iterable, n):
 def parse_yaml(filename: str, debug = False):
     logger.add_file_handler(filename.replace(".dag.yml",".static-analysis.log"))
     # parse_yaml needed here instead of in compartmentalization for use in multithreading
-    # HAKCCompartmentalization.add_yaml_constructors()
     # logger.error(f"parsing {filename}")
     HAKCCompartmentalization.add_yaml_constructors()
     with open(filename, 'rb') as f:
         try:
-            compartmentalization = yaml.load(f, Loader=yaml.Loader)
+            compartmentalization = yaml.load(f, Loader=yaml.CLoader)
             logger.debug(f"Loaded {compartmentalization} from {filename}")
             return compartmentalization
         except Exception as e:
             logger.fatal(f"Failed to load yaml with error: {str(e)} in {filename}")
             traceback.print_exc()
-
 
 
 def compute_dag_edge_weight(**kwargs) -> int:
@@ -220,10 +218,22 @@ def create_compartmentalization_multithread(files: set[str], core_count: int, co
                 pbar.update(1)
                 file = futures_to_files[future]
                 try:
-                    subG = future.result()
-                    # Note: nx.union requires graphs be disjoint, so use nx.compose instead
+                    subG: HAKCCompartmentalization = future.result()
+                    # Note on graph merging functions:
+                    # - nx.union(g1,g2)               requires graphs be disjoint (our graphs are not disjoint)
+                    # - nx.compose(g1,g2)             merges g1 and g2, then returns a copy (slow, especially with large graphs)
+                    # - g1.update(g2.edges, g2.nodes) updates g1 with the nodes and edges of g2 (no copy returned)
+                    # Update: I guess none of the methods above work quite right, so manually add the edges and data
                     if subG:
-                        compartmentalization = nx.compose(compartmentalization, subG)
+                        # compartmentalization = nx.compose(compartmentalization, subG)
+                        # logger.info(f"subG nodes: {subG.nodes(data=True)}")
+                        # logger.info(f"subG edges: {subG.edges(data=True)}")
+                        # compartmentalization.update(nodes=subG.nodes)
+                        for node, data in subG.nodes(data=True):
+                            compartmentalization.add_node(node)
+                        for u, v, data in subG.edges(data=True):
+                            compartmentalization.add_edge(u,v,data)
+                        # compartmentalization.update(edges=subG.edges(data=True))
                     else:
                         logger.error(f"Loaded compartmentalization is None!")
 

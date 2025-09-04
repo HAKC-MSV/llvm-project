@@ -26,7 +26,7 @@ class HAKCServerThread(socketserver.StreamRequestHandler):
         self.logger = cast(HAKCLogger, logging.getLogger(str(threading.get_ident())))
         # Maybe use CLoader because it's faster (but may have some compatability issues)
 
-        self.yaml_loader = yaml.Loader
+        self.yaml_loader = yaml.CLoader
         self.file_handler = None
         self.size_in_bytes = struct.calcsize(HAKCServerThread.size_fmt)
         self.config: HAKCServerConfig = None

@@ -93,21 +93,30 @@ static bool runDataAccessGraphAnalysis(CommonHAKCAnalysis &HAKCAnalysis) {
         << "Failed to create " << sys::path::parent_path(Path) << "\n";
     throw std::exception();
   }
-  raw_fd_ostream out(Path, err);
-  if (!err) {
-    HAKCModuleAnalysis ModuleAnalysis(HAKCAnalysis);
-    if (HAKCAnalysis.GetSystemInfo().GetTemporalAnalysisEnabled()) {
-      ModuleAnalysis.TemporalAnalysis();
-    }
-    CommonHAKCAnalysis::getLogger(Fatal) << "Starting Analysis Client " << Path << "\n";
-    HAKCAnalysisClient AnalysisClient(HAKCAnalysis.GetSystemInfo());
-    AnalysisClient.set_dag_filename(Path);
-    AnalysisClient.SendSymbolsToAnalysisServer(ModuleAnalysis);
-    AnalysisClient.CloseConnection();
-  } else {
-    CommonHAKCAnalysis::getLogger(Fatal) << "Failed to open " << Path << "\n";
-    throw std::exception();
+  // Note: not going to create file if it will be empty
+  // raw_fd_ostream out(Path, err);
+  // if (!err) {
+  HAKCModuleAnalysis ModuleAnalysis(HAKCAnalysis);
+  if (HAKCAnalysis.GetSystemInfo().GetTemporalAnalysisEnabled()) {
+    ModuleAnalysis.TemporalAnalysis();
   }
+  CommonHAKCAnalysis::getLogger(Fatal) << "Starting Analysis Client " << Path << "\n";
+  auto TypeIdentifier = ModuleAnalysis.GetTypeIdentifier();
+  auto FunctionCount = TypeIdentifier.GetFunctions().size() + TypeIdentifier.GetUnmappedFunctions().size();
+  auto GlobalCount = TypeIdentifier.GetGlobals().size() + TypeIdentifier.GetUnmappedGlobals().size();
+  // Only ever connect to server if symbols need to be sent
+  if (FunctionCount + GlobalCount > 0) {
+    HAKCAnalysisClient AnalysisClient(HAKCAnalysis.GetSystemInfo());
+    AnalysisClient.SendSymbolsToAnalysisServer(ModuleAnalysis, Path);
+    AnalysisClient.CloseConnection();
+  }
+  else {
+    CommonHAKCAnalysis::getLogger(Info) << "Skipping file " << Path << "with 0 symbols\n";
+  }
+  // } else {
+  //   CommonHAKCAnalysis::getLogger(Fatal) << "Failed to open " << Path << "\n";
+  //   throw std::exception();
+  // }
   return false;
 }
 

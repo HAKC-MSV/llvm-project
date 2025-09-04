@@ -27,7 +27,7 @@ class SupportedBackingStore(Enum):
 
 
 class HAKCPolicyDataSource:
-    def __init__(self, config: HAKCServerConfig, yaml_loader=yaml.CLoader, **kwargs):
+    def __init__(self, config: HAKCServerConfig, yaml_loader=yaml.Loader, **kwargs):
         self.endpoints = {config.get_compartment_endpoint: self.get_compartment_by_id,
                           config.get_division_endpoint: self.get_division_by_id,
                           config.get_division_from_symbol_endpoint: self.get_symbol_division,
@@ -133,7 +133,7 @@ class NullHAKCPolicyDataStore(HAKCPolicyDataSource):
 
 class YAMLHAKCPolicyDataStore(HAKCPolicyDataSource):
     def __init__(self, config: HAKCServerConfig, **kwargs):
-        HAKCPolicyDataSource.__init__(self, config, yaml_loader=yaml.CLoader, **kwargs)
+        HAKCPolicyDataSource.__init__(self, config, yaml_loader=yaml.Loader, **kwargs)
         self.compartmentalization = None
         self.deserialize_compartmentalization(config.data_path)
 

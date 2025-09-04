@@ -6,11 +6,12 @@ from typing_extensions import Self
 import networkx as nx
 import pandas as pd
 import yaml
+import os
 from networkx.classes.reportviews import NodeView
 from networkx.readwrite import json_graph
 from yaml import MappingNode
 
-from .HAKCBase import HAKCDivisionEnum, HAKCDBNode, HAKCDBRelation
+from .HAKCBase import HAKCDivisionEnum, HAKCDBNode
 from .HAKCDatabase import HAKCDatabase
 from .HAKCLogger import HAKCLogger
 from .HAKCObjects import HAKCSymbol, HAKCDefinitionLocation, HAKCFunction, HAKCType, HAKCCompartment, HAKCDivision, \
@@ -105,7 +106,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         return dumper.represent_mapping(cls.yaml_tag, compartmentalization_data)
 
     @classmethod
-    def from_yaml(cls, loader: yaml.Loader, node):
+    def from_yaml(cls, loader: yaml.CLoader, node):
         # HAKCCompartmentalization.add_yaml_constructors()
         graph_data = loader.construct_mapping(node, deep=True)
         graph = json_graph.node_link_graph(graph_data, edges='edges')
@@ -510,6 +511,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
                 for key, val in attr_list.items():
                     df_data[key] = val
                 df = pd.DataFrame(df_data)
+            logger.info(f"PERSISTING EDGE DATA: {df}")
             logger.debug(f'Persisting {len(head_primary_keys)} edges to {table_name}')
             try:
                 conn.insert_from_dataframe(table_name, df)
@@ -581,20 +583,25 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         ]
     @staticmethod
     def add_yaml_constructors() -> None:
-        yaml.add_constructor(HAKCType.yaml_tag, HAKCType.from_yaml, Loader=yaml.Loader)
-        yaml.add_constructor(HAKCScope.yaml_tag, HAKCScope.from_yaml, Loader=yaml.Loader)
-        yaml.add_constructor(HAKCSymbol.yaml_tag, HAKCSymbol.from_yaml, Loader=yaml.Loader)
-        yaml.add_constructor(HAKCCompartment.yaml_tag, HAKCCompartment.from_yaml, Loader=yaml.Loader)
-        yaml.add_constructor(HAKCDivision.yaml_tag, HAKCDivision.from_yaml, Loader=yaml.Loader)
-        yaml.add_constructor(HAKCDefinitionLocation.yaml_tag, HAKCDefinitionLocation.from_yaml, Loader=yaml.Loader)
-        yaml.add_constructor(HAKCFunction.yaml_tag, HAKCFunction.from_yaml, Loader=yaml.Loader)
-        yaml.add_constructor(HAKCGlobalVariable.yaml_tag, HAKCGlobalVariable.from_yaml, Loader=yaml.Loader)
-        yaml.add_constructor(HAKCCompartmentalization.yaml_tag, HAKCCompartmentalization.from_yaml, Loader=yaml.Loader)
-        yaml.add_constructor(HAKCAdjustment.yaml_tag, HAKCAdjustment.from_yaml, Loader=yaml.Loader)
-        yaml.add_constructor(HAKCCompartmentalizationAdjustment.yaml_tag, HAKCCompartmentalizationAdjustment.from_yaml, Loader=yaml.Loader)
+        for loader in [yaml.Loader, yaml.CLoader]:
+            yaml.add_constructor(HAKCType.yaml_tag, HAKCType.from_yaml, Loader=loader)
+            yaml.add_constructor(HAKCScope.yaml_tag, HAKCScope.from_yaml, Loader=loader)
+            yaml.add_constructor(HAKCSymbol.yaml_tag, HAKCSymbol.from_yaml, Loader=loader)
+            yaml.add_constructor(HAKCCompartment.yaml_tag, HAKCCompartment.from_yaml, Loader=loader)
+            yaml.add_constructor(HAKCDivision.yaml_tag, HAKCDivision.from_yaml, Loader=loader)
+            yaml.add_constructor(HAKCDefinitionLocation.yaml_tag, HAKCDefinitionLocation.from_yaml, Loader=loader)
+            yaml.add_constructor(HAKCFunction.yaml_tag, HAKCFunction.from_yaml, Loader=loader)
+            yaml.add_constructor(HAKCGlobalVariable.yaml_tag, HAKCGlobalVariable.from_yaml, Loader=loader)
+            yaml.add_constructor(HAKCCompartmentalization.yaml_tag, HAKCCompartmentalization.from_yaml, Loader=loader)
+            yaml.add_constructor(HAKCAdjustment.yaml_tag, HAKCAdjustment.from_yaml, Loader=loader)
+            yaml.add_constructor(HAKCCompartmentalizationAdjustment.yaml_tag, HAKCCompartmentalizationAdjustment.from_yaml, Loader=loader)
 
     def save_as_yaml(self, filename: str):
         logger.debug(f'Saving compartmentalization to {filename}')
+        # Note: python script will now create the file and directories, rather than the cpp script
+        directory = os.path.dirname(filename)
+        if not os.path.exists(directory):
+            os.makedirs(directory)
         with open(filename, "w") as f:
             # Note: Don't use yaml.CDumper, it does something that breaks the loader
             yaml.dump(self, f, Dumper=yaml.Dumper)

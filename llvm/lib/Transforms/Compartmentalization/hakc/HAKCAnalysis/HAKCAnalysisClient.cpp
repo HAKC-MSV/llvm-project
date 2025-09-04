@@ -10,11 +10,8 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/CommonHAKCAnalysis.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/HAKCModuleAnalysis.h"
-#include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartment.h"
-#include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartmentDivision.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCSystemInformation.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTypeIdentifier/HAKCFunctionInfo.h"
-#include <unistd.h>
 
 namespace llvm::hakc {
 
@@ -182,52 +179,38 @@ void HAKCAnalysisClient::add_global_variable(const HAKCGlobalInfo &GI) const{
   }
 }
 
-void HAKCAnalysisClient::SendSymbolsToAnalysisServer(HAKCModuleAnalysis &ModuleAnalysis) const {
+void HAKCAnalysisClient::SendSymbolsToAnalysisServer(HAKCModuleAnalysis &ModuleAnalysis, StringRef filename) const {
 
   CommonHAKCAnalysis::getLogger(Debug) << "Starting to send symbols to analysis server\n";
   auto TypeIdentifier = ModuleAnalysis.GetTypeIdentifier();
+  // Note: Sorting functions is not necessary since saving as HAKCCompartmentalization is a networkx graph and will rearrange symbol order
 
-  std::vector<std::shared_ptr<HAKCGlobalInfo>> SortedGlobals;
-  auto GlobalCount = TypeIdentifier.GetGlobals().size() +
-                     TypeIdentifier.GetUnmappedGlobals().size();
-  SortedGlobals.reserve(GlobalCount);
-  for (auto &it : TypeIdentifier.GetGlobals()) {
-    SortedGlobals.push_back(it.second);
+  auto FunctionCount = TypeIdentifier.GetFunctions().size() + TypeIdentifier.GetUnmappedFunctions().size();
+  std::vector<std::shared_ptr<HAKCFunctionInfo>> Functions;
+  if (FunctionCount > 0) {
+    Functions.reserve(FunctionCount);
+    for (auto &it : TypeIdentifier.GetFunctions()) {
+      Functions.push_back(it.second);
+    }
+    for (const auto &Unmapped : TypeIdentifier.GetUnmappedFunctions()) {
+      Functions.push_back(Unmapped);
+    }
   }
-  for (const auto &Unmapped : TypeIdentifier.GetUnmappedGlobals()) {
-    SortedGlobals.push_back(Unmapped);
+
+  auto GlobalCount = TypeIdentifier.GetGlobals().size() + TypeIdentifier.GetUnmappedGlobals().size();
+  std::vector<std::shared_ptr<HAKCGlobalInfo>> Globals;
+  if (GlobalCount > 0){
+    Globals.reserve(GlobalCount);
+    for (auto &it : TypeIdentifier.GetGlobals()) {
+      Globals.push_back(it.second);
+    }
+    for (const auto &Unmapped : TypeIdentifier.GetUnmappedGlobals()) {
+      Globals.push_back(Unmapped);
+    }
   }
-  llvm::sort(SortedGlobals.begin(), SortedGlobals.end(),
-             [](const std::shared_ptr<HAKCGlobalInfo> &LHS,
-                const std::shared_ptr<HAKCGlobalInfo> &RHS) {
-               return LHS->GetName() < RHS->GetName();
-             });
 
-  // for (auto &it: SortedGlobals) {
-  //   add_global_variable(*it);
-  // }
-
-  auto FunctionCount = TypeIdentifier.GetFunctions().size() +
-                       TypeIdentifier.GetUnmappedFunctions().size();
-
-  std::vector<std::shared_ptr<HAKCFunctionInfo>> SortedFunctions;
-  SortedFunctions.reserve(FunctionCount);
-  for (auto &it : TypeIdentifier.GetFunctions()) {
-    SortedFunctions.push_back(it.second);
-  }
-  for (const auto &Unmapped : TypeIdentifier.GetUnmappedFunctions()) {
-    SortedFunctions.push_back(Unmapped);
-  }
-  llvm::sort(SortedFunctions.begin(), SortedFunctions.end(),
-             [](const std::shared_ptr<HAKCFunctionInfo> &LHS,
-                const std::shared_ptr<HAKCFunctionInfo> &RHS) {
-               return LHS->GetName() < RHS->GetName();
-             });
-
-  // for (auto &it: SortedFunctions) {
-  //   add_function(*it);
-  // }
-  add_symbols(SortedFunctions, SortedGlobals);
+  set_dag_filename(filename);
+  add_symbols(Functions, Globals);
   CommonHAKCAnalysis::getLogger(Debug) << "Finished sending symbols to analysis server\n";
 }
 
@@ -237,6 +220,5 @@ void HAKCAnalysisClient::CloseConnection() {
   DisconnectFromDatabase();
   CommonHAKCAnalysis::getLogger(Verbose) << "Closed connection\n";
 }
-
 
 } // namespace llvm::hakc

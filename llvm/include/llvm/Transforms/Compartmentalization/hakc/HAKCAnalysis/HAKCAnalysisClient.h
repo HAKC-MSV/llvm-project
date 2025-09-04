@@ -32,7 +32,7 @@ public:
 
   void add_global_variable(const HAKCGlobalInfo &Global) const;
 
-  void SendSymbolsToAnalysisServer(HAKCModuleAnalysis &ModuleAnalysis) const;
+  void SendSymbolsToAnalysisServer(HAKCModuleAnalysis &ModuleAnalysis, StringRef filename) const;
 
   void CloseConnection();
 

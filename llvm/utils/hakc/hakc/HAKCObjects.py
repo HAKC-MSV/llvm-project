@@ -25,7 +25,7 @@ class HAKCDefinitionLocation(HAKCDBNode, yaml.YAMLObject):
         return f"{self.get_table_name()}({self.defining_file})"
 
     @classmethod
-    def from_yaml(cls, loader: yaml.Loader, node):
+    def from_yaml(cls, loader: yaml.CLoader, node):
         return cls(**loader.construct_mapping(node, deep=True))
 
     def __eq__(self, other):
@@ -87,7 +87,7 @@ class HAKCDivision(HashedHAKCDBNode, yaml.YAMLObject):
         return f"{self.get_table_name()}(division_id={self.division_id}, hash={self.get_computed_hash()})"
 
     @classmethod
-    def from_yaml(cls, loader: yaml.Loader, node):
+    def from_yaml(cls, loader: yaml.CLoader, node):
         return cls(**loader.construct_mapping(node, deep=True))
 
     def __eq__(self, other):
@@ -168,7 +168,7 @@ class HAKCCompartment(HAKCDBNode, yaml.YAMLObject):
         return f"{self.get_table_name()}(compartment_id={self.compartment_id})"
 
     @classmethod
-    def from_yaml(cls, loader: yaml.Loader, node):
+    def from_yaml(cls, loader: yaml.CLoader, node):
         return cls(**loader.construct_mapping(node, deep=True))
 
     def __eq__(self, other):
@@ -243,7 +243,7 @@ class HAKCType(HashedHAKCDBNode, yaml.YAMLObject):
         return f"{self.yaml_tag}(DebugType: {self.debug_type}, LLVMType: {self.llvm_type})"
 
     @classmethod
-    def from_yaml(cls, loader: yaml.Loader, node):
+    def from_yaml(cls, loader: yaml.CLoader, node):
         return cls(**loader.construct_mapping(node, deep=True))
 
     def __eq__(self, other):
@@ -337,7 +337,7 @@ class HAKCScope(HashedHAKCDBNode, yaml.YAMLObject):
         return f"{self.yaml_tag}({self.local_scope_name})" if self.local_scope_name else ''
 
     @classmethod
-    def from_yaml(cls, loader: yaml.Loader, node):
+    def from_yaml(cls, loader: yaml.CLoader, node):
         return cls(**loader.construct_mapping(node, deep=True))
 
     def __eq__(self, other):
@@ -433,7 +433,7 @@ class HAKCSymbol(HashedHAKCDBNode, yaml.YAMLObject):
         return out
 
     @classmethod
-    def from_yaml(cls, loader: yaml.Loader, node):
+    def from_yaml(cls, loader: yaml.CLoader, node):
         logger.fatal(f"Constructing symbol with: {node}")
         return cls(**loader.construct_mapping(node, deep=True))
 
@@ -531,7 +531,7 @@ class HAKCFunction(HAKCSymbol):
         return out
 
     @classmethod
-    def from_yaml(cls, loader: yaml.Loader, node):
+    def from_yaml(cls, loader: yaml.CLoader, node):
         # logger.fatal(f"Constructing symbol with: {node}")
         return cls(**loader.construct_mapping(node, deep=True))
 
@@ -558,7 +558,7 @@ class HAKCGlobalVariable(HAKCSymbol):
         return HAKCSymbol.debug_print(self)
 
     @classmethod
-    def from_yaml(cls, loader: yaml.Loader, node):
+    def from_yaml(cls, loader: yaml.CLoader, node):
         return cls(**loader.construct_mapping(node, deep=True))
 
     def get_db_data(self, convert_hash=True) -> dict[HAKCDBColumn, object]:
@@ -575,7 +575,7 @@ class HAKCAdjustment(yaml.YAMLObject):
         self.compartment = HAKCCompartment(compartment_id)
 
     @classmethod
-    def from_yaml(cls, loader: yaml.Loader, node):
+    def from_yaml(cls, loader: yaml.CLoader, node):
         # return cls(loader.construct_mapping(node, deep=True)[''])
         return cls(**loader.construct_mapping(node, deep=True))
 
@@ -595,7 +595,7 @@ class HAKCCompartmentalizationAdjustment(yaml.YAMLObject):
             self.adjustment_regexes[re.compile(adjustment.path)] = adjustment
 
     @classmethod
-    def from_yaml(cls, loader: yaml.Loader, node):
+    def from_yaml(cls, loader: yaml.CLoader, node):
         logger.fatal(f"node: {node}")
         return cls(**loader.construct_mapping(node, deep=True))
 
@@ -635,7 +635,7 @@ class HAKCIndirectSourceLink(HAKCPrintableObj, yaml.YAMLObject):
         self.function_name = FunctionName
 
     @classmethod
-    def from_yaml(cls, loader: yaml.Loader, node):
+    def from_yaml(cls, loader: yaml.CLoader, node):
         return cls(**loader.construct_mapping(node, deep=True))
 
     def get_hash_inputs(self) -> list[object]:
@@ -681,7 +681,7 @@ class HAKCIndirectCallSource(HAKCPrintableObj, yaml.YAMLObject):
         assert (isinstance(self.type, HAKCType))
 
     @classmethod
-    def from_yaml(cls, loader: yaml.Loader, node):
+    def from_yaml(cls, loader: yaml.CLoader, node):
         return cls(**loader.construct_mapping(node, deep=True))
 
     def debug_print(self, root=True, whitespace=""):
