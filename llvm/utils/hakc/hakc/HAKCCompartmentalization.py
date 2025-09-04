@@ -511,7 +511,6 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
                 for key, val in attr_list.items():
                     df_data[key] = val
                 df = pd.DataFrame(df_data)
-            logger.info(f"PERSISTING EDGE DATA: {df}")
             logger.debug(f'Persisting {len(head_primary_keys)} edges to {table_name}')
             try:
                 conn.insert_from_dataframe(table_name, df)

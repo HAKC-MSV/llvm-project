@@ -228,12 +228,16 @@ def create_compartmentalization_multithread(files: set[str], core_count: int, co
                         # compartmentalization = nx.compose(compartmentalization, subG)
                         # logger.info(f"subG nodes: {subG.nodes(data=True)}")
                         # logger.info(f"subG edges: {subG.edges(data=True)}")
-                        # compartmentalization.update(nodes=subG.nodes)
-                        for node, data in subG.nodes(data=True):
-                            compartmentalization.add_node(node)
-                        for u, v, data in subG.edges(data=True):
-                            compartmentalization.add_edge(u,v,data)
-                        # compartmentalization.update(edges=subG.edges(data=True))
+                        # compartmentalization.update(nodes=subG.nodes(data=True)
+                        # compartmentalization.update(nodes=subG.nodes(data=True)
+                        compartmentalization.update(edges=subG.edges(data=True, keys=True), nodes=subG.nodes(data=True))
+                        # for node, data in subG.nodes(data=True):
+                        #     compartmentalization.add_node(node, **data)
+                        #     logger.info(f"node {node} with data {data} -> {compartmentalization.nodes[node]}")
+                        #
+                        # for u, v, key, data in subG.edges(keys=True, data=True):
+                        #     logger.info(f"{u} -{key}> {v} ; {data}")
+                        #     compartmentalization.add_edge(u, v, key, **data)
                     else:
                         logger.error(f"Loaded compartmentalization is None!")
 
@@ -244,7 +248,7 @@ def create_compartmentalization_multithread(files: set[str], core_count: int, co
     logger.info(f'Adding compartmentalization')
     compartmentalization.add_default_compartmentalization(conn)
     compartmentalization.persist_to_database(conn)
-    # logger.info(f'Total symbols {len(conn.get_symbols())}')
+    logger.info(f'Total symbols {len(conn.get_symbols())}')
     return compartmentalization
 
 
@@ -328,7 +332,7 @@ def create_new_dag(analysis_root: str, core_count: int, db_dir: str,
     if single_thread:
         compartmentalization = create_dag_single_thread(filenames, conn)
     else:
-        core_count = min(max(1, core_count), 100)
+        core_count = max(1, core_count)
         compartmentalization = create_dag_multithread(filenames, core_count, conn)
 
     end = time.time()

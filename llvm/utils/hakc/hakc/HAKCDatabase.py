@@ -195,12 +195,7 @@ class HAKCDatabase:
     def delete_all_compartments(self):
         cmd = f"""
         MATCH (div:{HAKCDivision.get_table_name()})-[:{HAKCDivision.relation_compartment}]->(c:{HAKCCompartment.get_table_name()})
-        DETACH DELETE div;
-        """
-        self.execute_prepared_stmt(cmd)
-        cmd = f"""
-        MATCH (c:{HAKCCompartment.get_table_name()})
-        DETACH DELETE c;
+        DETACH DELETE div, c;
         """
         self.execute_prepared_stmt(cmd)
 
