@@ -13,12 +13,10 @@ class TimeoutException(Exception):
 class TerminateConnectionException(Exception):
     pass
 
-
 class SupportedBackingStore(Enum):
     NULL = "null"
     YAML = "yaml"
     KUZU = "kuzu"
-
 
 class HAKCDataRequest:
     def __init__(self, Endpoint: str, **kwargs):
@@ -74,6 +72,9 @@ class HAKCServerConfig:
         self.data_path = backing_store_config.get("path", None)
         if self.data_path is None and self.type != SupportedBackingStore.NULL.value:
             raise RuntimeError("ERROR: path (for data store) is missing")
+        self.dag_path = kwargs.get("dag_path", None)
+        if self.dag_path is None:
+            raise RuntimeError("ERROR: dag_path is missing")
         self.default_compartment_id = backing_store_config.get("default_compartment", 0)
         self.default_division_id = backing_store_config.get("default_division", 53)
         self.default_access_token = backing_store_config.get("default_access_token", 5353)

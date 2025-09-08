@@ -6,7 +6,6 @@
 
 #include "../../../../../../lld/MachO/Config.h"
 
-#include "llvm/Support/Timer.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/CommonHAKCAnalysis.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/HAKCModuleAnalysis.h"
@@ -44,77 +43,43 @@ void HAKCAnalysisClient::CheckConnection() const {
 }
 
 void HAKCAnalysisClient::SendTerminateConnection() const {
-  auto currentTime = std::chrono::system_clock::now();
-  auto milliseconds_since_epoch =
-      std::chrono::duration_cast<std::chrono::milliseconds>(
-          currentTime.time_since_epoch());
-  CommonHAKCAnalysis::getLogger(Verbose)
-      << milliseconds_since_epoch.count() << " "
-      << "Executing command \n";
-
   CheckConnection();
   json::Object Parameters({{"CLIENT TERMINATING CONNECTION", true}});
   HAKCDatabaseRequest Request(SystemInformation.GetDatabaseInformation().GetTerminateConnectionEndpoint(), Parameters);
   Client.SendTerminateConnection(Request);
 }
 
-json::Object
+HAKCResult
 HAKCAnalysisClient::Execute(StringRef Endpoint,
-                                        json::Object &Parameters) const {
-  auto currentTime = std::chrono::system_clock::now();
-  auto milliseconds_since_epoch =
-      std::chrono::duration_cast<std::chrono::milliseconds>(
-          currentTime.time_since_epoch());
-  CommonHAKCAnalysis::getLogger(Verbose)
-      << milliseconds_since_epoch.count() << " "
-      << "Executing command \n";
-
+                                        json::Object &Parameters) {
   CheckConnection();
   HAKCDatabaseRequest Request(Endpoint, Parameters);
-  auto Response = Client.HandleRequest(Request);
+  HAKCDatabaseResponse Response = Client.HandleRequest(Request);
   if (!Response) {
     CommonHAKCAnalysis::getLogger(Fatal)
         << "Error Handling Request to " << Endpoint << "\n";
     throw std::exception();
   }
-  auto ParsedJson = Response.GetJSON();
-  if (auto E = ParsedJson.takeError()) {
-    CommonHAKCAnalysis::getLogger(Fatal)
-        << "Error Parsing JSON: " << llvm::toString(std::move(E)) << "\n";
-    throw std::exception();
+  if ( Response.ShouldTerminateConnection() ) {
+    DisconnectFromDatabase();
   }
-  for (auto pair : *ParsedJson->getAsObject()) {
-    if (pair.getFirst() == "CLIENT TERMINATING CONNECTION") {
-      auto currentTime = std::chrono::system_clock::now();
-      auto milliseconds_since_epoch =
-          std::chrono::duration_cast<std::chrono::milliseconds>(
-              currentTime.time_since_epoch());
-      CommonHAKCAnalysis::getLogger(Fatal)
-          << milliseconds_since_epoch.count() << " "
-          << "Unrecoverable error on Analysis Server; Analysis Client stopping!!\n";
 
-      throw std::runtime_error(
-          "Unrecoverable error on Analysis Server; Analysis Client stopping!!\n");
-    }
-  }
-  auto Obj = ParsedJson->getAsObject();
-  return *Obj;
+  return Response.GetResult();
 }
 
-void HAKCAnalysisClient::set_dag_filename(StringRef filename) const {
+void HAKCAnalysisClient::set_dag_filename(StringRef filename) {
   json::Object Parameters({{"dag-filename", filename}});
-  auto ResponseData = Execute(
+  auto result = Execute(
       SystemInformation.GetDatabaseInformation().GetSetDagFilenameEndpoint(),
       Parameters);
-  auto Success = ResponseData.getBoolean("Success");
-  if (!Success) {
-    CommonHAKCAnalysis::getLogger(Fatal) << "Invalid Response for set_dag_filename\n";
+  if (!result.success) {
+    CommonHAKCAnalysis::getLogger(Fatal) << "Invalid Response for set_dag_filename with error: " << result.error << "\n";
     throw std::exception();
   }
 }
 
 
-void HAKCAnalysisClient::add_symbols(ArrayRef<std::shared_ptr<HAKCFunctionInfo>> FIs, ArrayRef<std::shared_ptr<HAKCGlobalInfo>> GIs) const{
+void HAKCAnalysisClient::add_symbols(ArrayRef<std::shared_ptr<HAKCFunctionInfo>> FIs, ArrayRef<std::shared_ptr<HAKCGlobalInfo>> GIs) {
   CommonHAKCAnalysis::getLogger(Debug) << "Sending add-symbols with " << FIs.size() << " functions and " << GIs.size() << " global variables\n";
 
   std::vector<std::string> AllSymbols;
@@ -134,52 +99,47 @@ void HAKCAnalysisClient::add_symbols(ArrayRef<std::shared_ptr<HAKCFunctionInfo>>
 
   json::Object Parameters({{"allSymbols", AllSymbols}});
 
-  auto ResponseData = Execute(
+  auto result = Execute(
   SystemInformation.GetDatabaseInformation().GetAddSymbolsEndpoint(), Parameters);
-  auto Success = ResponseData.getBoolean("Success");
-  if (!Success) {
+  if (!result.success) {
     CommonHAKCAnalysis::getLogger(Fatal) << "Invalid Response for AllSymbols\n";
     throw std::exception();
   }
 }
 
-void HAKCAnalysisClient::add_function(const HAKCFunctionInfo &FI) const{
+void HAKCAnalysisClient::add_function(const HAKCFunctionInfo &FI) {
   CommonHAKCAnalysis::getLogger(Debug) << "Sending add-function: " << FI.GetFunction()->getName() << " of type " << FI.GetFunction()->getFunctionType() << "\n";
   std::string ObjectYaml;
   raw_string_ostream os(ObjectYaml);
   os << FI.GetYaml(0);
   json::Object Parameters({{"object", ObjectYaml}});
 
-  auto ResponseData = Execute(
+  auto result = Execute(
       SystemInformation.GetDatabaseInformation().GetAddFunctionEndpoint(),
       Parameters);
-  auto Success = ResponseData.getBoolean("Success");
-  if (!Success) {
-    CommonHAKCAnalysis::getLogger(Fatal)
-        << "Invalid Response for " << *FI.GetFunction() << "\n";
+  if (!result.success) {
+    CommonHAKCAnalysis::getLogger(Fatal)<< "Invalid Response for " << *FI.GetFunction() << " with error: " << result.error << "\n";
     throw std::exception();
   }
 }
 
-void HAKCAnalysisClient::add_global_variable(const HAKCGlobalInfo &GI) const{
-	CommonHAKCAnalysis::getLogger(Debug) << "Sending add-global-variable: " << GI.GetGlobalVariable()->getName()  << " of type " << GI.GetGlobalVariable()->getType() << "\n";
+void HAKCAnalysisClient::add_global_variable(const HAKCGlobalInfo &GI) {
+	CommonHAKCAnalysis::getLogger(Debug) << "Sending add-global-variable: " << GI.GetGlobalVariable()->getName()  << " of type " << GI.GetGlobalVariable()->getType()  << "\n";
   std::string ObjectYaml;
   raw_string_ostream os(ObjectYaml);
   os << GI.GetYaml(0);
   json::Object Parameters({{"object", ObjectYaml}});
 
-  auto ResponseData = Execute(
+  auto result = Execute(
       SystemInformation.GetDatabaseInformation().GetAddGlobalVariableEndpoint(),
       Parameters);
-  auto Success = ResponseData.getBoolean("Success");
-  if (!Success) {
-    CommonHAKCAnalysis::getLogger(Fatal)
-        << "Invalid Response for " << *GI.GetGlobalVariable() << "\n";
+  if (!result.success) {
+    CommonHAKCAnalysis::getLogger(Fatal)<< "Invalid Response for " << *GI.GetGlobalVariable() << " with error: " << result.error << "\n";
     throw std::exception();
   }
 }
 
-void HAKCAnalysisClient::SendSymbolsToAnalysisServer(HAKCModuleAnalysis &ModuleAnalysis, StringRef filename) const {
+void HAKCAnalysisClient::SendSymbolsToAnalysisServer(HAKCModuleAnalysis &ModuleAnalysis, StringRef filename)  {
 
   CommonHAKCAnalysis::getLogger(Debug) << "Starting to send symbols to analysis server\n";
   auto TypeIdentifier = ModuleAnalysis.GetTypeIdentifier();

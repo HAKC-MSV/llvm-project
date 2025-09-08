@@ -2,12 +2,12 @@ import json
 import logging
 import socketserver
 import struct
+import threading
 from typing import cast
 
 import yaml
-import threading
 
-from .HAKCBase import HAKCPrintableObj
+from .HAKCBase import HAKCPrintableObj, HAKCResponse
 from .HAKCLogger import HAKCLogger
 from .HAKCServerConfig import HAKCServerConfig, HAKCDataRequest, TimeoutException, TerminateConnectionException
 
@@ -66,16 +66,19 @@ class HAKCServerThread(socketserver.StreamRequestHandler):
     def write_response_to_socket(self, response: HAKCPrintableObj):
         if not (isinstance(response, HAKCPrintableObj)):
             raise Exception(f"Generated response to request is not a HAKCPrintableObj and is invalid: {response}")
-        self.logger.debug(f"Sending response {response}")
+        # self.logger.debug(f"Sending response {response}")
         response_data = json.dumps(response.to_yaml_dict(), default=str)
+        # self.logger.debug(f"Sending response data {response_data}")
         encoded_data = response_data.encode('utf-8')
+        self.logger.debug(f"Sending encoded data {encoded_data}")
         bytes_written = self.write_raw_bytes(struct.pack(
             HAKCServerThread.size_fmt, len(encoded_data)))
+        # self.logger.debug(f"Sending {bytes_written} bytes")
         bytes_written += self.write_raw_bytes(encoded_data)
         return bytes_written
 
     # noinspection PyTypeChecker
-    def handle_endpoint(self, hakc_request: HAKCDataRequest):
+    def handle_endpoint(self, hakc_request: HAKCDataRequest) -> HAKCResponse:
         if hakc_request.endpoint not in self.endpoints:
             raise RuntimeError(f'Invalid Endpoint {hakc_request.endpoint}, endpoints available: {self.endpoints.keys()}')
         return self.endpoints[hakc_request.endpoint](**hakc_request.parameters)
@@ -93,6 +96,7 @@ class HAKCServerThread(socketserver.StreamRequestHandler):
         self.init()
         logger.debug(f'Handling request')
         hakc_request = None
+        response = None
         try:
             while True:
                 hakc_request = self.read_request_from_socket()
@@ -102,17 +106,17 @@ class HAKCServerThread(socketserver.StreamRequestHandler):
 
         # the 'raise' will call 'handle_error' in HAKCAnalysisServer
         except ConnectionAbortedError:
-            self.logger.fatal(f'Client Aborted Connection while handling request: {hakc_request}')
+            self.logger.fatal(f'Client Aborted Connection after returning {response}')
             if self.hakc_server.config.test_mode:
                 raise TimeoutException
             self.hakc_server.reset_alarm()
             return
         except ConnectionResetError:
-            self.logger.fatal(f'Client Reset Connection while handling request: {hakc_request}')
+            self.logger.fatal(f'Client Reset Connection after returning {response}')
             self.hakc_server.reset_alarm()
             return
         except TimeoutException:
-            self.logger.fatal(f'Timeout received while handling request: {hakc_request}')
+            self.logger.fatal(f'Timeout received after returning {response}')
             self.hakc_server.reset_alarm()
             return
         except TerminateConnectionException:

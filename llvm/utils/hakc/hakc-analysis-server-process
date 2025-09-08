@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 import argparse
 import logging
+import multiprocessing as mp
 import signal
-from typing import Optional, cast
+from typing import cast
 
 import yaml
 
+from hakc.HAKCAnalysisServer import HAKCAnalysisServer, global_queue, SaveDAGEvent
+from hakc.HAKCCompartmentalization import HAKCCompartmentalization
 from hakc.HAKCLogger import LoggingLevelEnum, parse_log_level, setup_logging, HAKCLogger
-from hakc.HAKCAnalysisServer import HAKCAnalysisServer
 from hakc.HAKCServerConfig import HAKCServerConfig, TimeoutException
+
 logging.setLoggerClass(HAKCLogger)
 
 logger = logging.getLogger('hakc-analysis-server-process')
@@ -16,6 +19,31 @@ logger = logging.getLogger('hakc-analysis-server-process')
 def timeout_handler(signum, frame):
     raise TimeoutException
 
+def merger_thread(dag_path: str):
+    # using global variables global_queue, SaveDAGEvent
+    logger.info(f"Spinning up HAKCCompartmentalization thread!")
+    global_compartmentalization = HAKCCompartmentalization()
+
+    while True:
+        if global_queue.empty():
+            if SaveDAGEvent.is_set():
+                # queue must be empty before thread can exit
+                logger.info(f"Got SaveDAGEvent signal")
+                logger.info(f"Saving DAG {global_compartmentalization}")
+                global_compartmentalization.save_as_yaml(dag_path)
+                logger.info(f"Saved DAG to {dag_path}")
+                SaveDAGEvent.clear()
+                return
+            continue
+        subG = global_queue.get()
+        if subG:
+            global_compartmentalization.update(edges=subG.edges(data=True, keys=True),
+                                               nodes=subG.nodes(data=True))
+            logger.info(f"""\tMerged {global_compartmentalization} with
+                                    {len(global_compartmentalization.get_types())}\tTypes
+                                    {len(global_compartmentalization.get_scopes())}\tScopes
+                                    {len(global_compartmentalization.get_global_variables())}\tGlobal Variables
+                                    {len(global_compartmentalization.get_functions())}\tFunctions""")
 
 # noinspection PyTypeChecker
 def main():
@@ -45,6 +73,8 @@ def main():
     AnalysisServerMainLogger: HAKCLogger = cast(HAKCLogger, logging.getLogger('hakc-analysis-server-main'))
     if config.log_path:
         AnalysisServerMainLogger.add_file_handler(config.log_path)
+    proc = mp.Process(target=merger_thread, args=(config.dag_path,))
+    proc.start()
     with HAKCAnalysisServer(config, AnalysisServerMainLogger) as server:
         try:
             if config.server_timeout > 0:
@@ -59,7 +89,14 @@ def main():
             AnalysisServerMainLogger.error(f'Analysis Server received generic Exception: {e}')
         finally:
             server.server_close()
-
+    # logger.info(f"Setting SaveDAGEvent signal")
+    SaveDAGEvent.set()
+    # logger.error(f"Joining merger proc")
+    global_queue.close()
+    # logger.error(f"closed queue")
+    # global_queue.join_thread()
+    # logger.error(f"joined queue")
+    proc.join()
 
 if __name__ == "__main__":
     main()

@@ -9,6 +9,7 @@ import yaml
 from .HAKCBase import HAKCDBColumn, HAKCDBRelation, HAKCDBNode, HAKCPrintableObj, HashedHAKCDBNode, \
     HAKCPayload
 from .HAKCLogger import HAKCLogger
+
 logger: HAKCLogger = cast(HAKCLogger, logging.getLogger('hakc-dag'))
 
 
@@ -70,7 +71,7 @@ class HAKCDivision(HashedHAKCDBNode, yaml.YAMLObject):
         HashedHAKCDBNode.__init__(self, **kwargs)
         self.division_id = DivisionID
         self.salt = kwargs.get("Salt", random.randint(0, sys.maxsize))
-        self.access_token = kwargs.get("AccessToken", None)
+        self.access_token = kwargs.get("AccessToken", 0)
 
     @staticmethod
     def compute_access_token(compartment_id: int, division_ids: set[int]) -> int:
@@ -84,7 +85,7 @@ class HAKCDivision(HashedHAKCDBNode, yaml.YAMLObject):
         return f"{self.get_table_name()}({self.division_id})"
 
     def __str__(self):
-        return f"{self.get_table_name()}(division_id={self.division_id}, hash={self.get_computed_hash()})"
+        return f"{self.get_table_name()}(division_id={self.division_id}, hash={self.get_computed_hash()}, Salt={self.salt}, AccessToken={self.access_token})"
 
     @classmethod
     def from_yaml(cls, loader: yaml.CLoader, node):
@@ -134,13 +135,11 @@ class HAKCDivision(HashedHAKCDBNode, yaml.YAMLObject):
         }
 
     def get_info_tokens(self, convert_hash=True) -> dict[str, object]:
-        tokens = {
+        return {
             "DivisionID": self.division_id,
             "Salt": self.salt,
+            "AccessToken": self.access_token
         }
-        if self.access_token is not None:
-            tokens["AccessToken"] = self.access_token
-        return tokens
 
 
 class HAKCCompartment(HAKCDBNode, yaml.YAMLObject):
@@ -151,7 +150,7 @@ class HAKCCompartment(HAKCDBNode, yaml.YAMLObject):
         yaml.YAMLObject.__init__(self)
         HAKCDBNode.__init__(self, **kwargs)
         self.compartment_id = CompartmentID
-        self.entry_token = kwargs.get("EntryToken", None)
+        self.entry_token = kwargs.get("EntryToken", 0)
 
     @staticmethod
     def compute_entry_token(compartment_id: int, entry_divisions: set[int]):
@@ -211,11 +210,10 @@ class HAKCCompartment(HAKCDBNode, yaml.YAMLObject):
         return []
 
     def get_info_tokens(self, convert_hash=True) -> dict[str, object]:
-        tokens = {self.get_primary_key().column_name: self.compartment_id}
-        if self.entry_token is not None:
-            tokens['EntryToken'] = self.entry_token
-        return tokens
-
+        return {
+            "CompartmentID": self.compartment_id,
+            "EntryToken": self.entry_token
+        }
 
 class HAKCType(HashedHAKCDBNode, yaml.YAMLObject):
     yaml_tag = "!HAKCType"
@@ -434,7 +432,7 @@ class HAKCSymbol(HashedHAKCDBNode, yaml.YAMLObject):
 
     @classmethod
     def from_yaml(cls, loader: yaml.CLoader, node):
-        logger.fatal(f"Constructing symbol with: {node}")
+        # logger.fatal(f"Constructing symbol with: {node}")
         return cls(**loader.construct_mapping(node, deep=True))
 
     def __eq__(self, other):
@@ -596,7 +594,6 @@ class HAKCCompartmentalizationAdjustment(yaml.YAMLObject):
 
     @classmethod
     def from_yaml(cls, loader: yaml.CLoader, node):
-        logger.fatal(f"node: {node}")
         return cls(**loader.construct_mapping(node, deep=True))
 
     def get_adjusted_division_and_compartment(self, defining_path: str) -> Optional[
@@ -611,12 +608,6 @@ class HAKCCompartmentalizationAdjustment(yaml.YAMLObject):
                 adjustment = (adjustment.division, adjustment.compartment)
 
         return adjustment
-
-
-class HAKCDivisionCompartmentPayload(HAKCPayload):
-    def __init__(self, division: HAKCDivision, compartment: HAKCCompartment, **kwargs):
-        HAKCPayload.__init__(self, {'Division': division, 'Compartment': compartment}, **kwargs)
-
 
 class HAKCIndirectSourceLink(HAKCPrintableObj, yaml.YAMLObject):
     yaml_tag = "!HAKCIndirectSourceLink"
@@ -699,3 +690,23 @@ class HAKCIndirectCallSource(HAKCPrintableObj, yaml.YAMLObject):
         for link in self.source:
             result.append(link)
         return result
+
+class HAKCDivisionPayload(HAKCPayload):
+    def __init__(self, division: HAKCDivision, **kwargs):
+        assert isinstance(division, HAKCDivision)
+        HAKCPayload.__init__(self, {'Division': division.to_yaml_dict()}, **kwargs)
+
+class HAKCCompartmentPayload(HAKCPayload):
+    def __init__(self, compartment: HAKCCompartment, **kwargs):
+        assert isinstance(compartment, HAKCCompartment)
+        HAKCPayload.__init__(self, {'Compartment': compartment.to_yaml_dict()}, **kwargs)
+
+class HAKCDivisionCompartmentPayload(HAKCPayload):
+    def __init__(self, division: HAKCDivision, compartment: HAKCCompartment, **kwargs):
+        assert isinstance(division, HAKCDivision) and isinstance(compartment, HAKCCompartment)
+        HAKCPayload.__init__(self, {'Division': division.to_yaml_dict(), 'Compartment': compartment.to_yaml_dict()}, **kwargs)
+
+class HAKCValidTargetsPayload(HAKCPayload):
+    def __init__(self, valid_targets: list[int]):
+        assert isinstance(valid_targets, list)
+        HAKCPayload.__init__(self, {'ValidTargets': valid_targets if valid_targets else []})

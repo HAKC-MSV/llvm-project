@@ -1,21 +1,21 @@
 import logging
+import os
 import re
 from typing import Type, Optional, cast, Union, Hashable, Tuple
-from typing_extensions import Self
 
 import networkx as nx
 import pandas as pd
 import yaml
-import os
 from networkx.classes.reportviews import NodeView
 from networkx.readwrite import json_graph
+from typing_extensions import Self
 from yaml import MappingNode
 
 from .HAKCBase import HAKCDivisionEnum, HAKCDBNode
 from .HAKCDatabase import HAKCDatabase
 from .HAKCLogger import HAKCLogger
 from .HAKCObjects import HAKCSymbol, HAKCDefinitionLocation, HAKCFunction, HAKCType, HAKCCompartment, HAKCDivision, \
-    HAKCScope, HAKCGlobalVariable, HAKCIndirectCallSource, HAKCAdjustment, HAKCCompartmentalizationAdjustment
+    HAKCScope, HAKCGlobalVariable, HAKCAdjustment, HAKCCompartmentalizationAdjustment
 
 logging.setLoggerClass(HAKCLogger)
 
@@ -138,14 +138,14 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             self.__add_persistent_edge(function, direct_call, key=HAKCFunction.relation_direct_calls)
 
         for indirect_call in function.indirect_calls:
-            # TODO handle indirect call sources
+            # TODO handle indirect call sources?
             # logger.error(f"indirect_call: {type(indirect_call)}")
             # assert(isinstance(indirect_call, HAKCType))
-            if isinstance(indirect_call, HAKCType):
-                # TODO: should types already be persisted? getting duplicate key error when using data columns as hakctype hashable inputs
-                # self.__add_type(indirect_call, already_persisted = True)
-                self.__add_type(indirect_call)
-                self.__add_persistent_edge(function, indirect_call, key=HAKCFunction.relation_indirect_calls)
+            # if isinstance(indirect_call, HAKCType):
+            # TODO: should types already be persisted? getting duplicate key error when using data columns as hakctype hashable inputs
+            # self.__add_type(indirect_call, already_persisted = True)
+            # self.__add_type(indirect_call)
+            self.__add_persistent_edge(function, indirect_call, key=HAKCFunction.relation_indirect_calls)
 
     def add_global_variable(self, global_variable: HAKCGlobalVariable) -> None:
         return self.__add_global_variable(global_variable)

@@ -16,6 +16,8 @@ namespace llvm::hakc {
 class HAKCModuleAnalysis;
 class HAKCModuleTransform;
 class HAKCSystemInformation;
+// class HAKCDatabaseConnection;
+// class HAKCResult;
 
 typedef std::shared_ptr<HAKCCompartment> HAKCCompartmentP;
 typedef std::shared_ptr<HAKCCompartmentDivision> HAKCDivisionP;
@@ -57,7 +59,7 @@ protected:
 
   HAKCCompartmentP FindCachedCompartment(hakc_compartment_id_t CompartmentID);
 
-  json::Object Execute(StringRef Endpoint, json::Object &Parameters) const;
+  HAKCResult Execute(StringRef Endpoint, json::Object &Parameters);
 
   HAKCCompartmentP CreateCompartment(hakc_compartment_id_t CompartmentID,
                                      hakc_access_token_t AccessToken,

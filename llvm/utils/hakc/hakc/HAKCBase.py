@@ -1,6 +1,7 @@
 import hashlib
 from enum import Enum
 from typing import Type, Literal
+
 import yaml
 
 # set global yaml loader and dumper
@@ -270,11 +271,24 @@ class HAKCPayload(HAKCPrintableObj):
             self.payload[key] = val
 
 class HAKCResult(HAKCPayload):
-    def __init__(self, success: bool = True, **kwargs):
-        HAKCPayload.__init__(self, payload={'Success': success}, **kwargs)
+    def __init__(self, success: bool = True, error: str = '', data: HAKCPayload = None, **kwargs):
+        HAKCPayload.__init__(self, payload={'Success': success, 'Error': error, 'Data': data})
 
+class HAKCResultSuccess(HAKCResult):
+    def __init__(self, data: HAKCPayload = None):
+        # HAKCResult.__init__(self, payload={'Success': True, 'Error': '', 'Data': data})
+        HAKCResult.__init__(self, success=True, error='', data=data)
 
+class HAKCResultFail(HAKCResult):
+    def __init__(self, error: str):
+        # HAKCResult.__init__(self, payload={'Success': False, 'Error': error, 'Data': {}})
+        HAKCResult.__init__(self, success=False, error=error, data=None)
 
+class HAKCResponse(HAKCPayload):
+    # response type -> endpoint
+    # status -> (success, error, payload)
+    def __init__(self, result: HAKCResult, response_endpoint: str, **kwargs):
+        HAKCPayload.__init__(self, payload={'Result': result, 'ResponseEndpoint': response_endpoint}, **kwargs)
 
 class HashedHAKCDBNode(HAKCDBNode):
     def __init__(self, **kwargs):

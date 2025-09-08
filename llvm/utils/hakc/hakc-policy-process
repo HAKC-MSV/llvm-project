@@ -8,8 +8,8 @@ import yaml
 
 from hakc.HAKCLogger import LoggingLevelEnum, parse_log_level, setup_logging, HAKCLogger
 from hakc.HAKCPolicyServer import HAKCPolicyServer, NullHAKCPolicyDataStore, HAKCPolicyDataSource, \
-    YAMLHAKCPolicyDataStore, KUZUHAKCPolicyDataStore, TimeoutException, SupportedBackingStore
-from hakc.HAKCServerConfig import HAKCServerConfig
+    YAMLHAKCPolicyDataStore, KUZUHAKCPolicyDataStore, SupportedBackingStore
+from hakc.HAKCServerConfig import HAKCServerConfig, TimeoutException
 
 logging.setLoggerClass(HAKCLogger)
 

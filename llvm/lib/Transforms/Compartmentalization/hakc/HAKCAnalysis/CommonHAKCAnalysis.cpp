@@ -101,7 +101,7 @@ void CommonHAKCAnalysis::InitConfig(StringRef ConfigPath) {
       SystemConfig.ConsoleLogLevel); // setting the errs() stream to the
                                      // configured log level
   HAKCLog->addStream(
-      createLogPath(SystemConfig.DagAnalysisRootPath),
+      createLogPath(SystemConfig.DagAnalysisRootPath, SystemConfig.PassMode),
       SystemConfig
           .FileLogLevel); // setting the fd_ostream to configured log level
 
@@ -133,13 +133,22 @@ std::string CommonHAKCAnalysis::createDagYamlPath(StringRef DagAnalysisRootPath)
   return std::string(Path);
 }
 
-std::string CommonHAKCAnalysis::createLogPath(StringRef DagAnalysisRootPath) {
+std::string CommonHAKCAnalysis::createLogPath(StringRef DagAnalysisRootPath, HAKCPassModeTypeEnum PassMode) {
   SmallString<256> Path;
   SmallString<256> ModulePath;
   GetModuleFullPath(M, ModulePath);
   sys::path::append(Path, DagAnalysisRootPath);
   sys::path::append(Path, ModulePath);
-  sys::path::replace_extension(Path, ".log");
+
+  if ( PassMode == RunDataAccessGraphAnalysis || PassMode == RunDataAccessGraphAnalysisSingleSourceFile) {
+    sys::path::replace_extension(Path, ".dag.log");
+  }
+  else if (PassMode == RunCompartmentalization) {
+    sys::path::replace_extension(Path, ".comp.log");
+  }
+  else if (PassMode == RunConfigAndExit || PassMode == InvalidPassModeType) {
+    return "";
+  }
   sys::path::make_preferred(Path);
   return std::string(Path);
 }

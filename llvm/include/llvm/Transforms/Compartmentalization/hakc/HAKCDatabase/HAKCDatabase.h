@@ -17,6 +17,9 @@ namespace llvm::hakc {
 class HAKCModuleAnalysis;
 class HAKCModuleTransform;
 class HAKCSystemInformation;
+class HAKCDatabaseResponse;
+class HAKCDatabaseConnection;
+// class HAKCResult;
 
 typedef std::shared_ptr<HAKCCompartment> HAKCCompartmentP;
 typedef std::shared_ptr<HAKCCompartmentDivision> HAKCDivisionP;
@@ -31,22 +34,94 @@ protected:
   json::Value Request;
 };
 
+class HAKCPayload {
+public:
+  HAKCPayload(json::Object *payload) : payload(*payload) {};
+  virtual ~HAKCPayload() = default;
+
+  // template <typename T> T GetValue(StringRef key);
+  // unsigned GetInteger(StringRef key);
+  // std::vector<unsigned> GetIntegerArray(StringRef key);
+
+protected:
+  json::Object payload;
+};
+
+class HAKCDivisionPayload : public HAKCPayload {
+
+public:
+  HAKCDivisionPayload(json::Object *payload);
+  unsigned DivisionID;
+  unsigned Salt;
+  unsigned AccessToken;
+};
+
+class HAKCCompartmentPayload : public HAKCPayload {
+
+public:
+  HAKCCompartmentPayload(json::Object *payload);
+  unsigned CompartmentID;
+  unsigned EntryToken;
+};
+
+class HAKCDivisionCompartmentPayload : public HAKCPayload {
+
+public:
+  HAKCDivisionCompartmentPayload(json::Object *payload);
+  unsigned DivisionID;
+  unsigned Salt;
+  unsigned AccessToken;
+  unsigned CompartmentID;
+  unsigned EntryToken;
+};
+
+class HAKCValidTargetsPayload : public HAKCPayload {
+
+public:
+  HAKCValidTargetsPayload(json::Object *payload);
+  std::vector<uint> ValidTargets;
+};
+
+class HAKCResult {
+  friend HAKCDatabaseResponse;
+
+public:
+  HAKCResult();
+
+  bool success;
+  std::string error;
+
+  std::shared_ptr<HAKCPayload> GetData() { return data; };
+
+protected:
+  std::shared_ptr<HAKCPayload> data;
+};
+
 class HAKCDatabaseResponse {
 public:
-  HAKCDatabaseResponse(std::chrono::milliseconds Timeout);
-
+  friend HAKCResult;
+  // read in the HAKCResponse structure from server
+  HAKCDatabaseResponse(const HAKCDatabaseInformation &database_information);
+  void parse_result(json::Object *_result);
   Expected<json::Value> GetJSON() const;
 
   operator bool() const;
 
   void operator<<(raw_socket_stream &OS);
 
+  HAKCResult &GetResult() { return result; }
+
+  bool ShouldTerminateConnection() { return terminate_connection; }
+
 protected:
   std::string Response;
   std::chrono::milliseconds Timeout;
   bool Success;
-
-  ssize_t ReadFromSocket(raw_socket_stream &OS, void *Dest, ssize_t Size) const;
+  std::string response_endpoint;
+  HAKCResult result;
+  const HAKCDatabaseInformation &database_information;
+  bool terminate_connection;
+  ssize_t ReadFromSocket(raw_socket_stream &OS, void *Dest, ssize_t Size);
 };
 
 class HAKCDatabaseConnection {
@@ -64,6 +139,10 @@ public:
 
   void connect();
 
+  const HAKCDatabaseInformation &GetDatabaseInformation() {
+    return DatabaseInformation;
+  }
+
 protected:
   std::unique_ptr<raw_socket_stream> Socket;
   const HAKCDatabaseInformation &DatabaseInformation;
@@ -71,7 +150,6 @@ protected:
 
   bool CheckConnection() const;
 };
-
 
 } // namespace llvm::hakc
 

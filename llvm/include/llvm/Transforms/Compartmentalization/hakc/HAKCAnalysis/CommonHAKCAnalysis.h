@@ -187,7 +187,7 @@ public:
 
   std::string createDagYamlPath(StringRef DagAnalysisRootPath);
 
-  std::string createLogPath(StringRef DagAnalysisRootPath);
+  std::string createLogPath(StringRef DagAnalysisRootPath, HAKCPassModeTypeEnum PassMode);
 
 private:
   static bool valueHasAttribute(Value *v, Attribute::AttrKind Kind);

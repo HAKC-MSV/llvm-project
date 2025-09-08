@@ -18,7 +18,7 @@ hakc::HAKCLogger::~HAKCLogger() { HAKCStreams.clear(); }
 
 void hakc::HAKCLogger::addStream(StringRef log_path,
                                  hakc::HAKCLogLevel log_level) {
-  if (log_level == Disabled) {
+  if (log_level == Disabled || log_path.empty()) {
     disabled = true;
   } else {
     auto log_dir = sys::path::parent_path(log_path).str();
