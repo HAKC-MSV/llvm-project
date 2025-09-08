@@ -116,6 +116,7 @@ def create_compartmentalization_single_thread(files: set[str], conn: HAKCDatabas
     return compartmentalization
 
 def create_dag_single_thread(files: set[str], conn: HAKCDatabase) -> HAKCCompartmentalization:
+    # TODO: update this
     compartmentalization = create_compartmentalization_single_thread(files, conn)
     dag_edges = dict()
     dag_edges_added = 0

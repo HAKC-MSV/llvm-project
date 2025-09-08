@@ -7,7 +7,6 @@
 #include "llvm/Support/Timer.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/CommonHAKCAnalysis.h"
-#include <unistd.h>
 
 namespace llvm::hakc {
 
@@ -241,7 +240,7 @@ void HAKCCompartmentalizationPolicy::GetValidTargets(
 
   RetrievedTargetCompartments.insert(CompartmentID);
   if (valid_targets.size() == 0) {
-    CommonHAKCAnalysis::getLogger(Error)
+    CommonHAKCAnalysis::getLogger(Debug)
         << "No ValidTargets found for CompartmentID: " << CompartmentID << "\n";
     return;
   }
@@ -290,7 +289,6 @@ HAKCResult HAKCCompartmentalizationPolicy::Execute(StringRef Endpoint,
   if (Response.ShouldTerminateConnection()) {
     DisconnectFromDatabase();
   }
-  CommonHAKCAnalysis::getLogger(Fatal) << "Returning from execute with valid response!\n";
   return Response.GetResult();
 }
 

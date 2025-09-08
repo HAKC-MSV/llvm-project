@@ -3,9 +3,6 @@
 //
 
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/HAKCAnalysisClient.h"
-
-#include "../../../../../../lld/MachO/Config.h"
-
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/CommonHAKCAnalysis.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/HAKCModuleAnalysis.h"

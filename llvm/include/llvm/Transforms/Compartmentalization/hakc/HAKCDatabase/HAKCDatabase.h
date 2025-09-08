@@ -103,7 +103,6 @@ public:
   // read in the HAKCResponse structure from server
   HAKCDatabaseResponse(const HAKCDatabaseInformation &database_information);
   void parse_result(json::Object *_result);
-  Expected<json::Value> GetJSON() const;
 
   operator bool() const;
 

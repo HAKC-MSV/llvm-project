@@ -101,12 +101,14 @@ class HAKCServerThread(socketserver.StreamRequestHandler):
             while True:
                 hakc_request = self.read_request_from_socket()
                 response = self.handle_endpoint(hakc_request)
+                logger.info(f"{response}")
                 bytes_written = self.write_response_to_socket(response)
                 assert bytes_written > 0, f"Bytes written to socket should always be >0: bytes_written = {bytes_written}"
 
         # the 'raise' will call 'handle_error' in HAKCAnalysisServer
         except ConnectionAbortedError:
-            self.logger.fatal(f'Client Aborted Connection after returning {response}')
+            # debug level because we expect the client to timeout once they are finished with their queries
+            self.logger.debug(f'Client Aborted Connection after returning {response}')
             if self.hakc_server.config.test_mode:
                 raise TimeoutException
             self.hakc_server.reset_alarm()
