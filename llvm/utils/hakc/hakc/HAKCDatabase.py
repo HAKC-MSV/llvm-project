@@ -121,7 +121,7 @@ class HAKCDatabase:
         MATCH (comp1:{HAKCCompartment.get_table_name()})<-[:{HAKCDivision.relation_compartment}]-(div1:{HAKCDivision.get_table_name()})<-[:{HAKCSymbol.relation_division}]-(sym1:{HAKCSymbol.get_table_name()})-[:{HAKCSymbol.relation_dag}]->(sym2:{HAKCSymbol.get_table_name()})-[:{HAKCSymbol.relation_division}]->(div2:{HAKCDivision.get_table_name()})-[:{HAKCDivision.relation_compartment}]->(comp2:{HAKCCompartment.get_table_name()})
         WITH  *
         WHERE comp1.CompartmentID = $source_compartment_id
-        RETURN DISTINCT comp1.CompartmentID, comp2.CompartmentID;
+        RETURN DISTINCT comp2.CompartmentID;
         """
         response = self.execute_prepared_stmt(cmd, source_compartment_id=source_compartment_id)
         targets = set()
