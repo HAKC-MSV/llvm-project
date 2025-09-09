@@ -8,7 +8,7 @@ from .HAKCBase import HAKCDBNode, HAKCDBRelation
 from .HAKCLogger import HAKCLogger
 from .HAKCObjects import HAKCSymbol, HAKCFunction, HAKCScope, HAKCType, HAKCGlobalVariable, HAKCDivision, \
     HAKCCompartment, HAKCDefinitionLocation
-
+import time
 logging.setLoggerClass(HAKCLogger)
 
 logger: HAKCLogger = cast(HAKCLogger, logging.getLogger('hakc-database'))
@@ -23,15 +23,17 @@ class HAKCDatabase:
         self.open(read_only=read_only, max_num_threads=max_num_threads)
         self.cache_hit_mutex = mp.Lock()
         self.cache_miss_mutex = mp.Lock()
+        self.total_query_time_mutex = mp.Lock()
         self.query_cache_mutex = mp.Lock()
         self.cache_hit = 0
         self.cache_miss = 0
+        self.total_query_time = 0
         self.query_cache = {}
 
     def increment_cache_hit(self):
         self.cache_hit_mutex.acquire()
         try:
-            logger.error(f"Incrementing cache_hit {self.cache_hit}")
+            # logger.debug(f"Incrementing cache_hit {self.cache_hit}")
             self.cache_hit += 1
         finally:
             self.cache_hit_mutex.release()
@@ -39,10 +41,17 @@ class HAKCDatabase:
     def increment_cache_miss(self):
         self.cache_miss_mutex.acquire()
         try:
-            logger.error(f"Incrementing cache_miss {self.cache_miss}")
+#             logger.debug(f"Incrementing cache_miss {self.cache_miss}")
             self.cache_miss += 1
         finally:
             self.cache_miss_mutex.release()
+
+    def increment_total_query_time(self, delta):
+        self.total_query_time_mutex.acquire()
+        try:
+            self.total_query_time += delta
+        finally:
+            self.total_query_time_mutex.release()
 
     def get_cache_hits(self):
         self.cache_hit_mutex.acquire()
@@ -62,16 +71,36 @@ class HAKCDatabase:
             self.cache_miss_mutex.release()
             return out
 
-    def get_query_cache(self, key):
-        self.query_cache_mutex.acquire()
-        value = None
+    def get_total_query_time(self):
+        self.total_query_time_mutex.acquire()
+        out = None
         try:
-            if key in self.query_cache:
-                self.increment_cache_hit()
-                value = self.query_cache[key]
+            out = self.total_query_time
         finally:
-            self.query_cache_mutex.release()
-            return value
+            self.total_query_time_mutex.release()
+            return out
+
+    def get_query_cache(self, key):
+        # TODO: skipping getting lock on read only operation, which should be atomic
+        # print(f"Attempting to acquire lock...")
+        # start_wait_time = time.time()
+        # self.query_cache_mutex.acquire()
+        # end_wait_time = time.time()
+        # wait_duration = end_wait_time - start_wait_time
+        # print(f"Acquired lock after waiting for {wait_duration:.4f} seconds.")
+        #
+        # value = None
+        # try:
+        #     if key in self.query_cache:
+        #         self.increment_cache_hit()
+        #         value = self.query_cache[key]
+        # finally:
+        #     self.query_cache_mutex.release()
+        #     return value
+        if key in self.query_cache:
+            self.increment_cache_hit()
+            return self.query_cache[key]
+        return None
 
     def set_query_cache(self, key, value):
         self.query_cache_mutex.acquire()
@@ -82,13 +111,27 @@ class HAKCDatabase:
         finally:
             self.query_cache_mutex.release()
 
-
     def get_hit_rate(self) -> Tuple[int, int, float]:
         cache_hits = self.get_cache_hits()
         cache_misses = self.get_cache_misses()
         total = cache_hits + cache_misses
         ratio = float(float(cache_hits) / float(total)) if total > 0 else 0
         return cache_hits, cache_misses, round(100 * ratio)
+
+    def get_cache_stats(self):
+        total_queries = self.get_cache_misses()
+        total_hits = self.get_cache_hits()
+        # time saved = average query time * number of cache hits
+        stats = ""
+        cache_hits, cache_misses, hit_rate = self.get_hit_rate()
+        self.total_query_time_mutex.acquire()
+        try:
+            average_miss_penalty = (float(self.total_query_time) / float(total_queries))
+            time_saved = round(total_hits * average_miss_penalty)
+            stats += f"\t{total_queries} database queries took {round(self.total_query_time, 2)} seconds with an average of {round(average_miss_penalty, 2)} seconds, hit rate={round(hit_rate, 2)}%; {total_hits} cache hits saved {time_saved} seconds of cpu time."
+        finally:
+            self.total_query_time_mutex.release()
+            return stats
 
     def __del__(self):
         self.close()
@@ -109,22 +152,31 @@ class HAKCDatabase:
         self.conn = kuzu.Connection(self.database)  # thread i connection
 
     def execute_prepared_stmt(self, prepared_stmt: str, **kwargs):
-        return self.conn.execute(prepared_stmt, parameters=kwargs)
+        start = time.time()
+        response =  self.conn.execute(prepared_stmt, parameters=kwargs)
+        end = time.time()
+        self.increment_total_query_time(end - start)
+        logger.info(self.get_cache_stats())
+        return response
+
+    @staticmethod
+    def create_query_key(stmt: str, **kwargs):
+        return stmt.replace(' ', '') + str(tuple(sorted(kwargs.items())))
 
     def execute(self, prepared_stmt: str, enable_cache = True, **kwargs):
         # adding query level caching (essentially a wrapper for conn.execute)
         if enable_cache:
-            _statement = copy.deepcopy(str(prepared_stmt))
-            _kwargs = copy.deepcopy(dict(kwargs))
-            key = _statement.replace(' ', '') + str(tuple(sorted(_kwargs.items())))
-            cache_hits, cache_misses, hit_rate = self.get_hit_rate()
+            # _statement = copy.deepcopy(str(prepared_stmt))
+            # _kwargs = copy.deepcopy(dict(kwargs))
+            key = HAKCDatabase.create_query_key(prepared_stmt, **kwargs)
+            # cache_hits, cache_misses, hit_rate = self.get_hit_rate()
             found = self.get_query_cache(key)
             if found is not None:
-                logger.info(f"Cache hit {cache_hits} ({hit_rate}%)\t[Database level cache]")
+                # logger.info(f"Cache hit  with hit rate {hit_rate}% ({cache_hits}/{cache_hits+cache_misses})\t[Database level cache]")
                 return found
             value = self.execute_prepared_stmt(prepared_stmt, **kwargs).get_as_df()
             self.set_query_cache(key, value)
-            logger.info(f"Cache miss {cache_misses} ({hit_rate}%)\t[Database level cache]")
+            # logger.info(f"Cache miss with hit rate {hit_rate}% ({cache_hits}/{cache_hits+cache_misses})\t[Database level cache]")
             return value
         # if enable_cache:
         #     _statement = copy.deepcopy(str(prepared_stmt))

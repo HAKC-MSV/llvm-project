@@ -239,16 +239,15 @@ class HAKCServerThreadInstance(HAKCServerThread):
                           self.hakc_server.config.add_function_endpoint: self.add_function,
                           self.hakc_server.config.add_global_variable_endpoint: self.add_global_variable,
                           self.hakc_server.config.terminate_connection_endpoint: self.terminate_connection}
-        # TODO: add database level caching?
-        self.query_cache = {self.hakc_server.config.set_dag_filename_endpoint: {},
-                            self.hakc_server.config.add_symbols_endpoint: {},
-                            self.hakc_server.config.add_function_endpoint: {},
-                            self.hakc_server.config.add_global_variable_endpoint: {},
-                            self.hakc_server.config.terminate_connection_endpoint: {}}
+        # self.query_cache = {self.hakc_server.config.set_dag_filename_endpoint: {},
+        #                     self.hakc_server.config.add_symbols_endpoint: {},
+        #                     self.hakc_server.config.add_function_endpoint: {},
+        #                     self.hakc_server.config.add_global_variable_endpoint: {},
+        #                     self.hakc_server.config.terminate_connection_endpoint: {}}
         if self.policy_mode:
             for endpoint_str, endpoint_fn in self.policy_source.endpoints.items():
                 self.endpoints[endpoint_str] = endpoint_fn
-                self.query_cache[endpoint_str] = {}
+                # self.query_cache[endpoint_str] = {}
         if self.analysis_mode:
             self.compartmentalization = HAKCCompartmentalization()
             self.compartmentalization.add_yaml_constructors()
@@ -319,12 +318,12 @@ class HAKCServer(socketserver.ThreadingUnixStreamServer):
         socketserver.ThreadingUnixStreamServer.__init__(self, str(config.socket_path), HAKCServerThreadInstance)
 
     def __del__(self):
-        logger.info(f"Closing HAKCServer")
+        logger.debug(f"Closing HAKCServer")
 
     def handle_error(self, request, client):
         import traceback
         traceback.print_exc()
-        self.logger.info(f"Error handling request {request} for client {client}")
+        self.logger.error(f"Error handling request {request} for client {client}")
         # do a server shutdown, rather than a server_close()
         self.shutdown()
 

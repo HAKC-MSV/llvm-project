@@ -15,8 +15,8 @@ logging.setLoggerClass(HAKCLogger)
 
 logger: HAKCLogger = cast(HAKCLogger, logging.getLogger('hakc-server'))
 
-new_stack_size = 256 * 1024 * 1024
-threading.stack_size(new_stack_size)
+# new_stack_size = 256 * 1024 * 1024
+# threading.stack_size(new_stack_size)
 
 # noinspection PyTypeChecker
 class HAKCServerThread(socketserver.StreamRequestHandler):
@@ -32,9 +32,6 @@ class HAKCServerThread(socketserver.StreamRequestHandler):
         self.size_in_bytes = struct.calcsize(HAKCServerThread.size_fmt)
         self.config: HAKCServerConfig = None
         self.endpoints = dict()
-        self.query_cache = {}
-        self.cache_hit = 0
-        self.cache_miss = 0
         self.policy_source = None
 
     @property
@@ -85,32 +82,12 @@ class HAKCServerThread(socketserver.StreamRequestHandler):
         endpoint = hakc_request.endpoint
         if endpoint not in self.endpoints:
             raise RuntimeError(f'Invalid Endpoint {endpoint}, endpoints available: {self.endpoints.keys()}')
-
-        key = self.config.get_cache_key_from_request(hakc_request) if self.config else None
-        # logger.info(f"Created cache key: {key}")
-        if key:
-            readable_key = key.replace('\n','')[0:min(len(key),40)]
-            # logger.error(f"query_cache: {self.query_cache} with endpoint {endpoint}")
-            if key in self.query_cache[endpoint].keys():
-                self.cache_hit += 1
-                # Note: slicing key to make more readable
-                # logger.info(f"Cache hit {self.cache_hit} on {readable_key}\t[Thread level cache]")
-                # logger.debug(f"Cache hit {key} -> {self.query_cache[endpoint][key]}")
-                return self.query_cache[endpoint][key]
-            self.cache_miss += 1
-            # logger.info(f"Cache miss {self.cache_miss} on {key[0:min(len(key),40)]}\t[Thread level cache] on {endpoint} {self.query_cache}")
-            # logger.info(f"Cache miss {self.cache_miss} on {readable_key}\t[Thread level cache]")
-            self.query_cache[endpoint][key] = self.endpoints[endpoint](**hakc_request.parameters)
-            # logger.debug(f"Cache miss {key} -> {self.query_cache[endpoint][key]}")
-            return self.query_cache[endpoint][key]
-        # if key does not exist (aka we don't support caching, always do the request)
         return self.endpoints[endpoint](**hakc_request.parameters)
 
     def __del__(self):
         # This seems to be executed by the main thread
         if self.logger:
-            hit_rate = round(100*(float(self.cache_hit)/float(self.cache_miss))) if self.cache_miss > 0 else 0
-            self.logger.info(f"Killing Server Thread { f'with {hit_rate}% Cache (Hits/Misses)' if (self.cache_hit > 0 or self.cache_miss > 0) else ''}")
+            self.logger.debug(f"Killing Server Thread")
 
     def terminate_connection(self, **kwargs):
         self.logger.debug(f"Raising Terminate Connection Signal")
