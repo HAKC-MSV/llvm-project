@@ -16,25 +16,16 @@
 
 namespace llvm::hakc {
 HAKCTransformer::HAKCTransformer(HAKCModuleAnalysis &ModuleAnalysis,
-                                 HAKCCompartmentalizationPolicy &Policy)
-    : ModuleAnalysis(ModuleAnalysis), Policy(Policy),
-      HAKCIRBuilder(ModuleAnalysis.GetModule().getContext()),
-      CompartmentalizationPolicy(Policy), VariadicTransferFunctions() {
-  InitAnalysis();
-}
-
-HAKCTransformer::HAKCTransformer(HAKCModuleAnalysis &ModuleAnalysis,
-                                 HAKCCompartmentalizationPolicyDAG &Policy)
-    : ModuleAnalysis(ModuleAnalysis), Policy(Policy),
-      HAKCIRBuilder(ModuleAnalysis.GetModule().getContext()),
-      CompartmentalizationPolicy(Policy), VariadicTransferFunctions() {
+                                 HAKCServerClient &Client)
+    : ModuleAnalysis(ModuleAnalysis), Client(Client),
+      HAKCIRBuilder(ModuleAnalysis.GetModule().getContext()), VariadicTransferFunctions() {
   InitAnalysis();
 }
 
 void HAKCTransformer::InitAnalysis() {
   for (auto &F : getModule().functions()) {
     if (ModuleAnalysis.FunctionNeedsAnalysis(&F)) {
-      auto &Division = Policy.GetDivision(&F);
+      auto &Division = Client.GetDivision(&F);
       auto Compartment = Division.GetHAKCCompartment();
       RegisterUsedCompartment(Compartment);
       ModuleAnalysis.AnalysisFunctions.push_back(&F);
@@ -44,7 +35,7 @@ void HAKCTransformer::InitAnalysis() {
 }
 
 void HAKCTransformer::RegisterUsedCompartment(HAKCCompartment &compartment) {
-  if (compartment != Policy.GetDefaultDivision().GetHAKCCompartment()) {
+  if (compartment != Client.GetDefaultDivision().GetHAKCCompartment()) {
     ModuleAnalysis.UsedCompartments.push_back(compartment);
   }
 }
@@ -57,7 +48,7 @@ void HAKCTransformer::MoveGlobalsToHAKCSection() {
 
   for (auto *pGlobal : globalsToChange) {
     auto finalName = getGlobalHAKCSectionName(pGlobal);
-    auto compartment = Policy.GetDivision(pGlobal).GetHAKCCompartment();
+    auto compartment = Client.GetDivision(pGlobal).GetHAKCCompartment();
     RegisterUsedCompartment(compartment);
 
     if (finalName != pGlobal->getSection()) {
@@ -77,7 +68,7 @@ Function *HAKCTransformer::GetFunctionByName(StringRef Name,
 }
 
 bool HAKCTransformer::isModuleCompartmentalized() {
-  auto &DefaultCompartment = Policy.GetDefaultDivision().GetHAKCCompartment();
+  auto &DefaultCompartment = Client.GetDefaultDivision().GetHAKCCompartment();
   auto Search = [DefaultCompartment](HAKCCompartment &Compartment) {
     return Compartment != DefaultCompartment;
   };
@@ -130,7 +121,7 @@ void HAKCTransformer::TransformModule() {
 void HAKCTransformer::TransformFunctions() {
   for (auto *F : ModuleAnalysis.AnalysisFunctions) {
     HAKCFunctionAnalysis FunctionTransformation(F, ModuleAnalysis, (*this),
-                                                Policy);
+                                                Client);
     FunctionTransformation.InstrumentCode();
   }
 }
@@ -163,11 +154,11 @@ bool HAKCTransformer::TransferFunctionShouldBeCreated(Function *F) {
 
 std::string
 HAKCTransformer::getGlobalHAKCSectionName(GlobalVariable *GV) const {
-  if (CommonHAKCAnalysis::IsUncompartmentalizedSymbol(GV, Policy)) {
+  if (CommonHAKCAnalysis::IsUncompartmentalizedSymbol(GV, Client)) {
     return GV->getSection().str();
   }
 
-  auto Compartment = Policy.GetDivision(GV).GetHAKCCompartment();
+  auto Compartment = Client.GetDivision(GV).GetHAKCCompartment();
   std::string finalName = HAKC_SECTION_PREFIX.str();
   finalName += std::to_string(Compartment.GetCompartmentID()->getSExtValue());
 
@@ -185,8 +176,8 @@ HAKCTransformer::getGlobalHAKCSectionName(GlobalVariable *GV) const {
 void HAKCTransformer::AddTransferFunctions() {
   FunctionList FuncsNeedingTransfers;
   for (auto &F : getModule().functions()) {
-    if (!CommonHAKCAnalysis::IsUncompartmentalizedSymbol(&F, Policy) &&
-        getCommonAnalysis().functionIsTransferCandidate(&F, Policy) &&
+    if (!CommonHAKCAnalysis::IsUncompartmentalizedSymbol(&F, Client) &&
+        getCommonAnalysis().functionIsTransferCandidate(&F, Client) &&
         !CommonHAKCAnalysis::IsOutsideTransferFunc(&F) &&
         ModuleAnalysis.functionEscapes(&F)) {
       FuncsNeedingTransfers.push_back(&F);
@@ -198,8 +189,8 @@ void HAKCTransformer::AddTransferFunctions() {
 
     Function *transferFunc = nullptr;
 
-    if (getCommonAnalysis().functionIsTransferCandidate(&F, Policy)) {
-      auto Compartment = Policy.GetDivision(&F).GetHAKCCompartment();
+    if (getCommonAnalysis().functionIsTransferCandidate(&F, Client)) {
+      auto Compartment = Client.GetDivision(&F).GetHAKCCompartment();
       transferFunc = CreateTransferFunction(&F);
       if (!transferFunc) {
         CommonHAKCAnalysis::getLogger(Fatal)
@@ -239,14 +230,14 @@ void HAKCTransformer::AddTransferFunctions() {
       transferFunc->copyAttributesFrom(&F);
     }
 
-    if (getCommonAnalysis().ValueShouldBeReplacedWithTransfer(&F, Policy)) {
+    if (getCommonAnalysis().ValueShouldBeReplacedWithTransfer(&F, Client)) {
       if (!getCommonAnalysis().IsNoTransferFunction(&F)) {
         CommonHAKCAnalysis::getLogger(Verbose)
             << "Replacing uses of " << F.getName() << " with "
             << transferFunc->getName() << "\n";
         // in_debug = debug_output;
         std::vector<std::pair<User *, unsigned>> UsesToReplace;
-        auto TargetDivision = Policy.GetDivision(&F);
+        auto TargetDivision = Client.GetDivision(&F);
 
         for (auto &FUse : F.uses()) {
           if (auto *I = dyn_cast<Instruction>(FUse.getUser())) {
@@ -257,7 +248,7 @@ void HAKCTransformer::AddTransferFunctions() {
           if (auto *CallI = dyn_cast<CallInst>(FUse.getUser())) {
             if (CallI->getCalledFunction() == &F) {
               auto HeadDivision =
-                  Policy.GetDivision(CallI->getParent()->getParent());
+                  Client.GetDivision(CallI->getParent()->getParent());
               if (HeadDivision.GetHAKCCompartment().GetCompartmentID() !=
                   TargetDivision.GetHAKCCompartment().GetCompartmentID()) {
                 UsesToReplace.push_back(
@@ -308,7 +299,7 @@ bool HAKCTransformer::ConstantStructTransferIsNeeded(
     }
     if (auto *GlobalVal = dyn_cast<GlobalValue>(Def)) {
       Result =
-          !CommonHAKCAnalysis::IsUncompartmentalizedSymbol(GlobalVal, Policy);
+          !CommonHAKCAnalysis::IsUncompartmentalizedSymbol(GlobalVal, Client);
     } else if (auto *StructMember = dyn_cast<ConstantStruct>(Def)) {
       Result = ConstantStructTransferIsNeeded(StructMember);
     }
@@ -325,7 +316,7 @@ bool HAKCTransformer::ConstantStructTransferIsNeeded(
 
 bool HAKCTransformer::TransferIsNeeded(GlobalVariable *GlobalVar) {
   bool IsKernelSym =
-      CommonHAKCAnalysis::IsUncompartmentalizedSymbol(GlobalVar, Policy);
+      CommonHAKCAnalysis::IsUncompartmentalizedSymbol(GlobalVar, Client);
   bool Result = GlobalVar->hasInitializer() && !IsKernelSym;
   if (Result) {
     if (auto *ConstStruct =
@@ -410,7 +401,7 @@ Function *HAKCTransformer::CreateInitTransfer(GlobalVariable *GlobalVar) {
 
 std::string
 HAKCTransformer::GlobalVariableROSectionName(GlobalVariable *GlobalVar) {
-  auto Compartment = Policy.GetDivision(GlobalVar).GetHAKCCompartment();
+  auto Compartment = Client.GetDivision(GlobalVar).GetHAKCCompartment();
   std::string SectionName = ".hakc.";
   SectionName += std::to_string(Compartment.GetCompartmentIDValue());
   SectionName += ".ro_data";
@@ -450,7 +441,7 @@ void HAKCTransformer::PopulateGlobalInitTransferFunc(
 }
 
 void HAKCTransformer::AddCompartmentMetadata() {
-  auto &DefaultCompartment = Policy.GetDefaultDivision().GetHAKCCompartment();
+  auto &DefaultCompartment = Client.GetDefaultDivision().GetHAKCCompartment();
   for (auto Compartment : ModuleAnalysis.UsedCompartments) {
     if (Compartment != DefaultCompartment) {
       AddCompartmentMetadataEntry(Compartment);
@@ -511,7 +502,7 @@ void HAKCTransformer::emitModParamGetCtx(GlobalValue *kernparam) {
       ConstantInt::get(IntegerType::get(getModule().getContext(), 64), 0);
 
   // get HAKC symbol for the kernel parameter Value
-  auto &Division = Policy.GetDivision(kernparam);
+  auto &Division = Client.GetDivision(kernparam);
 
   CommonHAKCAnalysis::getLogger(Verbose)
       << kernparam << " " << Division << "\n";
@@ -560,13 +551,6 @@ bool HAKCTransformer::FunctionIsInAnalysisSet(Function *F) {
                     ModuleAnalysis.AnalysisFunctions.end()));
 }
 
-// HAKCTransformer::HAKCTransformer(HAKCCompartmentalizationPolicy
-// &Policy,
-//                                        HAKCTransformer &ModuleAnalysis)
-//     : HAKCIRBuilder(ModuleAnalysis.getModule().getContext()),
-//       CompartmentalizationPolicy(Policy), ModuleAnalysis(ModuleAnalysis),
-//       VariadicTransferFunctions() {}
-
 Type *HAKCTransformer::GetEntryTokenType(unsigned AddrSpace) const {
   return HAKCCompartment::GetEntryTokenType(HAKCIRBuilder.getContext());
 }
@@ -576,7 +560,7 @@ void HAKCTransformer::CreateDataAuthArguments(
     SmallVectorImpl<Value *> &Result) {
   Function *F = I->getFunction();
   Value *HAKCPointerBitCast;
-  auto Division = CompartmentalizationPolicy.GetDivision(F);
+  auto Division = Client.GetDivision(F);
   auto *AccessToken = Division.GetAccessToken();
   unsigned AddrSpace = GetPointerAddrSpace(HAKCPointer);
   auto *DataAuthFuncTy = getCommonAnalysis().GetDataAuthenticationFunctionType(
@@ -601,7 +585,7 @@ void HAKCTransformer::CreateCodeAuthArguments(
     SmallVectorImpl<Value *> &Results) {
   Function *F = I->getFunction();
   auto *ExitTokens = GetValidTargetCompartments(F);
-  auto Division = CompartmentalizationPolicy.GetDivision(F);
+  auto Division = Client.GetDivision(F);
   auto AccessToken = Division.GetAccessToken();
 
   if (!ExitTokens->getValueType()->isArrayTy()) {
@@ -634,7 +618,7 @@ void HAKCTransformer::CreateTransferArguments(HAKCPointerBase &HAKCPointer,
   auto AddrSpace = GetPointerAddrSpace(HAKCPointer);
   bool IsPerCPU =
       CommonHAKCAnalysis::IsPerCPUPointer(HAKCPointer.GetBaseDefinition());
-  auto Division = CompartmentalizationPolicy.GetDivision(Target);
+  auto Division = Client.GetDivision(Target);
 
   OperandCast = HAKCIRBuilder.CreateBitOrPointerCast(
       HAKCPointer.GetBaseDefinition(), HAKCIRBuilder.getPtrTy(AddrSpace));
@@ -865,7 +849,7 @@ GlobalVariable *HAKCTransformer::GetValidTargetCompartments(
                 const hakc_compartment_id_t RHS) { return LHS < RHS; });
 
   for (auto ID : IDs) {
-    auto TargetCompartment = CompartmentalizationPolicy.GetCompartment(ID);
+    auto TargetCompartment = Client.GetCompartment(ID);
     EntryTokenValues.push_back(TargetCompartment->GetEntryToken());
   }
 
@@ -903,7 +887,7 @@ GlobalVariable *HAKCTransformer::GetValidTargetCompartments(
 }
 
 GlobalVariable *HAKCTransformer::GetValidTargetCompartments(Function *F) const {
-  auto Division = CompartmentalizationPolicy.GetDivision(F);
+  auto Division = Client.GetDivision(F);
   return GetValidTargetCompartments(Division);
 }
 
@@ -1002,7 +986,7 @@ Instruction *HAKCTransformer::CreateCustomTransfer(HAKCPointerBase &HAKCPointer,
     throw std::exception();
   }
 
-  auto TargetDivision = CompartmentalizationPolicy.GetDivision(Target);
+  auto TargetDivision = Client.GetDivision(Target);
   return CustomTransfer->CreateTransfer(HAKCIRBuilder, TargetDivision,
                                         HAKCPointer, Size, IsData);
 }
@@ -1016,10 +1000,10 @@ HAKCTransformer::CreateSignWithDivision(HAKCPointerBase &HAKCPointer,
 
   HAKC_Compartment_ID CompartmentIDValue;
   if (auto *GV = dyn_cast<GlobalValue>(HAKCPointer.GetBaseDefinition())) {
-    auto Division = CompartmentalizationPolicy.GetDivision(GV);
+    auto Division = Client.GetDivision(GV);
     CompartmentIDValue = Division.GetHAKCCompartment().GetCompartmentID();
   } else {
-    auto Division = CompartmentalizationPolicy.GetDivision(Target);
+    auto Division = Client.GetDivision(Target);
     CompartmentIDValue = Division.GetHAKCCompartment().GetCompartmentID();
   }
 
@@ -1173,7 +1157,7 @@ Instruction *HAKCTransformer::CreateVoidCastCompartmentTransfer(
     throw std::exception();
   }
 
-  auto TargetDivision = CompartmentalizationPolicy.GetDivision(Target);
+  auto TargetDivision = Client.GetDivision(Target);
 
   /*
    * at this point, we know the dest type is a struct* and we know the actual
@@ -1243,7 +1227,7 @@ Function *HAKCTransformer::GetTransferFunction(Function *F) const {
 
 bool HAKCTransformer::NoKernelTransfers(Function *Target) {
   return CommonHAKCAnalysis::IsUncompartmentalizedSymbol(
-      Target, CompartmentalizationPolicy);
+      Target, Client);
 }
 
 Value *HAKCTransformer::CreateActionCall(HAKCTransferAction &TransferAction,
@@ -1556,7 +1540,7 @@ Function *HAKCTransformer::PopulateTransferFunction(
       << "Populating " << TransferFunction->getName() << "\n";
 
   bool NoKernelXfers = NoKernelTransfers(Target);
-  auto TargetDivision = CompartmentalizationPolicy.GetDivision(Target);
+  auto TargetDivision = Client.GetDivision(Target);
   SmallVector<Value *> Args;
   for (unsigned i = 0; i < TransferFunction->arg_size(); i++) {
     auto *ArgP = TransferFunction->getArg(i);
@@ -1700,7 +1684,7 @@ ConstantInt *HAKCTransformer::GetDefaultObjectSize() { return getInt64(1); }
 
 bool HAKCTransformer::TargetIsKernel(GlobalValue *Target) {
   return CommonHAKCAnalysis::IsUncompartmentalizedSymbol(
-      Target, CompartmentalizationPolicy);
+      Target, Client);
 }
 
 unsigned HAKCTransformer::GetPointerAddrSpace(HAKCPointerBase &HAKCPointer) {

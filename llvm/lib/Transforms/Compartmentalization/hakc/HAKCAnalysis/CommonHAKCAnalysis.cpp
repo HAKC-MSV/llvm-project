@@ -3,7 +3,7 @@
 //
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/CommonHAKCAnalysis.h"
 #include "llvm/Support/FileSystem.h"
-#include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartmentalizationPolicy.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCDatabase/HAKCServerClient.h"
 
 #include "llvm/IR/DerivedTypes.h"
 
@@ -517,11 +517,11 @@ bool CommonHAKCAnalysis::FunctionHasPointerArg(Function *F) {
 }
 
 bool CommonHAKCAnalysis::ValueShouldBeReplacedWithTransfer(
-    Value *V, HAKCCompartmentalizationPolicy &Policy) {
+    Value *V, HAKCServerClient &Client) {
   if (auto *F = dyn_cast<Function>(V)) {
-    return functionIsTransferCandidate(F, Policy);
+    return functionIsTransferCandidate(F, Client);
   } else if (auto *BCO = dyn_cast<BitCastOperator>(V)) {
-    return ValueShouldBeReplacedWithTransfer(BCO->getOperand(0), Policy);
+    return ValueShouldBeReplacedWithTransfer(BCO->getOperand(0), Client);
   }
   return false;
 }
@@ -586,8 +586,8 @@ CommonHAKCAnalysis::GetCodeAuthenticationFunctionType(Module &M,
 }
 
 bool CommonHAKCAnalysis::IsCompartmentalizedFunction(
-    Function *F, HAKCCompartmentalizationPolicy &Policy) {
-  return !IsUncompartmentalizedSymbol(F, Policy) && !IsOutsideTransferFunc(F);
+    Function *F, HAKCServerClient &Client) {
+  return !IsUncompartmentalizedSymbol(F, Client) && !IsOutsideTransferFunc(F);
 }
 
 std::string CommonHAKCAnalysis::GetOutsideTransferName(Function *F) {
@@ -617,9 +617,9 @@ bool CommonHAKCAnalysis::FunctionIsModParamGetCtx(Function *F) {
 }
 
 bool CommonHAKCAnalysis::functionIsTransferCandidate(
-    Function *F, HAKCCompartmentalizationPolicy &Policy) {
-  auto Division = Policy.GetDivision(F);
-  return !IsNoTransferFunction(F) && !IsUncompartmentalizedSymbol(F, Policy) &&
+    Function *F, HAKCServerClient &Client) {
+  auto Division = Client.GetDivision(F);
+  return !IsNoTransferFunction(F) && !IsUncompartmentalizedSymbol(F, Client) &&
          !F->isDeclaration() && !IsCapabilityReassignmentFunc(F) &&
          !FunctionIsComplexVariadic(F) && !FunctionIsModParamGetCtx(F) &&
          FunctionHasPointerArg(F) &&
@@ -679,10 +679,10 @@ bool CommonHAKCAnalysis::PointerShouldBeConsideredCode(
 }
 
 bool CommonHAKCAnalysis::IsUncompartmentalizedSymbol(
-    GlobalValue *GV, HAKCCompartmentalizationPolicy &Policy) {
-  auto Division = Policy.GetDivision(GV);
+    GlobalValue *GV, HAKCServerClient &Client) {
+  auto Division = Client.GetDivision(GV);
   return Division.GetHAKCCompartment() ==
-         Policy.GetDefaultDivision().GetHAKCCompartment();
+         Client.GetDefaultDivision().GetHAKCCompartment();
 }
 
 bool CommonHAKCAnalysis::IsAllocationFunction(Function *F) {
@@ -704,9 +704,9 @@ HAKCCustomAllocation CommonHAKCAnalysis::GetAllocationDefinition(Function *F) {
 }
 
 bool CommonHAKCAnalysis::FunctionsAreInSameCompartment(
-    Function *F, Function *G, HAKCCompartmentalizationPolicy &Policy) {
-  auto FCompartment = Policy.GetDivision(F).GetHAKCCompartment();
-  auto GCompartment = Policy.GetDivision(G).GetHAKCCompartment();
+    Function *F, Function *G, HAKCServerClient &Client) {
+  auto FCompartment = Client.GetDivision(F).GetHAKCCompartment();
+  auto GCompartment = Client.GetDivision(G).GetHAKCCompartment();
   return FCompartment == GCompartment;
 }
 

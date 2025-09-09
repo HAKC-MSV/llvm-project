@@ -282,11 +282,8 @@ def construct_dag(compartmentalization, dag_path: str, core_count: int, db_dir: 
     dag_compartmentalization = create_dag_multithread(compartmentalization, core_count, db_dir)
     end = time.time()
 
-    logger.info(f'Finished creating DAG.')
+    logger.info(f'Finished creating DAG {dag_compartmentalization}')
     logger.info(f'    Total Time: {end - start} seconds')
-    logger.info(f'    Type Count: {len(dag_compartmentalization.get_types())}')
-    logger.info(f'  Global Count: {len(dag_compartmentalization.get_global_variables())}')
-    logger.info(f'Function Count: {len(dag_compartmentalization.get_functions())}')
     return dag_compartmentalization
 
 def print_edge_data(G):
@@ -366,11 +363,7 @@ def main():
 
     if args.create_dag:
         compartmentalization = parse_yaml(args.dag_path)
-        logger.info(f"""\tLoaded {compartmentalization} with
-                                {len(compartmentalization.get_types())}\tTypes
-                                {len(compartmentalization.get_scopes())}\tScopes
-                                {len(compartmentalization.get_global_variables())}\tGlobal Variables
-                                {len(compartmentalization.get_functions())}\tFunctions""")
+        logger.info(f"\tLoaded {compartmentalization}")
         create_new_db(compartmentalization, args.db_dir)
         compartmentalization = add_default_compartmentalization(compartmentalization, args.db_dir)
         compartmentalization = construct_dag(compartmentalization, args.dag_path, args.core_count, args.db_dir)

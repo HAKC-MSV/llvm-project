@@ -3,14 +3,17 @@ import multiprocessing as mp
 from typing import Type, Optional, Tuple, cast
 
 import pandas as pd
-
+import copy
 from .HAKCBase import HAKCDBNode, HAKCDBRelation
 from .HAKCLogger import HAKCLogger
 from .HAKCObjects import HAKCSymbol, HAKCFunction, HAKCScope, HAKCType, HAKCGlobalVariable, HAKCDivision, \
     HAKCCompartment, HAKCDefinitionLocation
 
 logging.setLoggerClass(HAKCLogger)
-logger: HAKCLogger = cast(HAKCLogger, logging.getLogger('hakc-dag'))
+
+logger: HAKCLogger = cast(HAKCLogger, logging.getLogger('hakc-database'))
+
+# creating thread lock for shared resource (caching system)
 
 class HAKCDatabase:
     def __init__(self, db_dir: str, read_only: bool = False, max_num_threads=int(mp.cpu_count() / 2)):
@@ -18,7 +21,74 @@ class HAKCDatabase:
         self.database = None
         self.conn = None
         self.open(read_only=read_only, max_num_threads=max_num_threads)
-        self.count_executed_statements = 0
+        self.cache_hit_mutex = mp.Lock()
+        self.cache_miss_mutex = mp.Lock()
+        self.query_cache_mutex = mp.Lock()
+        self.cache_hit = 0
+        self.cache_miss = 0
+        self.query_cache = {}
+
+    def increment_cache_hit(self):
+        self.cache_hit_mutex.acquire()
+        try:
+            logger.error(f"Incrementing cache_hit {self.cache_hit}")
+            self.cache_hit += 1
+        finally:
+            self.cache_hit_mutex.release()
+
+    def increment_cache_miss(self):
+        self.cache_miss_mutex.acquire()
+        try:
+            logger.error(f"Incrementing cache_miss {self.cache_miss}")
+            self.cache_miss += 1
+        finally:
+            self.cache_miss_mutex.release()
+
+    def get_cache_hits(self):
+        self.cache_hit_mutex.acquire()
+        out = None
+        try:
+            out = self.cache_hit
+        finally:
+            self.cache_hit_mutex.release()
+            return out
+
+    def get_cache_misses(self):
+        self.cache_miss_mutex.acquire()
+        out = None
+        try:
+            out = self.cache_miss
+        finally:
+            self.cache_miss_mutex.release()
+            return out
+
+    def get_query_cache(self, key):
+        self.query_cache_mutex.acquire()
+        value = None
+        try:
+            if key in self.query_cache:
+                self.increment_cache_hit()
+                value = self.query_cache[key]
+        finally:
+            self.query_cache_mutex.release()
+            return value
+
+    def set_query_cache(self, key, value):
+        self.query_cache_mutex.acquire()
+        try:
+            if key not in self.query_cache:
+                self.increment_cache_miss()
+                self.query_cache[key] = value
+        finally:
+            self.query_cache_mutex.release()
+
+
+    def get_hit_rate(self) -> Tuple[int, int, float]:
+        cache_hits = self.get_cache_hits()
+        cache_misses = self.get_cache_misses()
+        total = cache_hits + cache_misses
+        ratio = float(float(cache_hits) / float(total)) if total > 0 else 0
+        return cache_hits, cache_misses, round(100 * ratio)
 
     def __del__(self):
         self.close()
@@ -39,8 +109,37 @@ class HAKCDatabase:
         self.conn = kuzu.Connection(self.database)  # thread i connection
 
     def execute_prepared_stmt(self, prepared_stmt: str, **kwargs):
-        self.count_executed_statements += 1
         return self.conn.execute(prepared_stmt, parameters=kwargs)
+
+    def execute(self, prepared_stmt: str, enable_cache = True, **kwargs):
+        # adding query level caching (essentially a wrapper for conn.execute)
+        if enable_cache:
+            _statement = copy.deepcopy(str(prepared_stmt))
+            _kwargs = copy.deepcopy(dict(kwargs))
+            key = _statement.replace(' ', '') + str(tuple(sorted(_kwargs.items())))
+            cache_hits, cache_misses, hit_rate = self.get_hit_rate()
+            found = self.get_query_cache(key)
+            if found is not None:
+                logger.info(f"Cache hit {cache_hits} ({hit_rate}%)\t[Database level cache]")
+                return found
+            value = self.execute_prepared_stmt(prepared_stmt, **kwargs).get_as_df()
+            self.set_query_cache(key, value)
+            logger.info(f"Cache miss {cache_misses} ({hit_rate}%)\t[Database level cache]")
+            return value
+        # if enable_cache:
+        #     _statement = copy.deepcopy(str(prepared_stmt))
+        #     _kwargs = copy.deepcopy(dict(kwargs))
+        #     key = _statement.replace(' ', '') + str(tuple(sorted(_kwargs.items())))
+        #     hit_rate = round(100*(float(self.cache_hit)/float(self.cache_miss))) if self.cache_miss > 0 else 0
+        #
+        #     if key in self.query_cache:
+        #         logger.info(f"Cache hit {self.cache_miss} ({hit_rate}%)\t[Database level cache]")
+        #         self.cache_miss += 1
+        #         return self.query_cache[key]
+        #     logger.info(f"Cache miss {self.cache_hit} ({hit_rate}%)\t[Database level cache]")
+        #     self.query_cache[key] = self.execute_prepared_stmt(prepared_stmt, **kwargs).get_as_df()
+        #     return self.query_cache[key]
+        return self.execute_prepared_stmt(prepared_stmt, **kwargs).get_as_df()
 
     def get_compartment_entry_token_from_id(self, compartment_id: int) -> Optional[int]:
         cmd = f"""
@@ -49,9 +148,7 @@ class HAKCDatabase:
         WHERE comp.{str(HAKCCompartment.get_primary_key())} = $compartment_id
         RETURN DISTINCT div1.DivisionID AS DivisionID
         """
-        response = self.execute_prepared_stmt(cmd, compartment_id=compartment_id)
-        # todo: check if response has next?
-        data = response.get_as_df().to_dict(orient='records')
+        data = self.execute(cmd, compartment_id=compartment_id).to_dict(orient='records')
         target_divisions = set()
         for division_id_dict in data:
             division_id = division_id_dict['DivisionID'] if 'DivisionID' in division_id_dict else None
@@ -66,8 +163,7 @@ class HAKCDatabase:
         WHERE comp.{str(HAKCCompartment.get_primary_key())} = $compartment_id AND div1.DivisionID = $division_id
         RETURN DISTINCT div2.DivisionID AS DivisionID
         """
-        response = self.execute_prepared_stmt(cmd, division_id=division_id, compartment_id=compartment_id)
-        data = response.get_as_df().to_dict(orient='records')
+        data = self.execute(cmd, division_id=division_id, compartment_id=compartment_id).to_dict(orient='records')
         division_ids = {division_id}
         for division_id_dict in data:
             division_id = division_id_dict['DivisionID'] if 'DivisionID' in division_id_dict else None
@@ -82,13 +178,11 @@ class HAKCDatabase:
         WHERE div.DivisionID = $division_id AND c.CompartmentID = $compartment_id
         RETURN DISTINCT div.DivisionID AS DivisionID, div.Salt AS Salt, div.{str(HAKCDivision.get_primary_key())} AS division_hash
         """
-        response = self.execute_prepared_stmt(cmd, division_id=division_id, compartment_id=compartment_id)
-        if response.has_next():
-            data = response.get_as_df().to_dict(orient='records')
-            # list of dictionary
-            if len(data) == 1:
-                division = HAKCDivision(AccessToken=access_token, **data[0])
-                return division
+        data = self.execute(cmd, division_id=division_id, compartment_id=compartment_id).to_dict(orient='records')
+        # list of dictionaries
+        if len(data) == 1:
+            division = HAKCDivision(AccessToken=access_token, **data[0])
+            return division
         return None
 
     def get_division_id_compartment_id_from_symbol(self, symbol: HAKCSymbol) -> Optional[
@@ -99,9 +193,7 @@ class HAKCDatabase:
         WHERE Name = $Name AND Scope = $Scope
         RETURN DISTINCT DivisionID, Salt, CompartmentID;
         """
-        response = self.execute_prepared_stmt(cmd, Name=symbol.name, Scope=symbol.scope.scope)
-        # TODO: double check that this only returns one row
-        data = response.get_as_df().to_dict(orient='records')
+        data = self.execute(cmd, Name=symbol.name, Scope=symbol.scope.scope).to_dict(orient='records')
         if len(data) == 1:
             division = HAKCDivision(**data[0])
             compartment = HAKCCompartment(**data[0])
@@ -123,9 +215,9 @@ class HAKCDatabase:
         WHERE comp1.CompartmentID = $source_compartment_id
         RETURN DISTINCT comp2.CompartmentID;
         """
-        response = self.execute_prepared_stmt(cmd, source_compartment_id=source_compartment_id)
+        data = self.execute(cmd, source_compartment_id=source_compartment_id).to_dict(orient='records')
         targets = set()
-        for entry in response.get_as_df().to_dict(orient='records'):
+        for entry in data:
             target_id = entry["comp2.CompartmentID"] if "comp2.CompartmentID" in entry else None
             if target_id:
                 logger.debug(f"Found valid_targets from {entry['comp1.CompartmentID']} to {target_id}")
@@ -155,9 +247,9 @@ class HAKCDatabase:
         MATCH (sym:{HAKCSymbol.get_table_name()})
         RETURN sym.{str(HAKCSymbol.get_primary_key())} AS symbol_hash;
         """
-        response = self.execute_prepared_stmt(cmd)
+        data = self.execute(cmd).to_dict(orient='records')
         all_symbol_hashes = set()
-        for entry in response.get_as_df().to_dict(orient='records'):
+        for entry in data:
             symbol_hash = entry["symbol_hash"] if "symbol_hash" in entry else None
             if symbol_hash:
                 all_symbol_hashes.add(int(symbol_hash))
@@ -186,18 +278,21 @@ class HAKCDatabase:
         MATCH (div:{HAKCDivision.get_table_name()})-[:{HAKCDivision.relation_compartment}]->(c:{HAKCCompartment.get_table_name()})
         DETACH DELETE div, c;
         """
-        self.execute_prepared_stmt(cmd)
+        self.execute(cmd, enable_cache=False)
 
     def get_all_divisions(self):
         cmd = f"""
         MATCH (div:{HAKCDivision.get_table_name()})
         RETURN div.DivisionID as DivisionID, div.Salt as Salt, div.{str(HAKCDivision.get_primary_key())} as division_hash
         """
-        response = self.execute_prepared_stmt(cmd)
-        divisions = set()
-        if response.has_next():
-            for entry in response.get_as_df().to_dict(orient='records'):
-                divisions.add(HAKCDivision(**entry))
+        data = self.execute(cmd).to_dict(orient='records')
+        # divisions = set()
+        # use list instead of set becasue we allow for duplicates
+        divisions = list()
+        # if response.has_next():
+        for entry in data:
+            # divisions.add(HAKCDivision(**entry))
+            divisions.append(HAKCDivision(**entry))
         return divisions
 
     def get_all_compartments(self):
@@ -206,10 +301,9 @@ class HAKCDatabase:
         RETURN {HAKCCompartment.get_table_name()}.CompartmentID as CompartmentID;
         """
         compartments = set()
-        response = self.execute_prepared_stmt(cmd)
-        if response.has_next():
-            for entry in response.get_as_df().to_dict(orient='records'):
-                compartments.add(HAKCCompartment(**entry))
+        data = self.execute(cmd).to_dict(orient='records')
+        for entry in data:
+            compartments.add(HAKCCompartment(**entry))
         return compartments
 
     def get_symbol_definition_location(self, symbol: HAKCSymbol) -> Optional[HAKCDefinitionLocation]:
@@ -218,11 +312,9 @@ class HAKCDatabase:
         WHERE sym.{str(HAKCSymbol.get_primary_key())} = $symbol_hash
         RETURN dl.DefiningFile as DefiningFile, e.DefiningLine as DefiningLine;
         """
-        response = self.execute_prepared_stmt(cmd, symbol_hash=hash(symbol))
-        if response.has_next():
-            data = response.get_as_df().to_dict(orient='records')
-            if len(data) == 1:
-                return HAKCDefinitionLocation(**data[0])
+        data = self.execute(cmd, symbol_hash=hash(symbol)).to_dict(orient='records')
+        if len(data) == 1:
+            return HAKCDefinitionLocation(**data[0])
         return None
 
     def get_dag_computation_edges(self, symbol_hash: int) -> dict[str, list[int]]:
@@ -236,7 +328,7 @@ class HAKCDatabase:
         response = self.execute_prepared_stmt(cmd, symbol_hash=symbol_hash)
         df = response.get_as_pl()
         for table_name, entries in df.to_dict(as_series=False).items():
-            logger.error(f"Got response: {table_name} -> {entries}")
+            # logger.error(f"Got response: {table_name} -> {entries}")
             if len(entries) > 0:
                 result[table_name] = entries
         cmd = f"""
@@ -305,12 +397,11 @@ class HAKCDatabase:
             ORDER BY ty.DebugType, ty.LLVMType;
         """
         try:
-            response = self.execute_prepared_stmt(cmd, symbol_hash=hash(symbol))
+            data = self.execute(cmd, symbol_hash=hash(symbol)).to_dict(orient='records')
             types = []
-            if response.has_next():
-                for entry in response.get_as_df().to_dict(orient='records'):
-                    ty = self._create_type_from_response(**entry)
-                    types.append(ty)
+            for entry in data:
+                ty = self._create_type_from_response(**entry)
+                types.append(ty)
         except Exception as e:
             logger.error(f'get_indirect_calls failed')
             raise e
@@ -324,13 +415,12 @@ class HAKCDatabase:
                 RETURN DISTINCT head.*, tail.*, ty.*, scope.*;
             """
         try:
-            response = self.execute_prepared_stmt(cmd, symbol_hash=hash(symbol))
+            data = self.execute(cmd, symbol_hash=hash(symbol)).to_dict(orient='records')
             direct_calls = set()
-            if response.has_next():
-                for entry in response.get_as_df().to_dict(orient='records'):
-                    if entry["head.IsFunction"] and entry["tail.IsFunction"]:
-                        call = self._create_symbol_from_response(is_function=True, symbol_prefix='tail.', **entry)
-                        direct_calls.add(call)
+            for entry in data:
+                if entry["head.IsFunction"] and entry["tail.IsFunction"]:
+                    call = self._create_symbol_from_response(is_function=True, symbol_prefix='tail.', **entry)
+                    direct_calls.add(call)
         except Exception as e:
             logger.error(f'get_direct_calls failed')
             raise e
@@ -345,13 +435,11 @@ class HAKCDatabase:
             sc.LocalScopeName, ty.DebugType, ty.LLVMType;
         """
         try:
-            response = self.execute_prepared_stmt(cmd, symbol_hash=hash(symbol))
+            data = self.execute(cmd, symbol_hash=hash(symbol)).to_dict(orient='records')
             used_symbols = set()
-            if response.has_next():
-                for entry in response.get_as_df().to_dict(orient='records'):
-                    symbol = self._create_symbol_from_response(symbol_prefix='tail.', scope_prefix='sc.',
-                                                               type_prefix='ty.', **entry)
-                    used_symbols.add(symbol)
+            for entry in data:
+                symbol = self._create_symbol_from_response(symbol_prefix='tail.', scope_prefix='sc.', type_prefix='ty.', **entry)
+                used_symbols.add(symbol)
         except Exception as e:
             logger.error(f'get_used_symbols failed')
             raise e
@@ -395,11 +483,11 @@ class HAKCDatabase:
 
     def create_node_table(self, node_type: Type[HAKCDBNode]):
         create_cmd = f'CREATE NODE TABLE IF NOT EXISTS {node_type.get_table_definition()}'
-        self.execute_prepared_stmt(create_cmd)
+        self.execute(create_cmd, enable_cache=False)
 
     def create_relationship_table(self, edge_type: HAKCDBRelation):
         create_cmd = f'CREATE REL TABLE IF NOT EXISTS {edge_type.get_definition()}'
-        self.execute_prepared_stmt(create_cmd)
+        self.execute(create_cmd, enable_cache=False)
 
     def get_dag_edges(self, _symbol: HAKCSymbol) -> set[tuple['HAKCSymbol', int]]:
         # want to reconstruct the output from the yaml exactly, so the compartmentalization can be rebuilt from the database
@@ -416,25 +504,19 @@ class HAKCDatabase:
         """
 
         # print(cmd)
-        response = self.execute_prepared_stmt(cmd, symbol_hash=hash(_symbol))
+        data = self.execute(cmd, symbol_hash=hash(_symbol)).to_dict(orient='records')
         dag_edges = set()
-
-        if response.has_next():
-            # Note: the uint64 hashes seem to be cast to floats if a nan is present
-            # print(info)
-            for entry in response.get_as_df().to_dict(orient='records'):
-                # logger.fatal(f"Processing symbol {data['HAKCSymbol.Name'] if 'HAKCSymbol.Name' in data else ''}")
-
-                if entry["HAKCSymbol.IsFunction"]:
-                    func = HAKCDatabase.__create_object_from_response(HAKCFunction, **entry)
-                    dag_edge = (func, entry[f"{HAKCSymbol.relation_symbol}.weight"])
-                    dag_edges.add(dag_edge)
-                    # print(f"Found DAG: {dag_edge}")
-                else:
-                    gv = HAKCDatabase.__create_object_from_response(HAKCGlobalVariable, **entry)
-                    dag_edge = (gv, entry[f"{HAKCSymbol.relation_symbol}.weight"])
-                    dag_edges.add(dag_edge)
-                    # print(f"Found DAG: {dag_edge}")
+        for entry in data:
+            if entry["HAKCSymbol.IsFunction"]:
+                func = HAKCDatabase.__create_object_from_response(HAKCFunction, **entry)
+                dag_edge = (func, entry[f"{HAKCSymbol.relation_symbol}.weight"])
+                dag_edges.add(dag_edge)
+                # print(f"Found DAG: {dag_edge}")
+            else:
+                gv = HAKCDatabase.__create_object_from_response(HAKCGlobalVariable, **entry)
+                dag_edge = (gv, entry[f"{HAKCSymbol.relation_symbol}.weight"])
+                dag_edges.add(dag_edge)
+                # print(f"Found DAG: {dag_edge}")
         return dag_edges
 
 
@@ -451,15 +533,10 @@ class HAKCDatabase:
         WHERE {HAKCSymbol.get_table_name()}.{HAKCSymbol.get_primary_key()} = $symbol_hash  
         RETURN DISTINCT {scope_attrs}, {symbol_attrs}, {division_attrs}, {compartment_attrs};
         """
-        # print(cmd)
-        # Note: some issue with the below prepared statement
-        response = self.execute_prepared_stmt(cmd, symbol_hash=hash(_symbol))
+        data = self.execute(cmd, symbol_hash=hash(_symbol)).to_dict(orient='records')
         div, comp = None, None
-        if response.has_next():
-            # Note: the uint64 hashes seem to be cast to floats if a nan is present
-            data = response.get_as_df().to_dict(orient='records')
-            if len(data) == 1:
-                div, comp = HAKCDatabase.__create_object_from_response(HAKCDivision, **data[0])
+        if len(data) == 1:
+            div, comp = HAKCDatabase.__create_object_from_response(HAKCDivision, **data[0])
         return div, comp
 
     @staticmethod
@@ -468,6 +545,7 @@ class HAKCDatabase:
         return ", ".join([f"{cls.get_table_name()}.{x.column_name}" for x in cls.get_data_columns()] + [f"{cls.get_table_name()}.{cls.get_primary_key()}"])
 
     def _get_symbols(self, symbol_name: str = None, symbol_hash: int = None, where: str = None, deep = False ) -> set[HAKCSymbol]:
+        # TODO: add function level caching
         # want to reconstruct the output from the yaml exactly, so the compartmentalization can be rebuilt from the database
         type_attrs = HAKCDatabase.get_object_attributes(HAKCType)
         scope_attrs = HAKCDatabase.get_object_attributes(HAKCScope)
@@ -486,37 +564,26 @@ class HAKCDatabase:
             cmdargs['symbol_name'] = symbol_name
         if symbol_hash:
             cmdargs['symbol_hash'] = symbol_hash
-        response = self.execute_prepared_stmt(cmd, **cmdargs)
+        data = self.execute(cmd, **cmdargs).to_dict(orient='records')
         # logger.fatal(response)
         functions = set()
         gvs = set()
-        # if response.has_next():
-        #     lines = response.get_next()
-        #     for line in lines:
-        #         print(line)
+        for entry in data:
+            entry["HAKCDefinitionLocation.DefiningLine"] = entry["DefiningLine"]
+            del entry["DefiningLine"]
 
-        # logger.fatal(str(response.get_next()))
-        if response.has_next():
-            # pd.set_option('display.max_columns', 15)
-            # logger.fatal(data[['HAKCSymbol.Name', 'HAKCDefinitionLocation.dl_hash']].head(3))
-            for entry in response.get_as_df().to_dict(orient='records'):
-                # logger.debug(f"Processing symbol {entry['HAKCSymbol.Name'] if 'HAKCSymbol.Name' in entry else ''}")
+            # if no definition found, then remove empty keys
+            if 'HAKCDefinitionLocation.DefiningFile' in entry:
+                del entry['HAKCDefinitionLocation.DefiningFile']
+            if 'HAKCDefinitionLocation.DefiningLine' in entry:
+                del entry['HAKCDefinitionLocation.DefiningLine']
 
-                entry["HAKCDefinitionLocation.DefiningLine"] = entry["DefiningLine"]
-                del entry["DefiningLine"]
-
-                # if no definition found, then remove empty keys
-                if 'HAKCDefinitionLocation.DefiningFile' in entry:
-                    del entry['HAKCDefinitionLocation.DefiningFile']
-                if 'HAKCDefinitionLocation.DefiningLine' in entry:
-                    del entry['HAKCDefinitionLocation.DefiningLine']
-
-                if entry["HAKCSymbol.IsFunction"] is True:
-                    func = HAKCDatabase.__create_object_from_response(HAKCFunction, **entry)
-                    functions.add(func)
-                else:
-                    gv = HAKCDatabase.__create_object_from_response(HAKCGlobalVariable, **entry)
-                    gvs.add(gv)
+            if entry["HAKCSymbol.IsFunction"] is True:
+                func = HAKCDatabase.__create_object_from_response(HAKCFunction, **entry)
+                functions.add(func)
+            else:
+                gv = HAKCDatabase.__create_object_from_response(HAKCGlobalVariable, **entry)
+                gvs.add(gv)
 
         # the 'base' HAKCSymbol is now created, now look for all symbols used, direct calls, indirect calls, types used
         # Note: Speeding up performance by only doing a 'shallow' query of the direct calls, since we only need to know enough to create the symbol hash
@@ -548,33 +615,11 @@ class HAKCDatabase:
             WHERE sym.Name=$Name AND dl.DefiningFile=$DefiningFile AND dl.DefiningLine=$DefiningLine
             RETURN DISTINCT sym.{HAKCSymbol.get_primary_key()}
         """
-        response = self.execute_prepared_stmt(cmd, Name=Name, DefiningFile=DefiningFile, DefiningLine=DefiningLine)
-        data = response.get_as_df().to_dict(orient='records')
+        data = self.execute(cmd, Name=Name, DefiningFile=DefiningFile, DefiningLine=DefiningLine).to_dict(orient='records')
         if len(data) == 1:
             return data[0][f"sym.{HAKCSymbol.get_primary_key()}"]
         logger.fatal(f"Queried symbol hash from (Name, DefiningFile, DefiningLine) = ({Name}, {DefiningFile}, {DefiningLine}), but could not find symbol hash!")
         return None
-
-    # def set_compartment_id_by_symbol(self, _symbol : HAKCSymbol, new_compartment_id: int):
-    #
-    #     # delete old relationship between symbol and compartment
-    #     # Note: Assumes that the new compartment id exists in the database, which is true for the time being
-    #     cmd = f"""
-    #     MATCH (sym:{HAKCSymbol.get_table_name()})-[:{HAKCSymbol.relation_division}]->(div:{HAKCDivision.get_table_name()})-[old_edge:{HAKCDivision.relation_compartment}]->(comp:{HAKCCompartment.get_table_name()})
-    #     WHERE sym.{HAKCSymbol.get_primary_key()} = $symbol_hash
-    #     DELETE old_edge
-    #     RETURN comp.CompartmentID
-    #     """
-    #     response = self.execute_prepared_stmt(cmd, symbol_hash=hash(_symbol))
-    #     logger.debug(get_response_as_dict(response))
-    #     cmd = f"""
-    #     MATCH (sym)-[:{HAKCSymbol.relation_division}]->(div:{HAKCDivision.get_table_name()}), (comp:{HAKCCompartment.get_table_name()})
-    #     WHERE sym.{HAKCSymbol.get_primary_key()} = $symbol_hash AND comp.CompartmentID = $compartment_id
-    #     CREATE (div)-[new_edge:{HAKCDivision.relation_compartment}]->(comp)
-    #     RETURN comp.CompartmentID
-    #     """
-    #     response = self.execute_prepared_stmt(cmd, symbol_hash=int(_symbol.get_computed_hash()), compartment_id=new_compartment_id)
-    #     logger.debug(get_response_as_dict(response))
 
     def set_division_compartment_id_by_symbol(self, _symbol : HAKCSymbol, new_division_id: int, new_compartment_id: int):
 
@@ -584,14 +629,14 @@ class HAKCDatabase:
         WHERE sym.{HAKCSymbol.get_primary_key()} = $symbol_hash
         DELETE old_div_edge, old_comp_edge;
         """
-        self.execute_prepared_stmt(cmd, symbol_hash=hash(_symbol))
+        self.execute(cmd, symbol_hash=hash(_symbol), enable_cache=False)
 
         # create new compartment if it does not exist in the database
         # MERGE -> If MATCH <pattern> then RETURN <pattern> ELSE CREATE <pattern>
         cmd = f"""
         MERGE (comp:{HAKCCompartment.get_table_name()} {{CompartmentID: $compartment_id}});
         """
-        self.execute_prepared_stmt(cmd, compartment_id=new_compartment_id)
+        self.execute(cmd, compartment_id=new_compartment_id, enable_cache=False)
 
         # check if new division is connected to the new compartment
         cmd = f"""
@@ -599,7 +644,7 @@ class HAKCDatabase:
         WHERE comp.CompartmentID = $compartment_id
         RETURN div.*; 
         """
-        response = self.execute_prepared_stmt(cmd, compartment_id=new_compartment_id)
+        response = self.execute(cmd, compartment_id=new_compartment_id, enable_cache=False)
         data = response.get_as_df().to_dict(orient='records')
         create_division = len(data) == 0
 
@@ -611,7 +656,7 @@ class HAKCDatabase:
             WHERE comp.CompartmentID = $compartment_id 
             CREATE (div:{HAKCDivision.get_table_name()} {{division_hash: $division_hash, DivisionID: $division_id, Salt: $salt}})-[:{HAKCDivision.relation_compartment}]->(comp:{HAKCCompartment.get_table_name()}); 
             """
-            self.execute_prepared_stmt(cmd, compartment_id=new_compartment_id, division_hash=hash(new_div), division_id=new_division_id, salt=new_div.salt)
+            self.execute(cmd, compartment_id=new_compartment_id, division_hash=hash(new_div), division_id=new_division_id, salt=new_div.salt, enable_cache=False)
 
         cmd = f"""
         MATCH (div:{HAKCDivision.get_table_name()})-[:{HAKCDivision.relation_compartment}]->(comp:{HAKCCompartment.get_table_name()}), 
@@ -619,4 +664,4 @@ class HAKCDatabase:
         WHERE sym.{HAKCSymbol.get_primary_key()} = $symbol_hash AND comp.CompartmentID = $compartment_id AND div.DivisionID = $division_id
         CREATE (sym)-[new_div_edge]->(div);
         """
-        self.execute_prepared_stmt(cmd, symbol_hash=int(_symbol.get_computed_hash()), compartment_id=new_compartment_id, division_id=new_division_id)
+        self.execute(cmd, symbol_hash=int(_symbol.get_computed_hash()), compartment_id=new_compartment_id, division_id=new_division_id, enable_cache=False)

@@ -5,8 +5,7 @@
 #ifndef HAKC_COMMONHAKCANALYSIS_H
 #define HAKC_COMMONHAKCANALYSIS_H
 
-// #include "llvm/Transforms/Compartmentalization/hakc/HAKCDatabase/HAKCDatabase.h"
-#include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartmentalizationPolicy.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCDatabase/HAKCServerClient.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCSystemInformation.h"
 
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCLogger.h"
@@ -84,7 +83,7 @@ public:
 
   bool
   ValueShouldBeReplacedWithTransfer(Value *V,
-                                    HAKCCompartmentalizationPolicy &Policy);
+                                    HAKCServerClient &Client);
 
   bool IsSafeTransitionFunction(Function *F);
 
@@ -103,7 +102,7 @@ public:
   bool IsAllocationFunction(Function *F);
 
   bool functionIsTransferCandidate(Function *F,
-                                   HAKCCompartmentalizationPolicy &Policy);
+                                   HAKCServerClient &Client);
 
   static HAKCLogger &getLogger(HAKCLogLevel log_level,
                                bool suppress_output = false);
@@ -126,7 +125,7 @@ public:
 
   static bool
   FunctionsAreInSameCompartment(Function *F, Function *G,
-                                HAKCCompartmentalizationPolicy &Policy);
+                                HAKCServerClient &Client);
 
   bool IsSafeTransitionCall(CallBase *call);
 
@@ -134,7 +133,7 @@ public:
 
   static bool
   IsCompartmentalizedFunction(Function *F,
-                              HAKCCompartmentalizationPolicy &Policy);
+                              HAKCServerClient &Client);
 
   static bool IsStringType(Type *Ty);
 
@@ -159,7 +158,7 @@ public:
 
   static bool
   IsUncompartmentalizedSymbol(GlobalValue *GV,
-                              HAKCCompartmentalizationPolicy &Policy);
+                              HAKCServerClient &Client);
 
   static void VerifyFunction(Function *F);
 

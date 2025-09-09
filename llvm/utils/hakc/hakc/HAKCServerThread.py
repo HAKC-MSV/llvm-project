@@ -3,7 +3,7 @@ import logging
 import socketserver
 import struct
 import threading
-from typing import cast
+from typing import cast, Optional
 
 import yaml
 
@@ -15,22 +15,27 @@ logging.setLoggerClass(HAKCLogger)
 
 logger: HAKCLogger = cast(HAKCLogger, logging.getLogger('hakc-server'))
 
+new_stack_size = 256 * 1024 * 1024
+threading.stack_size(new_stack_size)
+
 # noinspection PyTypeChecker
 class HAKCServerThread(socketserver.StreamRequestHandler):
     size_fmt = "@L"
 
     def init(self):
         # Note: handler() can be called before the actual __init__() function is called, so make a custom blocking init() for use in handler()
-        logger.debug(f"Spinning up Server Thread")
         # Initialize thread specific data
         self.logger = cast(HAKCLogger, logging.getLogger(str(threading.get_ident())))
         # Maybe use CLoader because it's faster (but may have some compatability issues)
-
         self.yaml_loader = yaml.CLoader
         self.file_handler = None
         self.size_in_bytes = struct.calcsize(HAKCServerThread.size_fmt)
         self.config: HAKCServerConfig = None
         self.endpoints = dict()
+        self.query_cache = {}
+        self.cache_hit = 0
+        self.cache_miss = 0
+        self.policy_source = None
 
     @property
     def hakc_server(self):
@@ -66,42 +71,62 @@ class HAKCServerThread(socketserver.StreamRequestHandler):
     def write_response_to_socket(self, response: HAKCPrintableObj):
         if not (isinstance(response, HAKCPrintableObj)):
             raise Exception(f"Generated response to request is not a HAKCPrintableObj and is invalid: {response}")
-        # self.logger.debug(f"Sending response {response}")
         response_data = json.dumps(response.to_yaml_dict(), default=str)
-        # self.logger.debug(f"Sending response data {response_data}")
         encoded_data = response_data.encode('utf-8')
         self.logger.debug(f"Sending encoded data {encoded_data}")
         bytes_written = self.write_raw_bytes(struct.pack(
             HAKCServerThread.size_fmt, len(encoded_data)))
-        # self.logger.debug(f"Sending {bytes_written} bytes")
         bytes_written += self.write_raw_bytes(encoded_data)
         return bytes_written
 
     # noinspection PyTypeChecker
     def handle_endpoint(self, hakc_request: HAKCDataRequest) -> HAKCResponse:
-        if hakc_request.endpoint not in self.endpoints:
-            raise RuntimeError(f'Invalid Endpoint {hakc_request.endpoint}, endpoints available: {self.endpoints.keys()}')
-        return self.endpoints[hakc_request.endpoint](**hakc_request.parameters)
+        # logger.error(f"Handling {hakc_request}")
+        endpoint = hakc_request.endpoint
+        if endpoint not in self.endpoints:
+            raise RuntimeError(f'Invalid Endpoint {endpoint}, endpoints available: {self.endpoints.keys()}')
+
+        key = self.config.get_cache_key_from_request(hakc_request) if self.config else None
+        # logger.info(f"Created cache key: {key}")
+        if key:
+            readable_key = key.replace('\n','')[0:min(len(key),40)]
+            # logger.error(f"query_cache: {self.query_cache} with endpoint {endpoint}")
+            if key in self.query_cache[endpoint].keys():
+                self.cache_hit += 1
+                # Note: slicing key to make more readable
+                # logger.info(f"Cache hit {self.cache_hit} on {readable_key}\t[Thread level cache]")
+                # logger.debug(f"Cache hit {key} -> {self.query_cache[endpoint][key]}")
+                return self.query_cache[endpoint][key]
+            self.cache_miss += 1
+            # logger.info(f"Cache miss {self.cache_miss} on {key[0:min(len(key),40)]}\t[Thread level cache] on {endpoint} {self.query_cache}")
+            # logger.info(f"Cache miss {self.cache_miss} on {readable_key}\t[Thread level cache]")
+            self.query_cache[endpoint][key] = self.endpoints[endpoint](**hakc_request.parameters)
+            # logger.debug(f"Cache miss {key} -> {self.query_cache[endpoint][key]}")
+            return self.query_cache[endpoint][key]
+        # if key does not exist (aka we don't support caching, always do the request)
+        return self.endpoints[endpoint](**hakc_request.parameters)
 
     def __del__(self):
         # This seems to be executed by the main thread
         if self.logger:
-            self.logger.debug("Killing Analysis Server Thread")
+            hit_rate = round(100*(float(self.cache_hit)/float(self.cache_miss))) if self.cache_miss > 0 else 0
+            self.logger.info(f"Killing Server Thread { f'with {hit_rate}% Cache (Hits/Misses)' if (self.cache_hit > 0 or self.cache_miss > 0) else ''}")
 
     def terminate_connection(self, **kwargs):
         self.logger.debug(f"Raising Terminate Connection Signal")
         raise TerminateConnectionException
 
     def handle(self):
-        self.init()
+        # self.init()
         logger.debug(f'Handling request')
         hakc_request = None
         response = None
         try:
             while True:
                 hakc_request = self.read_request_from_socket()
+                logger.debug(f"{hakc_request}")
                 response = self.handle_endpoint(hakc_request)
-                logger.info(f"{response}")
+                logger.debug(f"{response}")
                 bytes_written = self.write_response_to_socket(response)
                 assert bytes_written > 0, f"Bytes written to socket should always be >0: bytes_written = {bytes_written}"
 

@@ -44,7 +44,7 @@ class HAKCFunctionAnalysis {
 protected:
   HAKCModuleAnalysis &ModuleAnalysis;
   HAKCTransformer &Transformer;
-  HAKCCompartmentalizationPolicy &Policy;
+  HAKCServerClient &Client;
   HAKCPointerManager PointerManager;
   bool DebugActive;
 
@@ -146,7 +146,7 @@ public:
   virtual ~HAKCFunctionAnalysis() = default;
 
   HAKCFunctionAnalysis(Function *F, HAKCModuleAnalysis &ModuleAnalysis, HAKCTransformer &Transformer,
-                       HAKCCompartmentalizationPolicy &Policy);
+                       HAKCServerClient &Client);
 
   HAKCTypeIdentifier& GetTypeIdentifier() const;
 

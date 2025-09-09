@@ -113,7 +113,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         return cls(max_division_count=graph_data.get('division_count', 16), G=graph)
 
     def __str__(self):
-        return f"HAKCCompartmentalization with {len(self.nodes)} nodes and {len(self.edges)} edges"
+        return f"HAKCCompartmentalization with {len(self.nodes)} nodes and {len(self.edges)} edges [{len(self.get_symbols())} Symbols, {len(self.get_types())} Types, {len(self.get_scopes())} Scopes, {len(self.get_definition_locations())} DefinitionLocations, {len(self.get_divisions_compartments())} (Divisions, Compartments) tuples]"
 
     def add_symbols(self, functions: list[HAKCFunction], global_variables: list[HAKCGlobalVariable]) -> None:
         for global_variable in global_variables:
@@ -141,11 +141,11 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             # TODO handle indirect call sources?
             # logger.error(f"indirect_call: {type(indirect_call)}")
             # assert(isinstance(indirect_call, HAKCType))
-            # if isinstance(indirect_call, HAKCType):
-            # TODO: should types already be persisted? getting duplicate key error when using data columns as hakctype hashable inputs
-            # self.__add_type(indirect_call, already_persisted = True)
-            # self.__add_type(indirect_call)
-            self.__add_persistent_edge(function, indirect_call, key=HAKCFunction.relation_indirect_calls)
+            if isinstance(indirect_call, HAKCType):
+                # TODO: should types already be persisted? getting duplicate key error when using data columns as hakctype hashable inputs
+                # self.__add_type(indirect_call, already_persisted = True)
+                # self.__add_type(indirect_call)
+                self.__add_persistent_edge(function, indirect_call, key=HAKCFunction.relation_indirect_calls)
 
     def add_global_variable(self, global_variable: HAKCGlobalVariable) -> None:
         return self.__add_global_variable(global_variable)

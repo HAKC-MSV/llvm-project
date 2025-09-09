@@ -14,10 +14,10 @@
 namespace llvm::hakc {
 HAKCFunctionAnalysis::HAKCFunctionAnalysis(
     Function *F, HAKCModuleAnalysis &ModuleAnalysis,
-    HAKCTransformer &Transformer, HAKCCompartmentalizationPolicy &Policy)
-    : ModuleAnalysis(ModuleAnalysis), Transformer(Transformer), Policy(Policy),
+    HAKCTransformer &Transformer, HAKCServerClient &Client)
+    : ModuleAnalysis(ModuleAnalysis), Transformer(Transformer), Client(Client),
       PointerManager(
-          *this, Policy,
+          *this, Client,
           ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().OutputDebugInfo(
               F)),
       DebugActive(
@@ -32,7 +32,7 @@ HAKCLogger &HAKCFunctionAnalysis::getLogger(HAKCLogLevel log_level) const {
 
 void HAKCFunctionAnalysis::UpdateHAKCFunctionParameters() const {
   if (CommonHAKCAnalysis::IsUncompartmentalizedSymbol(CurrentFunction,
-                                                      Policy)) {
+                                                      Client)) {
     return;
   }
 
@@ -50,7 +50,7 @@ void HAKCFunctionAnalysis::UpdateHAKCFunctionParameters() const {
     TransferTarget = F->getParent()->getFunction(TransferTargetName);
   }
   auto TargetCompartment =
-      Policy.GetDivision(TransferTarget).GetHAKCCompartment();
+      Client.GetDivision(TransferTarget).GetHAKCCompartment();
 
   for (auto *CallI : HAKCFunctionCalls) {
     auto HAKCTransferFunction =
@@ -576,7 +576,7 @@ void HAKCFunctionAnalysis::CheckCompareOperandForDirectFunctionUse(
   if (auto *func = dyn_cast<Function>(Op)) {
     if (GetModuleAnalysis()
             .GetCommonAnalysis()
-            .ValueShouldBeReplacedWithTransfer(func, Policy)) {
+            .ValueShouldBeReplacedWithTransfer(func, Client)) {
       HAKCFunctionAnalysis::getLogger(Verbose)
           << "Adding comparison to directFunctionUsers for argument "
           << std::to_string(OpNo) << "\n";
@@ -740,7 +740,7 @@ bool HAKCFunctionAnalysis::globalShouldBeTransferred(
 
 bool HAKCFunctionAnalysis::isCompartmentalizedFunction() const {
   return CommonHAKCAnalysis::IsCompartmentalizedFunction(CurrentFunction,
-                                                         Policy);
+                                                         Client);
 }
 
 /**
@@ -863,9 +863,9 @@ void HAKCFunctionAnalysis::handleCall(CallInst *call) {
     }
     if (call->getCalledFunction()) {
       auto TargetCompartment =
-          Policy.GetDivision(call->getCalledFunction()).GetHAKCCompartment();
+          Client.GetDivision(call->getCalledFunction()).GetHAKCCompartment();
       if (!CommonHAKCAnalysis::IsUncompartmentalizedSymbol(
-              call->getCalledFunction(), Policy)) {
+              call->getCalledFunction(), Client)) {
         NonKernelDirectFunctionCallSet.insert(call);
       }
     }
@@ -883,7 +883,7 @@ void HAKCFunctionAnalysis::relocateFunctionSection() {
 
 std::string HAKCFunctionAnalysis::getHAKCFunctionSectionName() {
   std::string sectionName = HAKC_SECTION_PREFIX.str();
-  auto Compartment = Policy.GetDivision(&GetFunction()).GetHAKCCompartment();
+  auto Compartment = Client.GetDivision(&GetFunction()).GetHAKCCompartment();
   sectionName += std::to_string(Compartment.GetCompartmentIDValue());
   if (GetFunction().getSection().empty()) {
     sectionName += ".text";
@@ -981,14 +981,14 @@ void HAKCFunctionAnalysis::TemporalAnalysisHandleStore(
 
 void HAKCFunctionAnalysis::setup() {
   if (!SetupHasRun) {
-    auto Compartment = Policy.GetDivision(CurrentFunction).GetHAKCCompartment();
+    auto Compartment = Client.GetDivision(CurrentFunction).GetHAKCCompartment();
     HAKCFunctionAnalysis::getLogger(Debug)
         << "Running setup for " << GetFunction().getName() << "\n"
         << GetFunction() << "\nCompartmentID = "
         << std::to_string(Compartment.GetCompartmentIDValue()) << "\n";
     PointerManager.SetFunctionIsCompartmentalized(
         !CommonHAKCAnalysis::IsUncompartmentalizedSymbol(CurrentFunction,
-                                                         Policy));
+                                                         Client));
     for (auto it = inst_begin(CurrentFunction); it != inst_end(CurrentFunction);
          ++it) {
       Instruction *inst = &*it;
@@ -1009,11 +1009,11 @@ bool HAKCFunctionAnalysis::modifiedFunction() const {
 
 void HAKCFunctionAnalysis::
     CheckForValidCompartmentTransitionAndUpdateIntraCompartmentCalls() {
-  auto CurrentDivision = Policy.GetDivision(&GetFunction());
-  Policy.GetValidTargets(CurrentDivision.GetHAKCCompartment());
+  auto CurrentDivision = Client.GetDivision(&GetFunction());
+  Client.GetValidTargets(CurrentDivision.GetHAKCCompartment());
   for (auto *call : NonKernelDirectFunctionCallSet) {
     auto TargetCompartment =
-        Policy.GetDivision(call->getCalledFunction()).GetHAKCCompartment();
+        Client.GetDivision(call->getCalledFunction()).GetHAKCCompartment();
     if (CurrentDivision.GetHAKCCompartment().GetCompartmentID() ==
         TargetCompartment.GetCompartmentID()) {
       /* Aliases are being used for transfer functions, so if the
@@ -1058,7 +1058,7 @@ void HAKCFunctionAnalysis::
             << " to "
             << std::to_string(TargetCompartment.GetCompartmentIDValue())
             << " is statically possible but not allowed in the"
-            << " Compartmentalization Policy\n"
+            << " Compartmentalization Client\n"
             << "A call from " << call->getFunction()->getName() << " to "
             << call->getCalledFunction()->getName() << " is not allowed\n";
         throw std::exception();
@@ -1200,7 +1200,7 @@ HAKCFunctionAnalysis::SignGlobalPointerWithColor(GlobalValue *GlobalVar) {
 
 void HAKCFunctionAnalysis::createMissingTransfers() {
   if (CommonHAKCAnalysis::IsUncompartmentalizedSymbol(CurrentFunction,
-                                                      Policy)) {
+                                                      Client)) {
     return;
   }
   HAKCFunctionAnalysis::getLogger(Verbose)
@@ -1280,7 +1280,7 @@ void HAKCFunctionAnalysis::ReplaceDirectFunctionUsesWithTransfers() {
 
 void HAKCFunctionAnalysis::InstrumentCode() {
   AddInstrumentation(
-      !CommonHAKCAnalysis::IsUncompartmentalizedSymbol(&GetFunction(), Policy));
+      !CommonHAKCAnalysis::IsUncompartmentalizedSymbol(&GetFunction(), Client));
 }
 
 void HAKCFunctionAnalysis::UpdateHAKCFunctionParameters(
@@ -1300,9 +1300,9 @@ void HAKCFunctionAnalysis::UpdateHAKCFunctionParameters(
     if (CommonHAKCAnalysis::IsOutsideTransferFunc(F)) {
       auto *TransferTarget =
           CommonHAKCAnalysis::GetOriginalFunctionFromTransferFunction(F);
-      Division = Policy.GetDivision(TransferTarget);
+      Division = Client.GetDivision(TransferTarget);
     } else {
-      Division = Policy.GetDivision(F);
+      Division = Client.GetDivision(F);
     }
 
     HAKCFunctionAnalysis::getLogger(Verbose)

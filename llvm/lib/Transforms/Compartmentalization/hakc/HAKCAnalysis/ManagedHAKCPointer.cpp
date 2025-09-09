@@ -717,7 +717,7 @@ void ManagedHAKCPointer::CreatePointerUseClones() {
 
 bool ManagedHAKCPointer::BaseDefinitionShouldBeTransferred() {
   if (!CommonHAKCAnalysis::IsCompartmentalizedFunction(
-          &Manager.GetFunctionAnalysis().GetFunction(), Manager.GetPolicy()) ||
+          &Manager.GetFunctionAnalysis().GetFunction(), Manager.GetClient()) ||
       ManuallyTransferred || PurposefullyIgnored) {
     return false;
   }
@@ -733,7 +733,7 @@ bool ManagedHAKCPointer::BaseDefinitionShouldBeTransferred() {
                .IsAllocation(BaseDefinition) ||
            !CommonHAKCAnalysis::FunctionsAreInSameCompartment(
                &Manager.GetFunctionAnalysis().GetFunction(), Callee,
-               Manager.GetPolicy());
+               Manager.GetClient());
   } else if (BaseIsAuthenticatedPointer()) {
     return GetProtectedUserCount() > 0;
   }

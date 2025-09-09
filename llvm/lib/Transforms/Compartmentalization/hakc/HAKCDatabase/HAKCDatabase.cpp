@@ -90,11 +90,8 @@ HAKCDivisionPayload::HAKCDivisionPayload(json::Object *payload)
     : HAKCPayload(payload), DivisionID(0), Salt(0), AccessToken(0) {
   auto division = GetObject(payload, "Division");
   DivisionID = GetInteger(division, "DivisionID");
-  CommonHAKCAnalysis::getLogger(Fatal) << "Got 'DivisionID' from payload!\n";
   Salt = GetInteger(division, "Salt");
-  CommonHAKCAnalysis::getLogger(Fatal) << "Got 'Salt' from payload!\n";
   AccessToken = GetInteger(division, "AccessToken");
-  CommonHAKCAnalysis::getLogger(Fatal) << "Got 'AccessToken' from payload!\n";
 }
 
 HAKCCompartmentPayload::HAKCCompartmentPayload(json::Object *payload)
@@ -148,26 +145,24 @@ void HAKCDatabaseResponse::parse_result(json::Object *_result) {
     terminate_connection = true;
     return;
   }
-  auto payload = GetObject(_result, "Data");
   if (response_endpoint == database_information.GetCompartmentEndpoint()) {
+    auto payload = GetObject(_result, "Data");
     result.data = std::make_shared<HAKCCompartmentPayload>(payload);
   } else if (response_endpoint == database_information.GetDivisionEndpoint()) {
+    auto payload = GetObject(_result, "Data");
     result.data = std::make_shared<HAKCDivisionPayload>(payload);
-  } else if (response_endpoint ==
-             database_information.GetSymbolDivisionEndpoint()) {
+  } else if (response_endpoint == database_information.GetSymbolDivisionEndpoint()) {
+    auto payload = GetObject(_result, "Data");
     result.data = std::make_shared<HAKCDivisionCompartmentPayload>(payload);
-  } else if (response_endpoint ==
-             database_information.GetValidTargetsEndpoint()) {
+  } else if (response_endpoint == database_information.GetValidTargetsEndpoint()) {
+    auto payload = GetObject(_result, "Data");
     result.data = std::make_shared<HAKCValidTargetsPayload>(payload);
-  } else if (response_endpoint ==
-                 database_information.GetSetDagFilenameEndpoint() ||
-             response_endpoint ==
-                 database_information.GetAddSymbolsEndpoint() ||
-             response_endpoint ==
-                 database_information.GetAddFunctionEndpoint() ||
-             response_endpoint ==
-                 database_information.GetAddGlobalVariableEndpoint()) {
-    result.data = std::make_shared<HAKCPayload>(payload);
+  } else if (response_endpoint == database_information.GetSetDagFilenameEndpoint() ||
+             response_endpoint == database_information.GetAddSymbolsEndpoint() ||
+             response_endpoint == database_information.GetAddFunctionEndpoint() ||
+             response_endpoint == database_information.GetAddGlobalVariableEndpoint()) {
+    // These requests don't have a 'Data' field to extract, so just pass the result
+    result.data = std::make_shared<HAKCPayload>(_result);
   } else {
     // unknown endpoint
     CommonHAKCAnalysis::getLogger(Fatal)

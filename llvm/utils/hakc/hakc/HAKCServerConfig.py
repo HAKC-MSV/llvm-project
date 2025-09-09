@@ -1,7 +1,7 @@
 import logging
 from enum import Enum
 from pathlib import Path
-from typing import cast
+from typing import cast, Optional
 from .HAKCLogger import HAKCLogger
 
 logging.setLoggerClass(HAKCLogger)
@@ -60,7 +60,9 @@ class HAKCServerConfig:
         self.reuse_path = kwargs.get('reuse_path', False)
         self.log_path = kwargs.get('log_path', None)
         self.test_mode = kwargs.get("test-mode", False)
-        self.server_timeout = int(kwargs.get('server_timeout', -1))
+        self.server_timeout_analysis = int(kwargs.get('server_timeout_analysis', -1))
+        self.server_timeout_policy = int(kwargs.get('server_timeout_policy', -1))
+        self.server_timeout = -1
         if self.reuse_path and self.socket_path.exists():
             self.socket_path.unlink()
         backing_store_config = kwargs.get('backing_policy_config', dict())
@@ -90,6 +92,28 @@ class HAKCServerConfig:
         self.add_function_endpoint = kwargs.get('add-function-endpoint', "add-function")
         self.add_global_variable_endpoint = kwargs.get('add-global-variable-endpoint', "add-global-variable")
         self.terminate_connection_endpoint = kwargs.get('terminate-connection-endpoint', "terminate-connection")
+
+    def get_cache_key_from_request(self, hakc_request: HAKCDataRequest) -> Optional[str]:
+        endpoint = hakc_request.endpoint
+        parameters = hakc_request.parameters
+        logger.debug(f"Creating cache key for {endpoint} with parameters {parameters}")
+        if endpoint in [self.get_compartment_endpoint, self.get_valid_targets_from_compartment_id_endpoint]:
+            # compartment_id: int
+            return f"CompartmentID={parameters['compartment-id']}"
+        elif endpoint == self.get_division_endpoint:
+            # (division_id: int, compartment_id: int) -> HAKCDivision
+            return f"(CompartmentID={parameters['compartment-id']},DivisionID={parameters['division-id']})"
+        elif endpoint == self.get_division_from_symbol_endpoint:
+            # HAKCSymbol -> Tuple[HAKCDivision, HAKCCompartment]
+            return f"Symbol={parameters['object'].replace(' ','')}"
+        return None
+        # these endpoints need to modify state, so they cannot be cached
+        # elif endpoint in [self.set_dag_filename_endpoint,
+        #                                self.add_symbols_endpoint,
+        #                                self.add_function_endpoint,
+        #                                self.add_global_variable_endpoint,
+        #                                self.terminate_connection_endpoint]:
+        # pass
 
 def kwargs_get(cls, name: str, default: any = None, **kwargs):
     # Function to retrieve and validate function parameter

@@ -282,18 +282,22 @@ HAKCModuleAnalysis::ExtractGlobalFromKernelParam(GlobalVariable *GV) {
 void HAKCModuleAnalysis::TemporalAnalysis() {
   // FunctionTemporalAnalysis
   CommonHAKCAnalysis::getLogger(Debug)
-      << "!!!! Starting Module Temporal Analysis !!!!\n";
+      << "!!!! Module Temporal Analysis Disabled (need to update the code!) !!!!\n";
+  // CommonHAKCAnalysis::getLogger(Debug)
+  //     << "!!!! Starting Module Temporal Analysis !!!!\n";
   // create managed pointers (essentially what is being done at the beginning of
   // the compartmentalization code)
-  HAKCCompartmentalizationPolicyDAG Policy(GetCommonAnalysis().GetSystemInfo());
-  HAKCTransformer Transformer((*this), Policy);
-  for (auto *F : AnalysisFunctions) {
-    // temporal analysis
-    HAKCFunctionAnalysis FunctionAnalysis(F, (*this), Transformer, Policy);
-    FunctionAnalysis.TemporalAnalysis();
-  }
-  CommonHAKCAnalysis::getLogger(Debug)
-      << "!!!! Finished Module Temporal Analysis !!!!\n";
+  // TODO: update to new server
+  // HAKCCompartmentalizationPolicyDAG Policy(GetCommonAnalysis().GetSystemInfo());
+  // HAKCTransformer Transformer((*this), Policy);
+  // for (auto *F : AnalysisFunctions) {
+  //   // temporal analysis
+  //   HAKCFunctionAnalysis FunctionAnalysis(F, (*this), Transformer, Policy);
+  //   FunctionAnalysis.TemporalAnalysis();
+  // }
+  // CommonHAKCAnalysis::getLogger(Debug)
+  //     << "!!!! Finished Module Temporal Analysis !!!!\n";
+
 }
 
 // we generate these for all kernel params, some may go unused by the actual

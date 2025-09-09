@@ -4,7 +4,7 @@
  */
 
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCPass.h"
-#include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/HAKCAnalysisClient.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCDatabase/HAKCServerClient.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/HAKCModuleAnalysis.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCSystemInformation.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCTransformer.h"
@@ -53,9 +53,9 @@ static bool runCompartmentalization(CommonHAKCAnalysis &HAKCAnalysis) {
   }
 
   if (PerformTransformations) {
-    HAKCCompartmentalizationPolicy Policy(HAKCAnalysis.GetSystemInfo());
+    HAKCServerClient Client(HAKCAnalysis.GetSystemInfo());
     HAKCModuleAnalysis ModuleAnalysis(HAKCAnalysis);
-    HAKCTransformer Transformer(ModuleAnalysis, Policy);
+    HAKCTransformer Transformer(ModuleAnalysis, Client);
     if (HAKCAnalysis.GetSystemInfo().GetTemporalAnalysisEnabled()) {
       Transformer.performTemporalTransformations();
     }
@@ -100,15 +100,14 @@ static bool runDataAccessGraphAnalysis(CommonHAKCAnalysis &HAKCAnalysis) {
   if (HAKCAnalysis.GetSystemInfo().GetTemporalAnalysisEnabled()) {
     ModuleAnalysis.TemporalAnalysis();
   }
-  CommonHAKCAnalysis::getLogger(Fatal) << "Starting Analysis Client " << Path << "\n";
   auto TypeIdentifier = ModuleAnalysis.GetTypeIdentifier();
   auto FunctionCount = TypeIdentifier.GetFunctions().size() + TypeIdentifier.GetUnmappedFunctions().size();
   auto GlobalCount = TypeIdentifier.GetGlobals().size() + TypeIdentifier.GetUnmappedGlobals().size();
   // Only ever connect to server if symbols need to be sent
   if (FunctionCount + GlobalCount > 0) {
-    HAKCAnalysisClient AnalysisClient(HAKCAnalysis.GetSystemInfo());
-    AnalysisClient.SendSymbolsToAnalysisServer(ModuleAnalysis, Path);
-    AnalysisClient.CloseConnection();
+    HAKCServerClient Client(HAKCAnalysis.GetSystemInfo());
+    Client.SendSymbolsToAnalysisServer(ModuleAnalysis, Path);
+    Client.CloseConnection();
   }
   else {
     CommonHAKCAnalysis::getLogger(Info) << "Skipping file " << Path << "with 0 symbols\n";
