@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 import argparse
+import io
 import logging
 import multiprocessing as mp
+import pstats
 import signal
+from pathlib import Path
 from typing import cast, Optional
-
+import cProfile
 import yaml
 import os
 
@@ -19,6 +22,13 @@ logger = logging.getLogger('hakc-server-process')
 
 def timeout_handler(signum, frame):
     raise TimeoutException
+
+
+def output_profile_stats(profile):
+    s = io.StringIO()
+    ps = pstats.Stats(profile, stream=s).sort_stats('tottime')
+    ps.print_stats()
+    logger.info(s.getvalue())
 
 def merger_thread(dag_path: str):
     # using global variables global_queue, SaveDAGEvent
@@ -42,43 +52,13 @@ def merger_thread(dag_path: str):
                                                nodes=subG.nodes(data=True))
             logger.info(f"\tMerged {global_compartmentalization}")
 
-# noinspection PyTypeChecker
-def main():
-    parser = argparse.ArgumentParser(description='HAKC Analysis Server Process')
-    parser.add_argument('--config', help='Path to config file', required=True)
-    parser.add_argument('--log-level', required=False, dest='log_level', default=LoggingLevelEnum.INFO,
-                        help=f'Log level to display, can be lower case {[level.name for level in LoggingLevelEnum]}',
-                        type=parse_log_level)
-    parser.add_argument('-l', '--log', default=None, dest='log_path')
-    parser.add_argument('--log-mode', default='w', dest='log_mode')
-    parser.add_argument('--server-mode', default=HAKCServerMode.ANALYSIS, dest='server_mode',
-                        help=f'Server mode can be {[mode.name for mode in HAKCServerMode]}', type=parse_server_mode)
-    parser.add_argument('--no-timeout', required=False, dest='no_timeout', action='store_true',
-                        help='Ignore timeout in config file')
+def server_proc(config: HAKCServerConfig, tid: int, ServerMainLogger: logger):
 
-    args = parser.parse_args()
-
-    # setting up root logger, which all other loggers should inherit its properties (unless we overwrite them later)
-    # need to set up server logger here, or else all the initialization stuff will happen without debugging
-    # loggers that are used in the data_source files need to be initialized BEFORE the init_data_source function is called
-    root_logger = logging.getLogger()
-    setup_logging(root_logger, log_level=args.log_level, log_file=args.log_path if args.log_path else '', log_mode=args.log_mode)
-    config = None
-    with open(args.config, 'r') as f:
-        parsed_config = yaml.safe_load(f)
-        config = HAKCServerConfig(**parsed_config)
-    config.server_timeout = config.server_timeout_analysis if (args.server_mode == HAKCServerMode.ANALYSIS) else config.server_timeout_policy
-    if args.no_timeout:
-        config.server_timeout = -1
-    ServerMainLogger: HAKCLogger = cast(HAKCLogger, logging.getLogger('hakc-server-main'))
-    if config.log_path:
-        ServerMainLogger.add_file_handler(config.log_path)
-
-    proc = None
-    if args.server_mode == HAKCServerMode.ANALYSIS:
-        proc = mp.Process(target=merger_thread, args=(config.dag_path,))
-        proc.start()
-    with HAKCServer(config, args.server_mode, ServerMainLogger) as server:
+    config.socket_path = Path(os.path.join(config.socket_path, str(tid)))
+    logger.error(f"Spinning up TID {tid} on {config.socket_path}")
+    if config.reuse_path and config.socket_path.exists():
+        config.socket_path.unlink()
+    with HAKCServer(config, HAKCServerMode.POLICY, ServerMainLogger) as server:
         try:
             if config.server_timeout > 0:
                 signal.signal(signal.SIGALRM, timeout_handler)
@@ -92,10 +72,87 @@ def main():
             ServerMainLogger.error(f'Analysis Server received generic Exception: {e}')
         finally:
             server.server_close()
+
+# noinspection PyTypeChecker
+def main():
+    parser = argparse.ArgumentParser(description='HAKC Analysis Server Process')
+    parser.add_argument('--config', help='Path to config file', required=True)
+    parser.add_argument('--log-level', required=False, dest='log_level', default=LoggingLevelEnum.INFO,
+                        help=f'Log level to display, can be lower case {[level.name for level in LoggingLevelEnum]}',
+                        type=parse_log_level)
+    parser.add_argument('-l', '--log', default=None, dest='log_path')
+    parser.add_argument('--log-mode', default='w', dest='log_mode')
+    parser.add_argument('--server-mode', default=HAKCServerMode.ANALYSIS, dest='server_mode',
+                        help=f'Server mode can be {[mode.name for mode in HAKCServerMode]}', type=parse_server_mode)
+    parser.add_argument('--no-timeout', required=False, dest='no_timeout', action='store_true',
+                        help='Ignore timeout in config file')
+    parser.add_argument('--profile', dest='profile', action='store_true')
+    args = parser.parse_args()
+
+
+
+    # setting up root logger, which all other loggers should inherit its properties (unless we overwrite them later)
+    # need to set up server logger here, or else all the initialization stuff will happen without debugging
+    # loggers that are used in the data_source files need to be initialized BEFORE the init_data_source function is called
+    root_logger = logging.getLogger()
+    setup_logging(root_logger, log_level=args.log_level, log_file=args.log_path if args.log_path else '', log_mode=args.log_mode)
+    config = None
+    profile = None
+    with open(args.config, 'r') as f:
+        parsed_config = yaml.safe_load(f)
+        config = HAKCServerConfig(**parsed_config)
+    config.server_timeout = config.server_timeout_analysis if (args.server_mode == HAKCServerMode.ANALYSIS) else config.server_timeout_policy
+    if args.no_timeout:
+        config.server_timeout = -1
+    ServerMainLogger: HAKCLogger = cast(HAKCLogger, logging.getLogger('hakc-server-main'))
+    if config.log_path:
+        ServerMainLogger.add_file_handler(config.log_path)
+
+
+    if args.profile:
+        profile = cProfile.Profile()
+        profile.enable()
+
+    # config.socket_path
+    proc = None
+    if args.server_mode == HAKCServerMode.ANALYSIS:
+        proc = mp.Process(target=merger_thread, args=(config.dag_path,))
+        proc.start()
+
+    if args.server_mode == HAKCServerMode.POLICY:
+        servers = []
+        for tid in range(config.max_sockets):
+            # logger.error(f"Spinning up TID {tid}")
+            sproc = mp.Process(target=server_proc, args=(config, tid, ServerMainLogger,))
+            sproc.start()
+            servers.append(sproc)
+
+        for tid in range(config.max_sockets):
+            logger.error(f"Joining TID {tid}")
+            servers[tid].join()
+    # with HAKCServer(config, args.server_mode, ServerMainLogger) as server:
+    #     try:
+    #         if config.server_timeout > 0:
+    #             signal.signal(signal.SIGALRM, timeout_handler)
+    #             signal.alarm(config.server_timeout)
+    #         server.serve_forever()
+    #     except KeyboardInterrupt:
+    #         ServerMainLogger.info('Analysis Server received User KeyboardInterrupt Exception')
+    #     except TimeoutException:
+    #         ServerMainLogger.info(f'Analysis Server received Timeout Exception')
+    #     except Exception as e:
+    #         ServerMainLogger.error(f'Analysis Server received generic Exception: {e}')
+    #     finally:
+    #         server.server_close()
     if args.server_mode == HAKCServerMode.ANALYSIS:
         SaveDAGEvent.set()
         global_queue.close()
         proc.join()
+
+    if args.profile:
+        profile.disable()
+        output_profile_stats(profile)
+
 
 if __name__ == "__main__":
     main()

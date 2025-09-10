@@ -57,14 +57,15 @@ class HAKCServerConfig:
         if self.socket_path is None:
             raise RuntimeError("ERROR: socket_path is missing from policy_config.yml")
         self.socket_path = Path(self.socket_path)
+        self.max_sockets = kwargs.get('max_sockets', 16)
         self.reuse_path = kwargs.get('reuse_path', False)
         self.log_path = kwargs.get('log_path', None)
         self.test_mode = kwargs.get("test-mode", False)
         self.server_timeout_analysis = int(kwargs.get('server_timeout_analysis', -1))
         self.server_timeout_policy = int(kwargs.get('server_timeout_policy', -1))
         self.server_timeout = -1
-        if self.reuse_path and self.socket_path.exists():
-            self.socket_path.unlink()
+        # if self.reuse_path and self.socket_path.exists():
+        #     self.socket_path.unlink()
         backing_store_config = kwargs.get('backing_policy_config', dict())
         if len(backing_store_config) == 0:
             raise RuntimeError(f'Missing backing store configuration')

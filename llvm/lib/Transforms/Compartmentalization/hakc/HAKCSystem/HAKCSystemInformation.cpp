@@ -9,6 +9,7 @@
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCPostTargetAction.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCPreTransferAction.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCTransferAction.h"
+#include "llvm/Support/Threading.h"
 
 namespace llvm::hakc {
 HAKCDatabaseInformation::HAKCDatabaseInformation()
@@ -16,6 +17,8 @@ HAKCDatabaseInformation::HAKCDatabaseInformation()
       SymbolDivisionEndpoint(), Timeout(), MaxConnectionRetries(10) {}
 
 StringRef HAKCDatabaseInformation::GetServerURL() const { return ServerURL; }
+
+unsigned HAKCDatabaseInformation::GetMaxSockets() const { return MaxSockets; }
 
 StringRef HAKCDatabaseInformation::GetCompartmentEndpoint() const {
   return CompartmentEndpoint;
@@ -63,7 +66,9 @@ unsigned HAKCDatabaseInformation::GetMaxRetries() const {
 
 void HAKCDatabaseInformation::operator<<(
     const HAKCYamlDatabaseConfig &DatabaseConfig) {
-  ServerURL = DatabaseConfig.ServerURL;
+  // ServerURL = DatabaseConfig.ServerURL;
+  ServerURL = DatabaseConfig.ServerURL + "/" + std::to_string(get_threadid() % DatabaseConfig.MaxSockets);
+  MaxSockets = DatabaseConfig.MaxSockets;
   CompartmentEndpoint = DatabaseConfig.GetCompartmentEndpoint;
   DivisionEndpoint = DatabaseConfig.GetDivisionEndpoint;
   SymbolDivisionEndpoint = DatabaseConfig.GetSymbolDivisionEndpoint;

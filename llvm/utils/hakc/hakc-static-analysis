@@ -181,7 +181,7 @@ def adjust_compartmentalization(adjust_path: str, db_dir: str):
             if adjusted_division != nec_division:
                 logger.info(f'{symbol} is moving to {adjusted_division}')
             else:
-                logger.debug(f'{symbol} is moving to {adjusted_division}')
+                logger.debug(f'{symbol} is moving to NEC {adjusted_division}')
             compartmentalization.set_symbol_division_by_object(symbol, adjusted_division, adjusted_compartment)
         else:
             logger.info(f'{symbol} is unchanged')

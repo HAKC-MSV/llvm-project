@@ -41,6 +41,8 @@ public:
 
   StringRef GetServerURL() const;
 
+  unsigned GetMaxSockets() const;
+
   StringRef GetCompartmentEndpoint() const;
 
   StringRef GetDivisionEndpoint() const;
@@ -67,6 +69,7 @@ public:
 
 protected:
   std::string ServerURL;
+  unsigned MaxSockets;
   std::string CompartmentEndpoint;
   std::string DivisionEndpoint;
   std::string SymbolDivisionEndpoint;

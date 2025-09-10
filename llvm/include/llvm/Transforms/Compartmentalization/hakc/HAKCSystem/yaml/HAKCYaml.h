@@ -173,6 +173,7 @@ struct HAKCYAMLActionType : public HAKCYAMLSymbolDeclaration {
 
 struct HAKCYamlDatabaseConfig {
   HAKCYAMLStringType ServerURL;
+  unsigned MaxSockets;
   HAKCYAMLStringType GetCompartmentEndpoint;
   HAKCYAMLStringType GetDivisionEndpoint;
   HAKCYAMLStringType GetSymbolDivisionEndpoint;
@@ -388,6 +389,7 @@ template <> struct yaml::MappingTraits<hakc::HAKCYAMLCustomTransferType> {
 template <> struct yaml::MappingTraits<hakc::HAKCYamlDatabaseConfig> {
   static void mapping(yaml::IO &Io, hakc::HAKCYamlDatabaseConfig &YamlConfig) {
     Io.mapRequired("server-url", YamlConfig.ServerURL);
+    Io.mapOptional("max-sockets", YamlConfig.MaxSockets, 16);
     Io.mapOptional("server-timeout", YamlConfig.ServerTimeout, 10); // timeout in seconds (formerly milliseconds)
     Io.mapOptional("get-compartment-by-id-endpoint",
                    YamlConfig.GetCompartmentEndpoint, "get-compartment-id");

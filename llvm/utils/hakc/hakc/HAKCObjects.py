@@ -141,7 +141,6 @@ class HAKCDivision(HashedHAKCDBNode, yaml.YAMLObject):
             "AccessToken": self.access_token
         }
 
-
 class HAKCCompartment(HAKCDBNode, yaml.YAMLObject):
     yaml_tag = "!HAKCCompartment"
     max_compartments = 16
