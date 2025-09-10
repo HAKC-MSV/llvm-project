@@ -1,5 +1,7 @@
 import logging
 import multiprocessing as mp
+import os
+import shutil
 from typing import Type, Optional, Tuple, cast
 
 import pandas as pd
@@ -8,6 +10,7 @@ from .HAKCBase import HAKCDBNode, HAKCDBRelation
 from .HAKCLogger import HAKCLogger
 from .HAKCObjects import HAKCSymbol, HAKCFunction, HAKCScope, HAKCType, HAKCGlobalVariable, HAKCDivision, \
     HAKCCompartment, HAKCDefinitionLocation
+
 import time
 logging.setLoggerClass(HAKCLogger)
 
@@ -15,6 +18,7 @@ logger: HAKCLogger = cast(HAKCLogger, logging.getLogger('hakc-database'))
 
 import threading
 # creating thread lock for shared resource (caching system)
+
 
 class HAKCDatabase:
     def __init__(self, db_dir: str, read_only: bool = False, max_num_threads=int(mp.cpu_count() / 2)):
@@ -109,11 +113,11 @@ class HAKCDatabase:
         self.conn = kuzu.Connection(self.database)  # thread i connection
 
     def execute_prepared_stmt(self, prepared_stmt: str, **kwargs):
-        start = time.time()
+        # start = time.time()
         response =  self.conn.execute(prepared_stmt, parameters=kwargs)
-        end = time.time()
-        self.increment_total_query_time(end - start)
-        logger.info(self.get_cache_stats())
+        # end = time.time()
+        # self.increment_total_query_time(end - start)
+        # logger.info(self.get_cache_stats())
         return response
 
     @staticmethod

@@ -116,11 +116,11 @@ class HAKCServerThread(socketserver.StreamRequestHandler):
             self.hakc_server.reset_alarm()
             return
         except ConnectionResetError:
-            self.logger.fatal(f'Client Reset Connection after returning {response}')
+            self.logger.fatal(f'Client Reset Connection after returning {response[0:min(len(str(response)),250)]}')
             self.hakc_server.reset_alarm()
             return
         except TimeoutException:
-            self.logger.fatal(f'Timeout received after returning {response}')
+            self.logger.fatal(f'Timeout received after returning {response[0:min(len(str(response)),250)]}')
             self.hakc_server.reset_alarm()
             return
         except TerminateConnectionException:
@@ -133,6 +133,6 @@ class HAKCServerThread(socketserver.StreamRequestHandler):
                 self.logger.debug(f'Analysis Server Thread received terminate connection from Client; killing thread (General Fallthrough Exception)')
                 self.logger.removeHandler(self.file_handler)
                 return
-            self.logger.fatal(f"Error handling request: {hakc_request} with error: {e}")
+            self.logger.fatal(f"Error handling request: {response[0:min(len(str(response)),250)]} with error: {e}")
             self.hakc_server.reset_alarm()
             raise e

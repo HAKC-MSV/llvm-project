@@ -11,18 +11,32 @@ import cProfile
 import yaml
 import os
 
-from hakc.HAKCServer import HAKCServer, global_queue, SaveDAGEvent, HAKCServerMode, parse_server_mode
+import time
+from hakc.HAKCServer import HAKCServer, global_queues, global_queues_events, final_queue, num_mergers, HAKCServerMode, timeout_signals
 from hakc.HAKCCompartmentalization import HAKCCompartmentalization
 from hakc.HAKCLogger import LoggingLevelEnum, parse_log_level, setup_logging, HAKCLogger
 from hakc.HAKCServerConfig import HAKCServerConfig, TimeoutException
+from hakc.HAKCDatabase import HAKCDatabase
+# from hakc.HAKCStaticAnalysis import add_default_compartmentalization, construct_dag, adjust_compartmentalization
+
+final_compartmentalization = mp.Value(HAKCCompartmentalization, HAKCCompartmentalization())
+
 
 logging.setLoggerClass(HAKCLogger)
 
 logger = logging.getLogger('hakc-server-process')
 
+server_processes = {}
+merger_processes = {}
+
 def timeout_handler(signum, frame):
     raise TimeoutException
 
+def parse_server_mode(server_mode: str) -> HAKCServerMode:
+    for mode in HAKCServerMode:
+        if mode.name == server_mode.upper() or mode.name == server_mode.lower():
+            return mode
+    raise RuntimeError(f'Invalid server mode {server_mode}')
 
 def output_profile_stats(profile):
     s = io.StringIO()
@@ -30,66 +44,97 @@ def output_profile_stats(profile):
     ps.print_stats()
     logger.info(s.getvalue())
 
-def merger_thread(dag_path: str):
+def launch_final_merger_process(dag_path: Optional[str]):
+    global final_compartmentalization
     # using global variables global_queue, SaveDAGEvent
-    logger.info(f"Spinning up HAKCCompartmentalization thread!")
-    global_compartmentalization = HAKCCompartmentalization()
+    logger.info(f"Spinning up final merger process!")
+    # final_compartmentalization = HAKCCompartmentalization()
 
     while True:
-        if global_queue.empty():
-            if SaveDAGEvent.is_set():
+        if final_queue.empty():
+            events_set = 0
+            for pid, event in global_queues_events.items():
+                if event.is_set():
+                    events_set += 1
+            if events_set == len(global_queues_events) and len(final_compartmentalization) > 0:
                 # queue must be empty before thread can exit
-                logger.debug(f"Got SaveDAGEvent signal")
-                logger.info(f"Saving DAG {global_compartmentalization}")
-                global_compartmentalization.save_as_yaml(dag_path)
-                logger.info(f"Saved DAG to {dag_path}")
-                SaveDAGEvent.clear()
+                if dag_path:
+                    logger.info(f"Saving Final Compartmentalization DAG {final_compartmentalization}")
+                    final_compartmentalization.save_as_yaml(dag_path)
+                    logger.info(f"Saved Final Compartmentalization DAG to {dag_path}")
+                logger.info(f"Finished constructing final compartmentalization!")
                 return
+            # logger.error(f".")
+            time.sleep(0.5) # prevent proc from taking up too many cpu cycles
             continue
-        subG = global_queue.get()
+        subG = final_queue.get()
         if subG:
+            logger.info(f"\tMerging Final Compartmentalization {final_compartmentalization}")
+            final_compartmentalization.update(edges=subG.edges(data=True, keys=True),
+                                               nodes=subG.nodes(data=True))
+
+def launch_merger_process(pid: int):
+    # using global variables global_queue, SaveDAGEvent
+    logger.info(f"Spinning up merger process {pid}!")
+    global_compartmentalization = HAKCCompartmentalization()
+
+    # clang thread -> data -> server thread
+    # server_thread -> comp -> global_queues[pid]
+    # merger_thread -> consume global_queues[pid]
+    # global
+
+    while True:
+        if global_queues[pid].empty():
+            # only one thread (arbitrarily designated to be pid 0) can save the final graph
+            if global_queues_events[pid].is_set() and len(global_compartmentalization) > 0:
+                logger.info(f"Adding {global_compartmentalization} to final queue")
+                final_queue.put(global_compartmentalization)
+                return
+            time.sleep(0.1) # prevent proc from taking up too many cpu cycles
+            continue
+        subG = global_queues[pid].get()
+        if subG:
+            # logger.info(f"\tMerging {global_compartmentalization}")
             global_compartmentalization.update(edges=subG.edges(data=True, keys=True),
                                                nodes=subG.nodes(data=True))
-            logger.info(f"\tMerged {global_compartmentalization}")
 
-def server_proc(config: HAKCServerConfig, tid: int, ServerMainLogger: logger):
-
-    config.socket_path = Path(os.path.join(config.socket_path, str(tid)))
-    logger.error(f"Spinning up TID {tid} on {config.socket_path}")
+def launch_server_process(config: HAKCServerConfig, server_mode: HAKCServerMode, pid: int, ServerMainLogger: logger):
+    config.socket_path = Path(os.path.join(config.socket_path, str(pid)))
+    logger.info(f"Spinning up server process {pid}!")
     if config.reuse_path and config.socket_path.exists():
         config.socket_path.unlink()
-    with HAKCServer(config, HAKCServerMode.POLICY, ServerMainLogger) as server:
+    with HAKCServer(config, server_mode, pid, ServerMainLogger) as server:
         try:
             if config.server_timeout > 0:
                 signal.signal(signal.SIGALRM, timeout_handler)
                 signal.alarm(config.server_timeout)
             server.serve_forever()
         except KeyboardInterrupt:
-            ServerMainLogger.info('Analysis Server received User KeyboardInterrupt Exception')
+            ServerMainLogger.info(f'Server received User KeyboardInterrupt Exception')
         except TimeoutException:
-            ServerMainLogger.info(f'Analysis Server received Timeout Exception')
+            ServerMainLogger.info(f'Server received Timeout Exception')
+            global_queues_events[pid].set()
         except Exception as e:
-            ServerMainLogger.error(f'Analysis Server received generic Exception: {e}')
+            ServerMainLogger.error(f'Server received generic Exception: {e}')
         finally:
             server.server_close()
 
 # noinspection PyTypeChecker
 def main():
     parser = argparse.ArgumentParser(description='HAKC Analysis Server Process')
-    parser.add_argument('--config', help='Path to config file', required=True)
-    parser.add_argument('--log-level', required=False, dest='log_level', default=LoggingLevelEnum.INFO,
-                        help=f'Log level to display, can be lower case {[level.name for level in LoggingLevelEnum]}',
-                        type=parse_log_level)
-    parser.add_argument('-l', '--log', default=None, dest='log_path')
-    parser.add_argument('--log-mode', default='w', dest='log_mode')
-    parser.add_argument('--server-mode', default=HAKCServerMode.ANALYSIS, dest='server_mode',
-                        help=f'Server mode can be {[mode.name for mode in HAKCServerMode]}', type=parse_server_mode)
-    parser.add_argument('--no-timeout', required=False, dest='no_timeout', action='store_true',
-                        help='Ignore timeout in config file')
     parser.add_argument('--profile', dest='profile', action='store_true')
+    parser.add_argument('--log-mode', default='w', dest='log_mode')
+    parser.add_argument('--config', help='Path to config file', required=True)
+    parser.add_argument('--no-timeout', required=False, dest='no_timeout', action='store_true', help='Ignore timeout in config file')
+    parser.add_argument('--log-level', required=False, dest='log_level',
+                        help=f'Log level to display, can be lower case {[level.name for level in LoggingLevelEnum]}',
+                        type=parse_log_level, default=LoggingLevelEnum.INFO,)
+    parser.add_argument('-l', '--log', dest='log_path', default=None)
+    parser.add_argument('--server-mode', dest='server_mode', help=f'Server mode can be {[mode.name for mode in HAKCServerMode]}',
+                        type=parse_server_mode, default=HAKCServerMode.ANALYSIS)
+    parser.add_argument('--db-dir', help='Directory to use for the kuzu database', dest='db_dir', default=None)
+    parser.add_argument('--adjust-path', dest='adjust_path', help='Path to adjustment YAML', default=None)
     args = parser.parse_args()
-
-
 
     # setting up root logger, which all other loggers should inherit its properties (unless we overwrite them later)
     # need to set up server logger here, or else all the initialization stuff will happen without debugging
@@ -98,6 +143,7 @@ def main():
     setup_logging(root_logger, log_level=args.log_level, log_file=args.log_path if args.log_path else '', log_mode=args.log_mode)
     config = None
     profile = None
+    global final_compartmentalization
     with open(args.config, 'r') as f:
         parsed_config = yaml.safe_load(f)
         config = HAKCServerConfig(**parsed_config)
@@ -108,51 +154,64 @@ def main():
     if config.log_path:
         ServerMainLogger.add_file_handler(config.log_path)
 
-
     if args.profile:
         profile = cProfile.Profile()
         profile.enable()
 
     # config.socket_path
-    proc = None
+    final_merger_process = None
     if args.server_mode == HAKCServerMode.ANALYSIS:
-        proc = mp.Process(target=merger_thread, args=(config.dag_path,))
-        proc.start()
+        # todo: tweak values
+        # for pid in range(min(config.max_sockets / num_mergers, 1)):
+        for pid in range(config.max_sockets):
+            # create a queue for each merger thread
+            global_queues[pid] = mp.Queue()
+            # create corresponding event to signal to merger that the server is done adding compartmentalizations
+            # TODO: probably move this event queue to the server procs
+            global_queues_events[pid] = mp.Event()
+            # global_queues_events[pid] = mp.Event()
+            merger_process = mp.Process(target=launch_merger_process, args=(pid,), name=f"Merger {pid}")
+            merger_process.start()
+            merger_processes[pid] = merger_process
+        # launch final merger to combine all the compartmentalizations from other mergers
+        final_merger_process = mp.Process(target=launch_final_merger_process, args=(config.dag_path,), name=f"Final Merger")
+        final_merger_process.start()
 
-    if args.server_mode == HAKCServerMode.POLICY:
-        servers = []
-        for tid in range(config.max_sockets):
-            # logger.error(f"Spinning up TID {tid}")
-            sproc = mp.Process(target=server_proc, args=(config, tid, ServerMainLogger,))
-            sproc.start()
-            servers.append(sproc)
+    for pid in range(config.max_sockets):
+        server_process = mp.Process(target=launch_server_process, args=(config, args.server_mode, pid, ServerMainLogger,), name=f"Server {pid}")
+        server_process.start()
+        server_processes[pid] = server_process
 
-        for tid in range(config.max_sockets):
-            logger.error(f"Joining TID {tid}")
-            servers[tid].join()
-    # with HAKCServer(config, args.server_mode, ServerMainLogger) as server:
-    #     try:
-    #         if config.server_timeout > 0:
-    #             signal.signal(signal.SIGALRM, timeout_handler)
-    #             signal.alarm(config.server_timeout)
-    #         server.serve_forever()
-    #     except KeyboardInterrupt:
-    #         ServerMainLogger.info('Analysis Server received User KeyboardInterrupt Exception')
-    #     except TimeoutException:
-    #         ServerMainLogger.info(f'Analysis Server received Timeout Exception')
-    #     except Exception as e:
-    #         ServerMainLogger.error(f'Analysis Server received generic Exception: {e}')
-    #     finally:
-    #         server.server_close()
+    for pid, server_process in server_processes.items():
+        server_process.join()
+        # when server process finishes, signal that its queue is finished
+        # global_queues_events[pid].set()
+        logger.error(f"Joined {server_process.name}")
+
     if args.server_mode == HAKCServerMode.ANALYSIS:
-        SaveDAGEvent.set()
-        global_queue.close()
-        proc.join()
+        for pid, merger_process in merger_processes.items():
+            merger_process.join()
+            logger.error(f"Joined {merger_process.name}")
+        final_merger_process.join()
+        # TODO: add in the static analysis script
+        logger.info(f"Finished constructing {final_compartmentalization}")
+
+        if args.db_dir:
+            logger.info(f"Deleting db at {args.db_dir}")
+            final_compartmentalization.delete_db(args.db_dir)
+            logger.info(f"Creating new db at {args.db_dir}")
+            final_compartmentalization.create_new_db(args.db_dir)
+            logger.info(f"Adding default final_compartmentalization")
+            final_compartmentalization.add_default_compartmentalization(args.db_dir)
+            logger.info(f"Constructing DAG from {final_compartmentalization}")
+            # TODO: update dag cores
+            final_compartmentalization.create_dag(int(mp.cpu_count() / 2), args.db_dir)
+        if args.adjust_path:
+            final_compartmentalization.adjust_compartmentalization(args.adjust_path, args.db_dir)
 
     if args.profile:
         profile.disable()
         output_profile_stats(profile)
-
 
 if __name__ == "__main__":
     main()

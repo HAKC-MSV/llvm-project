@@ -66,7 +66,6 @@ unsigned HAKCDatabaseInformation::GetMaxRetries() const {
 
 void HAKCDatabaseInformation::operator<<(
     const HAKCYamlDatabaseConfig &DatabaseConfig) {
-  // ServerURL = DatabaseConfig.ServerURL;
   ServerURL = DatabaseConfig.ServerURL + "/" + std::to_string(get_threadid() % DatabaseConfig.MaxSockets);
   MaxSockets = DatabaseConfig.MaxSockets;
   CompartmentEndpoint = DatabaseConfig.GetCompartmentEndpoint;
