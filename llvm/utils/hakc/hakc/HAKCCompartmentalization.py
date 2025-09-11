@@ -47,6 +47,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
     def __init__(self, max_division_count: Optional[int] = 16, G: Optional[nx.MultiDiGraph] = None):
         yaml.YAMLObject.__init__(self)
         nx.MultiDiGraph.__init__(self)
+        self.conn = None
         if G:
             self.load_from_yaml(G)
         self.max_division_count = max_division_count
@@ -143,7 +144,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
 
     def __str__(self):
         divs_comps = len(self.get_divisions_compartments())
-        return f"HAKCCompartmentalization with {len(self.nodes)} nodes, {len(self.edges)} edges [{len(self.get_symbols())} Symbols, {len(self.get_types())} Types, {len(self.get_scopes())} Scopes, {len(self.get_definition_locations())} DefinitionLocations {f', {divs_comps} (Divisions, Compartments) tuples' if divs_comps > 0 else ''}]"
+        return f"HAKCCompartmentalization with {len(self.nodes)} nodes, {len(self.edges)} edges [{len(self.get_symbols())} Symbols, {len(self.get_types())} Types, {len(self.get_scopes())} Scopes, {len(self.get_definition_locations())} DefinitionLocations{f' , {divs_comps} (Divisions, Compartments) tuples' if divs_comps > 0 else ''}]"
 
     def add_symbols(self, functions: list[HAKCFunction], global_variables: list[HAKCGlobalVariable]) -> None:
         for global_variable in global_variables:
@@ -274,9 +275,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             compartment_id += 1
 
         if db_dir:
-            conn = HAKCDatabase(db_dir)
-            self.persist_to_database(conn, create_schema=create_schema)
-            conn.close()
+            self.persist_to_database(self.conn, create_schema=create_schema)
 
 
     def create_dag_multithread(self, core_count: int, db_dir: str):
@@ -285,6 +284,8 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         symbol_hashes = self.get_symbol_hashes()
         batch_size = 100
         dag_edges_added = 0
+        # the conn must be closed since N threads are opened using init_mp_database
+        self.close_conn()
         with concurrent.futures.ProcessPoolExecutor(max_workers=core_count, initializer=init_mp_database,
                                                     initargs=(db_dir,)) as executor:
             futures = list()
@@ -322,11 +323,11 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
                     logger.info(f'Stopping edge computation')
                     executor.shutdown(wait=False, cancel_futures=True)
                     raise ki
-
+        # reopen connection
+        self.open_conn(db_dir)
         logger.info(f'Adding {dag_edges_added} DAG edges {self}')
-        conn = HAKCDatabase(db_dir, max_num_threads=core_count)
-        conn.persist_dag_edges(dag_edges)
-        conn.close()
+        # conn = self.conn if self.conn else HAKCDatabase(db_dir, max_num_threads=core_count)
+        self.conn.persist_dag_edges(dag_edges)
         return self
 
     def create_dag(self, core_count: int, db_dir: str):
@@ -351,9 +352,9 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             raise RuntimeError(f"Unable to load Adjustments from {adjust_path}")
 
         logger.info(f'Adjusting compartmentalization based on {adjust_path}')
-        conn = HAKCDatabase(db_dir)
+        # conn = HAKCDatabase(db_dir)
 
-        symbols = conn.get_symbols()
+        symbols = self.conn.get_symbols()
         assert len(symbols) != 0, f"No symbols were returned from database!"
         nec_division = None
         no_enforcement_compartment = None
@@ -371,7 +372,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
                     adjusted_division = nec_division
                     adjusted_compartment = no_enforcement_compartment
                 else:
-                    adjustments = conn.get_division_id_compartment_id_from_symbol(symbol)
+                    adjustments = self.conn.get_division_id_compartment_id_from_symbol(symbol)
                     if adjustments is None:
                         logger.error(f'Could not find original division for {symbol}')
                         continue
@@ -389,11 +390,11 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
                 logger.info(f'{symbol} is unchanged')
 
         logger.info(f'Removing existing compartments')
-        conn.delete_all_compartments()
-        self.persist_to_database(conn)
+        self.conn.delete_all_compartments()
+        self.persist_to_database(self.conn)
         logger.info(f'Done adjusting compartmentalization')
-        logger.info(f'Compartmentalization now has {len(conn.get_all_divisions())} divisions across {len(conn.get_all_compartments())} compartments')
-        conn.close()
+        logger.info(f'Compartmentalization now has {len(self.conn.get_all_divisions())} divisions across {len(self.conn.get_all_compartments())} compartments')
+        # conn.close()
 
     def compute_entry_token(self, compartment_id: int, divisions=None) -> int:
         if divisions is None:
@@ -556,6 +557,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         return result
 
     def get_unpersisted_edges(self) -> dict[str, list[tuple[HAKCDBNode, HAKCDBNode, dict]]]:
+        # TODO: double check if this is working correctly after dag adjustment
         result = dict()
         for head, tail, table_name, attrs in self.edges(data=True, keys=True):
             if not attrs[HAKCCompartmentalization.persisted_attr]:
@@ -676,13 +678,23 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             logger.info(f'Removing existing database at {db_dir}')
             shutil.rmtree(db_dir)
 
+    def open_conn(self, db_dir: str, max_num_threads: int = 1):
+        self.conn = HAKCDatabase(db_dir, max_num_threads=max_num_threads)
+
+    def close_conn(self):
+        if self.conn:
+            self.conn.close()
+        self.conn = None
+
     def create_new_db(self, db_dir: str):
         logger.debug("Creating new database")
-        conn = HAKCDatabase(db_dir)
+        # Note: expecting users to close the connection manually
+        self.open_conn(db_dir)
         logger.debug(f"Creating schema")
-        self.persist_to_database(conn, create_schema=True)
-        logger.info(f"Created new database with {len(conn.get_all_symbol_hashes())} symbols")
-        conn.close()
+        self.persist_to_database(self.conn, create_schema=True)
+        logger.info(f"Created new database with {len(self.conn.get_all_symbol_hashes())} symbols")
+
+        #self.close_conn()
 
     def get_symbol_hashes(self) -> dict[int, HAKCSymbol]:
         symbol_hashes = dict()

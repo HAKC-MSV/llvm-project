@@ -1,8 +1,10 @@
 import json
 import logging
+import signal
 import socketserver
 import struct
 import threading
+import time
 from typing import cast, Optional
 
 import yaml
@@ -74,7 +76,14 @@ class HAKCServerThread(socketserver.StreamRequestHandler):
         bytes_written = self.write_raw_bytes(struct.pack(
             HAKCServerThread.size_fmt, len(encoded_data)))
         bytes_written += self.write_raw_bytes(encoded_data)
+        self.reset_alarm()
         return bytes_written
+
+    def reset_alarm(self):
+        # cancel existing alarm
+        signal.alarm(0)
+        if self.hakc_server.timeout > 0:
+            signal.alarm(self.hakc_server.timeout)
 
     # noinspection PyTypeChecker
     def handle_endpoint(self, hakc_request: HAKCDataRequest) -> HAKCResponse:
@@ -113,20 +122,16 @@ class HAKCServerThread(socketserver.StreamRequestHandler):
             self.logger.debug(f'Client Aborted Connection after returning {response}')
             if self.hakc_server.config.test_mode:
                 raise TimeoutException
-            self.hakc_server.reset_alarm()
             return
         except ConnectionResetError:
             self.logger.fatal(f'Client Reset Connection after returning {response[0:min(len(str(response)),250)]}')
-            self.hakc_server.reset_alarm()
             return
         except TimeoutException:
             self.logger.fatal(f'Timeout received after returning {response[0:min(len(str(response)),250)]}')
-            self.hakc_server.reset_alarm()
             return
         except TerminateConnectionException:
             self.logger.debug(f'Analysis Server Thread received terminate connection from Client; killing thread (TerminateConnectionException)')
             self.logger.removeHandler(self.file_handler)
-            self.hakc_server.reset_alarm()
             return
         except Exception as e:
             if hakc_request.endpoint == "terminate-connection":
@@ -134,5 +139,4 @@ class HAKCServerThread(socketserver.StreamRequestHandler):
                 self.logger.removeHandler(self.file_handler)
                 return
             self.logger.fatal(f"Error handling request: {response[0:min(len(str(response)),250)]} with error: {e}")
-            self.hakc_server.reset_alarm()
             raise e

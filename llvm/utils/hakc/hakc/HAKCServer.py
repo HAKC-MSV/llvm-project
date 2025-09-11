@@ -3,6 +3,7 @@ import multiprocessing as mp
 import os
 import signal
 import socketserver
+import time
 from enum import Enum
 from typing import Optional, cast, Tuple
 
@@ -20,18 +21,6 @@ from .HAKCServerThread import HAKCServerThread
 logging.setLoggerClass(HAKCLogger)
 
 logger: HAKCLogger = cast(HAKCLogger, logging.getLogger('hakc-server'))
-
-# create global thread safe structure to share sub compartmentalizations
-# add if statement
-# global_queue = mp.Queue()
-global_queues = {}
-global_queues_events = {}
-final_queue = mp.Queue()
-timeout_signals = {}
-# Todo add if statement or move this
-
-# SaveDAGEvent = mp.Event()
-num_mergers = 4
 
 mp_conn: HAKCDatabase | None = None
 
@@ -262,8 +251,11 @@ class HAKCServerThreadInstance(HAKCServerThread):
         if self.dag_filename:
             # self.compartmentalization.save_as_yaml(self.dag_filename)
             # global_queues[self.hakc_server.pid % num_mergers].put(self.compartmentalization)
-            logger.info(f"Adding {self.compartmentalization} to global_queue")
-            global_queues[self.hakc_server.pid].put(self.compartmentalization)
+            # 'Gather' operation
+            logger.info(f"Adding {self.compartmentalization} to server_gather_buckets")
+            assert len(self.compartmentalization) > 0
+            self.hakc_server.server_gather_buckets[self.hakc_server.id].put(self.compartmentalization)
+            # global_queues[self.hakc_server.pid].put(self.compartmentalization)
             # self.hakc_server.last_alive = time.time()
         HAKCServerThread.terminate_connection(self)
 
@@ -271,6 +263,7 @@ class HAKCServerThreadInstance(HAKCServerThread):
         self.dag_filename = kwargs_get(str, "dag-filename", None, **kwargs)
         self.file_handler = self.logger.add_file_handler(self.dag_filename.replace(".dag.yml", ".analysis-server.log"))
         logger.debug(f"Processing {self.dag_filename}")
+        # self.hakc_server.check_timeout()
         return HAKCResponse(HAKCResultSuccess(), self.hakc_server.config.set_dag_filename_endpoint)
 
     def add_symbols(self, **kwargs) -> HAKCResponse:
@@ -286,31 +279,32 @@ class HAKCServerThreadInstance(HAKCServerThread):
                 # TODO: probably make this a runtime error
                 logger.fatal(f"Invalid symbol: {symbol}")
                 return HAKCResponse(HAKCResultFail('Invalid request: object is not HAKCSymbol!'), self.hakc_server.config.add_symbols_endpoint)
+        # self.hakc_server.check_timeout()
         return HAKCResponse(HAKCResultSuccess(), self.hakc_server.config.add_symbols_endpoint)
 
     def add_function(self, **kwargs) -> HAKCResponse:
         func = yaml.load(kwargs_get(str, "object", None, **kwargs), Loader=self.yaml_loader)
         self.compartmentalization.add_function(func)
+        # self.hakc_server.check_timeout()
         return HAKCResponse(HAKCResultSuccess(), self.hakc_server.config.add_function_endpoint)
 
     def add_global_variable(self, **kwargs) -> HAKCResponse:
         gv = yaml.load(kwargs_get(str, "object", None, **kwargs), Loader=self.yaml_loader)
         self.compartmentalization.add_global_variable(gv)
+        # self.hakc_server.check_timeout()
         return HAKCResponse(HAKCResultSuccess(), self.hakc_server.config.add_global_variable_endpoint)
 
 # noinspection PyTypeChecker
 class HAKCServer(socketserver.ThreadingUnixStreamServer):
-    def __init__(self, config: HAKCServerConfig, server_mode: HAKCServerMode,  pid: int, logger: HAKCLogger, **kwargs):
-        self.pid = pid
+    def __init__(self, id: int, server_gather_buckets, config: HAKCServerConfig, server_mode: HAKCServerMode, logger: HAKCLogger, **kwargs):
+        self.id = id
+        self.server_gather_buckets = server_gather_buckets
         self.logger = logger
-        assert self.logger
         self.config = config
-        assert self.config
         self.analysis_mode = server_mode == HAKCServerMode.ANALYSIS
         self.policy_mode = server_mode == HAKCServerMode.POLICY
         self.timeout = config.server_timeout
-        # self.last_alive = time.time()
-        # todo add if policy
+        self.last_alive = time.time()
         if self.policy_mode:
             self.init_mp_database(self.config.data_path)
         self.logger.debug(f'Starting Server with socket {config.socket_path}')
@@ -321,24 +315,24 @@ class HAKCServer(socketserver.ThreadingUnixStreamServer):
         # global_queues_events[self.pid].set()
         logger.debug(f"Closing HAKCServer")
 
+    # def service_actions(self):
+    #     # this function is called in serve_forever, and will check for server livlieness for us
+    #     # logger.error(f"Running service action on {self.id}")
+    #     if self.timeout > 0:
+    #         now = time.time()
+    #         if now - self.last_alive > self.timeout:
+    #             logger.error(f"Raising timeout on {self.id}")
+    #             self.server_gather_buckets[self.id].put(None)
+    #             self.shutdown()
+    #             # raise TimeoutError
+    #     time.sleep(1)
+
     def handle_error(self, request, client):
-        # import traceback
-        # traceback.print_exc()
+        import traceback
+        traceback.print_exc()
         self.logger.error(f"Error handling request {request} for client {client}")
         # do a server shutdown, rather than a server_close()
         self.shutdown()
-
-    def reset_alarm(self):
-        # cancel existing alarm
-        signal.alarm(0)
-        # check if process is above the alotted time
-        # now = time.time()
-        if self.timeout > 0:
-            # if now - self.last_alive > self.timeout:
-            #     # timeout asap
-            #     signal.alarm(0.1)
-            # else:
-            signal.alarm(self.timeout)
 
     @staticmethod
     def init_data_source(config: HAKCServerConfig) -> Optional[HAKCPolicyDataSource]:
