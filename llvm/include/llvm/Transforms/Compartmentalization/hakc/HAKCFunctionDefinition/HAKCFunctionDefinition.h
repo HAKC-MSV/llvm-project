@@ -1,3 +1,13 @@
+//===----------------------------------------------------------------------===//
+//
+// Part of the MIT Lincoln Laboratory HAKC Compartmentalization Project.
+//
+//===----------------------------------------------------------------------===//
+///
+/// \file
+/// This file tracks the information associated with a specific function definition.
+///
+//===----------------------------------------------------------------------===//
 //
 // Created by de29664 on 6/23/23.
 //

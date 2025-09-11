@@ -1,3 +1,14 @@
+//===----------------------------------------------------------------------===//
+//
+// Part of the MIT Lincoln Laboratory HAKC Compartmentalization Project.
+//
+//===----------------------------------------------------------------------===//
+///
+/// \file
+/// This file contains the base class for information associated with a symbol.
+/// Note that both functions and global variables are subclasses of a symbol.
+///
+//===----------------------------------------------------------------------===//
 //
 // Created by de29664 on 6/11/24.
 //

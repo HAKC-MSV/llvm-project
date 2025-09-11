@@ -1,3 +1,14 @@
+//===----------------------------------------------------------------------===//
+//
+// Part of the MIT Lincoln Laboratory HAKC Compartmentalization Project.
+//
+//===----------------------------------------------------------------------===//
+///
+/// \file
+/// This file contains the common analysis base class. It contains various references
+/// to useful structs that are relevant to compartmentalization.
+///
+//===----------------------------------------------------------------------===//
 //
 // Created by de29664 on 3/21/23.
 //

@@ -1,3 +1,14 @@
+//===----------------------------------------------------------------------===//
+//
+// Part of the MIT Lincoln Laboratory HAKC Compartmentalization Project.
+//
+//===----------------------------------------------------------------------===//
+///
+/// \file
+/// This file contains the information needed to create a custom transfer function
+/// i.e., allowing data to be transferred correctly outside a boundary.
+///
+//===----------------------------------------------------------------------===//
 //
 // Created by de29664 on 6/21/23.
 //
