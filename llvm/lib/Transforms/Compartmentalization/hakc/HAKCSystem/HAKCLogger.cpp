@@ -4,7 +4,8 @@
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCLogger.h"
 
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/yaml/HAKCYaml.h"
-#include <filesystem>
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/Path.h"
 
 using namespace llvm;
 
