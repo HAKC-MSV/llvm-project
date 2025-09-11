@@ -620,7 +620,7 @@ HAKCTypeIdentifier::HandleFunction(const DISubprogram *SubProg) {
     return nullptr;
   }
   if (F->getSubprogram() != SubProg) {
-    CommonHAKCAnalysis::getLogger(Error, SuppressOutput)
+    CommonHAKCAnalysis::getLogger(Verbose, SuppressOutput)
         << *F << " SubProgram does (not?) equal " << *SubProg << "\n";
   } else {
     CommonHAKCAnalysis::getLogger(Verbose, SuppressOutput)

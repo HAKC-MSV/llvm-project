@@ -1,3 +1,14 @@
+//===----------------------------------------------------------------------===//
+//
+// Part of the MIT Lincoln Laboratory HAKC Compartmentalization Project.
+//
+//===----------------------------------------------------------------------===//
+///
+/// \file
+/// This file contains a logger implementation with custom loging levels, and
+/// the ability to add file handlers to log to files.
+///
+//===----------------------------------------------------------------------===//
 //
 // Created by de29664 on 8/8/25.
 //

@@ -1,3 +1,14 @@
+//===----------------------------------------------------------------------===//
+//
+// Part of the MIT Lincoln Laboratory HAKC Compartmentalization Project.
+//
+//===----------------------------------------------------------------------===//
+///
+/// \file
+/// This file contains the information associated with identifying a llvm type
+/// (debug types, llvm types, debug records, etc.)
+///
+//===----------------------------------------------------------------------===//
 //
 // Created by derrick on 9/8/21.
 //

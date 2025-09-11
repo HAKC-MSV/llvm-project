@@ -1,3 +1,14 @@
+//===----------------------------------------------------------------------===//
+//
+// Part of the MIT Lincoln Laboratory HAKC Compartmentalization Project.
+//
+//===----------------------------------------------------------------------===//
+///
+/// \file
+/// This file contains code which finds the allocation size of a memory allocation
+/// function call, e.g., to malloc
+///
+//===----------------------------------------------------------------------===//
 //
 // Created by al32163 on 10/23/2024
 //
