@@ -1,70 +1,47 @@
 !HAKCCompartmentalization
 directed: true
-division_count: 16
 edges:
-  - key: IsType
-    persisted: true
-    source: &id001 !HAKCFunction
-      DefiningFile: @HAKC_TEST_DIR@/hakc_test1.c
-      DefiningLine: 16
-      Name: foo
-      is_function: true
-      symbol_hash: 947f51a18d682209
-    target: &id002 !HAKCType
-      DebugType: int (struct data_struct2*)
-      LLVMType: i32 (ptr)
-      type_hash: f969fb193c20d0f8
-  - key: IndirectCall
-    persisted: true
-    source: *id001
-    target: *id002
-  - key: HasScope
-    persisted: true
-    source: *id001
-    target: &id005 !HAKCScope
-      LocalScopeName: global
-      Scope: global
-      scope_hash: 8001c27439650c5c
-  - key: UsedInCompilationUnit
-    persisted: true
-    source: *id001
-    target: &id003 !HAKCCompilationUnit
-      filename: @HAKC_TEST_DIR@/hakc_test1.c
-  - key: DefinedIn
-    line: 16
-    persisted: true
-    source: *id001
-    target: *id003
-  - key: DagEdge
-    persisted: true
-    source: *id001
-    target: *id001
-    weight: 1
-  - key: InDivision
-    persisted: true
-    source: *id001
-    target: &id004 !HAKCDivision
-      AccessToken: 73728
-      DivisionID: 13
-      division_hash: be7396225c569ba9
-  - key: InCompartment
-    persisted: true
-    source: *id004
-    target: &id006 !HAKCCompartment
-      CompartmentID: 1
-      EntryToken: 73728
-graph: { }
+- key: has_type
+  persisted: true
+  source: &id001 !HAKCFunction
+    IsFunction: true
+    Name: foo
+    symbol_hash: 33964434728527609
+  target: &id003 !HAKCType
+    DebugType: int (struct data_struct2*)
+    LLVMType: i32 (ptr)
+    type_hash: 70203796382032080
+- key: has_scope
+  persisted: true
+  source: *id001
+  target: &id004 !HAKCScope
+    LocalScopeName: global
+    Scope: global
+    scope_hash: 36030731704165644
+- key: has_division
+  persisted: true
+  source: *id001
+  target: &id002 !HAKCDivision
+    AccessToken: 73728
+    DivisionID: 13
+    Salt: 4727191781541152262
+- key: has_compartment
+  persisted: true
+  source: *id002
+  target: &id005 !HAKCCompartment
+    CompartmentID: 1
+    EntryToken: 65536
+graph: {}
+max_division_count: 16
 multigraph: true
 nodes:
-  - id: *id001
-    persisted: true
-  - id: *id002
-    persisted: true
-  - id: *id005
-    persisted: true
-  - id: *id003
-    persisted: true
-  - id: *id004
-    persisted: true
-  - id: *id006
-    persisted: true
+- id: *id001
+  persisted: true
+- id: *id003
+  persisted: true
+- id: *id004
+  persisted: true
+- id: *id002
+  persisted: true
+- id: *id005
+  persisted: true

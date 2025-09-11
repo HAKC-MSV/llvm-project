@@ -1,8 +1,13 @@
 import hashlib
 from enum import Enum
 from typing import Type, Literal
+
 import yaml
 
+# set global yaml loader and dumper
+# options: Loader, CLoader, CFullLoader, and some others
+hakc_loader = yaml.CLoader
+hakc_dumper = yaml.Dumper
 
 class QuotedString(str):
     pass
@@ -195,7 +200,7 @@ class HAKCDBNode(HAKCPrintableObj):
         self.set_hash = True
 
     @classmethod
-    def to_yaml(cls, dumper: yaml.Dumper, data):
+    def to_yaml(cls, dumper: hakc_dumper, data):
         return dumper.represent_mapping(data.yaml_tag, data.to_yaml_dict())
 
     def get_info_tokens(self, convert_hash=True) -> dict[str, object]:
@@ -255,7 +260,7 @@ class HAKCPayload(HAKCPrintableObj):
         self.payload = payload
 
     @classmethod
-    def to_yaml(cls, dumper: yaml.Dumper, data):
+    def to_yaml(cls, dumper: hakc_dumper, data):
         return dumper.represent_dict(data.to_yaml_dict())
 
     def get_info_tokens(self, convert_hash=True) -> dict[str, object]:
@@ -265,6 +270,25 @@ class HAKCPayload(HAKCPrintableObj):
         if key not in self.payload:
             self.payload[key] = val
 
+class HAKCResult(HAKCPayload):
+    def __init__(self, success: bool = True, error: str = '', data: HAKCPayload = None, **kwargs):
+        HAKCPayload.__init__(self, payload={'Success': success, 'Error': error, 'Data': data})
+
+class HAKCResultSuccess(HAKCResult):
+    def __init__(self, data: HAKCPayload = None):
+        # HAKCResult.__init__(self, payload={'Success': True, 'Error': '', 'Data': data})
+        HAKCResult.__init__(self, success=True, error='', data=data)
+
+class HAKCResultFail(HAKCResult):
+    def __init__(self, error: str):
+        # HAKCResult.__init__(self, payload={'Success': False, 'Error': error, 'Data': {}})
+        HAKCResult.__init__(self, success=False, error=error, data=None)
+
+class HAKCResponse(HAKCPayload):
+    # response type -> endpoint
+    # status -> (success, error, payload)
+    def __init__(self, result: HAKCResult, response_endpoint: str, **kwargs):
+        HAKCPayload.__init__(self, payload={'Result': result, 'ResponseEndpoint': response_endpoint}, **kwargs)
 
 class HashedHAKCDBNode(HAKCDBNode):
     def __init__(self, **kwargs):

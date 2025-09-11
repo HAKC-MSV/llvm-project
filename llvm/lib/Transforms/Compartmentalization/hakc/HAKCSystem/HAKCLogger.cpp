@@ -6,11 +6,12 @@
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/yaml/HAKCYaml.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
+#include <filesystem>
 
 using namespace llvm;
 
 llvm::hakc::HAKCLogger::HAKCLogger(hakc::HAKCLogLevel log_level)
-    : HAKCStreams(), LogLevel(Verbose), disabled(log_level == Disabled) {
+  : HAKCStreams(), LogLevel(Verbose), disabled(log_level == Disabled) {
   auto writer = std::make_shared<HAKCWriter>(log_level);
   HAKCStreams.push_back(writer);
 }
@@ -19,24 +20,22 @@ hakc::HAKCLogger::~HAKCLogger() { HAKCStreams.clear(); }
 
 void hakc::HAKCLogger::addStream(StringRef log_path,
                                  hakc::HAKCLogLevel log_level) {
-  if (log_level == Disabled) {
-    disabled = true;
-  } else {
-    auto log_dir = llvm::sys::path::parent_path(log_path).str();
+  if (log_level == Disabled || log_path.empty()) { disabled = true; } else {
+    auto log_dir = sys::path::parent_path(log_path).str();
     // create directory if it does not exist
-    if (!llvm::sys::fs::exists(log_dir)) {
-      std::error_code err = llvm::sys::fs::create_directories(log_dir);
+    if (!std::filesystem::exists(log_dir)) {
+      std::error_code err;
+      err = sys::fs::create_directories(log_dir);
       if (err) {
-        errs() << "Failed to create " << sys::path::parent_path(log_path) << "\n";
+        errs() << "Failed to create " << sys::path::parent_path(log_path) <<
+            "\n";
         // should we crash here?
         // throw std::exception();
       }
     }
 
     auto writer = std::make_shared<HAKCWriter>(log_path, log_level);
-    if (*writer) {
-      HAKCStreams.push_back(writer);
-    }
+    if (*writer) { HAKCStreams.push_back(writer); }
   }
 }
 
@@ -61,7 +60,7 @@ void hakc::HAKCLogger::SetFileConfiguredLogLevel(
 
 bool hakc::HAKCLogger::IsDisabled() const { return disabled; }
 
-iterator_range<SmallVector<std::shared_ptr<hakc::HAKCWriter>>::iterator>
+iterator_range<SmallVector<std::shared_ptr<hakc::HAKCWriter> >::iterator>
 hakc::HAKCLogger::Streams() {
   return make_range(HAKCStreams.begin(), HAKCStreams.end());
 }

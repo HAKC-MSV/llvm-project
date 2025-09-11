@@ -19,9 +19,8 @@ def parse_log_level(level_string: str) -> LoggingLevelEnum:
             return level
     raise RuntimeError(f'Invalid log level {level_string}')
 
-
 class HAKCLogger(logging.Logger):
-    log_fmt = "%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s"
+    log_fmt = "%(asctime)s [%(processName)s, %(threadName)-10.10s] [%(levelname)-3.3s]%(message)s"
 
     @staticmethod
     def get_formatter() -> logging.Formatter:
@@ -34,7 +33,7 @@ class HAKCLogger(logging.Logger):
         self.addHandler(self.console_handler)
 
     def progress_bar(self, **kwargs) -> tqdm.tqdm:
-        disabled = self.level not in {logging.INFO, logging.DEBUG}
+        disabled = self.level not in {logging.INFO, logging.DEBUG, logging.NOTSET}
         kwargs['file'] = self.console_handler.stream
         if disabled:
             kwargs['file'] = open(os.devnull, 'w')
@@ -46,6 +45,8 @@ class HAKCLogger(logging.Logger):
         file_handler = logging.FileHandler(log_file, mode=log_mode)
         file_handler.setFormatter(HAKCLogger.get_formatter())
         self.addHandler(file_handler)
+        # returning file_handler so threads can delete the per thread logger on completion
+        return file_handler
 
 
 def setup_logging(logger: HAKCLogger, log_file: str = "", log_level: LoggingLevelEnum = LoggingLevelEnum.WARNING,

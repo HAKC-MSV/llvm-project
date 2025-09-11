@@ -1,20 +1,35 @@
 import logging
+import os
 import re
+import shutil
+import time
 from typing import Type, Optional, cast, Union, Hashable, Tuple
-from typing_extensions import Self
+import concurrent.futures
+import io
+import itertools
+import logging
+import pstats
+import time
+from typing import cast
+
+import networkx as nx
+import yaml
 
 import networkx as nx
 import pandas as pd
 import yaml
 from networkx.classes.reportviews import NodeView
 from networkx.readwrite import json_graph
+from typing_extensions import Self
 from yaml import MappingNode
 
-from .HAKCBase import HAKCDivisionEnum, HAKCDBNode, HAKCDBRelation
+from .HAKCBase import HAKCDivisionEnum, HAKCDBNode
 from .HAKCDatabase import HAKCDatabase
 from .HAKCLogger import HAKCLogger
 from .HAKCObjects import HAKCSymbol, HAKCDefinitionLocation, HAKCFunction, HAKCType, HAKCCompartment, HAKCDivision, \
-    HAKCScope, HAKCGlobalVariable, HAKCIndirectCallSource
+    HAKCScope, HAKCGlobalVariable, HAKCAdjustment, HAKCCompartmentalizationAdjustment
+from .HAKCUtils import batched, compute_dag_edge_weight
+from .HAKCStaticAnalysis import init_mp_database, compute_dag_edges_for_symbol
 
 logging.setLoggerClass(HAKCLogger)
 
@@ -32,6 +47,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
     def __init__(self, max_division_count: Optional[int] = 16, G: Optional[nx.MultiDiGraph] = None):
         yaml.YAMLObject.__init__(self)
         nx.MultiDiGraph.__init__(self)
+        self.conn = None
         if G:
             self.load_from_yaml(G)
         self.max_division_count = max_division_count
@@ -42,13 +58,13 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         division_compartment_mapping = dict()
         for symbol in self.get_filtered_nodes(G, node_filter=lambda n: isinstance(n, HAKCFunction) or isinstance(n, HAKCGlobalVariable)):
             symbol: Union['HAKCFunction', 'HAKCGlobalVariable'] # suppress type warning
-            logger.fatal(f"symbol found: {symbol}")
+            # logger.fatal(f"symbol found: {symbol}")
             new_symbol = HAKCFunction(Name=symbol.name) if isinstance(symbol, HAKCFunction) else HAKCGlobalVariable(Name=symbol.name)
             new_symbol.set_computed_hash(symbol.computed_hash)
             for nbr in G.neighbors(symbol):
                 for edge_data in G.get_edge_data(symbol, nbr):
                     if edge_data == HAKCSymbol.relation_type:
-                        assert(isinstance(nbr, HAKCType))
+                        # assert isinstance(nbr, HAKCType), f"assert(isinstance({nbr}, HAKCType)"
                         new_symbol.type = nbr
                     elif edge_data == HAKCSymbol.relation_scope:
                         new_symbol.scope = nbr
@@ -91,10 +107,13 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
                 self.__add_function(new_symbol)
             else:
                 self.__add_global_variable(new_symbol)
-            division = symbol_division_mapping[symbol]
-            compartment = division_compartment_mapping[division]
-            self.__add_division_compartment(new_symbol, division, compartment)
+            # The yaml outputted from analysis will not have compartments or divisions, meaning the mapping dicts will be empty
+            division = symbol_division_mapping[symbol] if symbol in symbol_division_mapping else None
+            compartment = division_compartment_mapping[division] if division in division_compartment_mapping else None
+            if division and compartment:
+                self.__add_division_compartment(new_symbol, division, compartment)
         return self
+
     @classmethod
     def to_yaml(cls, dumper: yaml.Dumper, data) -> MappingNode:
         compartmentalization_data = json_graph.node_link_data(data, edges='edges')
@@ -102,13 +121,30 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         return dumper.represent_mapping(cls.yaml_tag, compartmentalization_data)
 
     @classmethod
-    def from_yaml(cls, loader: yaml.Loader, node):
+    def from_yaml(cls, loader: yaml.CLoader, node):
+        # HAKCCompartmentalization.add_yaml_constructors()
         graph_data = loader.construct_mapping(node, deep=True)
         graph = json_graph.node_link_graph(graph_data, edges='edges')
         return cls(max_division_count=graph_data.get('division_count', 16), G=graph)
 
+    @staticmethod
+    def parse_yaml(filename: str):
+        import traceback
+        logger.add_file_handler(filename.replace(".yml",".static-analysis.log").replace(".dag",""))
+        logger.info(f"Parsing {filename}")
+        HAKCCompartmentalization.add_yaml_constructors()
+        with open(filename, 'rb') as f:
+            try:
+                compartmentalization = yaml.load(f, Loader=yaml.CLoader)
+                logger.debug(f"Loaded {compartmentalization} from {filename}")
+                return compartmentalization
+            except Exception as e:
+                logger.fatal(f"Failed to load yaml with error: {str(e)} in {filename}")
+                traceback.print_exc()
+
     def __str__(self):
-        return f"HAKCCompartmentalization with {len(self.nodes)} nodes and {len(self.edges)} edges!"
+        divs_comps = len(self.get_divisions_compartments())
+        return f"HAKCCompartmentalization with {len(self.nodes)} nodes, {len(self.edges)} edges [{len(self.get_symbols())} Symbols, {len(self.get_types())} Types, {len(self.get_scopes())} Scopes, {len(self.get_definition_locations())} DefinitionLocations{f' , {divs_comps} (Divisions, Compartments) tuples' if divs_comps > 0 else ''}]"
 
     def add_symbols(self, functions: list[HAKCFunction], global_variables: list[HAKCGlobalVariable]) -> None:
         for global_variable in global_variables:
@@ -133,13 +169,13 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             self.__add_persistent_edge(function, direct_call, key=HAKCFunction.relation_direct_calls)
 
         for indirect_call in function.indirect_calls:
-            # TODO handle indirect call sources
+            # TODO handle indirect call sources?
             # logger.error(f"indirect_call: {type(indirect_call)}")
             # assert(isinstance(indirect_call, HAKCType))
             if isinstance(indirect_call, HAKCType):
                 # TODO: should types already be persisted? getting duplicate key error when using data columns as hakctype hashable inputs
                 # self.__add_type(indirect_call, already_persisted = True)
-                self.__add_type(indirect_call)
+                # self.__add_type(indirect_call)
                 self.__add_persistent_edge(function, indirect_call, key=HAKCFunction.relation_indirect_calls)
 
     def add_global_variable(self, global_variable: HAKCGlobalVariable) -> None:
@@ -220,7 +256,9 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         self.__add_persistent_edge(symbol, division, key=HAKCSymbol.relation_division)
         self.__add_persistent_edge(division, compartment, key=HAKCDivision.relation_compartment)
 
-    def add_default_compartmentalization(self, conn: HAKCDatabase, create_schema: bool = False) -> None:
+    def add_default_compartmentalization(self, db_dir: Optional[str] = None, create_schema: bool = False) -> None:
+        # TODO: add check that create_schema is always false if conn is none
+        logger.info(f'Adding Default Compartmentalization')
         compartment_id = HAKCCompartmentalization.no_enforcement_compartment_id + 1
         division_id = HAKCCompartmentalization.default_division
         symbols = list(self.get_symbols())
@@ -236,43 +274,127 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             self.__add_division_compartment(symbol, division, compartment)
             compartment_id += 1
 
-        # divs_comps = self.get_divisions_compartments()
-        # for div, comp in divs_comps:
-        #     # save original nodes
-        #     # comp = _comp
-        #     # div = _div
-        #     # self.remove_node(comp)
-        #     # self.remove_node(div)
-        #     # remove original nodes
-        #     # self.remove_node(_comp)
-        #     # self.remove_node(_div)
-        #     # Note: must compute tokens af
-        #     _comp = comp
-        #     _div = div
-        #     comp_attrs = self.nodes[comp]
-        #     div_attrs = self.nodes[div]
-        #     print("___________")
-        #     print(f"div {div} -> comp {comp}")
-        #     print(self[comp])
-        #
-        #     self.remove_node(_comp)
-        #     self.remove_node(_div)
-        #
-        #     _comp.entry_token = self.compute_entry_token(comp.compartment_id)
-        #     _div.access_token = self.compute_access_token(div.division_id, comp.compartment_id)
-        #
-        #     _comp.compute_hash()
-        #     _div.compute_hash()
-        #     # remove old node
-        #     self.add_node(comp, **comp_attrs)
-        #     self.add_node(div, **div_attrs)
-        #     # # force hash to be recomputed
-        #     # write back the updated nodes
-        #
-        #     # self.add_node(comp)
-        #     # self.add_node(div)
+        if db_dir:
+            self.persist_to_database(self.conn, create_schema=create_schema)
 
-        self.persist_to_database(conn, create_schema=create_schema)
+
+    def create_dag_multithread(self, core_count: int, db_dir: str):
+        # TODO: We might be able to rewrite this without depending on the compartmentalization object
+        logger.info(f'{self} starting DAG creation using {core_count} cores')
+        symbol_hashes = self.get_symbol_hashes()
+        batch_size = 100
+        dag_edges_added = 0
+        # the conn must be closed since N threads are opened using init_mp_database
+        self.close_conn()
+        with concurrent.futures.ProcessPoolExecutor(max_workers=core_count, initializer=init_mp_database,
+                                                    initargs=(db_dir,)) as executor:
+            futures = list()
+            with logger.progress_bar(total=int(len(symbol_hashes) / batch_size) + 1,
+                                     desc='DAG Edge computation scheduling') as pbar:
+                try:
+                    for symbol_hash_batch in batched(symbol_hashes.keys(), batch_size):
+                        future = executor.submit(compute_dag_edges_for_symbol, symbol_hash_batch)
+                        futures.append(future)
+                        pbar.update(1)
+                except Exception as e:
+                    logger.error(f'Error submitting tasks: {str(e)}')
+                    executor.shutdown(wait=False, cancel_futures=True)
+                    raise e
+
+            with logger.progress_bar(total=len(futures), desc='DAG Edge addition') as pbar:
+                try:
+                    dag_edges = dict()
+                    for future in concurrent.futures.as_completed(futures):
+                        pbar.update(1)
+                        try:
+                            edge_weights = future.result()
+                            # logger.error(f"edge weights: {edge_weights}")
+                            for (head_hash, tail_hash, dag_edge_weight) in edge_weights:
+                                if head_hash not in dag_edges:
+                                    dag_edges[head_hash] = dict()
+                                head_symbol = symbol_hashes[head_hash]
+                                tail_symbol = symbol_hashes[tail_hash]
+                                self.add_dag_edge(head_symbol, tail_symbol, dag_edge_weight=dag_edge_weight)
+                                dag_edges[head_hash][tail_hash] = dag_edge_weight
+                                dag_edges_added += 1
+                        except Exception as e:
+                            logger.error(f'Error computing DAG edge: {str(e)}')
+                except KeyboardInterrupt as ki:
+                    logger.info(f'Stopping edge computation')
+                    executor.shutdown(wait=False, cancel_futures=True)
+                    raise ki
+        # reopen connection
+        self.open_conn(db_dir)
+        logger.info(f'Adding {dag_edges_added} DAG edges {self}')
+        # conn = self.conn if self.conn else HAKCDatabase(db_dir, max_num_threads=core_count)
+        self.conn.persist_dag_edges(dag_edges)
+        return self
+
+    def create_dag(self, core_count: int, db_dir: str):
+        core_count = max(1, core_count)
+        logger.info(f'Starting DAG construction from {self} with {core_count} cores')
+        start = time.time()
+        self.create_dag_multithread(core_count, db_dir)
+        end = time.time()
+
+        logger.info(f'Finished creating DAG {self}')
+        logger.info(f'    Total Time: {end - start} seconds')
+
+
+    def adjust_compartmentalization(self, adjust_path: str, db_dir: str):
+
+        adjustment = None
+        with open(adjust_path, 'r') as f:
+            # TODO: does CLoader work here?
+            adjustment = yaml.load(f, Loader=yaml.Loader)
+
+        if not adjustment:
+            raise RuntimeError(f"Unable to load Adjustments from {adjust_path}")
+
+        logger.info(f'Adjusting compartmentalization based on {adjust_path}')
+        # conn = HAKCDatabase(db_dir)
+
+        symbols = self.conn.get_symbols()
+        assert len(symbols) != 0, f"No symbols were returned from database!"
+        nec_division = None
+        no_enforcement_compartment = None
+        if adjustment.add_no_enforcement_compartment:
+            nec_division = HAKCDivision(HAKCCompartmentalization.no_enforcement_division)
+            no_enforcement_compartment = HAKCCompartment(HAKCCompartmentalization.no_enforcement_compartment_id)
+            self.add_division(nec_division, no_enforcement_compartment)
+
+        for symbol in logger.progress_bar(iterable=self.get_symbols(), desc='Adjusting Compartmentalization'):
+            adjustments = adjustment.get_adjusted_division_and_compartment(symbol.definition_location.defining_file if symbol.definition_location else None)
+            adjusted_division = None
+            adjusted_compartment = None
+            if adjustments is None:
+                if adjustment.add_no_enforcement_compartment:
+                    adjusted_division = nec_division
+                    adjusted_compartment = no_enforcement_compartment
+                else:
+                    adjustments = self.conn.get_division_id_compartment_id_from_symbol(symbol)
+                    if adjustments is None:
+                        logger.error(f'Could not find original division for {symbol}')
+                        continue
+
+            if adjustments is not None:
+                adjusted_division, adjusted_compartment = adjustments
+
+            if adjusted_division is not None:
+                if adjusted_division != nec_division:
+                    logger.info(f'{symbol} is moving to {adjusted_division}')
+                else:
+                    logger.debug(f'{symbol} is moving to NEC {adjusted_division}')
+                self.set_symbol_division_by_object(symbol, adjusted_division, adjusted_compartment)
+            else:
+                logger.info(f'{symbol} is unchanged')
+
+        logger.info(f'Removing existing compartments')
+        self.conn.delete_all_compartments()
+        self.persist_to_database(self.conn)
+        logger.info(f'Done adjusting compartmentalization')
+        logger.info(f'Compartmentalization now has {len(self.conn.get_all_divisions())} divisions across {len(self.conn.get_all_compartments())} compartments')
+        # conn.close()
 
     def compute_entry_token(self, compartment_id: int, divisions=None) -> int:
         if divisions is None:
@@ -435,6 +557,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         return result
 
     def get_unpersisted_edges(self) -> dict[str, list[tuple[HAKCDBNode, HAKCDBNode, dict]]]:
+        # TODO: double check if this is working correctly after dag adjustment
         result = dict()
         for head, tail, table_name, attrs in self.edges(data=True, keys=True):
             if not attrs[HAKCCompartmentalization.persisted_attr]:
@@ -548,6 +671,31 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             for db_relation in db_relations:
                 conn.create_relationship_table(edge_type=db_relation)
 
+    @staticmethod
+    def delete_db(db_dir: str):
+        logger.debug("Deleting database")
+        if os.path.exists(db_dir) and os.path.isdir(db_dir):
+            logger.info(f'Removing existing database at {db_dir}')
+            shutil.rmtree(db_dir)
+
+    def open_conn(self, db_dir: str, max_num_threads: int = 1):
+        self.conn = HAKCDatabase(db_dir, max_num_threads=max_num_threads)
+
+    def close_conn(self):
+        if self.conn:
+            self.conn.close()
+        self.conn = None
+
+    def create_new_db(self, db_dir: str):
+        logger.debug("Creating new database")
+        # Note: expecting users to close the connection manually
+        self.open_conn(db_dir)
+        logger.debug(f"Creating schema")
+        self.persist_to_database(self.conn, create_schema=True)
+        logger.info(f"Created new database with {len(self.conn.get_all_symbol_hashes())} symbols")
+
+        #self.close_conn()
+
     def get_symbol_hashes(self) -> dict[int, HAKCSymbol]:
         symbol_hashes = dict()
         for symbol in self.get_symbols():
@@ -558,8 +706,6 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         # logger.debug(f"Trying to find symbol for hash {symbol_hash} with symbols {self.get_symbols()}")
         for symbol in self.get_symbols():
             assert(isinstance(symbol, HAKCSymbol))
-            logger.error(symbol)
-            # if hash(symbol) == symbol_hash:
             if symbol.get_computed_hash().final_hash == symbol_hash:
                 return symbol
         raise RuntimeError(f"Unable to find HAKCSymbol for symbol_hash = {symbol_hash}")
@@ -577,18 +723,26 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         ]
     @staticmethod
     def add_yaml_constructors() -> None:
-        yaml.add_constructor(HAKCType.yaml_tag, HAKCType.from_yaml)
-        yaml.add_constructor(HAKCScope.yaml_tag, HAKCScope.from_yaml)
-        yaml.add_constructor(HAKCSymbol.yaml_tag, HAKCSymbol.from_yaml)
-        yaml.add_constructor(HAKCCompartment.yaml_tag, HAKCCompartment.from_yaml)
-        yaml.add_constructor(HAKCDivision.yaml_tag, HAKCDivision.from_yaml)
-        yaml.add_constructor(HAKCDefinitionLocation.yaml_tag, HAKCDefinitionLocation.from_yaml)
-        yaml.add_constructor(HAKCFunction.yaml_tag, HAKCFunction.from_yaml)
-        yaml.add_constructor(HAKCGlobalVariable.yaml_tag, HAKCGlobalVariable.from_yaml)
-        yaml.add_constructor(HAKCCompartmentalization.yaml_tag, HAKCCompartmentalization.from_yaml)
+        for loader in [yaml.Loader, yaml.CLoader]:
+            yaml.add_constructor(HAKCType.yaml_tag, HAKCType.from_yaml, Loader=loader)
+            yaml.add_constructor(HAKCScope.yaml_tag, HAKCScope.from_yaml, Loader=loader)
+            yaml.add_constructor(HAKCSymbol.yaml_tag, HAKCSymbol.from_yaml, Loader=loader)
+            yaml.add_constructor(HAKCCompartment.yaml_tag, HAKCCompartment.from_yaml, Loader=loader)
+            yaml.add_constructor(HAKCDivision.yaml_tag, HAKCDivision.from_yaml, Loader=loader)
+            yaml.add_constructor(HAKCDefinitionLocation.yaml_tag, HAKCDefinitionLocation.from_yaml, Loader=loader)
+            yaml.add_constructor(HAKCFunction.yaml_tag, HAKCFunction.from_yaml, Loader=loader)
+            yaml.add_constructor(HAKCGlobalVariable.yaml_tag, HAKCGlobalVariable.from_yaml, Loader=loader)
+            yaml.add_constructor(HAKCCompartmentalization.yaml_tag, HAKCCompartmentalization.from_yaml, Loader=loader)
+            yaml.add_constructor(HAKCAdjustment.yaml_tag, HAKCAdjustment.from_yaml, Loader=loader)
+            yaml.add_constructor(HAKCCompartmentalizationAdjustment.yaml_tag, HAKCCompartmentalizationAdjustment.from_yaml, Loader=loader)
 
-    def save_as_yaml(self, fname: str):
-        logger.info(f'Saving compartmentalization to {fname}')
-        with open(fname, "w") as f:
-            yaml.dump(self, f)
-        logger.info(f"Finished saving compartmentalization to {fname}")
+    def save_as_yaml(self, filename: str):
+        logger.debug(f'Saving compartmentalization to {filename}')
+        # Note: python script will now create the file and directories, rather than the cpp script
+        directory = os.path.dirname(filename)
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+        with open(filename, "w") as f:
+            # Note: Don't use yaml.CDumper, it does something that breaks the loader
+            yaml.dump(self, f, Dumper=yaml.Dumper)
+        logger.info(f"Saved {self} to {filename}")

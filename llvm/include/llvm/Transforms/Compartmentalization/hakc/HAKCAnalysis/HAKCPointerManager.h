@@ -6,7 +6,7 @@
 #define HAKC_HAKCPOINTERMANAGER_H
 
 #include "ManagedHAKCPointer.h"
-#include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartmentalizationPolicy.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCDatabase/HAKCServerClient.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCLogger.h"
 #include <memory>
 
@@ -32,7 +32,7 @@ typedef std::vector<ManagedHAKCPointerUseP> ManagedHAKCPointerUseListType;
 class HAKCPointerManager {
 public:
   explicit HAKCPointerManager(HAKCFunctionAnalysis &Analysis,
-                              HAKCCompartmentalizationPolicy &Policy,
+                              HAKCServerClient &Client,
                               bool DebugActive);
 
   bool ManagePointer(Use &U);
@@ -111,7 +111,7 @@ public:
 
   void SetFunctionIsCompartmentalized(bool FunctionIsCompartmentalized);
 
-  HAKCCompartmentalizationPolicy &GetPolicy() const;
+  HAKCServerClient &GetClient() const;
 
   Instruction *CloneInstruction(Instruction *I);
 
@@ -136,7 +136,7 @@ protected:
   ManagedHAKCPointerUseListType AnalyzedUses;
 
   HAKCFunctionAnalysis &HAKCAnalysis;
-  HAKCCompartmentalizationPolicy &Policy;
+  HAKCServerClient &Client;
 
   unsigned DataAuthenticationsAdded;
   unsigned CodeAuthenticationsAdded;

@@ -173,10 +173,16 @@ struct HAKCYAMLActionType : public HAKCYAMLSymbolDeclaration {
 
 struct HAKCYamlDatabaseConfig {
   HAKCYAMLStringType ServerURL;
+  unsigned MaxSockets;
   HAKCYAMLStringType GetCompartmentEndpoint;
   HAKCYAMLStringType GetDivisionEndpoint;
   HAKCYAMLStringType GetSymbolDivisionEndpoint;
   HAKCYAMLStringType GetValidTargetsEndpoint;
+  HAKCYAMLStringType SetDagFilenameEndpoint;
+  HAKCYAMLStringType AddSymbolsEndpoint;
+  HAKCYAMLStringType AddFunctionEndpoint;
+  HAKCYAMLStringType AddGlobalVariableEndpoint;
+  HAKCYAMLStringType TerminateConnectionEndpoint;
   unsigned ServerTimeout;
   unsigned MaxConnectionRetries;
 };
@@ -383,7 +389,8 @@ template <> struct yaml::MappingTraits<hakc::HAKCYAMLCustomTransferType> {
 template <> struct yaml::MappingTraits<hakc::HAKCYamlDatabaseConfig> {
   static void mapping(yaml::IO &Io, hakc::HAKCYamlDatabaseConfig &YamlConfig) {
     Io.mapRequired("server-url", YamlConfig.ServerURL);
-    Io.mapOptional("server-timeout", YamlConfig.ServerTimeout, 1000);
+    Io.mapOptional("max-sockets", YamlConfig.MaxSockets, 16);
+    Io.mapOptional("server-timeout", YamlConfig.ServerTimeout, 10); // timeout in seconds (formerly milliseconds)
     Io.mapOptional("get-compartment-by-id-endpoint",
                    YamlConfig.GetCompartmentEndpoint, "get-compartment-id");
     Io.mapOptional("get-division-by-id-endpoint",
@@ -394,6 +401,21 @@ template <> struct yaml::MappingTraits<hakc::HAKCYamlDatabaseConfig> {
     Io.mapOptional("get-valid-targets-from-compartment-id-endpoint",
                    YamlConfig.GetValidTargetsEndpoint,
                    "get-valid-targets-from-compartment-id");
+    Io.mapOptional("set-dag-filename-endpoint",
+                   YamlConfig.SetDagFilenameEndpoint,
+                   "set-dag-filename");
+    Io.mapOptional("add-function-endpoint",
+                   YamlConfig.AddFunctionEndpoint,
+                   "add-function");
+    Io.mapOptional("add-symbols-endpoint",
+                   YamlConfig.AddSymbolsEndpoint,
+                   "add-symbols");
+    Io.mapOptional("add-global-variable-endpoint",
+                   YamlConfig.AddGlobalVariableEndpoint,
+                   "add-global-variable");
+    Io.mapOptional("terminate-connection-endpoint",
+                   YamlConfig.TerminateConnectionEndpoint,
+                   "terminate-connection");
     Io.mapOptional("max-connection-retries", YamlConfig.MaxConnectionRetries,
                    5);
   }

@@ -6,9 +6,14 @@ Database:
   get-division-by-id-endpoint: "get-division-by-id"
   get-division-from-symbol-endpoint: "get-division-from-symbol"
   get-valid-targets-from-compartment-id-endpoint: "get-valid-targets-from-compartment-id"
+  "add-function-endpoint": "add-function"
+  "add-global-variable-endpoint": "add-global-variable"
+  server-timeout: 10
 DagAnalysisRootPath: @HAKC_DAG_ANALYSIS_PATH@
-OutputDebugInfo: false
-PassMode: RunPostDominatorAnalysis
+ConsoleLogLevel: Debug
+FileLogLevel: Debug
+PassMode: @HAKC_PASS_MODE@
+TemporalAnalysisEnabled: @HAKC_TEMPORAL_ANALYSIS@
 TransferFunctionCandidates: [ ]
 PreTargetActions:
   - { name: "get_hakc_address_color", label: "saved-color" }

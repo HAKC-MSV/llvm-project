@@ -11,10 +11,10 @@
 
 namespace llvm::hakc {
 HAKCPointerManager::HAKCPointerManager(HAKCFunctionAnalysis &Analysis,
-                                       HAKCCompartmentalizationPolicy &Policy,
+                                       HAKCServerClient &Client,
                                        bool DebugActive)
     : ManagedPointersList(), AuthenticatedValues(), ProtectedValues(), Clones(),
-      HAKCAnalysis(Analysis), Policy(Policy), DataAuthenticationsAdded(0),
+      HAKCAnalysis(Analysis), Client(Client), DataAuthenticationsAdded(0),
       CodeAuthenticationsAdded(0), SafePointersAdded(0),
       IsCompartmentalized(false), DebugActive(DebugActive), CurrentPointerID(0),
       CurrentPointerUseID(0) {}
@@ -277,7 +277,7 @@ bool HAKCPointerManager::IsConstantExprUsedInKernelCall(User *U) const {
       if (auto *Call = dyn_cast<CallBase>(ConstUser)) {
         if (Call->getFunction() == &GetFunctionAnalysis().GetFunction() &&
             CommonHAKCAnalysis::IsUncompartmentalizedSymbol(
-                Call->getCalledFunction(), Policy)) {
+                Call->getCalledFunction(), Client)) {
           Result = true;
           break;
         }
@@ -424,7 +424,7 @@ bool HAKCPointerManager::UseShouldUtilizeSignedBasePointer(Use &U) const {
             .GetCommonAnalysis()
             .IsHAKCTransferFunction(Call->getCalledFunction()) ||
         CommonHAKCAnalysis::IsUncompartmentalizedSymbol(
-            Call->getCalledFunction(), Policy)) {
+            Call->getCalledFunction(), Client)) {
       UseSignedPointer = true;
     } else if (Call->isInlineAsm()) {
       UseSignedPointer = false;
@@ -1024,8 +1024,8 @@ Value *HAKCPointerManager::CreateAuthenticationAtLocation(
   }
 }
 
-HAKCCompartmentalizationPolicy &HAKCPointerManager::GetPolicy() const {
-  return Policy;
+HAKCServerClient &HAKCPointerManager::GetClient() const {
+  return Client;
 }
 
 bool HAKCPointerManager::DebugIsActive() const { return DebugActive; }

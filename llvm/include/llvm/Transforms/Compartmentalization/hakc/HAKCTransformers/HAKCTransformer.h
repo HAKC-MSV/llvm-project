@@ -15,7 +15,7 @@
 
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/HAKCModuleAnalysis.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/ManagedHAKCPointer.h"
-#include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartmentalizationPolicy.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCDatabase/HAKCServerClient.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCFunctionDefinition/HAKCCustomTransfer.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCFunctionDefinition/HAKCFunctionDefinition.h"
 
@@ -31,10 +31,7 @@ namespace llvm::hakc {
 class HAKCTransformer {
 public:
   HAKCTransformer(HAKCModuleAnalysis &ModuleAnalysis,
-                  HAKCCompartmentalizationPolicy &Policy);
-
-  HAKCTransformer(HAKCModuleAnalysis &ModuleAnalysis,
-                  HAKCCompartmentalizationPolicyDAG &Policy);
+                  HAKCServerClient &Client);
 
   virtual ~HAKCTransformer() = default;
 
@@ -205,9 +202,8 @@ public:
 
 protected:
   HAKCModuleAnalysis &ModuleAnalysis;
-  HAKCCompartmentalizationPolicy &Policy;
+  HAKCServerClient &Client;
   IRBuilder<> HAKCIRBuilder;
-  HAKCCompartmentalizationPolicy &CompartmentalizationPolicy;
 
   std::map<Function *, Function *> VariadicTransferFunctions;
 

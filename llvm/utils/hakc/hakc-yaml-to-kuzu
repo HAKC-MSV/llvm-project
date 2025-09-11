@@ -19,7 +19,7 @@ def yaml_to_kuzu(yaml_dir, kuzu_dir):
     # convert a db.yaml file to a kuzu-db
     compartmentalization = None
     with open(yaml_dir, 'rb') as f:
-        compartmentalization = yaml.load(f, Loader=yaml.Loader)
+        compartmentalization = yaml.load(f, Loader=yaml.CLoader)
         print(compartmentalization)
 
     # always delete the existing db (since it is stale)

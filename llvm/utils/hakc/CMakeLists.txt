@@ -1,6 +1,5 @@
     set(BinFiles
-            "hakc-static-analysis"
-            "hakc-policy-process"
+            "hakc-server-process"
     )
 
     set(HAKC_CC $<TARGET_FILE:clang>)
@@ -28,13 +27,6 @@
             ${CMAKE_CURRENT_SOURCE_DIR}/requirements.txt
             ${CMAKE_BINARY_DIR}/bin/hakc
             DEPENDS requirements.txt)
-    install(PROGRAMS requirements.txt
-            DESTINATION ${CMAKE_INSTALL_BINDIR}/hakc
-            COMPONENT hakc-policy-process)
-    install(PROGRAMS setup.py
-            DESTINATION ${CMAKE_INSTALL_BINDIR}/hakc
-            COMPONENT hakc-policy-process
-    )
 
     foreach (HAKCMod ${HAKC_MODS})
         add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/bin/hakc/hakc/${HAKCMod}
@@ -42,7 +34,4 @@
                 ${CMAKE_CURRENT_SOURCE_DIR}/hakc/${HAKCMod}
                 ${CMAKE_BINARY_DIR}/bin/hakc/hakc/${HAKCMod}
                 DEPENDS ${HAKCMod})
-        install(PROGRAMS ${HAKCMod}
-                DESTINATION "${CMAKE_INSTALL_BINDIR}/hakc/hakc"
-                COMPONENT hakc-policy-process)
     endforeach ()

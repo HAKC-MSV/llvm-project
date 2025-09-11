@@ -4,6 +4,7 @@
  */
 
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCPass.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCDatabase/HAKCServerClient.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/HAKCModuleAnalysis.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCSystemInformation.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCTransformer.h"
@@ -52,9 +53,9 @@ static bool runCompartmentalization(CommonHAKCAnalysis &HAKCAnalysis) {
   }
 
   if (PerformTransformations) {
-    HAKCCompartmentalizationPolicy Policy(HAKCAnalysis.GetSystemInfo());
+    HAKCServerClient Client(HAKCAnalysis.GetSystemInfo());
     HAKCModuleAnalysis ModuleAnalysis(HAKCAnalysis);
-    HAKCTransformer Transformer(ModuleAnalysis, Policy);
+    HAKCTransformer Transformer(ModuleAnalysis, Client);
     if (HAKCAnalysis.GetSystemInfo().GetTemporalAnalysisEnabled()) {
       Transformer.performTemporalTransformations();
     }
@@ -85,25 +86,36 @@ static bool runDataAccessGraphAnalysis(CommonHAKCAnalysis &HAKCAnalysis) {
     }
   }
 
-  std::error_code err;
-  err = sys::fs::create_directories(sys::path::parent_path(Path));
-  if (err) {
-    CommonHAKCAnalysis::getLogger(Fatal)
-        << "Failed to create " << sys::path::parent_path(Path) << "\n";
-    throw std::exception();
+  // std::error_code err;
+  // err = sys::fs::create_directories(sys::path::parent_path(Path));
+  // if (err) {
+  //   CommonHAKCAnalysis::getLogger(Fatal)
+  //       << "Failed to create " << sys::path::parent_path(Path) << "\n";
+  //   throw std::exception();
+  // }
+  // Note: not going to create file if it will be empty
+  // raw_fd_ostream out(Path, err);
+  // if (!err) {
+  HAKCModuleAnalysis ModuleAnalysis(HAKCAnalysis);
+  if (HAKCAnalysis.GetSystemInfo().GetTemporalAnalysisEnabled()) {
+    ModuleAnalysis.TemporalAnalysis();
   }
-  raw_fd_ostream out(Path, err);
-  if (!err) {
-    HAKCModuleAnalysis ModuleAnalysis(HAKCAnalysis);
-    if (HAKCAnalysis.GetSystemInfo().GetTemporalAnalysisEnabled()) {
-      ModuleAnalysis.TemporalAnalysis();
-    }
-    ModuleAnalysis.OutputYAML(out);
-    out.close();
-  } else {
-    CommonHAKCAnalysis::getLogger(Fatal) << "Failed to open " << Path << "\n";
-    throw std::exception();
+  auto TypeIdentifier = ModuleAnalysis.GetTypeIdentifier();
+  auto FunctionCount = TypeIdentifier.GetFunctions().size() + TypeIdentifier.GetUnmappedFunctions().size();
+  auto GlobalCount = TypeIdentifier.GetGlobals().size() + TypeIdentifier.GetUnmappedGlobals().size();
+  // Only ever connect to server if symbols need to be sent
+  if (FunctionCount + GlobalCount > 0) {
+    HAKCServerClient Client(HAKCAnalysis.GetSystemInfo());
+    Client.SendSymbolsToAnalysisServer(ModuleAnalysis, Path);
+    Client.CloseConnection();
   }
+  else {
+    CommonHAKCAnalysis::getLogger(Info) << "Skipping file " << Path << "with 0 symbols\n";
+  }
+  // } else {
+  //   CommonHAKCAnalysis::getLogger(Fatal) << "Failed to open " << Path << "\n";
+  //   throw std::exception();
+  // }
   return false;
 }
 

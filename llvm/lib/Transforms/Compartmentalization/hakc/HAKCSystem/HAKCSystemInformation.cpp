@@ -9,6 +9,7 @@
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCPostTargetAction.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCPreTransferAction.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCTransferAction.h"
+#include "llvm/Support/Threading.h"
 
 namespace llvm::hakc {
 HAKCDatabaseInformation::HAKCDatabaseInformation()
@@ -16,6 +17,8 @@ HAKCDatabaseInformation::HAKCDatabaseInformation()
       SymbolDivisionEndpoint(), Timeout(), MaxConnectionRetries(10) {}
 
 StringRef HAKCDatabaseInformation::GetServerURL() const { return ServerURL; }
+
+unsigned HAKCDatabaseInformation::GetMaxSockets() const { return MaxSockets; }
 
 StringRef HAKCDatabaseInformation::GetCompartmentEndpoint() const {
   return CompartmentEndpoint;
@@ -33,6 +36,26 @@ StringRef HAKCDatabaseInformation::GetValidTargetsEndpoint() const {
   return ValidTargetsEndpoint;
 }
 
+StringRef HAKCDatabaseInformation::GetSetDagFilenameEndpoint() const {
+  return SetDagFilenameEndpoint;
+}
+
+StringRef HAKCDatabaseInformation::GetAddSymbolsEndpoint() const {
+  return AddSymbolsEndpoint;
+}
+
+StringRef HAKCDatabaseInformation::GetAddFunctionEndpoint() const {
+  return AddFunctionEndpoint;
+}
+
+StringRef HAKCDatabaseInformation::GetAddGlobalVariableEndpoint() const {
+  return AddGlobalVariableEndpoint;
+}
+
+StringRef HAKCDatabaseInformation::GetTerminateConnectionEndpoint() const {
+  return TerminateConnectionEndpoint;
+}
+
 std::chrono::milliseconds HAKCDatabaseInformation::GetServerTimeout() const {
   return Timeout;
 }
@@ -43,11 +66,17 @@ unsigned HAKCDatabaseInformation::GetMaxRetries() const {
 
 void HAKCDatabaseInformation::operator<<(
     const HAKCYamlDatabaseConfig &DatabaseConfig) {
-  ServerURL = DatabaseConfig.ServerURL;
+  ServerURL = DatabaseConfig.ServerURL + "/" + std::to_string(get_threadid() % DatabaseConfig.MaxSockets);
+  MaxSockets = DatabaseConfig.MaxSockets;
   CompartmentEndpoint = DatabaseConfig.GetCompartmentEndpoint;
   DivisionEndpoint = DatabaseConfig.GetDivisionEndpoint;
   SymbolDivisionEndpoint = DatabaseConfig.GetSymbolDivisionEndpoint;
   ValidTargetsEndpoint = DatabaseConfig.GetValidTargetsEndpoint;
+  AddSymbolsEndpoint = DatabaseConfig.AddSymbolsEndpoint;
+  AddFunctionEndpoint = DatabaseConfig.AddFunctionEndpoint;
+  SetDagFilenameEndpoint = DatabaseConfig.SetDagFilenameEndpoint;
+  AddGlobalVariableEndpoint = DatabaseConfig.AddGlobalVariableEndpoint;
+  TerminateConnectionEndpoint = DatabaseConfig.TerminateConnectionEndpoint;
   // Note: Timeout is in ms, so multiply by 1000
   Timeout = std::chrono::milliseconds(DatabaseConfig.ServerTimeout * 1000);
   MaxConnectionRetries = DatabaseConfig.MaxConnectionRetries;
