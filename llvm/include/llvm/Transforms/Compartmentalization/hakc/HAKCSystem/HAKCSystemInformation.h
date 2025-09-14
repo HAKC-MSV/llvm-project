@@ -77,11 +77,14 @@ public:
 
   unsigned GetMaxRetries() const;
 
-  void operator<<(const HAKCYamlDatabaseConfig &DatabaseConfig);
+  StringRef GetRootPath() const;
+
+  void operator<<(const HAKCYAMLServerConfig &ServerConfig);
 
 protected:
-  std::string ServerURL;
-  unsigned MaxSockets;
+  std::string RootPath;
+  std::string SocketPath;
+  unsigned MaxServerProcesses;
   std::string CompartmentEndpoint;
   std::string DivisionEndpoint;
   std::string SymbolDivisionEndpoint;
@@ -154,7 +157,6 @@ public:
 
   StringRef GetPlatform() const;
 
-  StringRef GetDagAnalysisRootPath() const;
   HAKCStructList GetStructList() const;
 
   iterator_range<HAKCPreTransferActionList::iterator> PreTransferActions();
@@ -167,6 +169,9 @@ public:
 
   StringRef GetSingleSourceFile();
 
+  StringRef GetRootPath() const;
+
+
 protected:
   CommonHAKCAnalysis &CommonAnalysis;
   HAKCTypeIdentifier TypeIdentifier;
@@ -177,9 +182,9 @@ protected:
   bool DebugDatabase;
   HAKCPassModeTypeEnum PassMode;
   std::string SingleSourceFile;
+  std::string RootPath;
   std::string Arch;
   std::string Platform;
-  std::string DagAnalysisRootPath;
   HAKCStringList IncludePathsList;
   FunctionList NoTransferFunctionList;
   HAKCTransferList CompartmentTransferFunctionList;

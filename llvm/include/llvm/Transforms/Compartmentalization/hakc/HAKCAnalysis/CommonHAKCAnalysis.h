@@ -195,8 +195,6 @@ public:
 
   static Function *GetOriginalFunctionFromTransferFunction(Function *F);
 
-  std::string createDagYamlPath(StringRef DagAnalysisRootPath);
-
   std::string createLogPath(StringRef DagAnalysisRootPath, HAKCPassModeTypeEnum PassMode);
 
 private:

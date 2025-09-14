@@ -100,10 +100,10 @@ void CommonHAKCAnalysis::InitConfig(StringRef ConfigPath) {
   HAKCLog->SetConsoleConfiguredLogLevels(
       SystemConfig.ConsoleLogLevel); // setting the errs() stream to the
                                      // configured log level
-  HAKCLog->addStream(
-      createLogPath(SystemConfig.DagAnalysisRootPath, SystemConfig.PassMode),
-      SystemConfig
-          .FileLogLevel); // setting the fd_ostream to configured log level
+  // HAKCLog->addStream(
+  //     createLogPath(SystemConfig.DagAnalysisRootPath, SystemConfig.PassMode),
+  //     SystemConfig
+  //         .FileLogLevel); // setting the fd_ostream to configured log level
 
   // A bunch of work is done creating SystemInfo, so we want the log to be
   // created before this
@@ -122,22 +122,22 @@ CommonHAKCAnalysis::CommonHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM,
   InitConfig(ConfigPath);
 }
 
-std::string CommonHAKCAnalysis::createDagYamlPath(StringRef DagAnalysisRootPath) {
-  SmallString<256> Path;
-  SmallString<256> ModulePath;
-  GetModuleFullPath(M, ModulePath);
-  sys::path::append(Path, DagAnalysisRootPath);
-  sys::path::append(Path, ModulePath);
-  sys::path::replace_extension(Path, ".dag.yml");
-  sys::path::make_preferred(Path);
-  return std::string(Path);
-}
+// std::string CommonHAKCAnalysis::createDagYamlPath(StringRef DagAnalysisRootPath) {
+//   SmallString<256> Path;
+//   SmallString<256> ModulePath;
+//   GetModuleFullPath(M, ModulePath);
+//   sys::path::append(Path, DagAnalysisRootPath);
+//   sys::path::append(Path, ModulePath);
+//   sys::path::replace_extension(Path, ".dag.yml");
+//   sys::path::make_preferred(Path);
+//   return std::string(Path);
+// }
 
-std::string CommonHAKCAnalysis::createLogPath(StringRef DagAnalysisRootPath, HAKCPassModeTypeEnum PassMode) {
+std::string CommonHAKCAnalysis::createLogPath(StringRef RootPath, HAKCPassModeTypeEnum PassMode) {
   SmallString<256> Path;
   SmallString<256> ModulePath;
   GetModuleFullPath(M, ModulePath);
-  sys::path::append(Path, DagAnalysisRootPath);
+  sys::path::append(Path, RootPath);
   sys::path::append(Path, ModulePath);
 
   if ( PassMode == RunDataAccessGraphAnalysis || PassMode == RunDataAccessGraphAnalysisSingleSourceFile) {
@@ -756,7 +756,6 @@ Instruction *CommonHAKCAnalysis::GetTargetTypeCast(Instruction *I,
 void CommonHAKCAnalysis::GetModuleFullPath(Module &M,
                                            SmallVectorImpl<char> &Result) {
   const auto &SourceFileName = M.getSourceFileName();
-
   auto err = sys::fs::real_path(SourceFileName, Result, true);
   if (err) {
     getLogger(Fatal) << "Could not get real path to " << M.getSourceFileName()

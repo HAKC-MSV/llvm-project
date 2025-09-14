@@ -9,7 +9,6 @@ Database:
   "add-function-endpoint": "add-function"
   "add-global-variable-endpoint": "add-global-variable"
   server-timeout: 10
-DagAnalysisRootPath: @HAKC_DAG_ANALYSIS_PATH@
 ConsoleLogLevel: Debug
 FileLogLevel: Debug
 PassMode: @HAKC_PASS_MODE@
