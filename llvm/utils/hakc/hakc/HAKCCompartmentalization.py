@@ -286,6 +286,8 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         dag_edges_added = 0
         # the conn must be closed since N threads are opened using init_mp_database
         self.close_conn()
+        if db_dir == "":
+            raise RuntimeError(f"Trying to create_dag_multithread, but database path is missing!")
         with concurrent.futures.ProcessPoolExecutor(max_workers=core_count, initializer=init_mp_database,
                                                     initargs=(db_dir,)) as executor:
             futures = list()
@@ -345,14 +347,13 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
 
         adjustment = None
         with open(adjust_path, 'r') as f:
-            # TODO: does CLoader work here?
-            adjustment = yaml.load(f, Loader=yaml.Loader)
-
-        if not adjustment:
-            raise RuntimeError(f"Unable to load Adjustments from {adjust_path}")
+            try:
+                adjustment = yaml.load(f, Loader=yaml.Loader)
+            except Exception as e:
+                raise RuntimeError(f"Unable to load adjustments {adjust_path} with error: {e}")
 
         logger.info(f'Adjusting compartmentalization based on {adjust_path}')
-        # conn = HAKCDatabase(db_dir)
+        self.conn = self.conn if self.conn else HAKCDatabase(db_dir)
 
         symbols = self.conn.get_symbols()
         assert len(symbols) != 0, f"No symbols were returned from database!"
@@ -390,6 +391,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
                 logger.info(f'{symbol} is unchanged')
 
         logger.info(f'Removing existing compartments')
+
         self.conn.delete_all_compartments()
         self.persist_to_database(self.conn)
         logger.info(f'Done adjusting compartmentalization')
@@ -673,10 +675,11 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
 
     @staticmethod
     def delete_db(db_dir: str):
-        logger.debug("Deleting database")
-        if os.path.exists(db_dir) and os.path.isdir(db_dir):
-            logger.info(f'Removing existing database at {db_dir}')
-            shutil.rmtree(db_dir)
+        for _ in logger.progress_bar(iterable=[1], desc='Deleting old db', position=2):
+            logger.debug("Deleting database")
+            if os.path.exists(db_dir) and os.path.isdir(db_dir):
+                logger.info(f'Removing existing database at {db_dir}')
+                shutil.rmtree(db_dir)
 
     def open_conn(self, db_dir: str, max_num_threads: int = 1):
         self.conn = HAKCDatabase(db_dir, max_num_threads=max_num_threads)
@@ -687,14 +690,14 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         self.conn = None
 
     def create_new_db(self, db_dir: str):
-        logger.debug("Creating new database")
-        # Note: expecting users to close the connection manually
-        self.open_conn(db_dir)
-        logger.debug(f"Creating schema")
-        self.persist_to_database(self.conn, create_schema=True)
-        logger.info(f"Created new database with {len(self.conn.get_all_symbol_hashes())} symbols")
-
-        #self.close_conn()
+        for _ in logger.progress_bar(iterable=[1], desc='DeCreating new database', position=3):
+            logger.debug("Creating new database")
+            # Note: expecting users to close the connection manually
+            self.open_conn(db_dir)
+            logger.debug(f"Creating schema")
+            self.persist_to_database(self.conn, create_schema=True)
+            logger.info(f"Created new database with {len(self.conn.get_all_symbol_hashes())} symbols")
+            #self.close_conn()
 
     def get_symbol_hashes(self) -> dict[int, HAKCSymbol]:
         symbol_hashes = dict()

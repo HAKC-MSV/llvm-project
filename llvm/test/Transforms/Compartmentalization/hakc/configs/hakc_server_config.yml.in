@@ -1,19 +1,23 @@
-{
-  "backing_policy_config": {
-    "type": "@HAKC_BACKING_TYPE@",
-    "path": "@HAKC_BACKING_STORE@",
-    "default_compartment": 0,
-    "default_division": 0
-  },
-  "socket_path": "@HAKC_SOCKET_PATH@",
-  "reuse_path": true,
-  "test-mode": true,
-  "server_timeout": 10,
-  "get-compartment-by-id-endpoint": "get-compartment-by-id",
-  "get-division-by-id-endpoint": "get-division-by-id",
-  "get-division-from-symbol-endpoint": "get-division-from-symbol",
-  "get-valid-targets-from-compartment-id-endpoint": "get-valid-targets-from-compartment-id",
-  "set-dag-filename-endpoint": "set-dag-filename",
-  "add-function-endpoint": "add-function",
-  "add-global-variable-endpoint": "add-global-variable"
-}
+root-path: @CMAKE_BINARY_DIR@/
+socket-path: @CMAKE_BINARY_DIR@/db-socket
+database-path: @CMAKE_BINARY_DIR@/hakc-db
+reuse-path: true,
+test-mode: false,
+max-server-processes: 64
+log-level: INFO
+AnalysisConfig:
+    max-dag-processes: 64
+    timeout: 100
+PolicyConfig:
+    type: @HAKC_BACKING_TYPE@
+    path: @HAKC_BACKING_STORE@
+    default-compartment: 0
+    default-division: 0
+    timeout: 1000
+Endpoints:
+    get-compartment-by-id-endpoint: "get-compartment-by-id"
+    get-division-by-id-endpoint: "get-division-by-id"
+    get-division-from-symbol-endpoint: "get-division-from-symbol"
+    get-valid-targets-from-compartment-id-endpoint: "get-valid-targets-from-compartment-id"
+    add-symbols-endpoint: "add-symbols"
+    terminate-connection-endpoint: "terminate-connection"

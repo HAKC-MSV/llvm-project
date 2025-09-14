@@ -13,12 +13,12 @@
 
 namespace llvm::hakc {
 HAKCDatabaseInformation::HAKCDatabaseInformation()
-    : ServerURL(), CompartmentEndpoint(), DivisionEndpoint(),
+    : RootPath(), SocketPath(), MaxServerProcesses(), CompartmentEndpoint(), DivisionEndpoint(),
       SymbolDivisionEndpoint(), Timeout(), MaxConnectionRetries(10) {}
 
-StringRef HAKCDatabaseInformation::GetServerURL() const { return ServerURL; }
+StringRef HAKCDatabaseInformation::GetServerURL() const { return SocketPath; }
 
-unsigned HAKCDatabaseInformation::GetMaxSockets() const { return MaxSockets; }
+unsigned HAKCDatabaseInformation::GetMaxSockets() const { return MaxServerProcesses; }
 
 StringRef HAKCDatabaseInformation::GetCompartmentEndpoint() const {
   return CompartmentEndpoint;
@@ -64,29 +64,42 @@ unsigned HAKCDatabaseInformation::GetMaxRetries() const {
   return MaxConnectionRetries;
 }
 
+StringRef HAKCDatabaseInformation::GetRootPath() const {
+  return RootPath;
+}
+
 void HAKCDatabaseInformation::operator<<(
-    const HAKCYamlDatabaseConfig &DatabaseConfig) {
-  ServerURL = DatabaseConfig.ServerURL + "/" + std::to_string(get_threadid() % DatabaseConfig.MaxSockets);
-  MaxSockets = DatabaseConfig.MaxSockets;
-  CompartmentEndpoint = DatabaseConfig.GetCompartmentEndpoint;
-  DivisionEndpoint = DatabaseConfig.GetDivisionEndpoint;
-  SymbolDivisionEndpoint = DatabaseConfig.GetSymbolDivisionEndpoint;
-  ValidTargetsEndpoint = DatabaseConfig.GetValidTargetsEndpoint;
-  AddSymbolsEndpoint = DatabaseConfig.AddSymbolsEndpoint;
-  AddFunctionEndpoint = DatabaseConfig.AddFunctionEndpoint;
-  SetDagFilenameEndpoint = DatabaseConfig.SetDagFilenameEndpoint;
-  AddGlobalVariableEndpoint = DatabaseConfig.AddGlobalVariableEndpoint;
-  TerminateConnectionEndpoint = DatabaseConfig.TerminateConnectionEndpoint;
+    const HAKCYAMLServerConfig &ServerConfig) {
+  auto AnalysisConfig = ServerConfig.AnalysisConfig;
+  auto PolicyConfig = ServerConfig.PolicyConfig;
+  auto Endpoints = ServerConfig.Endpoints;
+  RootPath = ServerConfig.RootPath;
+  SocketPath = ServerConfig.SocketPath + "/" + std::to_string(get_threadid() % ServerConfig.MaxServerProcesses);
+  // client doesn't need to know database path, and some other information
+  MaxServerProcesses = ServerConfig.MaxServerProcesses;
+  CompartmentEndpoint = Endpoints.GetCompartmentEndpoint;
+  DivisionEndpoint = Endpoints.GetDivisionEndpoint;
+  SymbolDivisionEndpoint = Endpoints.GetSymbolDivisionEndpoint;
+  ValidTargetsEndpoint = Endpoints.GetValidTargetsEndpoint;
+  AddSymbolsEndpoint = Endpoints.AddSymbolsEndpoint;
+  AddFunctionEndpoint = Endpoints.AddFunctionEndpoint;
+  AddGlobalVariableEndpoint = Endpoints.AddGlobalVariableEndpoint;
+  TerminateConnectionEndpoint = Endpoints.TerminateConnectionEndpoint;
   // Note: Timeout is in ms, so multiply by 1000
-  Timeout = std::chrono::milliseconds(DatabaseConfig.ServerTimeout * 1000);
-  MaxConnectionRetries = DatabaseConfig.MaxConnectionRetries;
+  if (ServerConfig.PassMode == RunDataAccessGraphAnalysis) {
+    Timeout = std::chrono::milliseconds(AnalysisConfig.Timeout * 1000);
+  }
+  else {
+    Timeout = std::chrono::milliseconds(PolicyConfig.Timeout * 1000);
+  }
+  MaxConnectionRetries = ServerConfig.MaxConnectionRetries;
 }
 
 HAKCSystemInformation::HAKCSystemInformation(CommonHAKCAnalysis &CommonAnalysis)
     : CommonAnalysis(CommonAnalysis), TypeIdentifier(CommonAnalysis),
       DatabaseInformation(), ConsoleLogLevel(Verbose), FileLogLevel(Verbose),
       DebugDatabase(), PassMode(InvalidPassModeType), Arch(), Platform(),
-      DagAnalysisRootPath(), IncludePathsList(), NoTransferFunctionList(),
+      IncludePathsList(), NoTransferFunctionList(),
       CompartmentTransferFunctionList(), CodeValidationFunction(nullptr),
       DataValidationFunction(nullptr), SignWithDivisionFunction(nullptr),
       DefaultCompartmentTransfer(nullptr), PerCPUCompartmentTransfer(nullptr),
@@ -95,6 +108,10 @@ HAKCSystemInformation::HAKCSystemInformation(CommonHAKCAnalysis &CommonAnalysis)
       SafeTransitionFunctionList(), IgnoredGlobalList(),
       AllocationFunctionList(), CustomTransferList(), PreTransferActionList(),
       PostTargetActionList(), StructList() {}
+
+StringRef HAKCSystemInformation::GetRootPath() const {
+  return RootPath;
+}
 
 function_def_t HAKCSystemInformation::CreateHAKCFunction(
     HAKCYAMLFunctionDefinition &YAMLFunctionDef,
@@ -158,7 +175,6 @@ void HAKCSystemInformation::GetAllDefinedHAKCFunctions(
 void HAKCSystemInformation::operator<<(HAKCYamlConfig &YamlConfig) {
   Arch = YamlConfig.Arch;
   Platform = YamlConfig.Platform;
-  DagAnalysisRootPath = YamlConfig.DagAnalysisRootPath;
   PassMode = YamlConfig.PassMode;
   TemporalAnalysisEnabled = YamlConfig.TemporalAnalysisEnabled;
   if (PassMode == RunConfigAndExit) {
@@ -166,18 +182,18 @@ void HAKCSystemInformation::operator<<(HAKCYamlConfig &YamlConfig) {
   }
   ConsoleLogLevel = YamlConfig.ConsoleLogLevel;
   FileLogLevel = YamlConfig.FileLogLevel;
-  DatabaseInformation << YamlConfig.DatabaseConfig;
+  // setting pass mode temporarily so the timer can be set properly
+  YamlConfig.ServerConfig.PassMode = PassMode;
+  DatabaseInformation << YamlConfig.ServerConfig;
+  RootPath = YamlConfig.ServerConfig.RootPath;
+
   if (PassMode == RunDataAccessGraphAnalysisSingleSourceFile) {
     SingleSourceFile = YamlConfig.SingleSourceFile;
   }
 
   // ProcessDebugInfo must happen before creating custom transfers
   // dag analysis actually happens here!
-  if (PassMode == RunDataAccessGraphAnalysis) {
-    TypeIdentifier.ProcessDebugInfo();
-  } else {
-    TypeIdentifier.ProcessDebugInfo();
-  }
+  TypeIdentifier.ProcessDebugInfo();
 
   for (auto &NoTransferFunction : YamlConfig.NoTransferFunctions) {
     if (auto *F = GetModule().getFunction(NoTransferFunction.SymbolName)) {
@@ -352,10 +368,6 @@ bool HAKCSystemInformation::GetTemporalAnalysisEnabled() const {
 
 StringRef HAKCSystemInformation::GetSingleSourceFile() {
   return SingleSourceFile;
-}
-
-StringRef HAKCSystemInformation::GetDagAnalysisRootPath() const {
-  return DagAnalysisRootPath;
 }
 
 HAKCStructList HAKCSystemInformation::GetStructList() const {

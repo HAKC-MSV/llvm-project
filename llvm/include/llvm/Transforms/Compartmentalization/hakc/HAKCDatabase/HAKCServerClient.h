@@ -32,19 +32,17 @@ class HAKCSystemInformation;
 
 class HAKCServerClient {
 public:
-  explicit HAKCServerClient(HAKCSystemInformation &SystemInformation);
+  explicit HAKCServerClient(HAKCModuleAnalysis &ModuleAnalysis);
 
   virtual ~HAKCServerClient();
 
-  void set_dag_filename(StringRef filename) ;
+  void add_symbols(ArrayRef<std::shared_ptr<HAKCFunctionInfo>> FIs, ArrayRef<std::shared_ptr<HAKCGlobalInfo>> GIs);
 
-  void add_symbols(ArrayRef<std::shared_ptr<HAKCFunctionInfo>> FIs, ArrayRef<std::shared_ptr<HAKCGlobalInfo>> GIs) ;
+  void add_function(const HAKCFunctionInfo &Function);
 
-  void add_function(const HAKCFunctionInfo &Function) ;
+  void add_global_variable(const HAKCGlobalInfo &Global);
 
-  void add_global_variable(const HAKCGlobalInfo &Global) ;
-
-  void SendSymbolsToAnalysisServer(HAKCModuleAnalysis &ModuleAnalysis, StringRef filename) ;
+  void SendSymbolsToAnalysisServer(HAKCTypeIdentifier &TypeIdentifier);
 
   void CloseConnection();
 
@@ -57,7 +55,9 @@ public:
   virtual HAKCCompartmentDivision &GetDefaultDivision();
 
 protected:
+  HAKCModuleAnalysis &ModuleAnalysis;
   HAKCSystemInformation &SystemInformation;
+  const HAKCDatabaseInformation &DatabaseInformation;
   std::vector<HAKCCompartmentP> Compartments;
   std::vector<HAKCDivisionP> Divisions;
   HAKCDatabaseConnection Client;

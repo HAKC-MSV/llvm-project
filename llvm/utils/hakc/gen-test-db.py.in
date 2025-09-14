@@ -23,7 +23,6 @@ def main():
     config = f"""
     Arch: X86
     Platform: Linux
-    DagAnalysisRootPath: {dag_root}
     PassMode: {args.test_mode}
     Database:
       server-url: {socket_path}
