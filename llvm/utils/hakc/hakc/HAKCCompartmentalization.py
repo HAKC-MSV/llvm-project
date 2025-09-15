@@ -260,6 +260,8 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         division_id = HAKCCompartmentalization.default_division
         # first construct all the compartments and divisions
 
+        # self.print_unpersisted_nodes()
+
         for symbol in logger.progress_bar(iterable=list(self.get_symbols()), desc='Adding default compartmentalization'):
             # TODO: update; setting some default value for now, will update with Derrick (current implementation is probably logically incorrect)
             compartment = HAKCCompartment(compartment_id, EntryToken=self.compute_entry_token(compartment_id))
@@ -270,6 +272,9 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             compartment_id += 1
 
         if db_dir:
+
+            # self.print_unpersisted_nodes()
+
             # trying to close and reopen database
             self.conn.close()
             self.open_conn(db_dir)
@@ -341,7 +346,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
                     raise ki
         # reopen connection
         self.open_conn(db_dir)
-        logger.info(f'Adding {dag_edges_added} DAG edges {self}')
+        logger.debug(f'Adding {dag_edges_added} DAG edges {self}')
         self.conn.persist_dag_edges(dag_edges)
         return self
 
@@ -391,13 +396,13 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
                     raise ki
         # reopen connection
         self.open_conn(db_dir)
-        logger.info(f'Adding {dag_edges_added} DAG edges')
+        logger.debug(f'Adding {dag_edges_added} DAG edges')
         self.conn.persist_dag_edges(dag_edges)
         return self
 
     def create_dag(self, db_dir: str, core_count: int):
         core_count = max(1, core_count)
-        logger.info(f'Starting DAG construction from {self} with {core_count} cores')
+        logger.debug(f'Starting DAG construction from {self} with {core_count} cores')
         self.create_dag_multithread(core_count, db_dir)
         self.conn.print_stats()
 
@@ -409,7 +414,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             except Exception as e:
                 raise RuntimeError(f"Unable to load adjustments {adjust_path} with error: {e}")
 
-        logger.info(f'Adjusting compartmentalization based on {adjust_path}')
+        logger.debug(f'Adjusting compartmentalization based on {adjust_path}')
         self.conn = self.conn if self.conn else HAKCDatabase(db_dir)
 
         symbol_hashes_in_db = self.conn.get_all_symbol_hashes()
@@ -606,13 +611,13 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
     
     def print_unpersisted_nodes(self):
         nodes = self.get_unpersisted_nodes()
-        logger.info(f"unpersisted nodes:"
-                    f"{nodes['HAKCSymbol']} symbols" if 'HAKCSymbol' in nodes else ''
-                    f"{nodes['HAKCType']} types" if 'HAKCType' in nodes else ''
-                    f"{nodes['HAKCScope']} scopes" if 'HAKCScope' in nodes else ''
-                    f"{nodes['HAKCDefinitionLocation']} definition_locations" if 'HAKCDefinitionLocation' in nodes else ''
-                    f"{nodes['HAKCDivision']} divisions" if 'HAKCDivision' in nodes else ''
-                    f"{nodes['HAKCCompartment']} compartments" if 'HAKCCompartment' in nodes else '')
+        logger.info(f"Unpersisted nodes:"
+                    f"{len(nodes['HAKCSymbol'])} symbols" if 'HAKCSymbol' in nodes else ''
+                    f"{len(nodes['HAKCType'])} types" if 'HAKCType' in nodes else ''
+                    f"{len(nodes['HAKCScope'])} scopes" if 'HAKCScope' in nodes else ''
+                    f"{len(nodes['HAKCDefinitionLocation'])} definition_locations" if 'HAKCDefinitionLocation' in nodes else ''
+                    f"{len(nodes['HAKCDivision'])} divisions" if 'HAKCDivision' in nodes else ''
+                    f"{len(nodes['HAKCCompartment'])} compartments" if 'HAKCCompartment' in nodes else '')
 
     def get_unpersisted_nodes(self) -> dict[str, list[HAKCDBNode]]:
         result = dict()
@@ -641,7 +646,6 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
 
     def _persist_nodes(self, conn: HAKCDatabase):
         unpersisted_nodes = self.get_unpersisted_nodes()
-        self.print_unpersisted_nodes()
         for table_name, nodes in logger.progress_bar(iterable=unpersisted_nodes.items(), desc="Persisting nodes"):
             data_to_persist = dict()
             for node in nodes:
