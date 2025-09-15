@@ -2,7 +2,7 @@ import logging
 from enum import Enum
 from pathlib import Path
 from typing import cast, Optional
-from .HAKCLogger import HAKCLogger, LoggingLevelEnum
+from .HAKCLogger import HAKCLogger, LoggingLevelEnum, parse_log_level
 
 logging.setLoggerClass(HAKCLogger)
 logger: HAKCLogger = cast(HAKCLogger, logging.getLogger('hakc-policy-server'))
@@ -43,7 +43,7 @@ class HAKCDataRequest:
 class HAKCAnalysisConfig:
     def __init__(self, **kwargs):
         analysis_config = kwargs_get_or_error('AnalysisConfig', **kwargs)
-        self.adjustments_path = kwargs.get('adjustments-path', None)
+        self.adjustments_path = analysis_config.get('adjustments-path', None)
         self.max_dag_processes = analysis_config.get('max-dag-processes', -1)
         self.timeout = analysis_config.get('timeout', 100)
 
@@ -51,25 +51,26 @@ class HAKCPolicyConfig:
     def __init__(self, **kwargs):
         policy_config = kwargs_get_or_error('PolicyConfig', **kwargs)
         self.timeout = policy_config.get('timeout', 1000)
-        self.type = kwargs_get_or_error('type', **policy_config)
-        self.path = kwargs.get('path', None)
-        if self.path and self.type != SupportedBackingStore.NULL.value:
+        self.type = policy_config.get('type', 'kuzu')
+        self.path = policy_config.get('path', None)
+        if self.path and self.type == SupportedBackingStore.NULL.value:
             raise RuntimeError(f"PolicyConfig type is set to NULL, but path is set ({self.path}) but should be empty!")
+        self.default_compartment_id = policy_config.get('default-compartment', 0)
+        self.default_division_id = policy_config.get('default-division', 53)
+        self.default_access_token = policy_config.get("default_access_token", 5353)
+        self.default_entry_token = policy_config.get("default_entry_token", 3535)
 
 class HAKCEndpoints:
     def __init__(self, **kwargs):
-        self.default_compartment_id = kwargs.get("default_compartment", 0)
-        self.default_division_id = kwargs.get("default_division", 53)
-        self.default_access_token = kwargs.get("default_access_token", 5353)
-        self.default_entry_token = kwargs.get("default_entry_token", 3535)
-        self.get_compartment_endpoint = kwargs.get('get-compartment-by-id-endpoint', "get-compartment-by-id")
-        self.get_division_endpoint = kwargs.get('get-division-by-id-endpoint', "get-division-by-id")
-        self.get_division_from_symbol_endpoint = kwargs.get('get-division-from-symbol-endpoint',
+        endpoints = kwargs_get_or_error('Endpoints', **kwargs)
+        self.get_compartment_endpoint = endpoints.get('get-compartment-by-id-endpoint', "get-compartment-by-id")
+        self.get_division_endpoint = endpoints.get('get-division-by-id-endpoint', "get-division-by-id")
+        self.get_division_from_symbol_endpoint = endpoints.get('get-division-from-symbol-endpoint',
                                                             "get-division-from-symbol")
-        self.get_valid_targets_from_compartment_id_endpoint = kwargs.get(
+        self.get_valid_targets_from_compartment_id_endpoint = endpoints.get(
             'get-valid-targets-from-compartment-id-endpoint', "get-valid-targets-from-compartment-id")
-        self.add_symbols_endpoint = kwargs.get('add-symbols-endpoint', "add-symbols")
-        self.terminate_connection_endpoint = kwargs.get('terminate-connection-endpoint', "terminate-connection")
+        self.add_symbols_endpoint = endpoints.get('add-symbols-endpoint', "add-symbols")
+        self.terminate_connection_endpoint = endpoints.get('terminate-connection-endpoint', "terminate-connection")
 
 class HAKCServerConfig:
     def __init__(self, **kwargs):
@@ -82,7 +83,7 @@ class HAKCServerConfig:
         self.test_mode = kwargs.get('test-mode', False)
         self.max_server_processes = kwargs.get('max-server-processes', -1)
         self.log_path = kwargs.get('log-path', None)
-        self.log_level = kwargs.get('log-level', LoggingLevelEnum.INFO)
+        self.log_level = parse_log_level(kwargs.get('log-level', 'INFO'))
 
         # AnalysisConfig struct
         self.analysis_config = HAKCAnalysisConfig(**kwargs)

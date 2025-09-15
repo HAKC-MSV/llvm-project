@@ -18,15 +18,17 @@ from hakc.HAKCCompartmentalization import HAKCCompartmentalization
 from hakc.HAKCLogger import LoggingLevelEnum, parse_log_level, setup_logging, HAKCLogger
 from hakc.HAKCServerConfig import HAKCServerConfig, TimeoutException
 from hakc.HAKCDatabase import HAKCDatabase
+from hakc.HAKCObjects import HAKCDivision, HAKCCompartment
 from queue import Empty
 
 logging.setLoggerClass(HAKCLogger)
 
 logger = cast(HAKCLogger, logging.getLogger('hakc-server-process'))
 
-server_gather_procs: dict[int, mp.Process] = {}
-local_reduce_procs: dict[int, mp.Process] = {}
-global_reduce_proc: dict[int, mp.Process] = {} # size 1
+server_gather_procs: dict[int, mp.Process] = {} # used in analysis mode
+local_reduce_procs: dict[int, mp.Process] = {} # used in analysis mode
+global_reduce_proc: dict[int, mp.Process] = {} # used in analysis mode; size 1
+server_procs: dict[int, mp.Process] = {} # used in policy mode
 progress_bars_proc: Optional[mp.Process] = None
 
 def timeout_handler(signum, frame):
@@ -102,13 +104,12 @@ def launch_reduce_proc(reduce_id: int, server_gather_buckets, local_reduce_procs
             logger.fatal(f"local reduce error: {e}")
             raise e
 
-def launch_server_gather_proc(server_id: int, server_gather_buckets, server_gather_procs_completed: mp.Value, config: HAKCServerConfig, server_mode: HAKCServerMode, ServerMainLogger: logger):
+def launch_server_gather_proc(server_id: int, config: HAKCServerConfig, server_mode: HAKCServerMode, ServerMainLogger: logger, server_gather_buckets, server_gather_procs_completed: mp.Value):
     config.socket_path = Path(os.path.join(config.socket_path, str(server_id)))
     logger.debug(f"Spinning up server gather process {server_id}!")
     if config.reuse_path and config.socket_path.exists():
         config.socket_path.unlink()
-
-    with HAKCServer(server_id, server_gather_buckets, config, server_mode, ServerMainLogger) as server:
+    with HAKCServer(server_id, config, server_mode, ServerMainLogger, server_gather_buckets=server_gather_buckets) as server:
         try:
             if config.server_timeout > 0:
                 signal.signal(signal.SIGALRM, timeout_handler)
@@ -123,21 +124,26 @@ def launch_server_gather_proc(server_id: int, server_gather_buckets, server_gath
         finally:
             server.server_close()
 
+def launch_server_proc(server_id: int, config: HAKCServerConfig, server_mode: HAKCServerMode, ServerMainLogger: logger):
+    config.socket_path = Path(os.path.join(config.socket_path, str(server_id)))
+    logger.debug(f"Spinning up server process {server_id}!")
+    if config.reuse_path and config.socket_path.exists():
+        config.socket_path.unlink()
+
+    with HAKCServer(server_id, config, server_mode, ServerMainLogger) as server:
+        try:
+            if config.server_timeout > 0:
+                signal.signal(signal.SIGALRM, timeout_handler)
+                signal.alarm(config.server_timeout)
+            server.serve_forever()
+        except TimeoutException:
+            ServerMainLogger.debug(f'Closing server')
+        except Exception as e:
+            ServerMainLogger.error(f'Server received generic Exception: {e}')
+        finally:
+            server.server_close()
+
 def cleanup_processes():
-    global local_reduce_procs
-    global global_reduce_proc
-    global server_gather_procs
-    # try:
-    # for id, proc in local_reduce_procs.items():
-    #     if proc.is_alive():
-    #         proc.kill()
-    # for id, proc in global_reduce_proc.items():
-    #     if proc.is_alive():
-    #         proc.kill()
-    # for id, proc in server_gather_procs.items():
-    #     if proc.is_alive():
-    #         proc.kill()
-    # except KeyboardInterrupt:
     import subprocess
     subprocess.run(['pkill','-f','hakc-server-process'])
 
@@ -159,24 +165,36 @@ def spin_up_global_reduce_proc(comp, local_reduce_done, global_reduce_bucket):
                                                      name=f"global reduce")}
     [proc.start() for _, proc in global_reduce_proc.items()]
 
-def join_global_reduce_proc():
+def join_global_reduce_proc(global_reduce_proc_completed):
     global global_reduce_proc
     [proc.join() for _, proc in global_reduce_proc.items()]
+    global_reduce_proc_completed.value = 1
 
-def spin_up_server_gather_procs(config, server_gather_buckets, server_gather_procs_completed, server_mode, ServerMainLogger):
+def spin_up_server_gather_procs(config, server_gather_buckets, server_gather_procs_completed, ServerMainLogger):
     global server_gather_procs
     server_gather_procs = {server_id: mp.Process(target= launch_server_gather_proc,
-                                                 args= (server_id, server_gather_buckets, server_gather_procs_completed, config, server_mode, ServerMainLogger,),
+                                                 args= (server_id, config, HAKCServerMode.ANALYSIS, ServerMainLogger, server_gather_buckets, server_gather_procs_completed,),
                                                  name= f"gather server { f'{server_id}'.zfill(2) }") for server_id in range(config.max_server_processes)}
     [proc.start() for _, proc in server_gather_procs.items()]
+
+def spin_up_server_procs(config, ServerMainLogger):
+    global server_procs
+    server_procs = {server_id: mp.Process(target= launch_server_proc,
+                                                 args= (server_id, config, HAKCServerMode.POLICY, ServerMainLogger,),
+                                                 name= f"server { f'{server_id}'.zfill(2) }") for server_id in range(config.max_server_processes)}
+    [proc.start() for _, proc in server_procs.items()]
+
+def join_server_procs():
+    global server_procs
+    [proc.join() for _, proc in server_procs.items()]
 
 def join_server_gather_procs():
     global server_gather_procs
     [proc.join() for _, proc in server_gather_procs.items()]
 
-def spin_up_progress_bars(server_gather_procs_completed, local_reduce_procs_completed, max_server_processes):
+def spin_up_progress_bars(server_gather_procs_completed, local_reduce_procs_completed, global_reduce_proc_completed, max_server_processes):
     global progress_bars_proc
-    progress_bars_proc = mp.Process(target= launch_progress_bars, args=(server_gather_procs_completed,local_reduce_procs_completed, max_server_processes,), name= f"progress bars proc")
+    progress_bars_proc = mp.Process(target= launch_progress_bars, args=(server_gather_procs_completed,local_reduce_procs_completed, global_reduce_proc_completed, max_server_processes,), name= f"progress bars proc")
     progress_bars_proc.start()
 
 def join_progress_bars():
@@ -184,10 +202,10 @@ def join_progress_bars():
     progress_bars_proc.kill()
     progress_bars_proc.join()
 
-def launch_progress_bars(server_gather_procs_completed, local_reduce_procs_completed, max_server_processes):
-
-    server_gather_procs_completed_pbar = logger.progress_bar(total=max_server_processes, desc='Server Gather Processes Completed', position=0)
-    local_reduce_procs_completed_pbar = logger.progress_bar(total=max_server_processes, desc='Local Reduce Processes Completed', position=1)
+def launch_progress_bars(server_gather_procs_completed, local_reduce_procs_completed, global_reduce_proc_completed, max_server_processes):
+    server_gather_procs_completed_pbar = logger.progress_bar(total=max_server_processes, desc='Server Gather Processes Completed')
+    local_reduce_procs_completed_pbar = logger.progress_bar(total=max_server_processes, desc='Local Reduce Processes Completed')
+    global_reduce_proc_completed_pbar = logger.progress_bar(total=1, desc='Global Reduce Process Completed')
 
     while True:
         if server_gather_procs_completed.value > 0:
@@ -196,6 +214,9 @@ def launch_progress_bars(server_gather_procs_completed, local_reduce_procs_compl
         if local_reduce_procs_completed.value > 0:
             local_reduce_procs_completed_pbar.update(1)
             local_reduce_procs_completed.value -= 1
+        if global_reduce_proc_completed.value == 1:
+            global_reduce_proc_completed_pbar.update(1)
+            global_reduce_proc_completed_pbar.close()
         time.sleep(1)
 
 # noinspection PyTypeChecker
@@ -206,7 +227,7 @@ def main():
     parser.add_argument('--config', help='Path to server config file', required=True)
     parser.add_argument('--log-level', required=False, dest='log_level',
                         help=f'Log level to display, can be lower case {[level.name for level in LoggingLevelEnum]}',
-                        type=parse_log_level, default=LoggingLevelEnum.INFO,)
+                        type=parse_log_level)
     parser.add_argument('--server-mode', dest='server_mode', help=f'Server mode can be {[mode.name for mode in HAKCServerMode]}',
                         type=parse_server_mode, default=HAKCServerMode.ANALYSIS)
     args = parser.parse_args()
@@ -226,7 +247,7 @@ def main():
     config.server_timeout = config.analysis_config.timeout if analysis_mode else config.policy_config.timeout
 
     root_logger = logging.getLogger()
-    setup_logging(root_logger, log_level=args.log_level if args.log_level else config.log_level, log_file=config.log_path if config.log_path else '', log_mode=args.log_mode)
+    setup_logging(root_logger, log_level=args.log_level if args.log_level is not None else config.log_level, log_file=config.log_path if config.log_path else '', log_mode=args.log_mode)
 
     ServerMainLogger: HAKCLogger = cast(HAKCLogger, logging.getLogger('hakc-server-main'))
     if config.log_path:
@@ -236,26 +257,43 @@ def main():
         profile = cProfile.Profile()
         profile.enable()
 
+    start = time.time()
+
+    # conn = HAKCDatabase(config.database_path)
+    # conn.print_stats()
+    # if config.analysis_config.adjustments_path:
+    #     HAKCCompartmentalization().adjust_compartmentalization(config.database_path, config.analysis_config.adjustments_path)
+    # conn.print_stats()
+    #
+    # conn.get_division(0,0)
+    #
+    # return
+    # c = HAKCCompartmentalization()
+    # divs = c.get_divisions()
+    # logger.error(f"Got divs: {divs}")
+    # c.create_dag_multithread_all_db(100, config.database_path)
     # Spawn mp manager to share resources amongst processes
     with mp.Manager() as manager:
-        server_gather_procs_completed: mp.Value = mp.Value('i', 0)
-        local_reduce_procs_completed: mp.Value = mp.Value('i', 0)
-        # initialize shared data structures
-        # contains queues for each add-symbols resulting compartmentalization
-        server_gather_buckets = manager.dict({server_id: manager.Queue() for server_id in range(config.max_server_processes)})
 
-        spin_up_progress_bars(server_gather_procs_completed, local_reduce_procs_completed, config.max_server_processes)
         if policy_mode:
-            spin_up_server_gather_procs(config, server_gather_buckets, server_gather_procs_completed, args.server_mode, ServerMainLogger)
-            join_server_gather_procs()
+            spin_up_server_procs(config, ServerMainLogger)
+            join_server_procs()
 
         elif analysis_mode:
+            server_gather_procs_completed: mp.Value = mp.Value('i', 0)
+            local_reduce_procs_completed: mp.Value = mp.Value('i', 0)
+            global_reduce_proc_completed: mp.Value = mp.Value('i', 0)
+            spin_up_progress_bars(server_gather_procs_completed, local_reduce_procs_completed, global_reduce_proc_completed, config.max_server_processes)
+            # initialize shared data structures
+            # contains queues for each add-symbols resulting compartmentalization
+
+            server_gather_buckets = manager.dict({server_id: manager.Queue() for server_id in range(config.max_server_processes)})
             # Note: need to wrap compartmentalization object in a process safe structure or value will not update correctly
             comp = manager.Queue()
             local_reduce_done = manager.Event()
             global_reduce_bucket = manager.Queue()
 
-            spin_up_server_gather_procs(config, server_gather_buckets, server_gather_procs_completed, args.server_mode, ServerMainLogger)
+            spin_up_server_gather_procs(config, server_gather_buckets, server_gather_procs_completed, ServerMainLogger)
             spin_up_local_reduce_procs(config, server_gather_buckets, local_reduce_procs_completed, global_reduce_bucket)
             # launch final merger to combine all the compartmentalizations from other mergers
             spin_up_global_reduce_proc(comp, local_reduce_done, global_reduce_bucket)
@@ -265,28 +303,26 @@ def main():
 
             # only send 'done' signal once all the local reductions finish
             local_reduce_done.set()
-            join_global_reduce_proc()
+            join_global_reduce_proc(global_reduce_proc_completed)
+            join_progress_bars()
 
             compartmentalization = comp.get()
-
-            logger.debug(f"Deleting old db at {config.database_path}")
             compartmentalization.delete_db(config.database_path)
-            logger.debug(f"Opening new db at {config.database_path}")
-            # Note: creating new database creates a conn which must be closed manually later
+            # Note: creating new database creates conn which must be closed manually later
             compartmentalization.create_new_db(config.database_path)
-
             # Note: an open database connection is required to add default compartmentalization or create dag
-            logger.debug(f"Adding default compartmentalization at {config.database_path}")
             compartmentalization.add_default_compartmentalization(config.database_path)
-            logger.debug(f"Constructing DAG from {compartmentalization} at {config.database_path}")
-            compartmentalization.create_dag(config.analysis_config.max_dag_processes, config.database_path)
-
-            logger.debug(f"Finished constructing {compartmentalization}")
+            compartmentalization.create_dag(config.database_path, config.analysis_config.max_dag_processes)
 
             if config.analysis_config.adjustments_path:
-                compartmentalization.adjust_compartmentalization(config.analysis_config.adjustments_path, config.database_path)
+                compartmentalization.adjust_compartmentalization(config.database_path, config.analysis_config.adjustments_path)
+
             compartmentalization.close_conn()
-        join_progress_bars()
+
+    end = time.time()
+    logger.info(f'Finished constructing DAG {compartmentalization}')
+    logger.info(f'    Total Time: {end - start} seconds')
+
     if args.profile:
         profile.disable()
         output_profile_stats(profile)
@@ -297,7 +333,6 @@ if __name__ == "__main__":
         # print("\nCtrl+C detected via signal handler. Exiting.")
         # Perform cleanup here
         cleanup_processes()
-
         sys.exit(0)
 
     signal.signal(signal.SIGINT, signal_handler)
