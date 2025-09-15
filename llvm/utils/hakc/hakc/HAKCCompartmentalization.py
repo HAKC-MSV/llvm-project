@@ -362,8 +362,6 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             self.add_division(nec_division, no_enforcement_compartment)
 
         for symbol in logger.progress_bar(iterable=symbols, desc='Adjusting Compartmentalization'):
-            if symbol.definition_location is not None and symbol.definition_location.defining_file and "rosdemo" in symbol.definition_location.defining_file:
-                print(f'Found {symbol.definition_location.defining_file} in {symbol.definition_location}')
             adjustments = adjustment.get_adjusted_division_and_compartment(
                 symbol.definition_location.defining_file if symbol.definition_location else None)
             adjusted_division = None
@@ -386,6 +384,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
                     logger.info(f'{symbol} is moving to {adjusted_division}')
                 else:
                     logger.debug(f'{symbol} is moving to NEC {adjusted_division}')
+                self.add_symbol(symbol, already_persisted=True)
                 self.set_symbol_division_by_object(symbol, adjusted_division, adjusted_compartment)
             else:
                 logger.info(f'{symbol} is unchanged')
