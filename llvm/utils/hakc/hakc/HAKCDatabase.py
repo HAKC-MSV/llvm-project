@@ -82,13 +82,7 @@ class HAKCDatabase:
 
     def print_stats(self):
         stats = self.get_stats()
-        logger.info(f"hakc-db now has:"
-                    f"\n\t{stats['symbols']} symbols"
-                    f"\n\t{stats['types']} types"
-                    f"\n\t{stats['scopes']} scopes"
-                    f"\n\t{stats['definition_locations']} definition_locations"
-                    f"\n\t{stats['divisions']} divisions"
-                    f"\n\t{stats['compartments']} compartments")
+        logger.info(f"hakc-db with {stats['symbols']} Symbols, {stats['types']} Types, {stats['scopes']} Scopes, {stats['definition_locations']} DefinitionLocations, {stats['divisions']} Divisions, {stats['compartments']} Compartments")
 
     def increment_cache_hit(self):
         with self.cache_hit_mutex:
