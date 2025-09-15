@@ -42,8 +42,8 @@ class HAKCPolicyDataSource:
                           config.endpoints.get_division_from_symbol_endpoint: self.get_symbol_division,
                           config.endpoints.get_valid_targets_from_compartment_id_endpoint: self.get_valid_targets_from_compartment_id}
         self.yaml_loader = yaml_loader
-        self.default_compartment = HAKCCompartment(config.analysis_config.default_compartment_id, **{'EntryToken':0}) # need to use kwargs to set values
-        self.default_division = HAKCDivision(config.analysis_config.default_division_id, **{'Salt':0, 'AccessToken':0})
+        self.default_compartment = HAKCCompartment(config.policy_config.default_compartment_id, **{'EntryToken':config.policy_config.default_entry_token}) # need to use kwargs to set values
+        self.default_division = HAKCDivision(config.policy_config.default_division_id, **{'Salt':0, 'AccessToken':config.policy_config.default_access_token})
         self.socket_path = config.socket_path
         self.test_mode = config.test_mode
 
@@ -245,7 +245,8 @@ class HAKCServerThreadInstance(HAKCServerThread):
     def terminate_connection(self, **kwargs):
         # override terminate_connection function to add compartmentalization to queue
         assert len(self.compartmentalization) > 0
-        self.hakc_server.server_gather_buckets[self.hakc_server.id].put(self.compartmentalization)
+        if self.hakc_server.server_gather_buckets:
+            self.hakc_server.server_gather_buckets[self.hakc_server.id].put(self.compartmentalization)
         HAKCServerThread.terminate_connection(self)
 
     def add_symbols(self, **kwargs) -> HAKCResponse:
@@ -266,13 +267,13 @@ class HAKCServerThreadInstance(HAKCServerThread):
 
 # noinspection PyTypeChecker
 class HAKCServer(socketserver.ThreadingUnixStreamServer):
-    def __init__(self, id: int, server_gather_buckets, config: HAKCServerConfig, server_mode: HAKCServerMode, logger: HAKCLogger, **kwargs):
+    def __init__(self, id: int, config: HAKCServerConfig, server_mode: HAKCServerMode, logger: HAKCLogger, server_gather_buckets = None, **kwargs):
         self.id = id
-        self.server_gather_buckets = server_gather_buckets
         self.logger = logger
         self.config = config
         self.analysis_mode = server_mode == HAKCServerMode.ANALYSIS
         self.policy_mode = server_mode == HAKCServerMode.POLICY
+        self.server_gather_buckets = server_gather_buckets
         self.timeout = config.server_timeout
         self.last_alive = time.time()
         if self.policy_mode:

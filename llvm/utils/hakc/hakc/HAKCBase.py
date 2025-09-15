@@ -259,6 +259,8 @@ class HAKCPayload(HAKCPrintableObj):
         HAKCPrintableObj.__init__(self, **kwargs)
         self.payload = payload
 
+    def __str__(self):
+        return f"HAKCPayload: {self.payload}"
     @classmethod
     def to_yaml(cls, dumper: hakc_dumper, data):
         return dumper.represent_dict(data.to_yaml_dict())
@@ -273,6 +275,9 @@ class HAKCPayload(HAKCPrintableObj):
 class HAKCResult(HAKCPayload):
     def __init__(self, success: bool = True, error: str = '', data: HAKCPayload = None, **kwargs):
         HAKCPayload.__init__(self, payload={'Success': success, 'Error': error, 'Data': data})
+
+    def __str__(self):
+        return f"{'Successful' if self.payload['Success'] else 'Failed'} HAKCResponse with {self.payload}"
 
 class HAKCResultSuccess(HAKCResult):
     def __init__(self, data: HAKCPayload = None):
