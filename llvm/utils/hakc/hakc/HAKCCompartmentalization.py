@@ -1,5 +1,4 @@
 import concurrent.futures
-import concurrent.futures
 import logging
 import os
 import re
@@ -52,14 +51,12 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         for symbol in self.get_filtered_nodes(G, node_filter=lambda n: isinstance(n, HAKCFunction) or isinstance(n,
                                                                                                                  HAKCGlobalVariable)):
             symbol: Union['HAKCFunction', 'HAKCGlobalVariable']  # suppress type warning
-            # logger.fatal(f"symbol found: {symbol}")
             new_symbol = HAKCFunction(Name=symbol.name) if isinstance(symbol, HAKCFunction) else HAKCGlobalVariable(
                 Name=symbol.name)
             new_symbol.set_computed_hash(symbol.computed_hash)
             for nbr in G.neighbors(symbol):
                 for edge_data in G.get_edge_data(symbol, nbr):
                     if edge_data == HAKCSymbol.relation_type:
-                        # assert isinstance(nbr, HAKCType), f"assert(isinstance({nbr}, HAKCType)"
                         new_symbol.type = nbr
                     elif edge_data == HAKCSymbol.relation_scope:
                         new_symbol.scope = nbr
@@ -147,7 +144,6 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             self.__add_global_variable(global_variable)
 
         for function in functions:
-            # logger.debug(f"Adding function {function} with defining location {function.definition_location}")
             self.__add_function(function)
 
     def add_function(self, function: HAKCFunction) -> None:
@@ -166,12 +162,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
 
         for indirect_call in function.indirect_calls:
             # TODO handle indirect call sources?
-            # logger.error(f"indirect_call: {type(indirect_call)}")
-            # assert(isinstance(indirect_call, HAKCType))
             if isinstance(indirect_call, HAKCType):
-                # TODO: should types already be persisted? getting duplicate key error when using data columns as hakctype hashable inputs
-                # self.__add_type(indirect_call, already_persisted = True)
-                # self.__add_type(indirect_call)
                 self.__add_persistent_edge(function, indirect_call, key=HAKCFunction.relation_indirect_calls)
 
     def add_global_variable(self, global_variable: HAKCGlobalVariable) -> None:
@@ -204,7 +195,6 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         self.__add_persistent_edge(symbol, symbol.scope, already_persisted=already_persisted,
                                    key=HAKCSymbol.relation_scope)
         if symbol.definition_location:
-            # logger.fatal(f"Persisting symbol definition location {symbol} -> {symbol.definition_location}")
             self.__add_persistent_node(symbol.definition_location, already_persisted=already_persisted)
             self.__add_persistent_edge(symbol, symbol.definition_location, already_persisted=already_persisted,
                                        key=HAKCSymbol.relation_definition_location,
@@ -225,10 +215,6 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         if node not in self:
             attrs = {HAKCCompartmentalization.persisted_attr: already_persisted}
             self.add_node(node, **attrs)
-            # self.node_map[node_hash] = node
-        # assert self.node_map[node_hash] == node, f"{self.node_map[node_hash]} =?= {node}"
-        # print(f"FOUND {self.node_map[node_hash]} =?= {node}")
-        # return self.node_map[node_hash]
         return node
 
     def get_compartment_from_division(self, division: HAKCDivision) -> HAKCCompartment:
@@ -310,7 +296,6 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
                         pbar.update(1)
                         try:
                             edge_weights = future.result()
-                            # logger.error(f"edge weights: {edge_weights}")
                             for (head_hash, tail_hash, dag_edge_weight) in edge_weights:
                                 if head_hash not in dag_edges:
                                     dag_edges[head_hash] = dict()
@@ -325,10 +310,8 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
                     logger.info(f'Stopping edge computation')
                     executor.shutdown(wait=False, cancel_futures=True)
                     raise ki
-        # reopen connection
         self.open_conn(db_dir)
         logger.info(f'Adding {dag_edges_added} DAG edges {self}')
-        # conn = self.conn if self.conn else HAKCDatabase(db_dir, max_num_threads=core_count)
         self.conn.persist_dag_edges(dag_edges)
         return self
 
@@ -395,7 +378,6 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         logger.info(f'Done adjusting compartmentalization')
         logger.info(
             f'Compartmentalization now has {len(self.conn.get_all_divisions())} divisions across {len(self.conn.get_all_compartments())} compartments')
-        # conn.close()
 
     def compute_entry_token(self, compartment_id: int, divisions=None) -> int:
         if divisions is None:
@@ -541,7 +523,6 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         for symbol in self.get_symbols():
             if self.get_symbol_compartment_id(symbol) == compartment_id:
                 all_symbols_by_compartment_id.add(symbol)
-        # logger.debug(f"Got {len(self.get_symbols())} symbols")
         # now search all valid neighbors
         for caller in all_symbols_by_compartment_id:
             for callee in self.neighbors(caller):
@@ -701,8 +682,6 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         self.persist_to_database(self.conn, create_schema=True)
         logger.info(f"Created new database with {len(self.conn.get_all_symbol_hashes())} symbols")
 
-        # self.close_conn()
-
     def get_symbol_hashes(self) -> dict[int, HAKCSymbol]:
         symbol_hashes = dict()
         for symbol in self.get_symbols():
@@ -710,7 +689,6 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         return symbol_hashes
 
     def get_symbol_by_hash(self, symbol_hash: int) -> Optional[HAKCSymbol]:
-        # logger.debug(f"Trying to find symbol for hash {symbol_hash} with symbols {self.get_symbols()}")
         for symbol in self.get_symbols():
             assert (isinstance(symbol, HAKCSymbol))
             if symbol.get_computed_hash().final_hash == symbol_hash:

@@ -132,7 +132,6 @@ class HAKCDivision(HashedHAKCDBNode, yaml.YAMLObject):
     def get_db_data(self, convert_hash=True) -> dict[HAKCDBColumn, object]:
         schema = HAKCDivision.get_db_table_columns()
         return {
-            # schema[0]: hash(self) if convert_hash else self.get_computed_hash(),
             schema[0]: self.get_computed_hash().final_hash,
             schema[1]: self.division_id,
             schema[2]: self.salt
@@ -275,7 +274,6 @@ class HAKCType(HashedHAKCDBNode, yaml.YAMLObject):
             return [self._debug_type_transformed]
         else:
             return [self.llvm_type]
-        # return self.get_data_columns()
 
     def __hash__(self):
         return HAKCDBNode.__hash__(self)
@@ -325,7 +323,6 @@ class HAKCScope(HashedHAKCDBNode, yaml.YAMLObject):
         yaml.YAMLObject.__init__(self)
         HashedHAKCDBNode.__init__(self, **kwargs)
         self.scope = Scope
-        # kwargs["Name"] = LocalScopeName if LocalScopeName is not None else self.scope
         self.local_scope_name = LocalScopeName if LocalScopeName is not None else HAKCScope.global_scope
         self.is_global_scope = self.scope == HAKCScope.global_scope
         self.is_local_scope = self.scope == HAKCScope.local_scope
@@ -365,7 +362,6 @@ class HAKCScope(HashedHAKCDBNode, yaml.YAMLObject):
             return str(self) < str(other)
         # I guess at some point a HAKCType is being compared to HAKCScope
         logger.error(f"{other} is of type: {type(other)}")
-        # raise RuntimeError(f'{other} is not a {self.__class__.__name__}')
         return hash(self) < hash(other)
 
     def get_hash_inputs(self) -> list[object]:
@@ -391,7 +387,6 @@ class HAKCScope(HashedHAKCDBNode, yaml.YAMLObject):
         schema = HAKCScope.get_db_table_columns()
         assert (len(schema) == (len(self.get_data_columns()) + 1))
         return {
-            # schema[0]: hash(self) if convert_hash else self.get_computed_hash(),
             schema[0]: self.get_computed_hash().final_hash,
             schema[1]: self.scope,
             schema[2]: self.local_scope_name
@@ -419,8 +414,6 @@ class HAKCSymbol(HashedHAKCDBNode, yaml.YAMLObject):
         self.definition_location = DefinitionLocation
         self.used_symbols = UsedSymbols if UsedSymbols else list()
         assert len(self.name) != 0, "Name cannot be empty"
-        # assert isinstance(self.type, HAKCType), f"{self.type} is not a HAKCType"
-        # assert isinstance(self.scope, HAKCScope), f"{self.scope} is not a HAKCScope"
         if "type_hash" in kwargs:
             assert kwargs[
                        "type_hash"] == self.get_computed_hash(), f"type_hash ({kwargs['type_hash']}) =?= hash(self) ({self.get_computed_hash()})"
@@ -438,7 +431,6 @@ class HAKCSymbol(HashedHAKCDBNode, yaml.YAMLObject):
 
     @classmethod
     def from_yaml(cls, loader: yaml.CLoader, node):
-        # logger.fatal(f"Constructing symbol with: {node}")
         return cls(**loader.construct_mapping(node, deep=True))
 
     def __eq__(self, other):
@@ -489,7 +481,6 @@ class HAKCSymbol(HashedHAKCDBNode, yaml.YAMLObject):
         schema = HAKCSymbol.get_db_table_columns()
         assert (len(schema) == (len(self.get_data_columns()) + 1))
         return {
-            # schema[0]: hash(self) if convert_hash else self.get_computed_hash(),
             schema[0]: self.get_computed_hash().final_hash,
             schema[1]: isinstance(self, HAKCFunction),
             schema[2]: self.name
@@ -536,7 +527,6 @@ class HAKCFunction(HAKCSymbol):
 
     @classmethod
     def from_yaml(cls, loader: yaml.CLoader, node):
-        # logger.fatal(f"Constructing symbol with: {node}")
         return cls(**loader.construct_mapping(node, deep=True))
 
     @staticmethod

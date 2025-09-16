@@ -1,5 +1,6 @@
 import logging
 import multiprocessing as mp
+import threading
 from typing import Type, Optional, Tuple, cast
 
 import pandas as pd
@@ -12,8 +13,6 @@ from .HAKCObjects import HAKCSymbol, HAKCFunction, HAKCScope, HAKCType, HAKCGlob
 logging.setLoggerClass(HAKCLogger)
 
 logger: HAKCLogger = cast(HAKCLogger, logging.getLogger('hakc-database'))
-
-import threading
 
 
 # creating thread lock for shared resource (caching system)
@@ -40,7 +39,6 @@ class HAKCDatabase:
 
     def increment_cache_hit(self):
         with self.cache_hit_mutex:
-            # logger.debug(f"Incrementing cache_hit {self.cache_hit}")
             self.cache_hit += 1
 
     def increment_cache_miss(self):
@@ -111,11 +109,7 @@ class HAKCDatabase:
         self.conn = kuzu.Connection(self.database)  # thread i connection
 
     def execute_prepared_stmt(self, prepared_stmt: str, **kwargs):
-        # start = time.time()
         response = self.conn.execute(prepared_stmt, parameters=kwargs)
-        # end = time.time()
-        # self.increment_total_query_time(end - start)
-        # logger.info(self.get_cache_stats())
         return response
 
     @staticmethod
@@ -282,12 +276,9 @@ class HAKCDatabase:
         RETURN div.DivisionID as DivisionID, div.Salt as Salt, div.{str(HAKCDivision.get_primary_key())} as division_hash
         """
         data = self.execute(cmd).to_dict(orient='records')
-        # divisions = set()
         # use list instead of set becasue we allow for duplicates
         divisions = list()
-        # if response.has_next():
         for entry in data:
-            # divisions.add(HAKCDivision(**entry))
             divisions.append(HAKCDivision(**entry))
         return divisions
 
@@ -324,7 +315,6 @@ class HAKCDatabase:
         response = self.execute_prepared_stmt(cmd, symbol_hash=symbol_hash)
         df = response.get_as_pl()
         for table_name, entries in df.to_dict(as_series=False).items():
-            # logger.error(f"Got response: {table_name} -> {entries}")
             if len(entries) > 0:
                 result[table_name] = entries
         cmd = f"""
@@ -503,7 +493,6 @@ class HAKCDatabase:
         RETURN DISTINCT {type_attrs}, {scope_attrs}, {symbol_attrs}, {HAKCSymbol.relation_dag}.weight;
         """
 
-        # print(cmd)
         data = self.execute(cmd, symbol_hash=hash(_symbol)).to_dict(orient='records')
         dag_edges = set()
         for entry in data:
@@ -511,17 +500,14 @@ class HAKCDatabase:
                 func = HAKCDatabase.__create_object_from_response(HAKCFunction, **entry)
                 dag_edge = (func, entry[f"{HAKCSymbol.relation_symbol}.weight"])
                 dag_edges.add(dag_edge)
-                # print(f"Found DAG: {dag_edge}")
             else:
                 gv = HAKCDatabase.__create_object_from_response(HAKCGlobalVariable, **entry)
                 dag_edge = (gv, entry[f"{HAKCSymbol.relation_symbol}.weight"])
                 dag_edges.add(dag_edge)
-                # print(f"Found DAG: {dag_edge}")
         return dag_edges
 
     def get_division_compartment(self, _symbol: HAKCSymbol) -> tuple[HAKCDivision, HAKCCompartment]:
         assert (isinstance(_symbol, HAKCSymbol))
-        logger.debug(_symbol)
 
         symbol_attrs = HAKCDatabase.get_object_attributes(HAKCSymbol)
         division_attrs = HAKCDatabase.get_object_attributes(HAKCDivision)
@@ -559,7 +545,6 @@ class HAKCDatabase:
         OPTIONAL MATCH ({HAKCSymbol.get_table_name()})-[{HAKCSymbol.relation_definition_location}:{HAKCSymbol.relation_definition_location}]->({HAKCDefinitionLocation.get_table_name()}:{HAKCDefinitionLocation.get_table_name()})
         RETURN DISTINCT {type_attrs}, {scope_attrs}, {symbol_attrs}, {dl_attrs}, {HAKCSymbol.relation_definition_location}.DefiningLine AS DefiningLine;
         """
-        # logger.error(f"running command: {cmd}")
 
         cmdargs = dict()
         if symbol_name:
@@ -567,7 +552,6 @@ class HAKCDatabase:
         if symbol_hash:
             cmdargs['symbol_hash'] = symbol_hash
         data = self.execute(cmd, **cmdargs).to_dict(orient='records')
-        # logger.fatal(response)
         functions = set()
         gvs = set()
         for entry in data:
@@ -591,24 +575,19 @@ class HAKCDatabase:
         # Note: Speeding up performance by only doing a 'shallow' query of the direct calls, since we only need to know enough to create the symbol hash
         if deep:
             for func in functions:
-                # print(func)
                 used_symbols = self.get_used_symbols(func)
-                # print(f"used_symbols: {used_symbols}")
                 for used_symbol in used_symbols:
                     func.used_symbols.append(used_symbol)
 
                 direct_calls = self.get_direct_calls(func)
-                # print(f"direct_calls: {direct_calls}")
                 for direct_call in direct_calls:
                     func.direct_calls.append(direct_call)
 
                 indirect_calls = self.get_indirect_calls(func)
-                # print(f"indirect_calls: {indirect_calls}")
                 for indirect_call in indirect_calls:
                     func.indirect_calls.append(indirect_call)
 
         symbols = functions.union(gvs)
-        # logger.fatal(f"Returning symbols {symbols}")
         return symbols
 
     def get_symbol_hash(self, Name, DefiningFile, DefiningLine):
