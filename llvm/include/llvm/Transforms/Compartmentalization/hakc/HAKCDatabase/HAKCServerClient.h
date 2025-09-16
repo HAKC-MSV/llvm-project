@@ -1,3 +1,16 @@
+//===----------------------------------------------------------------------===//
+//
+// Part of the MIT Lincoln Laboratory HAKC Compartmentalization Project.
+//
+//===----------------------------------------------------------------------===//
+///
+/// \file
+/// This file contains the server client class which executes queries to server
+/// endpoints, and maintains a connection. This is used in both analysis
+/// (sending all symbols used to the server for DAG creation), and
+/// policy enforcement (enforcing the actual compartmentalization policy)
+///
+//===----------------------------------------------------------------------===//
 //
 // Created by de29664 on 7/29/24.
 //

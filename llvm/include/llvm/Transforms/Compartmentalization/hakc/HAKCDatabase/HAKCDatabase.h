@@ -1,3 +1,15 @@
+//===----------------------------------------------------------------------===//
+//
+// Part of the MIT Lincoln Laboratory HAKC Compartmentalization Project.
+//
+//===----------------------------------------------------------------------===//
+///
+/// \file
+/// This file contains the database class which allows the pass to connect to a
+/// tcp socket and query a database which is hosted by a server process. These
+/// queries are used to determine valid targets, symbol divisions, etc.
+///
+//===----------------------------------------------------------------------===//
 //
 // Created by de29664 on 7/29/24.
 //

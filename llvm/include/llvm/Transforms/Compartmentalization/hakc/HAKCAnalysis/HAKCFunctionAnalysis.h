@@ -1,4 +1,15 @@
+//===----------------------------------------------------------------------===//
 //
+// Part of the MIT Lincoln Laboratory HAKC Compartmentalization Project.
+//
+//===----------------------------------------------------------------------===//
+///
+/// \file
+/// This file contains the function analysis subclass class of common analysis.
+/// It contains specific functionality related to compartmentalization analysis
+/// at the function level.
+///
+//===----------------------------------------------------------------------===//
 // Created by de29664 on 3/21/23.
 //
 

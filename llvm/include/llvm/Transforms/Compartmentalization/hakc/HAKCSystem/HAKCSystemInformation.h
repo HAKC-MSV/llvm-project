@@ -1,3 +1,15 @@
+//===----------------------------------------------------------------------===//
+//
+// Part of the MIT Lincoln Laboratory HAKC Compartmentalization Project.
+//
+//===----------------------------------------------------------------------===//
+///
+/// \file
+/// This file contains all the configuration information that was parsed in
+/// yaml.h and performs some validation (e.g., checking if HAKC functions
+/// specified actually exist in the kernel)
+///
+//===----------------------------------------------------------------------===//
 //
 // Created by de29664 on 11/7/24.
 //

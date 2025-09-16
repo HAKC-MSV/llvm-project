@@ -1,3 +1,14 @@
+//===----------------------------------------------------------------------===//
+//
+// Part of the MIT Lincoln Laboratory HAKC Compartmentalization Project.
+//
+//===----------------------------------------------------------------------===//
+///
+/// \file
+/// This file contains Temporal Compartmentalization code related to
+/// 'compartments', also known as Epochs
+///
+//===----------------------------------------------------------------------===//
 //#ifndef HAKC_TICTACEPOCH_H
 //#define HAKC_TICTACEPOCH_H
 //

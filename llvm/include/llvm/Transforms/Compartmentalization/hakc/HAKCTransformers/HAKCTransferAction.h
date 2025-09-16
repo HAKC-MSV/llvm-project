@@ -1,3 +1,15 @@
+//===----------------------------------------------------------------------===//
+//
+// Part of the MIT Lincoln Laboratory HAKC Compartmentalization Project.
+//
+//===----------------------------------------------------------------------===//
+///
+/// \file
+/// This file contains the transfer action base class which inserts a transfer
+/// function which recolors the memory of a pointer, allowing the data to be
+/// accessed outside its current compartment.
+///
+//===----------------------------------------------------------------------===//
 //
 // Created by de29664 on 3/6/25.
 //

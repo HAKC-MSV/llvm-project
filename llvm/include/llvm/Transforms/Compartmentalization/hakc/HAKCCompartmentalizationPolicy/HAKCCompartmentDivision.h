@@ -1,3 +1,14 @@
+//===----------------------------------------------------------------------===//
+//
+// Part of the MIT Lincoln Laboratory HAKC Compartmentalization Project.
+//
+//===----------------------------------------------------------------------===//
+///
+/// \file
+/// This file contains the division, which is contained in a compartment, and
+/// tracks the division id, access token, and parent compartment.
+///
+//===----------------------------------------------------------------------===//
 //
 // Created by de29664 on 8/8/24.
 //

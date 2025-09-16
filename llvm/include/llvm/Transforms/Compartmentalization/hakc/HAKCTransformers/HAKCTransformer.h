@@ -1,3 +1,14 @@
+//===----------------------------------------------------------------------===//
+//
+// Part of the MIT Lincoln Laboratory HAKC Compartmentalization Project.
+//
+//===----------------------------------------------------------------------===//
+///
+/// \file
+/// This file contains the post target action class, e.g., what needs to be set
+/// after a transfer function is called.
+///
+//===----------------------------------------------------------------------===//
 //
 // Created by de29664 on 3/21/23.
 //

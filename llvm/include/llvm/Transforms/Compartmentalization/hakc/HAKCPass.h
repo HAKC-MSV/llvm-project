@@ -1,3 +1,14 @@
+//===----------------------------------------------------------------------===//
+//
+// Part of the MIT Lincoln Laboratory HAKC Compartmentalization Project.
+//
+//===----------------------------------------------------------------------===//
+///
+/// \file
+/// This file contains the top level declaration of the module level HAKC
+/// compartmentalization pass.
+///
+//===----------------------------------------------------------------------===//
 //
 // Created by derrick on 3/16/21.
 //

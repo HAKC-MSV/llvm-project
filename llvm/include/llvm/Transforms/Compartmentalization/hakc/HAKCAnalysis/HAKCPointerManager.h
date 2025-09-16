@@ -1,3 +1,15 @@
+//===----------------------------------------------------------------------===//
+//
+// Part of the MIT Lincoln Laboratory HAKC Compartmentalization Project.
+//
+//===----------------------------------------------------------------------===//
+///
+/// \file
+/// This file contains the base class that tracks pointers that are created
+/// during compartmentalization, e.g., a pointer that needs to be authenticated
+/// before allowing data to cross compartment boundaries
+///
+//===----------------------------------------------------------------------===//
 //
 // Created by de29664 on 11/14/23.
 //

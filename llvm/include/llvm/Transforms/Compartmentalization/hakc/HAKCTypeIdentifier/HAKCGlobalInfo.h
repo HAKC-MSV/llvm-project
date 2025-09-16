@@ -1,3 +1,14 @@
+//===----------------------------------------------------------------------===//
+//
+// Part of the MIT Lincoln Laboratory HAKC Compartmentalization Project.
+//
+//===----------------------------------------------------------------------===//
+///
+/// \file
+/// This file contains the information associated with a global variable that is
+/// being analyzed for compartmentalization
+///
+//===----------------------------------------------------------------------===//
 //
 // Created by de29664 on 5/2/23.
 //

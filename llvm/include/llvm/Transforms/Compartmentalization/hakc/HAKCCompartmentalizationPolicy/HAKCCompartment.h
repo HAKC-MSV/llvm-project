@@ -1,3 +1,14 @@
+//===----------------------------------------------------------------------===//
+//
+// Part of the MIT Lincoln Laboratory HAKC Compartmentalization Project.
+//
+//===----------------------------------------------------------------------===//
+///
+/// \file
+/// This file contains the compartment object which tracks the compartment id,
+/// entry token, and valid targets that can be called from this compartment.
+///
+//===----------------------------------------------------------------------===//
 //
 // Created by de29664 on 8/6/24.
 //
