@@ -604,7 +604,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
                 if self.has_edge(caller, callee, HAKCSymbol.relation_dag):
                     edge_weight = self.get_edge_data(caller, callee, HAKCSymbol.relation_dag)['weight']
                     if edge_weight > 0:
-                        valid_targets.add(self.get_symbol_compartment_id(callee))
+                        valid_targets.add(int(self.get_symbol_compartment_id(callee)))
         logger.debug(
             f"In get_valid_targets, compartment_id: {compartment_id}, valid targets: {sorted(list(valid_targets))}")
         return sorted(list(valid_targets))

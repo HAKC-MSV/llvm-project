@@ -62,7 +62,7 @@ json::Object* GetObject(json::Object* payload, StringRef key) {
   }
   auto obj = payload->getObject(key);
   if (!obj) {
-    CommonHAKCAnalysis::getLogger(Fatal) << "Unable to get " << key << " from payload!\n";
+    CommonHAKCAnalysis::getLogger(Fatal) << "Unable to get " << key << " object from payload!\n";
     throw std::exception();
   }
   CommonHAKCAnalysis::getLogger(Debug) << "Got " << key << " from payload!\n";

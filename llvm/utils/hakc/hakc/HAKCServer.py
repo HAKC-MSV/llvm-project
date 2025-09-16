@@ -178,7 +178,7 @@ class KUZUHAKCPolicyDataStore(HAKCPolicyDataSource):
         entry_token = self.conn.get_compartment_entry_token_from_id(compartment_id)
         if entry_token is None:
             return None
-        return HAKCCompartment(compartment_id, EntryToken=entry_token)
+        return HAKCCompartment(compartment_id, EntryToken=int(entry_token))
 
     def _get_division_from_backing_store(self, division_id: int, compartment_id: int) -> Optional[HAKCDivision]:
         logger.debug(f"Trying to get division {division_id} in compartment {compartment_id}")
@@ -310,4 +310,4 @@ class HAKCServer(socketserver.ThreadingUnixStreamServer):
     def init_mp_database(db_dir: str):
         global mp_conn
         mp_conn = HAKCDatabase(db_dir, read_only=True)
-        logger.debug(f"Created global connection to kuzu db")
+        # logger.debug(f"Created global connection to kuzu db")
