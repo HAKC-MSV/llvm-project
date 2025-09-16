@@ -319,9 +319,9 @@ def main():
 
             compartmentalization.close_conn()
 
-        end = time.time()
-        logger.info(f'Finished constructing DAG {compartmentalization}')
-        logger.info(f'    Total Time: {end - start} seconds')
+            end = time.time()
+            logger.info(f'Finished constructing DAG {compartmentalization}')
+            logger.info(f'    Total Time: {end - start} seconds')
 
     if args.profile:
         profile.disable()
