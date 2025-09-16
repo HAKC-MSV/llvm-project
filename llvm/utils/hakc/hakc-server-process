@@ -10,12 +10,11 @@ from pathlib import Path
 from typing import cast, Optional
 import cProfile
 import yaml
-import os
-
 import time
-from hakc.HAKCServer import HAKCServer, HAKCServerMode
+
 from hakc.HAKCCompartmentalization import HAKCCompartmentalization
 from hakc.HAKCLogger import LoggingLevelEnum, parse_log_level, setup_logging, HAKCLogger
+from hakc.HAKCServer import HAKCServer, HAKCServerMode
 from hakc.HAKCServerConfig import HAKCServerConfig, TimeoutException
 from hakc.HAKCDatabase import HAKCDatabase
 from hakc.HAKCObjects import HAKCDivision, HAKCCompartment
@@ -34,11 +33,13 @@ progress_bars_proc: Optional[mp.Process] = None
 def timeout_handler(signum, frame):
     raise TimeoutException
 
+
 def parse_server_mode(server_mode: str) -> HAKCServerMode:
     for mode in HAKCServerMode:
         if mode.name == server_mode.upper() or mode.name == server_mode.lower():
             return mode
     raise RuntimeError(f'Invalid server mode {server_mode}')
+
 
 def output_profile_stats(profile):
     s = io.StringIO()
@@ -259,19 +260,6 @@ def main():
 
     start = time.time()
 
-    # conn = HAKCDatabase(config.database_path)
-    # conn.print_stats()
-    # if config.analysis_config.adjustments_path:
-    #     HAKCCompartmentalization().adjust_compartmentalization(config.database_path, config.analysis_config.adjustments_path)
-    # conn.print_stats()
-    #
-    # conn.get_division(0,0)
-    #
-    # return
-    # c = HAKCCompartmentalization()
-    # divs = c.get_divisions()
-    # logger.error(f"Got divs: {divs}")
-    # c.create_dag_multithread_all_db(100, config.database_path)
     # Spawn mp manager to share resources amongst processes
     with mp.Manager() as manager:
 
