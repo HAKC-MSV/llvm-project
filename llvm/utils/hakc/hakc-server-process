@@ -277,7 +277,7 @@ def main():
         config = HAKCServerConfig(**parsed_config)
 
     analysis_mode = args.server_mode == HAKCServerMode.ANALYSIS
-    policy_mode = not analysis_mode
+    policy_mode = args.server_mode == HAKCServerMode.POLICY
     config.server_timeout = config.analysis_config.timeout if analysis_mode else config.policy_config.timeout
 
     root_logger = logging.getLogger()
