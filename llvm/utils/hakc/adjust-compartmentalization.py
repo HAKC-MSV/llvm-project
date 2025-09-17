@@ -37,7 +37,7 @@ def main():
 
     logger.info(f'Opening connection to {dest_dir}')
     compartmentalization.open_conn(dest_dir)
-    compartmentalization.adjust_compartmentalization(args.adjust_path, dest_dir)
+    compartmentalization.adjust_compartmentalization(dest_dir, args.adjust_path)
 
 
 if __name__ == "__main__":
