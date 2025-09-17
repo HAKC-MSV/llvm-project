@@ -1,22 +1,28 @@
 import logging
+import multiprocessing as mp
 from enum import Enum
 from pathlib import Path
-from typing import cast, Optional
-from .HAKCLogger import HAKCLogger, LoggingLevelEnum, parse_log_level
+from typing import cast
+
+from .HAKCLogger import HAKCLogger, parse_log_level
 
 logging.setLoggerClass(HAKCLogger)
 logger: HAKCLogger = cast(HAKCLogger, logging.getLogger('hakc-policy-server'))
 
+
 class TimeoutException(Exception):
     pass
 
+
 class TerminateConnectionException(Exception):
     pass
+
 
 class SupportedBackingStore(Enum):
     NULL = "null"
     YAML = "yaml"
     KUZU = "kuzu"
+
 
 class HAKCDataRequest:
     def __init__(self, Endpoint: str, **kwargs):
@@ -28,7 +34,8 @@ class HAKCDataRequest:
         # Note: be careful here because if there is an error or exception the thread will crash without any debug information
         if self.endpoint == 'terminate-connection':
             return 'Request to terminate-connection'
-        elif self.endpoint in ['get-compartment-by-id','get-division-by-id','get-division-from-symbol','get-valid-targets-from-compartment-id']:
+        elif self.endpoint in ['get-compartment-by-id', 'get-division-by-id', 'get-division-from-symbol',
+                               'get-valid-targets-from-compartment-id']:
             return f'Request query {self.endpoint} {self.parameters}'
         elif self.endpoint == 'add-symbols':
             out = f"Request to {self.endpoint} "
@@ -40,12 +47,14 @@ class HAKCDataRequest:
     def __repr__(self):
         return self.__str__()
 
+
 class HAKCAnalysisConfig:
     def __init__(self, **kwargs):
         analysis_config = kwargs_get_or_error('AnalysisConfig', **kwargs)
         self.adjustments_path = analysis_config.get('adjustments-path', None)
-        self.max_dag_processes = analysis_config.get('max-dag-processes', -1)
+        self.max_dag_processes = min(mp.cpu_count(), int(analysis_config.get('max-dag-processes', mp.cpu_count())))
         self.timeout = analysis_config.get('timeout', 100)
+
 
 class HAKCPolicyConfig:
     def __init__(self, **kwargs):
@@ -60,17 +69,19 @@ class HAKCPolicyConfig:
         self.default_access_token = policy_config.get("default_access_token", 5353)
         self.default_entry_token = policy_config.get("default_entry_token", 3535)
 
+
 class HAKCEndpoints:
     def __init__(self, **kwargs):
         endpoints = kwargs_get_or_error('Endpoints', **kwargs)
         self.get_compartment_endpoint = endpoints.get('get-compartment-by-id-endpoint', "get-compartment-by-id")
         self.get_division_endpoint = endpoints.get('get-division-by-id-endpoint', "get-division-by-id")
         self.get_division_from_symbol_endpoint = endpoints.get('get-division-from-symbol-endpoint',
-                                                            "get-division-from-symbol")
+                                                               "get-division-from-symbol")
         self.get_valid_targets_from_compartment_id_endpoint = endpoints.get(
             'get-valid-targets-from-compartment-id-endpoint', "get-valid-targets-from-compartment-id")
         self.add_symbols_endpoint = endpoints.get('add-symbols-endpoint', "add-symbols")
         self.terminate_connection_endpoint = endpoints.get('terminate-connection-endpoint', "terminate-connection")
+
 
 class HAKCServerConfig:
     def __init__(self, **kwargs):
@@ -81,7 +92,8 @@ class HAKCServerConfig:
         self.reuse_path = kwargs.get('reuse-path', True)
 
         self.test_mode = kwargs.get('test-mode', False)
-        self.max_server_processes = kwargs.get('max-server-processes', -1)
+        self.max_server_processes = min(mp.cpu_count(), int(kwargs.get('max-server-processes', mp.cpu_count())))
+
         self.log_path = kwargs.get('log-path', None)
         self.log_level = parse_log_level(kwargs.get('log-level', 'INFO'))
 
@@ -100,6 +112,7 @@ class HAKCServerConfig:
         if not self.test_mode and self.database_path == "":
             raise RuntimeError(f"Server is not in test mode, but database path is missing")
 
+
 def kwargs_get(cls, name: str, default: any = None, **kwargs):
     # Function to retrieve and validate function parameter
     assert (isinstance(name, str))
@@ -114,6 +127,7 @@ def kwargs_get(cls, name: str, default: any = None, **kwargs):
         return val_or_default
     except Exception:
         raise Exception(f"Failed to get parameter {name} of type {cls} from {kwargs}")
+
 
 def kwargs_get_or_error(key, **kwargs):
     val = kwargs.get(key, None)

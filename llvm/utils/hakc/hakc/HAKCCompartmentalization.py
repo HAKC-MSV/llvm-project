@@ -3,7 +3,6 @@ import logging
 import os
 import re
 import shutil
-import time
 from typing import Type, Optional, Union, Hashable, Tuple
 from typing import cast
 
@@ -254,7 +253,8 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         division_id = HAKCCompartmentalization.default_division
         # first construct all the compartments and divisions
 
-        for symbol in logger.progress_bar(iterable=list(self.get_symbols()), desc='Adding default compartmentalization'):
+        for symbol in logger.progress_bar(iterable=list(self.get_symbols()),
+                                          desc='Adding default compartmentalization'):
             # TODO: update; setting some default value for now, will update with Derrick (current implementation is probably logically incorrect)
             compartment = HAKCCompartment(compartment_id, EntryToken=self.compute_entry_token(compartment_id))
             division = HAKCDivision(division_id, AccessToken=self.compute_access_token(division_id, compartment_id))
@@ -269,14 +269,16 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             self.open_conn(db_dir)
             self.persist_to_database(self.conn, create_schema=create_schema)
 
-    def add_default_compartmentalization_only_db(self, db_dir: Optional[str] = None, create_schema: bool = False) -> None:
+    def add_default_compartmentalization_only_db(self, db_dir: Optional[str] = None,
+                                                 create_schema: bool = False) -> None:
         # TODO: add check that create_schema is always false if conn is none
         logger.debug(f'Adding Default Compartmentalization using only db ')
         compartment_id = HAKCCompartmentalization.no_enforcement_compartment_id + 1
         division_id = HAKCCompartmentalization.default_division
         # first construct all the compartments and divisions
 
-        for symbol in logger.progress_bar(iterable=list(self.conn.get_symbols()), desc='Adding default compartmentalization only db'):
+        for symbol in logger.progress_bar(iterable=list(self.conn.get_symbols()),
+                                          desc='Adding default compartmentalization only db'):
             # TODO: update; setting some default value for now, will update with Derrick (current implementation is probably logically incorrect)
             compartment = HAKCCompartment(compartment_id, EntryToken=self.compute_entry_token(compartment_id))
             division = HAKCDivision(division_id, AccessToken=self.compute_access_token(division_id, compartment_id))
@@ -511,6 +513,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
     def get_symbols(self) -> 'NodeView[Union[HAKCFunction, HAKCGlobalVariable, Hashable]]':
         return self.get_filtered_nodes(self, node_filter=lambda n: isinstance(n, HAKCFunction) or isinstance(n,
                                                                                                              HAKCGlobalVariable))
+
     def get_scopes(self) -> 'NodeView[HAKCScope | Hashable]':
         return self.get_filtered_nodes(self, node_filter=lambda n: isinstance(n, HAKCScope))
 
