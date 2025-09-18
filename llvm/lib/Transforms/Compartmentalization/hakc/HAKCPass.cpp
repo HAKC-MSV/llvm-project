@@ -24,8 +24,8 @@ std::string HAKC_CONFIG_PATH;
 // std::string HAKC_CONFIG_PATH;
 
 static cl::opt<std::string, true>
-    HAKC_CONFIG_CL("hakc-config", cl::desc("Path to HAKC Configuration File"),
-                   cl::location(HAKC_CONFIG_PATH), cl::Optional);
+HAKC_CONFIG_CL("hakc-config", cl::desc("Path to HAKC Configuration File"),
+               cl::location(HAKC_CONFIG_PATH), cl::Optional);
 using namespace llvm::hakc;
 
 namespace llvm {
@@ -85,9 +85,6 @@ static bool runDataAccessGraphAnalysis(CommonHAKCAnalysis &HAKCAnalysis) {
   }
 
   HAKCModuleAnalysis ModuleAnalysis(HAKCAnalysis);
-  if (HAKCAnalysis.GetSystemInfo().GetTemporalAnalysisEnabled()) {
-    ModuleAnalysis.TemporalAnalysis();
-  }
   auto TypeIdentifier = ModuleAnalysis.GetTypeIdentifier();
   auto FunctionCount = TypeIdentifier.GetFunctions().size() +
                        TypeIdentifier.GetUnmappedFunctions().size();
@@ -101,10 +98,6 @@ static bool runDataAccessGraphAnalysis(CommonHAKCAnalysis &HAKCAnalysis) {
     CommonHAKCAnalysis::getLogger(Info)
         << "Skipping file " << M.getSourceFileName() << "with 0 symbols\n";
   }
-  // } else {
-  //   CommonHAKCAnalysis::getLogger(Fatal) << "Failed to open " << Path <<
-  //   "\n"; throw std::exception();
-  // }
   return false;
 }
 
@@ -150,7 +143,8 @@ static bool RunHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM) {
 } // namespace hakc
 
 PreservedAnalyses HAKCPass::run(Module &M, ModuleAnalysisManager &MAM) {
-  return RunHAKCAnalysis(M, MAM) ? PreservedAnalyses::none()
-                                 : PreservedAnalyses::all();
+  return RunHAKCAnalysis(M, MAM)
+           ? PreservedAnalyses::none()
+           : PreservedAnalyses::all();
 }
 } // namespace llvm
