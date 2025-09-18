@@ -38,7 +38,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
     def __init__(self, max_division_count: Optional[int] = 16, G: Optional[nx.MultiDiGraph] = None):
         yaml.YAMLObject.__init__(self)
         nx.MultiDiGraph.__init__(self)
-        self.conn = None
+        self.db = None
         if G:
             self.load_from_yaml(G)
         self.max_division_count = max_division_count
@@ -265,9 +265,9 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
 
         if db_dir:
             # trying to close and reopen database
-            self.conn.close()
+            self.db.close()
             self.open_conn(db_dir)
-            self.persist_to_database(self.conn, create_schema=create_schema)
+            self.persist_to_database(self.db, create_schema=create_schema)
 
     def add_default_compartmentalization_only_db(self, db_dir: Optional[str] = None,
                                                  create_schema: bool = False) -> None:
@@ -277,7 +277,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         division_id = HAKCCompartmentalization.default_division
         # first construct all the compartments and divisions
 
-        for symbol in logger.progress_bar(iterable=list(self.conn.get_symbols()),
+        for symbol in logger.progress_bar(iterable=list(self.db.get_symbols()),
                                           desc='Adding default compartmentalization only db'):
             # TODO: update; setting some default value for now, will update with Derrick (current implementation is probably logically incorrect)
             compartment = HAKCCompartment(compartment_id, EntryToken=self.compute_entry_token(compartment_id))
@@ -288,7 +288,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             compartment_id += 1
 
         if db_dir:
-            self.persist_to_database(self.conn, create_schema=create_schema)
+            self.persist_to_database(self.db, create_schema=create_schema)
 
     def create_dag_multithread(self, core_count: int, db_dir: str):
         symbol_hashes = self.get_symbol_hashes()
@@ -336,14 +336,14 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
                     raise ki
         self.open_conn(db_dir)
         logger.debug(f'Adding {dag_edges_added} DAG edges {self}')
-        self.conn.persist_dag_edges(dag_edges)
+        self.db.persist_dag_edges(dag_edges)
         return self
 
     def create_dag(self, core_count: int, db_dir: str):
         core_count = max(1, core_count)
         logger.debug(f'Starting DAG construction from {self} with {core_count} cores')
         self.create_dag_multithread(core_count, db_dir)
-        self.conn.print_stats()
+        self.db.print_stats()
 
     def adjust_compartmentalization(self, db_dir: str, adjust_path: str):
         adjustment = None
@@ -353,13 +353,17 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             except Exception as e:
                 raise RuntimeError(f"Unable to load adjustments {adjust_path} with error: {e}")
 
-        logger.debug(f'Adjusting compartmentalization based on {adjust_path}')
-        self.conn = self.conn if self.conn else HAKCDatabase(db_dir)
-
         logger.info(f'Adjusting compartmentalization based on {adjust_path}')
 
-        symbols = self.conn.get_symbols()
-        assert len(symbols) != 0, f"No symbols were returned from database!"
+        # NB: We cannot remove the entries from the database yet, since we might need to get that information later
+        compartments_and_divisions = [n for n in self.get_filtered_nodes(self, node_filter=lambda n: isinstance(n,
+                                                                                                                HAKCDivision) or isinstance(
+            n, HAKCCompartment))]
+        logger.info(f'Removing {len(compartments_and_divisions)} compartments and divisions from compartmentalization')
+        self.remove_nodes_from(compartments_and_divisions)
+
+        symbol_count = len(self.db.get_all_symbol_hashes())
+        assert symbol_count != 0, f"No symbols were returned from database!"
         nec_division = None
         no_enforcement_compartment = None
         if adjustment.add_no_enforcement_compartment:
@@ -367,40 +371,43 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             no_enforcement_compartment = HAKCCompartment(HAKCCompartmentalization.no_enforcement_compartment_id)
             self.add_division(nec_division, no_enforcement_compartment)
 
-        for symbol in logger.progress_bar(iterable=symbols, desc='Adjusting Compartmentalization'):
-            adjustments = adjustment.get_adjusted_division_and_compartment(
-                symbol.definition_location.defining_file if symbol.definition_location else None)
-            adjusted_division = None
-            adjusted_compartment = None
-            if adjustments is None:
-                if adjustment.add_no_enforcement_compartment:
-                    adjusted_division = nec_division
-                    adjusted_compartment = no_enforcement_compartment
+        with logger.progress_bar(total=symbol_count, desc='Adjusting Compartmentalization') as pbar:
+            for symbol in self.db.get_symbol_generator():
+                pbar.update(1)
+                adjustments = adjustment.get_adjusted_division_and_compartment(
+                    symbol.definition_location.defining_file if symbol.definition_location else None)
+                adjusted_division = None
+                adjusted_compartment = None
+                if adjustments is None:
+                    if adjustment.add_no_enforcement_compartment:
+                        adjusted_division = nec_division
+                        adjusted_compartment = no_enforcement_compartment
+                    else:
+                        adjustments = self.db.get_division_id_compartment_id_from_symbol(symbol)
+                        if adjustments is None:
+                            logger.error(f'Could not find original division for {symbol}')
+                            continue
+
+                if adjustments is not None:
+                    adjusted_division, adjusted_compartment = adjustments
+
+                if adjusted_division is not None:
+                    if adjusted_division != nec_division:
+                        logger.info(f'{symbol} is moving to {adjusted_division}')
+                    else:
+                        logger.debug(f'{symbol} is moving to NEC {adjusted_division}')
+                    self.add_symbol(symbol, already_persisted=True)
+                    self.set_symbol_division_by_object(symbol, adjusted_division, adjusted_compartment)
                 else:
-                    adjustments = self.conn.get_division_id_compartment_id_from_symbol(symbol)
-                    if adjustments is None:
-                        logger.error(f'Could not find original division for {symbol}')
-                        continue
+                    logger.info(f'{symbol} is unchanged')
 
-            if adjustments is not None:
-                adjusted_division, adjusted_compartment = adjustments
-
-            if adjusted_division is not None:
-                if adjusted_division != nec_division:
-                    logger.info(f'{symbol} is moving to {adjusted_division}')
-                else:
-                    logger.debug(f'{symbol} is moving to NEC {adjusted_division}')
-                self.add_symbol(symbol, already_persisted=True)
-                self.set_symbol_division_by_object(symbol, adjusted_division, adjusted_compartment)
-            else:
-                logger.info(f'{symbol} is unchanged')
-
-        logger.info(f'Removing existing compartments')
-        self.conn.delete_all_compartments()
-        self.persist_to_database(self.conn)
+        logger.info(
+            f'Removing {len(self.db.get_all_divisions())} existing divisions and {len(self.db.get_all_compartments())} compartments from database')
+        self.db.delete_all_compartments()
+        self.persist_to_database(self.db)
         logger.info(f'Done adjusting compartmentalization')
         logger.info(
-            f'Compartmentalization now has {len(self.conn.get_all_divisions())} divisions across {len(self.conn.get_all_compartments())} compartments')
+            f'Compartmentalization now has {len(self.db.get_all_divisions())} divisions across {len(self.db.get_all_compartments())} compartments')
 
     def compute_entry_token(self, compartment_id: int, divisions=None) -> int:
         if divisions is None:
@@ -477,6 +484,8 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         self.set_symbol_division_by_object(symbol, division, compartment)
 
     def add_division(self, division: HAKCDivision, compartment: HAKCCompartment) -> None:
+        self.__add_persistent_node(division)
+        self.__add_persistent_node(compartment)
         self.__add_persistent_edge(division, compartment, key=HAKCDivision.relation_compartment)
 
     def set_symbol_division_by_object(self, symbol: HAKCSymbol, division: HAKCDivision,
@@ -680,7 +689,6 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         logger.info('Persisting new edges to database')
         self._persist_edges(conn)
         logger.info(f"Finished persisting nodes and edges to database")
-        self.conn.print_stats()
 
     @staticmethod
     def create_schema(conn: HAKCDatabase) -> None:
@@ -701,20 +709,20 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
                 shutil.rmtree(db_dir)
 
     def open_conn(self, db_dir: str, max_num_threads: int = 1):
-        self.conn = HAKCDatabase(db_dir, max_num_threads=max_num_threads)
+        self.db = HAKCDatabase(db_dir, max_num_threads=max_num_threads)
 
     def close_conn(self):
-        if self.conn:
-            self.conn.close()
-        self.conn = None
+        if self.db:
+            self.db.close()
+        self.db = None
 
     def create_new_db(self, db_dir: str):
         logger.debug("Creating new database")
         # Note: expecting users to close the connection manually
         self.open_conn(db_dir)
         logger.debug(f"Creating schema")
-        self.persist_to_database(self.conn, create_schema=True)
-        logger.info(f"Created new database with {len(self.conn.get_all_symbol_hashes())} symbols")
+        self.persist_to_database(self.db, create_schema=True)
+        logger.info(f"Created new database with {len(self.db.get_all_symbol_hashes())} symbols")
 
     def get_symbol_hashes(self) -> dict[int, HAKCSymbol]:
         symbol_hashes = dict()

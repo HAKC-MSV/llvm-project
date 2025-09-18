@@ -2,6 +2,7 @@ import logging
 import math
 import multiprocessing as mp
 import threading
+import typing
 from typing import Type, Optional, Tuple, cast
 
 import kuzu
@@ -166,17 +167,17 @@ class HAKCDatabase:
         return stmt.replace(' ', '') + str(tuple(sorted(kwargs.items())))
 
     def execute(self, prepared_stmt: str, enable_cache=True, **kwargs):
-        # adding query level caching (essentially a wrapper for conn.execute)
-        if enable_cache:
-            key = HAKCDatabase.create_query_key(prepared_stmt, **kwargs)
-            found = self.get_query_cache(key)
-            if found is not None:
-                # logger.info(f"Cache hit  with hit rate {hit_rate}% ({cache_hits}/{cache_hits+cache_misses})\t[Database level cache]")
-                return found
-            value = self.execute_prepared_stmt(prepared_stmt, **kwargs).get_as_df()
-            self.set_query_cache(key, value)
-            # logger.info(f"Cache miss with hit rate {hit_rate}% ({cache_hits}/{cache_hits+cache_misses})\t[Database level cache]")
-            return value
+        # # adding query level caching (essentially a wrapper for conn.execute)
+        # if enable_cache:
+        #     key = HAKCDatabase.create_query_key(prepared_stmt, **kwargs)
+        #     found = self.get_query_cache(key)
+        #     if found is not None:
+        #         # logger.info(f"Cache hit  with hit rate {hit_rate}% ({cache_hits}/{cache_hits+cache_misses})\t[Database level cache]")
+        #         return found
+        #     value = self.execute_prepared_stmt(prepared_stmt, **kwargs).get_as_df()
+        #     self.set_query_cache(key, value)
+        #     # logger.info(f"Cache miss with hit rate {hit_rate}% ({cache_hits}/{cache_hits+cache_misses})\t[Database level cache]")
+        #     return value
         return self.execute_prepared_stmt(prepared_stmt, **kwargs).get_as_df()
 
     def get_compartment_entry_token_from_id(self, compartment_id: int) -> Optional[int]:
@@ -292,8 +293,13 @@ class HAKCDatabase:
 
     def delete_all_compartments(self):
         cmd = f"""
-        MATCH (div:{HAKCDivision.get_table_name()})-[:{HAKCDivision.relation_compartment}]->(c:{HAKCCompartment.get_table_name()})
-        DETACH DELETE div, c;
+        MATCH (c:{HAKCCompartment.get_table_name()})
+        DETACH DELETE c;
+        """
+        self.execute(cmd, enable_cache=False)
+        cmd = f"""
+        MATCH (d:{HAKCDivision.get_table_name()})
+        DETACH DELETE d;
         """
         self.execute(cmd, enable_cache=False)
 
@@ -304,7 +310,7 @@ class HAKCDatabase:
         """
         # use list instead of set because we allow for duplicates
         divisions = set()
-        for _, entry in self.execute(cmd).iterrows():
+        for _, entry in self.execute(cmd, enable_cache=False).iterrows():
             divisions.add(HAKCDatabase.__create_object_from_df(HAKCDivision, entry))
         return divisions
 
@@ -314,7 +320,7 @@ class HAKCDatabase:
         RETURN DISTINCT {HAKCCompartment.get_table_name()}.CompartmentID as CompartmentID;
         """
         compartments = set()
-        for _, entry in self.execute(cmd).iterrows():
+        for _, entry in self.execute(cmd, enable_cache=False).iterrows():
             compartments.add(HAKCCompartment(CompartmentID=entry['CompartmentID']))
         return compartments
 
@@ -469,7 +475,10 @@ class HAKCDatabase:
                 data['HAKCCompartment.EntryToken'] if 'HAKCCompartment.EntryToken' in data else 0))
         raise RuntimeError(f"Trying to create invalid HAKC class from response: {cls} with data {data}")
 
-    def get_symbols(self):
+    def get_symbols(self) -> set[HAKCSymbol]:
+        return set(self._get_symbols())
+
+    def get_symbol_generator(self) -> typing.Iterator[HAKCSymbol]:
         return self._get_symbols()
 
     def create_node_table(self, node_type: Type[HAKCDBNode]):
@@ -528,8 +537,9 @@ class HAKCDatabase:
         return ", ".join([f"{cls.get_table_name()}.{x.column_name}" for x in cls.get_data_columns()] + [
             f"{cls.get_table_name()}.{cls.get_primary_key()}"])
 
-    def _get_symbols(self, symbol_name: str = None, symbol_hash: int = None, where: str = None, deep=False) -> set[
-        HAKCSymbol]:
+    def _get_symbols(self, symbol_name: str = None, symbol_hash: int = None, where: str = None, deep=False) -> \
+            typing.Iterator[
+                HAKCSymbol]:
         # want to reconstruct the output from the yaml exactly, so the compartmentalization can be rebuilt from the database
         type_attrs = HAKCDatabase.get_object_attributes(HAKCType)
         scope_attrs = HAKCDatabase.get_object_attributes(HAKCScope)
@@ -547,29 +557,24 @@ class HAKCDatabase:
             cmdargs['symbol_name'] = symbol_name
         if symbol_hash:
             cmdargs['symbol_hash'] = symbol_hash
-        functions = set()
-        gvs = set()
         for _, entry in self.execute(cmd, **cmdargs).iterrows():
             if entry["HAKCSymbol.IsFunction"] is True:
-                functions.add(HAKCDatabase.__create_object_from_df(HAKCFunction, entry))
+                symbol = HAKCDatabase.__create_object_from_df(HAKCFunction, entry)
+                # the 'base' HAKCSymbol is now created, now look for all symbols used, direct calls, indirect calls, types used
+                # Note: Speeding up performance by only doing a 'shallow' query of the direct calls, since we only need to know enough to create the symbol hash
+                if deep:
+                    for used_symbol in self.get_used_symbols(symbol):
+                        symbol.used_symbols.append(used_symbol)
+
+                    for direct_call in self.get_direct_calls(symbol):
+                        symbol.direct_calls.append(direct_call)
+
+                    for indirect_call in self.get_indirect_calls(symbol):
+                        symbol.indirect_calls.append(indirect_call)
             else:
-                gvs.add(HAKCDatabase.__create_object_from_df(HAKCGlobalVariable, entry))
+                symbol = HAKCDatabase.__create_object_from_df(HAKCGlobalVariable, entry)
 
-        # the 'base' HAKCSymbol is now created, now look for all symbols used, direct calls, indirect calls, types used
-        # Note: Speeding up performance by only doing a 'shallow' query of the direct calls, since we only need to know enough to create the symbol hash
-        if deep:
-            for func in functions:
-                for used_symbol in self.get_used_symbols(func):
-                    func.used_symbols.append(used_symbol)
-
-                for direct_call in self.get_direct_calls(func):
-                    func.direct_calls.append(direct_call)
-
-                for indirect_call in self.get_indirect_calls(func):
-                    func.indirect_calls.append(indirect_call)
-
-        symbols = functions.union(gvs)
-        return symbols
+            yield symbol
 
     def get_symbol_hash(self, Name, DefiningFile, DefiningLine):
         cmd = f"""
