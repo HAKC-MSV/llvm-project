@@ -50,6 +50,13 @@ def output_profile_stats(profile):
 
 
 def launch_global_reduce_proc(comp, local_reduce_done, global_reduce_bucket):
+    """
+    launch process to merge all compartmentalization subgraphs into one final compartmentaliation
+    :param comp:
+    :param local_reduce_done:
+    :param global_reduce_bucket:
+    :return:
+    """
     # import traceback
     logger.debug(f"Spinning up global reduce process!")
     compartmentalization = HAKCCompartmentalization()
@@ -79,6 +86,14 @@ def launch_global_reduce_proc(comp, local_reduce_done, global_reduce_bucket):
 
 
 def launch_reduce_proc(reduce_id: int, server_gather_buckets, local_reduce_procs_completed, global_reduce_bucket):
+    """
+    launch process to consume all symbols sent from client and produce a compartmentalization subgraph
+    :param reduce_id:
+    :param server_gather_buckets:
+    :param local_reduce_procs_completed:
+    :param global_reduce_bucket:
+    :return:
+    """
     logger.debug(f"Spinning up reduce process {reduce_id}!")
     local_reduce_compartmentalization = HAKCCompartmentalization()
 
@@ -111,6 +126,16 @@ def launch_reduce_proc(reduce_id: int, server_gather_buckets, local_reduce_procs
 
 def launch_server_gather_proc(server_id: int, config: HAKCServerConfig, server_mode: HAKCServerMode,
                               ServerMainLogger: logger, server_gather_buckets, server_gather_procs_completed: mp.Value):
+    """
+    launch server gather process which gathers all symbols received from server threads and adds it to a queue
+    :param server_id:
+    :param config:
+    :param server_mode:
+    :param ServerMainLogger:
+    :param server_gather_buckets:
+    :param server_gather_procs_completed:
+    :return:
+    """
     config.socket_path = Path(os.path.join(config.socket_path, str(server_id)))
     logger.debug(f"Spinning up server gather process {server_id}!")
     if config.reuse_path and config.socket_path.exists():
@@ -133,6 +158,14 @@ def launch_server_gather_proc(server_id: int, config: HAKCServerConfig, server_m
 
 
 def launch_server_proc(server_id: int, config: HAKCServerConfig, server_mode: HAKCServerMode, ServerMainLogger: logger):
+    """
+    launch server process which handles multiple client threads and replies with endpoint response
+    :param server_id:
+    :param config:
+    :param server_mode:
+    :param ServerMainLogger:
+    :return:
+    """
     config.socket_path = Path(os.path.join(config.socket_path, str(server_id)))
     logger.debug(f"Spinning up server process {server_id}!")
     if config.reuse_path and config.socket_path.exists():
@@ -153,6 +186,10 @@ def launch_server_proc(server_id: int, config: HAKCServerConfig, server_mode: HA
 
 
 def cleanup_processes():
+    """
+    kill all processes that have been created (using pkill with string match because tracking and killing processes created seems to cause a bunch of exceptions to print.
+    :return:
+    """
     import subprocess
     subprocess.run(['pkill', '-f', 'hakc-server-process'])
 
