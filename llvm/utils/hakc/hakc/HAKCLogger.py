@@ -14,12 +14,20 @@ class LoggingLevelEnum(Enum):
 
 
 def parse_log_level(level_string: str) -> LoggingLevelEnum:
+    """
+    parse string into LoggingLevelEnum
+    :param level_string:
+    :return: LoggingLevelEnum
+    """
     for level in LoggingLevelEnum:
         if level.name == level_string.upper():
             return level
     raise RuntimeError(f'Invalid log level {level_string}')
 
 class HAKCLogger(logging.Logger):
+    """
+    Custom HAKC logging.Logger
+    """
     log_fmt = "%(asctime)s [%(processName)s, %(threadName)-10.10s] [%(levelname)-3.3s]%(message)s"
 
     @staticmethod
