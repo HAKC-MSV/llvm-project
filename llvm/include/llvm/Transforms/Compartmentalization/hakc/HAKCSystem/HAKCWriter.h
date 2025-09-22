@@ -1,3 +1,14 @@
+//===----------------------------------------------------------------------===//
+//
+// Part of the MIT Lincoln Laboratory HAKC Compartmentalization Project.
+//
+//===----------------------------------------------------------------------===//
+///
+/// \file
+/// This file contains the HAKC Writer, which is a class that can print to either
+/// the console or a specified file.
+///
+//===----------------------------------------------------------------------===//
 //
 // Created by de29664 on 12/5/24.
 //

@@ -62,7 +62,7 @@ json::Object* GetObject(json::Object* payload, StringRef key) {
   }
   auto obj = payload->getObject(key);
   if (!obj) {
-    CommonHAKCAnalysis::getLogger(Fatal) << "Unable to get " << key << " from payload!\n";
+    CommonHAKCAnalysis::getLogger(Fatal) << "Unable to get " << key << " object from payload!\n";
     throw std::exception();
   }
   CommonHAKCAnalysis::getLogger(Debug) << "Got " << key << " from payload!\n";
@@ -157,8 +157,7 @@ void HAKCDatabaseResponse::parse_result(json::Object *_result) {
   } else if (response_endpoint == database_information.GetValidTargetsEndpoint()) {
     auto payload = GetObject(_result, "Data");
     result.data = std::make_shared<HAKCValidTargetsPayload>(payload);
-  } else if (response_endpoint == database_information.GetSetDagFilenameEndpoint() ||
-             response_endpoint == database_information.GetAddSymbolsEndpoint() ||
+  } else if (response_endpoint == database_information.GetAddSymbolsEndpoint() ||
              response_endpoint == database_information.GetAddFunctionEndpoint() ||
              response_endpoint == database_information.GetAddGlobalVariableEndpoint()) {
     // These requests don't have a 'Data' field to extract, so just pass the result

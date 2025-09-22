@@ -2,8 +2,8 @@
 // Created by de29664 on 7/29/24.
 //
 
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCDatabase/HAKCServerClient.h"
+#include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/CommonHAKCAnalysis.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/HAKCModuleAnalysis.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCSystemInformation.h"
@@ -11,24 +11,22 @@
 
 namespace llvm::hakc {
 
-HAKCServerClient::HAKCServerClient(
-    HAKCSystemInformation &SystemInformation)
-    : SystemInformation(SystemInformation), Compartments(), Divisions(), Client(SystemInformation.GetDatabaseInformation(), false), SymbolDivisionMap() {
-	ConnectToDatabase();
+HAKCServerClient::HAKCServerClient(HAKCModuleAnalysis &ModuleAnalysis)
+    : ModuleAnalysis(ModuleAnalysis),
+      SystemInformation(ModuleAnalysis.GetCommonAnalysis().GetSystemInfo()),
+      DatabaseInformation(SystemInformation.GetDatabaseInformation()),
+      Compartments(), Divisions(), Client(DatabaseInformation, false),
+      SymbolDivisionMap() {
+  ConnectToDatabase();
 }
 
-HAKCServerClient::~HAKCServerClient() {
-  DisconnectFromDatabase();
-}
+HAKCServerClient::~HAKCServerClient() { DisconnectFromDatabase(); }
 
-void HAKCServerClient::DisconnectFromDatabase() {
-  Client.close();
-}
+void HAKCServerClient::DisconnectFromDatabase() { Client.close(); }
 
 void HAKCServerClient::ConnectToDatabase() {
   CommonHAKCAnalysis::getLogger(Verbose)
-      << "Connecting to "
-      << SystemInformation.GetDatabaseInformation().GetServerURL() << "\n";
+      << "Connecting to " << DatabaseInformation.GetServerURL() << "\n";
   Client.connect();
 }
 
@@ -42,14 +40,13 @@ void HAKCServerClient::CheckConnection() const {
 void HAKCServerClient::SendTerminateConnection() const {
   CheckConnection();
   json::Object Parameters({{"CLIENT TERMINATING CONNECTION", true}});
-  HAKCDatabaseRequest Request(SystemInformation.GetDatabaseInformation().GetTerminateConnectionEndpoint(), Parameters);
+  HAKCDatabaseRequest Request(
+      DatabaseInformation.GetTerminateConnectionEndpoint(), Parameters);
   Client.SendTerminateConnection(Request);
 }
 
-
-HAKCResult
-HAKCServerClient::Execute(StringRef Endpoint,
-                                        json::Object &Parameters) {
+HAKCResult HAKCServerClient::Execute(StringRef Endpoint,
+                                     json::Object &Parameters) {
   CheckConnection();
   HAKCDatabaseRequest Request(Endpoint, Parameters);
   HAKCDatabaseResponse Response = Client.HandleRequest(Request);
@@ -58,36 +55,29 @@ HAKCServerClient::Execute(StringRef Endpoint,
         << "Error Handling Request to " << Endpoint << "\n";
     throw std::exception();
   }
-  if ( Response.ShouldTerminateConnection() ) {
+  if (Response.ShouldTerminateConnection()) {
     DisconnectFromDatabase();
   }
 
   return Response.GetResult();
 }
 
-void HAKCServerClient::set_dag_filename(StringRef filename) {
-  json::Object Parameters({{"dag-filename", filename}});
-  auto result = Execute(
-      SystemInformation.GetDatabaseInformation().GetSetDagFilenameEndpoint(),
-      Parameters);
-  if (!result.success) {
-    CommonHAKCAnalysis::getLogger(Fatal) << "Invalid Response for set_dag_filename with error: " << result.error << "\n";
-    throw std::exception();
-  }
-}
-
-void HAKCServerClient::add_symbols(ArrayRef<std::shared_ptr<HAKCFunctionInfo>> FIs, ArrayRef<std::shared_ptr<HAKCGlobalInfo>> GIs) {
-  CommonHAKCAnalysis::getLogger(Debug) << "Sending add-symbols with " << FIs.size() << " functions and " << GIs.size() << " global variables\n";
+void HAKCServerClient::add_symbols(
+    ArrayRef<std::shared_ptr<HAKCFunctionInfo>> FIs,
+    ArrayRef<std::shared_ptr<HAKCGlobalInfo>> GIs) {
+  CommonHAKCAnalysis::getLogger(Debug)
+      << "Sending add-symbols with " << FIs.size() << " functions and "
+      << GIs.size() << " global variables\n";
 
   std::vector<std::string> AllSymbols;
 
-  for (auto &it: FIs) {
+  for (auto &it : FIs) {
     std::string ObjectYaml;
     raw_string_ostream os(ObjectYaml);
     os << it->GetYaml(0);
     AllSymbols.push_back(ObjectYaml);
   }
-  for (auto &it: GIs) {
+  for (auto &it : GIs) {
     std::string ObjectYaml;
     raw_string_ostream os(ObjectYaml);
     os << it->GetYaml(0);
@@ -96,53 +86,21 @@ void HAKCServerClient::add_symbols(ArrayRef<std::shared_ptr<HAKCFunctionInfo>> F
 
   json::Object Parameters({{"allSymbols", AllSymbols}});
 
-  auto result = Execute(
-  SystemInformation.GetDatabaseInformation().GetAddSymbolsEndpoint(), Parameters);
+  auto result =
+      Execute(DatabaseInformation.GetAddSymbolsEndpoint(), Parameters);
   if (!result.success) {
     CommonHAKCAnalysis::getLogger(Fatal) << "Invalid Response for AllSymbols\n";
     throw std::exception();
   }
 }
 
-void HAKCServerClient::add_function(const HAKCFunctionInfo &FI) {
-  CommonHAKCAnalysis::getLogger(Debug) << "Sending add-function: " << FI.GetFunction()->getName() << " of type " << FI.GetFunction()->getFunctionType() << "\n";
-  std::string ObjectYaml;
-  raw_string_ostream os(ObjectYaml);
-  os << FI.GetYaml(0);
-  json::Object Parameters({{"object", ObjectYaml}});
+void HAKCServerClient::SendSymbolsToAnalysisServer(
+    HAKCTypeIdentifier &TypeIdentifier) {
+  CommonHAKCAnalysis::getLogger(Debug)
+      << "Starting to send symbols to analysis server\n";
 
-  auto result = Execute(
-      SystemInformation.GetDatabaseInformation().GetAddFunctionEndpoint(),
-      Parameters);
-  if (!result.success) {
-    CommonHAKCAnalysis::getLogger(Fatal)<< "Invalid Response for " << *FI.GetFunction() << " with error: " << result.error << "\n";
-    throw std::exception();
-  }
-}
-
-void HAKCServerClient::add_global_variable(const HAKCGlobalInfo &GI) {
-	CommonHAKCAnalysis::getLogger(Debug) << "Sending add-global-variable: " << GI.GetGlobalVariable()->getName()  << " of type " << GI.GetGlobalVariable()->getType()  << "\n";
-  std::string ObjectYaml;
-  raw_string_ostream os(ObjectYaml);
-  os << GI.GetYaml(0);
-  json::Object Parameters({{"object", ObjectYaml}});
-
-  auto result = Execute(
-      SystemInformation.GetDatabaseInformation().GetAddGlobalVariableEndpoint(),
-      Parameters);
-  if (!result.success) {
-    CommonHAKCAnalysis::getLogger(Fatal)<< "Invalid Response for " << *GI.GetGlobalVariable() << " with error: " << result.error << "\n";
-    throw std::exception();
-  }
-}
-
-void HAKCServerClient::SendSymbolsToAnalysisServer(HAKCModuleAnalysis &ModuleAnalysis, StringRef filename)  {
-
-  CommonHAKCAnalysis::getLogger(Debug) << "Starting to send symbols to analysis server\n";
-  auto TypeIdentifier = ModuleAnalysis.GetTypeIdentifier();
-  // Note: Sorting functions is not necessary since saving as HAKCCompartmentalization is a networkx graph and will rearrange symbol order
-
-  auto FunctionCount = TypeIdentifier.GetFunctions().size() + TypeIdentifier.GetUnmappedFunctions().size();
+  auto FunctionCount = TypeIdentifier.GetFunctions().size() +
+                       TypeIdentifier.GetUnmappedFunctions().size();
   std::vector<std::shared_ptr<HAKCFunctionInfo>> Functions;
   if (FunctionCount > 0) {
     for (auto &it : TypeIdentifier.GetFunctions()) {
@@ -153,9 +111,10 @@ void HAKCServerClient::SendSymbolsToAnalysisServer(HAKCModuleAnalysis &ModuleAna
     }
   }
 
-  auto GlobalCount = TypeIdentifier.GetGlobals().size() + TypeIdentifier.GetUnmappedGlobals().size();
+  auto GlobalCount = TypeIdentifier.GetGlobals().size() +
+                     TypeIdentifier.GetUnmappedGlobals().size();
   std::vector<std::shared_ptr<HAKCGlobalInfo>> Globals;
-  if (GlobalCount > 0){
+  if (GlobalCount > 0) {
     for (auto &it : TypeIdentifier.GetGlobals()) {
       Globals.push_back(it.second);
     }
@@ -164,21 +123,22 @@ void HAKCServerClient::SendSymbolsToAnalysisServer(HAKCModuleAnalysis &ModuleAna
     }
   }
 
-  set_dag_filename(filename);
   add_symbols(Functions, Globals);
-  CommonHAKCAnalysis::getLogger(Debug) << "Finished sending symbols to analysis server\n";
+  CommonHAKCAnalysis::getLogger(Debug)
+      << "Finished sending symbols to analysis server\n";
 }
 
 void HAKCServerClient::CloseConnection() {
+
+  SendSymbolsToAnalysisServer(ModuleAnalysis.GetTypeIdentifier());
   CommonHAKCAnalysis::getLogger(Verbose) << "Closing connection\n";
   SendTerminateConnection();
   DisconnectFromDatabase();
   CommonHAKCAnalysis::getLogger(Verbose) << "Closed connection\n";
 }
 
-
-HAKCDivisionP HAKCServerClient::FindCachedSymbolDivision(
-    HAKCSymbolP Symbol) const {
+HAKCDivisionP
+HAKCServerClient::FindCachedSymbolDivision(HAKCSymbolP Symbol) const {
   for (auto &it : SymbolDivisionMap) {
     if (it.first == Symbol) {
       return it.second;
@@ -187,8 +147,7 @@ HAKCDivisionP HAKCServerClient::FindCachedSymbolDivision(
   return nullptr;
 }
 
-hakc::HAKCCompartmentDivision &
-HAKCServerClient::GetDivision(GlobalValue *GV) {
+hakc::HAKCCompartmentDivision &HAKCServerClient::GetDivision(GlobalValue *GV) {
   // Get Division from Global Value -> query for (division_id, access_token,
   // compartment_id, entry_token)
   auto HAKCSymbol = SystemInformation.GetTypeIdentifier().FindSymbol(GV, true);
@@ -206,15 +165,13 @@ HAKCServerClient::GetDivision(GlobalValue *GV) {
   raw_string_ostream os(ObjectYaml);
   os << *HAKCSymbol;
   json::Object Parameters({{"object", ObjectYaml}});
-  HAKCResult result = Execute(
-      SystemInformation.GetDatabaseInformation().GetSymbolDivisionEndpoint(),
-      Parameters);
+  HAKCResult result =
+      Execute(DatabaseInformation.GetSymbolDivisionEndpoint(), Parameters);
   if (!result.success) {
     CommonHAKCAnalysis::getLogger(Fatal)
         << "Failed request to "
-        << SystemInformation.GetDatabaseInformation()
-               .GetSymbolDivisionEndpoint()
-        << " on GV " << *GV << " with error " << result.error << "\n";
+        << DatabaseInformation.GetSymbolDivisionEndpoint() << " on GV " << *GV
+        << " with error " << result.error << "\n";
     throw std::exception();
   }
 
@@ -244,9 +201,9 @@ HAKCCompartmentDivision &HAKCServerClient::GetDefaultDivision() {
   return *GetDivision(0, 0);
 }
 
-HAKCDivisionP HAKCServerClient::GetDivision(
-    hakc_compartment_id_t CompartmentID,
-    hakc_compartment_division_t DivisionID) {
+HAKCDivisionP
+HAKCServerClient::GetDivision(hakc_compartment_id_t CompartmentID,
+                              hakc_compartment_division_t DivisionID) {
   auto Division = FindCachedDivision(CompartmentID, DivisionID);
   if (Division) {
     return Division;
@@ -257,21 +214,17 @@ HAKCDivisionP HAKCServerClient::GetDivision(
       {"division-id", std::to_string(DivisionID)},
   });
 
-  auto result =
-      Execute(SystemInformation.GetDatabaseInformation().GetDivisionEndpoint(),
-              Parameters);
+  auto result = Execute(DatabaseInformation.GetDivisionEndpoint(), Parameters);
   if (!result.success) {
     CommonHAKCAnalysis::getLogger(Fatal)
-        << "Failed request to "
-        << SystemInformation.GetDatabaseInformation().GetDivisionEndpoint()
+        << "Failed request to " << DatabaseInformation.GetDivisionEndpoint()
         << " on compartment_id " << CompartmentID << " and division_id "
         << DivisionID << " with error " << result.error << "\n";
     throw std::exception();
   }
   // TODO: put isa check here?
   std::shared_ptr<HAKCDivisionPayload> division_payload =
-      std::dynamic_pointer_cast<HAKCDivisionPayload>(
-          result.GetData());
+      std::dynamic_pointer_cast<HAKCDivisionPayload>(result.GetData());
 
   // TODO: consolidate into one query?
   auto access_token = division_payload->AccessToken;
@@ -284,8 +237,8 @@ HAKCDivisionP HAKCServerClient::GetDivision(
   return Division;
 }
 
-HAKCCompartmentP HAKCServerClient::GetCompartment(
-    hakc_compartment_id_t CompartmentID) {
+HAKCCompartmentP
+HAKCServerClient::GetCompartment(hakc_compartment_id_t CompartmentID) {
   auto Compartment = FindCachedCompartment(CompartmentID);
   if (Compartment) {
     return Compartment;
@@ -295,13 +248,11 @@ HAKCCompartmentP HAKCServerClient::GetCompartment(
       {"compartment-id", std::to_string(CompartmentID)},
   });
 
-  auto result = Execute(
-      SystemInformation.GetDatabaseInformation().GetCompartmentEndpoint(),
-      Parameters);
+  auto result =
+      Execute(DatabaseInformation.GetCompartmentEndpoint(), Parameters);
   if (!result.success) {
     CommonHAKCAnalysis::getLogger(Fatal)
-        << "Failed request to "
-        << SystemInformation.GetDatabaseInformation().GetCompartmentEndpoint()
+        << "Failed request to " << DatabaseInformation.GetCompartmentEndpoint()
         << " on compartment_id " << CompartmentID << " with error "
         << result.error << "\n";
     throw std::exception();
@@ -313,8 +264,7 @@ HAKCCompartmentP HAKCServerClient::GetCompartment(
   return Compartment;
 }
 
-void HAKCServerClient::GetValidTargets(
-    HAKCCompartment &Compartment) {
+void HAKCServerClient::GetValidTargets(HAKCCompartment &Compartment) {
   hakc_compartment_id_t CompartmentID = Compartment.GetCompartmentIDValue();
   if (RetrievedTargetCompartments.contains(CompartmentID)) {
     return;
@@ -324,13 +274,11 @@ void HAKCServerClient::GetValidTargets(
       {"compartment-id", std::to_string(CompartmentID)},
   });
 
-  auto result = Execute(
-      SystemInformation.GetDatabaseInformation().GetValidTargetsEndpoint(),
-      Parameters);
+  auto result =
+      Execute(DatabaseInformation.GetValidTargetsEndpoint(), Parameters);
   if (!result.success) {
     CommonHAKCAnalysis::getLogger(Fatal)
-        << "Failed request to "
-        << SystemInformation.GetDatabaseInformation().GetValidTargetsEndpoint()
+        << "Failed request to " << DatabaseInformation.GetValidTargetsEndpoint()
         << " on compartment " << Compartment << " with error " << result.error
         << "\n";
     throw std::exception();
@@ -354,9 +302,10 @@ void HAKCServerClient::GetValidTargets(
   }
 }
 
-HAKCCompartmentP HAKCServerClient::CreateCompartment(
-    hakc_compartment_id_t CompartmentID, hakc_access_token_t EntryToken,
-    bool CheckForExisting) {
+HAKCCompartmentP
+HAKCServerClient::CreateCompartment(hakc_compartment_id_t CompartmentID,
+                                    hakc_access_token_t EntryToken,
+                                    bool CheckForExisting) {
   if (CheckForExisting) {
     if (auto Compartment = FindCachedCompartment(CompartmentID)) {
       return Compartment;
@@ -370,10 +319,9 @@ HAKCCompartmentP HAKCServerClient::CreateCompartment(
   return Compartment;
 }
 
-
-HAKCDivisionP HAKCServerClient::FindCachedDivision(
-    hakc_compartment_id_t CompartmentID,
-    hakc_compartment_division_t DivisionID) {
+HAKCDivisionP
+HAKCServerClient::FindCachedDivision(hakc_compartment_id_t CompartmentID,
+                                     hakc_compartment_division_t DivisionID) {
   for (auto &Division : Divisions) {
     if (Division->GetHAKCCompartment().GetCompartmentID()->equalsInt(
             CompartmentID) &&
@@ -384,8 +332,8 @@ HAKCDivisionP HAKCServerClient::FindCachedDivision(
   return nullptr;
 }
 
-HAKCCompartmentP HAKCServerClient::FindCachedCompartment(
-    hakc_compartment_id_t CompartmentID) {
+HAKCCompartmentP
+HAKCServerClient::FindCachedCompartment(hakc_compartment_id_t CompartmentID) {
   for (auto &Compartment : Compartments) {
     if (Compartment->GetCompartmentID()->equalsInt(CompartmentID)) {
       return Compartment;

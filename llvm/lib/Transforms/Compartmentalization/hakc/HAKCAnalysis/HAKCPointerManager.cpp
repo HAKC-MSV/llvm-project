@@ -572,7 +572,7 @@ ManagedHAKCPointerP HAKCPointerManager::GetManagedPointer(Value *V) {
       << "Finding Managed Pointer for " << V << "\n";
   auto *Def = GetDef(V);
   for (auto &ManagedPointer : ManagedPointers()) {
-    if (*ManagedPointer == Def) {
+    if (*ManagedPointer == Def || (ManagedPointer->GetProtectedPointer() && ManagedPointer->GetProtectedPointer() == Def)) {
       return ManagedPointer;
     }
   }
