@@ -684,8 +684,10 @@ HAKCTypeIdentifier::AddNoDebugGlobal(GlobalObject *GlobalObj) {
 
     GlobalInfo->SetGlobalVariable(GV);
     GlobalInfo->SetType(HAKCType);
-    GlobalInfo->SetLocalScope(DefinitionLocationScope);
-
+    if (GlobalObj->getLinkage() == GlobalObject::InternalLinkage || GlobalObj->
+        getLinkage() == GlobalObject::PrivateLinkage) {
+      GlobalInfo->SetLocalScope(DefinitionLocationScope);
+    }
     UnmappedGlobals.insert(GlobalInfo);
     return GlobalInfo;
   } else {
