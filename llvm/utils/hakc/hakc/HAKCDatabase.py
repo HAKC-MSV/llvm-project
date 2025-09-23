@@ -2,6 +2,7 @@ import logging
 import math
 import multiprocessing as mp
 import threading
+import time
 import typing
 from typing import Type, Optional, Tuple, cast
 
@@ -634,3 +635,13 @@ class HAKCDatabase:
         """
         self.execute(cmd, symbol_hash=int(_symbol.get_computed_hash()), compartment_id=new_compartment_id,
                      division_id=new_division_id, enable_cache=False)
+
+    def get_all_symbol_hashes_in_compartment(self, compartment_id: int) -> list[int]:
+        cmd = f"""
+        MATCH (comp1:{HAKCCompartment.get_table_name()})<-[:{HAKCDivision.relation_compartment}]-(div1:{HAKCDivision.get_table_name()})<-[:{HAKCSymbol.relation_division}]-(sym1:{HAKCSymbol.get_table_name()})
+        WHERE comp1.CompartmentID = $source_compartment_id
+        return sym1.{str(HAKCSymbol.get_primary_key())} AS symbol_hash;
+        """
+        response = self.execute(cmd, source_compartment_id=compartment_id)
+        ret = response['symbol_hash'].to_list()
+        return ret
