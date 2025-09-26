@@ -222,8 +222,7 @@ class HAKCCompartment(HAKCDBNode, yaml.YAMLObject):
 class HAKCType(HashedHAKCDBNode, yaml.YAMLObject):
     yaml_tag = "!HAKCType"
     unknown_type = "@UNKNOWN@"
-
-    def __init__(self, LLVMType: str, DebugType: Optional[str] = None, **kwargs):
+    def __init__(self, LLVMType: str, DebugType: Optional[str] = unknown_type, **kwargs):
         yaml.YAMLObject.__init__(self)
         if 'Name' not in kwargs:
             kwargs['Name'] = DebugType if DebugType is not None and DebugType != HAKCType.unknown_type else LLVMType
