@@ -18,8 +18,7 @@ class HAKCTest(lit.Test.Test):
 
 
 class HAKCTestSuite(ShTest):
-    # TODO: Add in kuzu tests
-    test_types = ['yaml']
+    test_types = ['kuzu', '']
 
     def __init__(self):
         super(HAKCTestSuite, self).__init__()

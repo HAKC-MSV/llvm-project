@@ -15,7 +15,9 @@
 namespace llvm::hakc {
 HAKCModuleAnalysis::HAKCModuleAnalysis(CommonHAKCAnalysis &CommonAnalysis)
   : UsedCompartments(), CommonAnalysis(CommonAnalysis), AnalysisFunctions(),
-    TypeIdentifier(CommonAnalysis.GetSystemInfo().GetTypeIdentifier()) {}
+    TypeIdentifier(CommonAnalysis.GetSystemInfo().GetTypeIdentifier()) {
+
+}
 
 //
 // void HAKCModuleAnalysis::InitAnalysis() {

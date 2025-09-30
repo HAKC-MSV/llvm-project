@@ -41,6 +41,7 @@ namespace llvm::hakc {
  */
 class HAKCTransformer {
 public:
+
   HAKCTransformer(HAKCModuleAnalysis &ModuleAnalysis,
                   HAKCServerClient &Client);
 
@@ -192,8 +193,6 @@ public:
                                            GlobalVariable *GlobalVar);
 
   void performTransformations();
-
-  void performTemporalTransformations();
 
   void AddCompartmentMetadata();
 

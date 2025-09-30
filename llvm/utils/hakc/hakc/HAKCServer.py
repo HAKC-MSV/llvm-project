@@ -1,51 +1,37 @@
 import logging
-import multiprocessing as mp
 import os
-import signal
 import socketserver
+import sys
 import time
-from enum import Enum
 from typing import Optional, cast, Tuple
 
 import yaml
 
 from .HAKCBase import HAKCResponse, HAKCResultSuccess, HAKCResultFail
 from .HAKCCompartmentalization import HAKCCompartmentalization
+from .HAKCConfig import kwargs_get, HAKCBuildMode, HAKCBackingType, HAKCConfig
 from .HAKCDatabase import HAKCDatabase
 from .HAKCLogger import HAKCLogger
 from .HAKCObjects import HAKCSymbol, HAKCCompartment, HAKCDivision, HAKCDivisionPayload, HAKCCompartmentPayload, \
     HAKCDivisionCompartmentPayload, HAKCValidTargetsPayload, HAKCFunction, HAKCGlobalVariable
-from .HAKCServerConfig import HAKCServerConfig, kwargs_get
 from .HAKCServerThread import HAKCServerThread
 
 logging.setLoggerClass(HAKCLogger)
 
-logger: HAKCLogger = cast(HAKCLogger, logging.getLogger('hakc-server'))
+logger: HAKCLogger = cast(HAKCLogger, logging.getLogger('hakc.server'))
 
 mp_conn: HAKCDatabase | None = None
 
-class SupportedBackingStore(Enum):
-    NULL = "null"
-    YAML = "yaml"
-    KUZU = "kuzu"
-
-class HAKCServerMode(Enum):
-    ANALYSIS = "analysis"
-    POLICY = "policy"
-
-
-class HAKCPolicyDataSource:
-    def __init__(self, config: HAKCServerConfig, yaml_loader=yaml.Loader, **kwargs):
+class HAKCEnforcementDataSource:
+    def __init__(self, config: HAKCConfig, yaml_loader=yaml.Loader, **kwargs):
         self.config = config
         self.endpoints = {config.endpoints.get_compartment_endpoint: self.get_compartment_by_id,
                           config.endpoints.get_division_endpoint: self.get_division_by_id,
                           config.endpoints.get_division_from_symbol_endpoint: self.get_symbol_division,
                           config.endpoints.get_valid_targets_from_compartment_id_endpoint: self.get_valid_targets_from_compartment_id}
         self.yaml_loader = yaml_loader
-        self.default_compartment = HAKCCompartment(config.policy_config.default_compartment_id, **{'EntryToken':config.policy_config.default_entry_token}) # need to use kwargs to set values
-        self.default_division = HAKCDivision(config.policy_config.default_division_id, **{'Salt':0, 'AccessToken':config.policy_config.default_access_token})
-        self.socket_path = config.socket_path
-        self.test_mode = config.test_mode
+        self.default_compartment = HAKCCompartment(config.default_compartment_id, **{'EntryToken':config.default_entry_token}) # need to use kwargs to set values
+        self.default_division = HAKCDivision(config.default_division_id, **{'Salt':0, 'AccessToken':config.default_access_token})
 
     def _get_default_division(self) -> HAKCDivision:
         return self.default_division
@@ -102,13 +88,16 @@ class HAKCPolicyDataSource:
         # get-valid-targets-from-compartment-id
         compartment_id = kwargs_get(int, "compartment-id", None, **kwargs)
         logger.debug(f'Calling _get_valid_targets_from_compartment_id with compartment_id = {compartment_id}')
-        return HAKCResponse(HAKCResultSuccess(HAKCValidTargetsPayload(self._get_valid_targets_from_compartment_id(compartment_id))),
+        valid_targets = self._get_valid_targets_from_compartment_id(compartment_id)
+        if len(valid_targets) == 0:
+            valid_targets = [self._get_default_compartment().compartment_id]
+        return HAKCResponse(HAKCResultSuccess(HAKCValidTargetsPayload(valid_targets)),
                             self.config.endpoints.get_valid_targets_from_compartment_id_endpoint)
 
 
-class NullHAKCPolicyDataStore(HAKCPolicyDataSource):
-    def __init__(self, config: HAKCServerConfig, **kwargs):
-        HAKCPolicyDataSource.__init__(self, config, **kwargs)
+class NullHAKCEnforcementDataStore(HAKCEnforcementDataSource):
+    def __init__(self, config: HAKCConfig, **kwargs):
+        HAKCEnforcementDataSource.__init__(self, config, **kwargs)
 
     def _get_compartment_from_backing_store(self, compartment_id: int) -> Optional[HAKCCompartment]:
         return self._get_default_compartment()
@@ -123,11 +112,11 @@ class NullHAKCPolicyDataStore(HAKCPolicyDataSource):
         return [self._get_default_compartment().compartment_id]
 
 
-class YAMLHAKCPolicyDataStore(HAKCPolicyDataSource):
-    def __init__(self, config: HAKCServerConfig, **kwargs):
-        HAKCPolicyDataSource.__init__(self, config, yaml_loader=yaml.Loader, **kwargs)
+class YAMLHAKCEnforcementDataStore(HAKCEnforcementDataSource):
+    def __init__(self, config: HAKCConfig, **kwargs):
+        HAKCEnforcementDataSource.__init__(self, config, yaml_loader=yaml.Loader, **kwargs)
         self.compartmentalization = None
-        self.deserialize_compartmentalization(config.policy_config.path)
+        self.deserialize_compartmentalization(config.server_config.backing_config.path)
 
     def _get_compartment_from_backing_store(self, compartment_id: int) -> Optional[HAKCCompartment]:
         return self.compartmentalization.get_compartment_node(compartment_id)
@@ -156,21 +145,20 @@ class YAMLHAKCPolicyDataStore(HAKCPolicyDataSource):
     def deserialize_compartmentalization(self, yamlin):
         if yamlin is None:
             raise RuntimeError(f'yamlin is None')
-        HAKCCompartmentalization.add_yaml_constructors()
 
         with open(yamlin, 'r') as file:
             self.compartmentalization = yaml.load(file, Loader=self.yaml_loader)
 
         if len(self.compartmentalization.nodes) == 0:
-            raise RuntimeError(f'{yamlin} does not contain a compartmentalization policy')
+            raise RuntimeError(f'{yamlin} does not contain an enforcement policy')
         logger.debug(f'Successfully deserialized {self.compartmentalization}!')
 
 
-class KUZUHAKCPolicyDataStore(HAKCPolicyDataSource):
-    def __init__(self, config: HAKCServerConfig, **kwargs):
-        HAKCPolicyDataSource.__init__(self, config, **kwargs)
+class KUZUHAKCEnforcementDataStore(HAKCEnforcementDataSource):
+    def __init__(self, config: HAKCConfig, **kwargs):
+        HAKCEnforcementDataSource.__init__(self, config, **kwargs)
         self.conn = None
-        self.connect(config.policy_config.path)
+        self.connect()
         logger.debug(f"Finished setting up KUZU Policy Source")
 
     def _get_compartment_from_backing_store(self, compartment_id: int) -> Optional[HAKCCompartment]:
@@ -202,15 +190,11 @@ class KUZUHAKCPolicyDataStore(HAKCPolicyDataSource):
         assert (isinstance(compartment_id, int))
         return self.conn.get_valid_targets_from_compartment_id(compartment_id)
 
-    def connect(self, kuzu_in):
+    def connect(self):
         global mp_conn
         self.conn = mp_conn
         logger.debug(f"Thread connected to Kuzu")
-        # logger.debug(f"Kuzu opening connection to {kuzu_in}")
-        # open kuzu database connection in read only mode (multithreading)
-        # self.database = HAKCDatabase(kuzu_in, True)
-        # self.database.open(True)
-        # logger.debug(f"Successfully connected to Kuzu")
+        self.conn.print_stats()
 
 # noinspection PyTypeChecker
 class HAKCServerThreadInstance(HAKCServerThread):
@@ -219,20 +203,19 @@ class HAKCServerThreadInstance(HAKCServerThread):
         HAKCServerThread.init(self)
         # Note: handler() can be called before the actual __init__() function is called, so make a custom blocking init() for use in handler()
         # Initialize thread specific data
-        logger.debug(f"Spinning up Server Thread Instance")
         self.config = self.hakc_server.config
-        self.analysis_mode = self.hakc_server.analysis_mode
-        self.policy_mode = self.hakc_server.policy_mode
-        self.policy_source = HAKCServer.init_data_source(self.hakc_server.config) if self.policy_mode else None
+        logger.debug(f"Spinning up Server Thread Instance in {self.config.build_mode} mode")
         self.endpoints = {self.hakc_server.config.endpoints.add_symbols_endpoint: self.add_symbols,
                           self.hakc_server.config.endpoints.terminate_connection_endpoint: self.terminate_connection}
-        if self.policy_mode:
-            for endpoint_str, endpoint_fn in self.policy_source.endpoints.items():
-                self.endpoints[endpoint_str] = endpoint_fn
-        if self.analysis_mode:
-            self.compartmentalization = HAKCCompartmentalization()
-            self.compartmentalization.add_yaml_constructors()
-        logger.debug(f"Finished initializing Server Thread in {'ANALYSIS' if self.analysis_mode else 'POLICY'} mode")
+
+        match self.config.build_mode:
+            case HAKCBuildMode.ANALYSIS:
+                self.compartmentalization = HAKCCompartmentalization()
+            case HAKCBuildMode.ENFORCEMENT:
+                self.enforcement_source = HAKCServer.init_data_source(self.hakc_server.config)
+                for endpoint_str, endpoint_fn in self.enforcement_source.endpoints.items():
+                    self.endpoints[endpoint_str] = endpoint_fn
+        logger.debug(f"Finished initializing {self.config.build_mode.name} Server Thread")
 
     def handle(self):
         self.init()
@@ -251,7 +234,6 @@ class HAKCServerThreadInstance(HAKCServerThread):
 
     def add_symbols(self, **kwargs) -> HAKCResponse:
         symbols = kwargs_get(list[str], "allSymbols", None, **kwargs)
-        # logger.debug(f"Adding {len(symbols)}\t symbols")
         for sym in symbols:
             symbol = yaml.load(sym, Loader=self.yaml_loader)
             if isinstance(symbol, HAKCFunction):
@@ -259,31 +241,26 @@ class HAKCServerThreadInstance(HAKCServerThread):
             elif isinstance(symbol, HAKCGlobalVariable):
                 self.compartmentalization.add_global_variable(symbol)
             else:
-                # TODO: probably make this a runtime error
                 logger.fatal(f"Invalid symbol: {symbol}")
                 return HAKCResponse(HAKCResultFail('Invalid request: object is not HAKCSymbol!'), self.hakc_server.config.endpoints.add_symbols_endpoint)
-        # self.hakc_server.check_timeout()
         return HAKCResponse(HAKCResultSuccess(), self.hakc_server.config.endpoints.add_symbols_endpoint)
 
 # noinspection PyTypeChecker
 class HAKCServer(socketserver.ThreadingUnixStreamServer):
-    def __init__(self, id: int, config: HAKCServerConfig, server_mode: HAKCServerMode, logger: HAKCLogger, server_gather_buckets = None, **kwargs):
-        self.id = id
+    def __init__(self, server_id: int, config: HAKCConfig, logger: HAKCLogger, server_gather_buckets = None, **kwargs):
+        self.id = server_id
         self.logger = logger
         self.config = config
-        self.analysis_mode = server_mode == HAKCServerMode.ANALYSIS
-        self.policy_mode = server_mode == HAKCServerMode.POLICY
         self.server_gather_buckets = server_gather_buckets
-        self.timeout = config.server_timeout
         self.last_alive = time.time()
-        if self.policy_mode:
-            self.init_mp_database(self.config.database_path)
+        if self.config.build_mode == HAKCBuildMode.ENFORCEMENT and config.server_config.backing_config.type == HAKCBackingType.KUZU:
+            logger.error(f"Starting database at {self.config.server_config.backing_config.path}")
+            self.init_mp_database(self.config.server_config.backing_config.path)
         self.logger.debug(f'Starting Server with socket {config.socket_path}')
         os.makedirs(os.path.dirname(config.socket_path), exist_ok=True)
         socketserver.ThreadingUnixStreamServer.__init__(self, str(config.socket_path), HAKCServerThreadInstance)
 
     def __del__(self):
-        # global_queues_events[self.pid].set()
         logger.debug(f"Closing HAKCServer")
 
     def handle_error(self, request, client):
@@ -292,22 +269,20 @@ class HAKCServer(socketserver.ThreadingUnixStreamServer):
         self.logger.error(f"Error handling request {request} for client {client}")
         # do a server shutdown, rather than a server_close()
         self.shutdown()
+        sys.exit(1)
 
     @staticmethod
-    def init_data_source(config: HAKCServerConfig) -> Optional[HAKCPolicyDataSource]:
-        if config.policy_config.type == SupportedBackingStore.NULL.value:
-            logger.debug(f'Creating NullHAKCPolicyDataStore')
-            return NullHAKCPolicyDataStore(config)
-        elif config.policy_config.type == SupportedBackingStore.YAML.value:
-            logger.debug(f'Creating YAMLPolicyDataStore')
-            return YAMLHAKCPolicyDataStore(config)
-        elif config.policy_config.type == SupportedBackingStore.KUZU.value:
-            logger.debug(f'Creating KUZUPolicyDataStore')
-            return KUZUHAKCPolicyDataStore(config)
-        raise RuntimeError(f"Unsupported data store type: {config.policy_config.type}")
+    def init_data_source(config: HAKCConfig) -> Optional[HAKCEnforcementDataSource]:
+        match config.server_config.backing_config.type:
+            case HAKCBackingType.NULL:
+                return NullHAKCEnforcementDataStore(config)
+            case HAKCBackingType.YAML:
+                return YAMLHAKCEnforcementDataStore(config)
+            case HAKCBackingType.KUZU:
+                return KUZUHAKCEnforcementDataStore(config)
+        raise RuntimeError(f"Unsupported data store type: {config.server_config.backing_config.type}")
 
     @staticmethod
     def init_mp_database(db_dir: str):
         global mp_conn
         mp_conn = HAKCDatabase(db_dir, read_only=True)
-        # logger.debug(f"Created global connection to kuzu db")

@@ -41,9 +41,10 @@ class HAKCLogger(logging.Logger):
         self.addHandler(self.console_handler)
 
     def progress_bar(self, **kwargs) -> tqdm.tqdm:
-        disabled = self.level not in {logging.INFO, logging.DEBUG, logging.NOTSET}
         kwargs['file'] = self.console_handler.stream
-        if disabled:
+        # print(f"Log level: {self.level}")
+        # disable progress bar printing if only errors or higher should be printed
+        if self.level >= LoggingLevelEnum.INFO.value:
             kwargs['file'] = open(os.devnull, 'w')
             kwargs['disable'] = True
 
@@ -57,15 +58,17 @@ class HAKCLogger(logging.Logger):
         return file_handler
 
 
-def setup_logging(logger: HAKCLogger, log_file: str = "", log_level: LoggingLevelEnum = LoggingLevelEnum.WARNING,
+def setup_logging(logger: HAKCLogger | logging.Logger, log_file: str = "", log_level: LoggingLevelEnum = LoggingLevelEnum.WARNING,
                   log_mode: str = 'w') -> None:
     logger.setLevel(log_level.value)
     if log_file and len(log_file) > 0:
         os.makedirs(os.path.dirname(log_file), exist_ok=True)
         # RootLogger does not inherit add_file_handler from HAKCLogger or something
-        if isinstance(logger, logging.RootLogger):
-            file_handler = logging.FileHandler(log_file, mode=log_mode)
-            file_handler.setFormatter(HAKCLogger.get_formatter())
-            logger.addHandler(file_handler)
-        else:
-            logger.add_file_handler(log_file, log_mode)
+        for name, logger in logging.root.manager.loggerDict.items():
+            # Other loggers exist, e.g., logging.PlaceHolder, but don't update these
+            if isinstance(logger, logging.RootLogger):
+                file_handler = logging.FileHandler(log_file, mode=log_mode)
+                file_handler.setFormatter(HAKCLogger.get_formatter())
+                logger.addHandler(file_handler)
+            elif isinstance(logger, HAKCLogger):
+                logger.add_file_handler(log_file, log_mode)

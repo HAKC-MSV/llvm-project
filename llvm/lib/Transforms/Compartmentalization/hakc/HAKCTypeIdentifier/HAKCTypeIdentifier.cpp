@@ -1362,6 +1362,7 @@ hakc::HAKCTypeIdentifier::FindUnionMember(const DICompositeType *UnionDef,
 }
 
 hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
+  // TODO: handle ptrtoint, phi ptr
   HAKCTypeP FoundType = nullptr;
   SmallVector<DbgVariableIntrinsic *> DbgUsers;
   SmallVector<DbgVariableRecord *> DVRUsers;

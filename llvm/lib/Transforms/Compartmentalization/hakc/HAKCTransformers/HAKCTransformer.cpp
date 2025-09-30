@@ -15,6 +15,7 @@
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCTransformer.h"
 
 namespace llvm::hakc {
+
 HAKCTransformer::HAKCTransformer(HAKCModuleAnalysis &ModuleAnalysis,
                                  HAKCServerClient &Client)
   : ModuleAnalysis(ModuleAnalysis), Client(Client),
@@ -131,17 +132,6 @@ void HAKCTransformer::performTransformations() {
   CommonHAKCAnalysis::getLogger(Debug)
       << "Final Module After Transformations:\n"
       << getModule() << "\n";
-}
-
-void HAKCTransformer::performTemporalTransformations() {
-  CommonHAKCAnalysis::getLogger(Error)
-      << "!!!Starting temporal transformations!!!\n";
-  TransformModule();
-  CommonHAKCAnalysis::getLogger(Debug)
-      << "Final Module After Transformations:\n"
-      << getModule() << "\n";
-  CommonHAKCAnalysis::getLogger(Error)
-      << "!!!End temporal transformations!!!\n";
 }
 
 bool HAKCTransformer::TransferFunctionShouldBeCreated(Function *F) {
@@ -584,8 +574,7 @@ void HAKCTransformer::CreateDataAuthArguments(
   auto Division = Client.GetDivision(F);
   auto *AccessToken = Division.GetAccessToken();
   unsigned AddrSpace = GetPointerAddrSpace(HAKCPointer);
-  auto *DataAuthFuncTy = getCommonAnalysis().GetDataAuthenticationFunctionType(
-      getModule(), AddrSpace);
+  auto *DataAuthFuncTy = getCommonAnalysis().GetDataAuthenticationFunctionType(AddrSpace);
 
   if (HAKCPointer.GetBaseDefinition()->getType()->isIntegerTy()) {
     HAKCPointerBitCast = HAKCIRBuilder.CreateIntToPtr(
@@ -781,8 +770,7 @@ Value *HAKCTransformer::CreateDataAuthentication(HAKCPointerBase &HAKCPointer,
 
   SmallVector<Value *> Args;
   unsigned AddrSpace = GetPointerAddrSpace(HAKCPointer);
-  auto *DataAuthFuncTy = getCommonAnalysis().GetDataAuthenticationFunctionType(
-      getModule(), AddrSpace);
+  auto *DataAuthFuncTy = getCommonAnalysis().GetDataAuthenticationFunctionType(AddrSpace);
   CreateDataAuthArguments(HAKCPointer, I, Args);
   for (unsigned i = 0; i < DataAuthFuncTy->getNumParams(); i++) {
     if (Args[i]->getType() != DataAuthFuncTy->getParamType(i)) {
@@ -916,6 +904,11 @@ GlobalVariable *HAKCTransformer::GetValidTargetCompartments(Function *F) const {
 
 CallInst *HAKCTransformer::CreateCall(Function *Callee,
                                       ArrayRef<Value *> Args) {
+  CommonHAKCAnalysis::getLogger(Error) << "Creating function " << *Callee << " with args:";
+  for (auto arg: Args) {
+    CommonHAKCAnalysis::getLogger(Error) << " " << *arg;
+  }
+  CommonHAKCAnalysis::getLogger(Error) << "\n";
   auto *Call = HAKCIRBuilder.CreateCall(Callee, Args);
 
   /* The LLVM function checker throws an error when an inline-able function with

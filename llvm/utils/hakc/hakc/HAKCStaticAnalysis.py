@@ -1,13 +1,8 @@
-import concurrent.futures
 import io
 import itertools
 import logging
 import pstats
-import time
 from typing import cast
-
-import networkx as nx
-import yaml
 
 from .HAKCDatabase import HAKCDatabase
 from .HAKCLogger import HAKCLogger
@@ -15,8 +10,7 @@ from .HAKCObjects import HAKCSymbol, HAKCFunction, HAKCCompartment, HAKCDivision
 
 logging.setLoggerClass(HAKCLogger)
 
-logger: HAKCLogger = cast(HAKCLogger, logging.getLogger('hakc-static-analysis'))
-
+logger: HAKCLogger = cast(HAKCLogger, logging.getLogger('hakc.static-analysis'))
 
 mp_conn: HAKCDatabase | None = None
 
@@ -40,7 +34,8 @@ def compute_dag_edges_for_symbol(symbol_hashes):
 def compute_dag_edges_for_symbol_with_conn(conn: HAKCDatabase, symbol_hash: int):
     results = list()
     tail_hash_types = conn.get_dag_computation_edges(symbol_hash)
-    # logger.error(f"Found tail hash: {tail_hash_types}")
+    if len(tail_hash_types) == 0:
+        raise RuntimeError("Unable to get dag computation edges!")
     dag_info = dict()
 
     for dag_edge_type, tail_hashes in tail_hash_types.items():
@@ -54,41 +49,6 @@ def compute_dag_edges_for_symbol_with_conn(conn: HAKCDatabase, symbol_hash: int)
             results.append((symbol_hash, tail_hash, dag_weight))
 
     return results
-
-
-# def create_compartmentalization_single_thread(files: set[str], conn: HAKCDatabase) -> HAKCCompartmentalization:
-#     compartmentalization = HAKCCompartmentalization()
-#     for filename in logger.progress_bar(iterable=sorted(files), desc='Parsing YAML'):
-#         subG = HAKCCompartmentalization.parse_yaml(filename)
-#         if subG:
-#             compartmentalization = nx.compose(compartmentalization, subG)
-#         else:
-#             logger.error(f"Loaded compartmentalization is None!")
-#     logger.info(f'Adding compartmentalization')
-#     compartmentalization.add_default_compartmentalization(conn)
-#     compartmentalization.persist_to_database(conn, create_schema=True)
-#     return compartmentalization
-
-# def create_dag_single_thread(files: set[str], conn: HAKCDatabase) -> HAKCCompartmentalization:
-#     # TODO: update this
-#     compartmentalization = create_compartmentalization_single_thread(files, conn)
-#     dag_edges = dict()
-#     dag_edges_added = 0
-#     symbols = compartmentalization.get_symbols()
-#     for symbol in logger.progress_bar(iterable=symbols, desc='DAG Edge computation'):
-#         for (head_hash, tail_hash, dag_edge_weight) in compute_dag_edges_for_symbol_with_conn(conn, hash(symbol)):
-#             if head_hash not in dag_edges:
-#                 dag_edges[head_hash] = dict()
-#             dag_edges[head_hash][tail_hash] = dag_edge_weight
-#             tail_symbol = compartmentalization.get_symbol_by_hash(tail_hash)
-#             compartmentalization.add_dag_edge(symbol, tail_symbol, dag_edge_weight=dag_edge_weight)
-#             dag_edges_added += 1
-#     logger.info(f'Adding {dag_edges_added} DAG edges to compartmentalization')
-#     conn.persist_dag_edges(dag_edges)
-#     logger.info(f'Adding compartmentalization')
-#     # compartmentalization.add_default_compartmentalization(conn)
-#     return compartmentalization
-
 
 def print_edge_data(G):
     for edge in G.edges:

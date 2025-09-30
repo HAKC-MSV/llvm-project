@@ -12,7 +12,7 @@ from hakc.HAKCLogger import LoggingLevelEnum, parse_log_level, HAKCLogger
 
 logging.setLoggerClass(HAKCLogger)
 
-logger: HAKCLogger = logging.getLogger('hakc-static-analysis')
+logger: HAKCLogger = cast(HAKCLogger, logging.getLogger('hakc.static-analysis'))
 
 
 def yaml_to_kuzu(yaml_dir, kuzu_dir):
@@ -28,7 +28,7 @@ def yaml_to_kuzu(yaml_dir, kuzu_dir):
         shutil.rmtree(kuzu_dir)
 
     conn = HAKCDatabase(kuzu_dir)
-    compartmentalization.persist_to_database(conn, create_schema=True)
+    compartmentalization.persist_to_database(create_schema=True)
 
     # compartmentalization = create_new_dag(args.dag_files_root, args.core_count, args.db_dir, args.delete_db)
     # conn.persist_dag_edges(dag_edges)
