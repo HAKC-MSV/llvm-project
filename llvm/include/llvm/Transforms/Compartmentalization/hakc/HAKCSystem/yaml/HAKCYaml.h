@@ -64,20 +64,6 @@ inline std::map<HAKCBuildModeTypeEnum, std::string> BuildModeToString = {
   {RunConfigAndExit, "run-config-and-exit"}
 };
 
-enum HAKCPassModeTypeEnum {
-  InvalidPassModeType,
-  Spatial,
-  Temporal,
-  SpatioTemporal
-};
-
-inline std::map<HAKCPassModeTypeEnum, std::string> PassModeToString = {
-  {InvalidPassModeType, "invalid-pass-mode-type"},
-  {Spatial, "spatial"},
-  {Temporal, "temporal"},
-  {SpatioTemporal, "spatio-temporal"}
-};
-
 struct HAKCYAMLSymbolDeclaration {
   HAKCYAMLStringType SymbolName;
 
@@ -256,11 +242,10 @@ struct HAKCYAMLClientConfig {
 struct HAKCYAMLConfig {
   HAKCYAMLClientConfig ClientConfig;
   HAKCYAMLStringType ClientConfigPath;
-  HAKCYAMLStringType BuildPath;
-  HAKCYAMLStringType SocketPath;
-  HAKCYAMLStringType LogPath;
+  HAKCYAMLStringType BuildDir;
+  HAKCYAMLStringType SocketDir;
+  HAKCYAMLStringType LogDir;
   HAKCBuildModeTypeEnum BuildMode;
-  HAKCPassModeTypeEnum PassMode;
   bool TemporalAnalysisEnabled;
   unsigned ServerCoreCount;
   unsigned DefaultCompartmentID;
@@ -328,17 +313,6 @@ struct yaml::ScalarEnumerationTraits<hakc::HAKCFunctionArgumentUse> {
     for (auto &it : hakc::HAKCArgumentArgumentUseStringMap()) {
       io.enumCase(value, it.second, it.first);
     }
-  }
-};
-
-template <> struct yaml::ScalarEnumerationTraits<hakc::HAKCPassModeTypeEnum> {
-  static void enumeration(IO &io, hakc::HAKCPassModeTypeEnum &value) {
-    io.enumCase(value, "spatial",
-                hakc::Spatial);
-    io.enumCase(value, "temporal",
-                hakc::Temporal);
-    io.enumCase(value, "spatio-temporal",
-                hakc::SpatioTemporal);
   }
 };
 
@@ -500,11 +474,10 @@ template <> struct yaml::MappingTraits<hakc::HAKCYAMLConfig> {
       errs() << "Error parsing config file " << YamlConfig.ClientConfigPath << "\n";
       throw std::exception();
     }
-    io.mapRequired("build-path", YamlConfig.BuildPath);
-    io.mapRequired("socket-path", YamlConfig.SocketPath);
-    io.mapRequired("log-path", YamlConfig.LogPath);
+    io.mapRequired("build-dir", YamlConfig.BuildDir);
+    io.mapRequired("socket-dir", YamlConfig.SocketDir);
+    io.mapRequired("log-dir", YamlConfig.LogDir);
     io.mapRequired("build-mode", YamlConfig.BuildMode);
-    io.mapRequired("pass-mode", YamlConfig.PassMode);
     io.mapOptional("server-core-count", YamlConfig.ServerCoreCount, 64);
     io.mapOptional("default-compartment-id", YamlConfig.DefaultCompartmentID);
     io.mapOptional("default-division-id", YamlConfig.DefaultDivisionID);

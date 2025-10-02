@@ -1,8 +1,7 @@
 import logging
 import multiprocessing as mp
 import threading
-import time
-from typing import Type, Optional, Tuple, Iterator, cast
+from typing import Type, Optional, Tuple, cast
 
 import kuzu
 import pandas as pd
@@ -16,7 +15,6 @@ logging.setLoggerClass(HAKCLogger)
 
 logger: HAKCLogger = cast(HAKCLogger, logging.getLogger('hakc.database'))
 
-import threading
 
 class HAKCDatabase:
     def __init__(self, db_dir: str, read_only: bool = False, max_num_threads=int(mp.cpu_count() / 2)):

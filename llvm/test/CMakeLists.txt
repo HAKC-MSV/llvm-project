@@ -266,7 +266,7 @@ if (LLVM_ENABLE_HAKC)
             ${hakc_server_config_in}
             ${hakc_client_config_in}
             ${hakc_lit_config_in}
-            ${hakc_configs_path}/client/linux/adjustments/hakc-spatial-adjustments.yaml
+            ${hakc_configs_path}/client/linux/adjustments/hakc-adjustments.yaml
     )
 
     file(GLOB_RECURSE HAKC_TESTS    ${HAKC_TEST_ROOT_DIR}/tests/*.c
@@ -294,29 +294,26 @@ if (LLVM_ENABLE_HAKC)
         else()
 
             #   Note: python/ contains a single test case which merely calls the python unittests and doesn't need additional configuration
-            set(pass_mode spatial)
-
             foreach (build_mode ${build_modes})
                 foreach (hakc_backing_type ${hakc_backing_types})
-                    set(hakc_socket_path ${CMAKE_BINARY_DIR}/tests/${test_prefix}/${hakc_backing_type}/hakc-sockets)
-                    string(LENGTH "${hakc_socket_path}/___" socket_path_length)
+                    set(hakc_socket_dir ${CMAKE_BINARY_DIR}/tests/${test_prefix}/${hakc_backing_type}/hakc-sockets)
+                    string(LENGTH "${hakc_socket_dir}/___" socket_path_length)
                     if (socket_path_length GREATER_EQUAL 107)
-                        message(WARNING "hakc_socket_path ${hakc_socket_path} is too long")
+                        message(WARNING "hakc_socket_dir ${hakc_socket_dir} is too long")
                     endif ()
 
-                    set(hakc_build_path             ${test_build_path})
-                    set(hakc_config_path            ${hakc_build_path}/${hakc_backing_type}/${build_mode}/hakc-config.yaml)
-                    set(hakc_server_config_path     ${hakc_build_path}/${hakc_backing_type}/${build_mode}/hakc-server-config.yaml)
-                    set(hakc_client_config_path     ${hakc_build_path}/${hakc_backing_type}/${build_mode}/hakc-client-config.yaml)
-                    set(hakc_log_path               ${hakc_build_path}/${hakc_backing_type}/${build_mode})
-                    set(hakc_lit_config_path        ${hakc_build_path}/${hakc_backing_type}/lit.local.cfg)
+                    set(hakc_build_dir              ${test_build_path})
+                    set(hakc_config_path            ${hakc_build_dir}/${hakc_backing_type}/${build_mode}/hakc-config.yaml)
+                    set(hakc_server_config_path     ${hakc_build_dir}/${hakc_backing_type}/${build_mode}/hakc-server-config.yaml)
+                    set(hakc_client_config_path     ${hakc_build_dir}/${hakc_backing_type}/${build_mode}/hakc-client-config.yaml)
+                    set(hakc_log_dir                ${hakc_build_dir}/${hakc_backing_type}/${build_mode})
+                    set(hakc_lit_config_path        ${hakc_build_dir}/${hakc_backing_type}/lit.local.cfg)
                     set(hakc_build_mode             ${build_mode})
-                    set(hakc_pass_mode              ${pass_mode})
                     set(hakc_server_core_count      ${hakc_test_core_count})
                     if(${hakc_backing_type} STREQUAL "kuzu")
-                        set(hakc_backing_path       ${hakc_build_path}/${hakc_backing_type}/hakc-db)
+                        set(hakc_backing_path       ${hakc_build_dir}/${hakc_backing_type}/hakc-db)
                     else()
-                        set(hakc_backing_path       ${hakc_build_path}/${hakc_backing_type}/hakc-dag.yaml)
+                        set(hakc_backing_path       ${hakc_build_dir}/${hakc_backing_type}/hakc-dag.yaml)
                     endif()
                     set(hakc_analysis_core_count    ${hakc_test_core_count})
 

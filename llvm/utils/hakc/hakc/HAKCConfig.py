@@ -105,8 +105,9 @@ class HAKCConfig:
         add_yaml_constructors()
         self.server_config = HAKCServerConfig(**read_sub_config(get_arg_or_error('server-config-path', **hakc_config)))
         # ignore pass_config_path
-        self.build_path = Path(get_arg_or_error('build-path', **hakc_config))
-        self.socket_path = Path(get_arg_or_error('socket-path', **hakc_config))
+        # self.build_path = Path(get_arg_or_error('build-path', **hakc_config))
+        self.socket_dir = Path(get_arg_or_error('socket-dir', **hakc_config))
+        self.socket_path = ''
         self.build_mode = parse_build_mode(get_arg_or_error('build-mode', **hakc_config))
         self.temporal_analysis_enabled = hakc_config.get('temporal-analysis-enabled', False)
         self.server_core_count = hakc_config.get('server-core-count', 64)
@@ -114,7 +115,7 @@ class HAKCConfig:
         self.default_division_id = hakc_config.get('default-division-id', 53)
         self.default_access_token = hakc_config.get('default-access-token', 5353)
         self.default_entry_token = hakc_config.get('default-entry-token', 3535)
-        self.log_path = hakc_config.get('log-path', '')
+        self.log_dir = hakc_config.get('log-dir', '')
         self.endpoints = HAKCEndpoints(**hakc_config)
         self.timeout = self.server_config.timeout
         self.log_level = self.server_config.log_level

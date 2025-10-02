@@ -18,7 +18,7 @@ HAKCSystemInformation::HAKCSystemInformation(CommonHAKCAnalysis &CommonAnalysis)
       SafeTransitionFunctionList(), AllocationFunctionList(),
       CustomTransferList(), CompartmentalizationSupportFunctionList(),
       IgnoredGlobalList(), ConsoleLogLevel(Verbose), FileLogLevel(Verbose),
-      BuildMode(InvalidBuildModeType), PassMode(InvalidPassModeType),
+      BuildMode(InvalidBuildModeType),
       PostTargetActionList(), PreTransferActionList(), HAKCSourcePathList(),
       IncludePathsList(), SeparateNamespacePathList(), StructList(),
       SymbolsToOutputDebugInfo(), CompartmentTransferFunctionList(),
@@ -99,10 +99,6 @@ HAKCBuildModeTypeEnum HAKCSystemInformation::GetBuildMode() const {
   return BuildMode;
 }
 
-HAKCPassModeTypeEnum HAKCSystemInformation::GetPassMode() const {
-  return PassMode;
-}
-
 function_def_t HAKCSystemInformation::CreateHAKCFunction(
     HAKCYAMLFunctionDefinition &YAMLFunctionDef) const {
   auto *TransferFunc = YAMLFunctionDef.GetFunction(TypeIdentifier);
@@ -170,15 +166,14 @@ void HAKCSystemInformation::GetAllDefinedHAKCFunctions(
 void HAKCSystemInformation::operator<<(HAKCYAMLConfig &Config) {
   auto Endpoints = Config.Endpoints;
 
-  BuildPath = Config.BuildPath;
+  BuildPath = Config.BuildDir;
   BuildMode = Config.BuildMode;
   if (BuildMode == RunConfigAndExit) {
     return;
   }
-  PassMode = Config.PassMode;
-  SocketPath = Config.SocketPath + "/" +
+  SocketPath = Config.SocketDir + "/" +
                std::to_string(get_threadid() % Config.ServerCoreCount);
-  LogPath = Config.LogPath;
+  LogPath = Config.LogDir;
   ServerCoreCount = Config.ServerCoreCount;
   CompartmentEndpoint = Endpoints.GetCompartmentEndpoint;
   DivisionEndpoint = Endpoints.GetDivisionEndpoint;
@@ -206,14 +201,6 @@ void HAKCSystemInformation::operator<<(HAKCYAMLConfig &Config) {
       NoTransferFunctionList.push_back(F);
     }
   }
-
-  // errs() << "Constructing SymbolsToOutputDebugInfo from
-  // Config.ClientConfig.PassDebugSymbols in file: " <<
-  // GetModule().getSourceFileName() <<"\n";
-  //
-  // for (auto& F : GetModule().getFunctionList()) {
-  //   errs() << "fn: " << F.getName() << "\n";
-  // }
 
   for (auto &SymbolName : Config.ClientConfig.PassDebugSymbols) {
     if (auto *F = GetModule().getFunction(SymbolName)) {

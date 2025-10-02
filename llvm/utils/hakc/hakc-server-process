@@ -114,7 +114,7 @@ def launch_reduce_proc(reduce_id: int, server_gather_buckets: type[mp.Manager.__
 def launch_server_gather_proc(server_id: int, config: HAKCConfig, ServerMainLogger: HAKCLogger,
                               server_gather_buckets: type[mp.Manager.__dict__],
                               server_gather_procs_completed: type[mp.Value]):
-    config.socket_path = Path(os.path.join(config.socket_path, str(server_id)))
+    config.socket_path = Path(os.path.join(config.socket_dir, str(server_id)))
     logger.debug(f"Spinning up server gather process {server_id}!")
     if config.socket_path.exists():
         config.socket_path.unlink()
@@ -136,8 +136,8 @@ def launch_server_gather_proc(server_id: int, config: HAKCConfig, ServerMainLogg
             server.server_close()
 
 def launch_server_proc(server_id: int, config: HAKCConfig, ServerMainLogger: HAKCLogger):
-    config.socket_path = Path(os.path.join(config.socket_path, str(server_id)))
-    logger.debug(f"Spinning up server process {server_id}!")
+    config.socket_path = Path(os.path.join(config.socket_dir, str(server_id)))
+    logger.debug(f"Spinning up server process {server_id} on socket {config.socket_path}!")
     if config.socket_path.exists():
         config.socket_path.unlink()
 
@@ -276,7 +276,7 @@ def main():
 
     root_logger = logging.getLogger()
     setup_logging(root_logger, log_level=config.log_level,
-                  log_file=config.log_path + "/hakc.server." + config.build_mode.value + ".log",
+                  log_file=config.log_dir + "/hakc.server." + config.build_mode.value + ".log",
                   log_mode=config.server_config.log_mode)
 
     server_main_logger: HAKCLogger = cast(HAKCLogger, logging.getLogger('hakc.server-main'))

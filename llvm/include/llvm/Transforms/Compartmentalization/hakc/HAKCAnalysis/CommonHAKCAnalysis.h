@@ -56,8 +56,6 @@ public:
 
   Module &GetModule() const;
 
-  ModuleAnalysisManager &GetMAM() const;
-
   Value *getDef(Value *V, bool followLoad);
 
   void findDefChain(Value *v, bool followLoad,
@@ -186,7 +184,7 @@ public:
 
   static Function *GetOriginalFunctionFromTransferFunction(Function *F);
 
-  std::string createLogPath(StringRef BuildPath, HAKCBuildModeTypeEnum BuildMode, HAKCPassModeTypeEnum PassMode);
+  std::string createLogPath(StringRef BuildPath, HAKCBuildModeTypeEnum BuildMode);
 
 private:
   static bool valueHasAttribute(Value *v, Attribute::AttrKind Kind);

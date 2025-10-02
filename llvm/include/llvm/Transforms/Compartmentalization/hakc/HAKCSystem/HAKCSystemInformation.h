@@ -52,7 +52,6 @@ public:
   HAKCLogLevel GetConsoleLogLevel() const;
   HAKCLogLevel GetFileLogLevel() const;
   HAKCBuildModeTypeEnum GetBuildMode() const;
-  HAKCPassModeTypeEnum GetPassMode() const;
   HAKCStructList GetStructList() const;
   HAKCTypeIdentifier &GetTypeIdentifier();
   Module &GetModule() const;
@@ -122,7 +121,6 @@ protected:
   HAKCLogLevel ConsoleLogLevel;
   HAKCLogLevel FileLogLevel;
   HAKCBuildModeTypeEnum BuildMode;
-  HAKCPassModeTypeEnum PassMode;
   HAKCPostTargetActionList PostTargetActionList;
   HAKCPreTransferActionList PreTransferActionList;
   HAKCStringList HAKCSourcePathList;

@@ -97,8 +97,7 @@ void CommonHAKCAnalysis::InitConfig(StringRef ConfigPath) {
       SystemConfig.ClientConfig.ConsoleLogLevel); // setting the errs() stream to
                                                 // the configured log level
   HAKCLog->addStream(
-      createLogPath(SystemConfig.BuildPath, SystemConfig.BuildMode,
-                    SystemConfig.PassMode),
+      createLogPath(SystemConfig.BuildDir, SystemConfig.BuildMode),
       SystemConfig.ClientConfig
           .FileLogLevel); // setting the fd_ostream to configured log level
 
@@ -115,23 +114,19 @@ CommonHAKCAnalysis::CommonHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM,
 }
 
 std::string CommonHAKCAnalysis::createLogPath(StringRef BuildPath,
-                                              HAKCBuildModeTypeEnum BuildMode,
-                                              HAKCPassModeTypeEnum PassMode) {
+                                              HAKCBuildModeTypeEnum BuildMode) {
   SmallString<256> Path;
   SmallString<256> ModulePath;
   GetModuleFullPath(M, ModulePath);
   sys::path::append(Path, BuildPath);
   sys::path::append(Path, ModulePath);
-  sys::path::replace_extension(Path, BuildModeToString[BuildMode] + "-" +
-                                         PassModeToString[PassMode] + ".log");
+  sys::path::replace_extension(Path, BuildModeToString[BuildMode] + ".log");
 
   sys::path::make_preferred(Path);
   return std::string(Path);
 }
 
 Module &CommonHAKCAnalysis::GetModule() const { return M; }
-
-ModuleAnalysisManager &CommonHAKCAnalysis::GetMAM() const { return MAM; }
 
 bool CommonHAKCAnalysis::IsHAKCTransferFunction(Function *F) {
   return IsFunctionInHAKCTransferFunctionList(

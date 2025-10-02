@@ -32,7 +32,7 @@ def main():
         config = HAKCConfig(**yaml.safe_load(f))
 
     root_logger = logging.getLogger()
-    setup_logging(root_logger, log_level=config.log_level, log_file=config.log_path + "/hakc.adjustments.log", log_mode=config.server_config.log_mode)
+    setup_logging(root_logger, log_level=config.log_level, log_file=config.log_dir + "/hakc.adjustments.log", log_mode=config.server_config.log_mode)
     # logger.error(f"Adjustments: {config.server_config.adjustments}")
     match config.server_config.backing_config.type:
         case HAKCBackingType.KUZU:

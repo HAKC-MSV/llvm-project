@@ -59,18 +59,13 @@ static bool runEnforcement(CommonHAKCAnalysis &HAKCAnalysis) {
   if (skip_current_file(HAKCAnalysis)) {
     return false;
   }
+  CommonHAKCAnalysis::getLogger(Info) << "Running Enforcement Pass Mode!\n";
   HAKCModuleAnalysis ModuleAnalysis(HAKCAnalysis);
   HAKCServerClient Client(ModuleAnalysis);
   HAKCTransformer Transformer(ModuleAnalysis, Client);
-  switch (HAKCAnalysis.GetSystemInfo().GetPassMode()) {
-  case Spatial:
-    CommonHAKCAnalysis::getLogger(Info) << "Running Spatial Enforcement Pass Mode!\n";
-    Transformer.performTransformations();
-    break;
-  default:
-    CommonHAKCAnalysis::getLogger(Fatal) << "Invalid HAKC Pass mode\n";
-    throw std::exception();
-  }
+
+  Transformer.performTransformations();
+
   return true;
 }
 
@@ -78,15 +73,8 @@ static bool runAnalysis(CommonHAKCAnalysis &HAKCAnalysis) {
   if (skip_current_file(HAKCAnalysis)) {
     return false;
   }
+  CommonHAKCAnalysis::getLogger(Info) << "Running Analysis Pass Mode!\n";
   HAKCModuleAnalysis ModuleAnalysis(HAKCAnalysis);
-  switch (HAKCAnalysis.GetSystemInfo().GetPassMode()) {
-  case Spatial:
-    CommonHAKCAnalysis::getLogger(Info) << "Running Spatial Analysis Pass Mode!\n";
-    break;
-  default:
-    CommonHAKCAnalysis::getLogger(Fatal) << "Invalid HAKC Pass mode\n";
-    throw std::exception();
-  }
 
   if (ShouldSendSymbolsToServer(ModuleAnalysis.GetTypeIdentifier())) {
     // Only ever connect to server if symbols need to be sent

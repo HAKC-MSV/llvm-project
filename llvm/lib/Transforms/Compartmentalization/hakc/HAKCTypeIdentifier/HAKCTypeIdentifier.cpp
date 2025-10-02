@@ -1844,10 +1844,6 @@ Module &HAKCTypeIdentifier::GetModule() const {
   return AnalysisHelper.GetModule();
 }
 
-ModuleAnalysisManager &HAKCTypeIdentifier::GetMAM() const {
-  return AnalysisHelper.GetMAM();
-}
-
 void HAKCTypeIdentifier::ProcessDebugInfo() {
   // this is where the dag analysis actually happens!
   DbgInfoFinder.processModule(GetModule());
