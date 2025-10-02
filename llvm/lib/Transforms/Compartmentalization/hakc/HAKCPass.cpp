@@ -1,7 +1,4 @@
-/**
- * @brief HAKC FunctionAnalysis and Transformation pass
- * @file HAKCPass.cpp
- */
+
 
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCPass.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/HAKCModuleAnalysis.h"
@@ -9,8 +6,6 @@
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCSystemInformation.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCTransformer.h"
 
-#include "llvm/Support/FileSystem.h"
-#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include "llvm/IR/PassManager.h"
@@ -20,8 +15,6 @@
 // critical reference guide for cl:
 // https://llvm.org/docs/CommandLine.html#internal-vs-external-storage
 std::string HAKC_CONFIG_PATH;
-// TODO: add start up log level option
-// std::string HAKC_CONFIG_PATH;
 
 static cl::opt<std::string, true>
 HAKC_CONFIG_CL("hakc-config", cl::desc("Path to HAKC Configuration File"),
