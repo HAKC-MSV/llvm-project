@@ -1,0 +1,4 @@
+config.name = "hakc-unittests"
+config.test_source_root = "@hakc_test_path@"
+config.substitutions.append(("%HAKC_RUN_PYTHON_UNITTESTS", "python3 @hakc_python_test_process@"))
+config.suffixes = [".py"]

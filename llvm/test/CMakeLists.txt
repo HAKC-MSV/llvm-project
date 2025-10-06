@@ -251,10 +251,10 @@ if (LLVM_ENABLE_HAKC)
     set(hakc_client_timeout         5)
     set(hakc_max_connection_retries 2)
 
-    set(hakc_config_in              ${hakc_configs_path}/hakc-config.yaml.in)
-    set(hakc_server_config_in       ${hakc_configs_path}/server/hakc-server-config.yaml.in)
-    set(hakc_client_config_in       ${hakc_configs_path}/client/linux/x86/hakc-client-config.yaml.in)
-    set(hakc_lit_config_in          ${hakc_configs_path}/tests/hakc-lit.local.cfg.in)
+    set(hakc_config_in              ${HAKC_TEST_ROOT_DIR}/configs/hakc-config.yaml.in)
+    set(hakc_server_config_in       ${HAKC_TEST_ROOT_DIR}/configs/hakc-server-config.yaml.in)
+    set(hakc_client_config_in       ${HAKC_TEST_ROOT_DIR}/configs/hakc-client-config.yaml.in)
+    set(hakc_lit_config_in          ${HAKC_TEST_ROOT_DIR}/configs/hakc-lit.local.cfg.in)
 
     # adjustments in tests currently unsupported
     set(hakc_adjustments_path_out   "")
@@ -266,7 +266,7 @@ if (LLVM_ENABLE_HAKC)
             ${hakc_server_config_in}
             ${hakc_client_config_in}
             ${hakc_lit_config_in}
-            ${hakc_configs_path}/client/linux/adjustments/hakc-adjustments.yaml
+            ${HAKC_TEST_ROOT_DIR}/configs/hakc-spatial-adjustments.yaml
     )
 
     file(GLOB_RECURSE HAKC_TESTS    ${HAKC_TEST_ROOT_DIR}/tests/*.c
@@ -287,9 +287,9 @@ if (LLVM_ENABLE_HAKC)
         if(hakc_test_path MATCHES ".*python.*")
             set(hakc_python_test_process            ${LLVM_MAIN_SRC_DIR}/utils/hakc/hakc-test-process)
             set(hakc_lit_config_path                ${test_build_path}/lit.local.cfg)
-            configure_file(                         ${hakc_configs_path}/tests/hakc-unittests-lit.local.cfg.in
+            configure_file(                         ${HAKC_TEST_ROOT_DIR}/configs/hakc-unittests-lit.local.cfg.in
                                                     ${hakc_lit_config_path})
-            list(APPEND HAKC_TEST_INPUTS            ${hakc_configs_path}/tests/hakc-unittests-lit.local.cfg.in)
+            list(APPEND HAKC_TEST_INPUTS            ${HAKC_TEST_ROOT_DIR}/configs/hakc-unittests-lit.local.cfg.in)
             list(APPEND HAKC_TEST_GENERATED_FILES   ${hakc_lit_config_path})
         else()
 
