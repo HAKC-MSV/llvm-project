@@ -34,8 +34,6 @@ public:
   static bool isRequired() { return true; }
 };
 
-void writeCallGraphDOT(Module &M, ModuleAnalysisManager &MAM, std::string pathPrefix);
-
 ModulePass *createCallGraphViewerPass();
 ModulePass *createCallGraphDOTPrinterPass();
 

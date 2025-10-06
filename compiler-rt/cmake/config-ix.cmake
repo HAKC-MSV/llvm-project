@@ -668,9 +668,6 @@ if(APPLE)
   list_intersect(ORC_SUPPORTED_ARCH
     ALL_ORC_SUPPORTED_ARCH
     SANITIZER_COMMON_SUPPORTED_ARCH)
-  list_intersect(HAKC_SUPPORTED_ARCH
-    ALL_HAKC_SUPPORTED_ARCH
-    SANITIZER_COMMON_SUPPORTED_ARCH)
 
 else()
   # Architectures supported by compiler-rt libraries.
@@ -704,7 +701,6 @@ else()
   filter_available_targets(GWP_ASAN_SUPPORTED_ARCH ${ALL_GWP_ASAN_SUPPORTED_ARCH})
   filter_available_targets(NSAN_SUPPORTED_ARCH ${ALL_NSAN_SUPPORTED_ARCH})
   filter_available_targets(ORC_SUPPORTED_ARCH ${ALL_ORC_SUPPORTED_ARCH})
-  filter_available_targets(HAKC_SUPPORTED_ARCH ${ALL_HAKC_SUPPORTED_ARCH})
 endif()
 
 if (MSVC)
@@ -895,8 +891,6 @@ if (COMPILER_RT_HAS_SANITIZER_COMMON AND XRAY_SUPPORTED_ARCH AND
 else()
   set(COMPILER_RT_HAS_XRAY FALSE)
 endif()
-
-set(COMPILER_RT_HAS_HAKC TRUE)
 
 if (ORC_SUPPORTED_ARCH)
   set(COMPILER_RT_HAS_ORC TRUE)
