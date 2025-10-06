@@ -11,4 +11,4 @@ six==1.17.0
 tqdm==4.67.1
 tzdata==2025.1
 typing_extensions===4.14.1
-psutils==7.0.0
+psutil==7.0.0

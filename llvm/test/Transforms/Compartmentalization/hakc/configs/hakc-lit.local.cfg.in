@@ -1,0 +1,17 @@
+config.name = "@hakc_test_name@-@hakc_backing_type@"
+config.test_source_root = "@hakc_test_path@"
+config.test_exec_root = "@hakc_test_path@/@hakc_backing_type@"
+
+config.substitutions.append(("%HAKC_PYTHON_VENV", "source @HAKC_PYTHON_VENV@/bin/activate"))
+config.substitutions.append(("%HAKC_START_ANALYSIS_SERVER",
+                             f'rm -rf @hakc_socket_path@ && mkdir -p @hakc_socket_path@ && eval \"python @hakc_server_process@ --config @hakc_build_path@/@hakc_backing_type@/analysis/hakc-config.yaml &\"'))
+config.substitutions.append(
+    ("%HAKC_RUN_ANALYSIS_PASS",
+     "clang -O0 -g -S -emit-llvm -mllvm --enable-hakc -mllvm --hakc-config=@hakc_build_path@/@hakc_backing_type@/analysis/hakc-config.yaml -o %t %s "))
+config.substitutions.append(("%HAKC_START_ENFORCEMENT_SERVER",
+                             f'rm -rf @hakc_socket_path@ && mkdir -p @hakc_socket_path@ && eval \"python @hakc_server_process@ --config @hakc_build_path@/@hakc_backing_type@/enforcement/hakc-config.yaml &\"'))
+config.substitutions.append(
+    ("%HAKC_RUN_ENFORCEMENT_PASS",
+     "clang -O0 -g -S -emit-llvm -mllvm --enable-hakc -mllvm --hakc-config=@hakc_build_path@/@hakc_backing_type@/enforcement/hakc-config.yaml -o %t %s "))
+config.suffixes = [".c", ".cpp"]
+config.substitutions.append(("%HAKC_EVALUATE", "cat %t | FileCheck %s || exit 1"))
