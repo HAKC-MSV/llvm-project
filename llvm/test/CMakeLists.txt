@@ -266,7 +266,6 @@ if (LLVM_ENABLE_HAKC)
             ${hakc_server_config_in}
             ${hakc_client_config_in}
             ${hakc_lit_config_in}
-            ${HAKC_TEST_ROOT_DIR}/configs/hakc-spatial-adjustments.yaml
     )
 
     file(GLOB_RECURSE HAKC_TESTS    ${HAKC_TEST_ROOT_DIR}/tests/*.c
