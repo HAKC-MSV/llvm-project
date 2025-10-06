@@ -75,22 +75,18 @@ void CommonHAKCAnalysis::InitConfig(StringRef ConfigPath) {
   if (!sys::fs::exists(ConfigPath)) {
     getLogger(Fatal) << "Could not find YAML file " << ConfigPath << "\n";
     throw std::exception();
-  } else if (!sys::fs::is_regular_file(ConfigPath)) {
+  }
+  if (!sys::fs::is_regular_file(ConfigPath)) {
     getLogger(Fatal) << ConfigPath << " is not a regular file\n";
     throw std::exception();
   }
 
-  HAKCYamlConfig SystemConfig;
+  HAKCYAMLConfig SystemConfig;
   ErrorOr<std::unique_ptr<MemoryBuffer>> mb = MemoryBuffer::getFile(ConfigPath);
   yaml::Input yin(mb.get()->getMemBufferRef().getBuffer());
 
   // yaml parsed here
   yin >> SystemConfig;
-  // abort run if not correct source file, and if in single file debug mode. Ensure that the hakcpass is aborted correctly once the hakc analysis returns.
-  if (M.getSourceFileName() != SystemConfig.SingleSourceFile && SystemConfig.PassMode == RunDataAccessGraphAnalysisSingleSourceFile) {
-    abort = true;
-    return;
-  }
 
   if (yin.error()) {
     getLogger(Fatal) << "Error parsing config file " << ConfigPath << "\n";
@@ -98,12 +94,12 @@ void CommonHAKCAnalysis::InitConfig(StringRef ConfigPath) {
   }
   // Creating fd log as soon as possible
   HAKCLog->SetConsoleConfiguredLogLevels(
-      SystemConfig.ConsoleLogLevel); // setting the errs() stream to the
-                                     // configured log level
-  // HAKCLog->addStream(
-  //     createLogPath(SystemConfig.DagAnalysisRootPath, SystemConfig.PassMode),
-  //     SystemConfig
-  //         .FileLogLevel); // setting the fd_ostream to configured log level
+      SystemConfig.ClientConfig.ConsoleLogLevel); // setting the errs() stream to
+                                                // the configured log level
+  HAKCLog->addStream(
+      createLogPath(SystemConfig.BuildDir, SystemConfig.BuildMode),
+      SystemConfig.ClientConfig
+          .FileLogLevel); // setting the fd_ostream to configured log level
 
   // A bunch of work is done creating SystemInfo, so we want the log to be
   // created before this
@@ -113,49 +109,24 @@ void CommonHAKCAnalysis::InitConfig(StringRef ConfigPath) {
 CommonHAKCAnalysis::CommonHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM,
                                        StringRef ConfigPath)
     : M(M), MAM(MAM), SystemInfo(*this) {
-  // create hakc logger?
-  // auto* log = new HAKCLogger();
-  // HAKCLog = std::make_shared<HAKCLogger>();
-  // trying to store reference to HAKCLog so it is not destroyed during common
-  // analysis lifetime
   _HAKCLog = HAKCLog;
   InitConfig(ConfigPath);
 }
 
-// std::string CommonHAKCAnalysis::createDagYamlPath(StringRef DagAnalysisRootPath) {
-//   SmallString<256> Path;
-//   SmallString<256> ModulePath;
-//   GetModuleFullPath(M, ModulePath);
-//   sys::path::append(Path, DagAnalysisRootPath);
-//   sys::path::append(Path, ModulePath);
-//   sys::path::replace_extension(Path, ".dag.yml");
-//   sys::path::make_preferred(Path);
-//   return std::string(Path);
-// }
-
-std::string CommonHAKCAnalysis::createLogPath(StringRef RootPath, HAKCPassModeTypeEnum PassMode) {
+std::string CommonHAKCAnalysis::createLogPath(StringRef BuildPath,
+                                              HAKCBuildModeTypeEnum BuildMode) {
   SmallString<256> Path;
   SmallString<256> ModulePath;
   GetModuleFullPath(M, ModulePath);
-  sys::path::append(Path, RootPath);
+  sys::path::append(Path, BuildPath);
   sys::path::append(Path, ModulePath);
+  sys::path::replace_extension(Path, BuildModeToString[BuildMode] + ".log");
 
-  if ( PassMode == RunDataAccessGraphAnalysis || PassMode == RunDataAccessGraphAnalysisSingleSourceFile) {
-    sys::path::replace_extension(Path, ".dag.log");
-  }
-  else if (PassMode == RunCompartmentalization) {
-    sys::path::replace_extension(Path, ".comp.log");
-  }
-  else if (PassMode == RunConfigAndExit || PassMode == InvalidPassModeType) {
-    return "";
-  }
   sys::path::make_preferred(Path);
   return std::string(Path);
 }
 
 Module &CommonHAKCAnalysis::GetModule() const { return M; }
-
-ModuleAnalysisManager &CommonHAKCAnalysis::GetMAM() const { return MAM; }
 
 bool CommonHAKCAnalysis::IsHAKCTransferFunction(Function *F) {
   return IsFunctionInHAKCTransferFunctionList(
@@ -177,13 +148,13 @@ bool CommonHAKCAnalysis::IsHAKCCompartmentalizationSupportFunction(
       F, SystemInfo.CompartmentalizationSupportFunctions());
 }
 
-HAKCLogger &CommonHAKCAnalysis::getLogger(HAKCLogLevel log_level, bool suppress_output) {
+HAKCLogger &CommonHAKCAnalysis::getLogger(HAKCLogLevel log_level,
+                                          bool suppress_output) {
   // must provide a log_level to print
   if (suppress_output) {
     // errs() << "SUPPRESSING OUTPUT!\n";
     HAKCLog->SetLogLevel(Disabled);
-  }
-  else {
+  } else {
     HAKCLog->SetLogLevel(log_level);
   }
   return *HAKCLog;
@@ -566,13 +537,12 @@ void CommonHAKCAnalysis::VerifyFunction(Function *F) {
 }
 
 FunctionType *
-CommonHAKCAnalysis::GetDataAuthenticationFunctionType(Module &M,
-                                                      unsigned AddrSpace) {
+CommonHAKCAnalysis::GetDataAuthenticationFunctionType(unsigned AddrSpace) {
   return GetSystemInfo().DataValidation()->GetFunction()->getFunctionType();
 }
 
 FunctionType *
-CommonHAKCAnalysis::GetTransferFunctionType(Module &M, unsigned int AddrSpace) {
+CommonHAKCAnalysis::GetTransferFunctionType(unsigned int AddrSpace) {
   return GetSystemInfo()
       .CompartmentTransfer(false)
       ->GetFunction()
@@ -580,13 +550,12 @@ CommonHAKCAnalysis::GetTransferFunctionType(Module &M, unsigned int AddrSpace) {
 }
 
 FunctionType *
-CommonHAKCAnalysis::GetCodeAuthenticationFunctionType(Module &M,
-                                                      unsigned AddrSpace) {
+CommonHAKCAnalysis::GetCodeAuthenticationFunctionType(unsigned AddrSpace) {
   return GetSystemInfo().CodeValidation()->GetFunction()->getFunctionType();
 }
 
-bool CommonHAKCAnalysis::IsCompartmentalizedFunction(
-    Function *F, HAKCServerClient &Client) {
+bool CommonHAKCAnalysis::IsCompartmentalizedFunction(Function *F,
+                                                     HAKCServerClient &Client) {
   return !IsUncompartmentalizedSymbol(F, Client) && !IsOutsideTransferFunc(F);
 }
 
@@ -616,8 +585,8 @@ bool CommonHAKCAnalysis::FunctionIsModParamGetCtx(Function *F) {
   return F->getName().starts_with(MODPARAM_GETCTX_PREFIX);
 }
 
-bool CommonHAKCAnalysis::functionIsTransferCandidate(
-    Function *F, HAKCServerClient &Client) {
+bool CommonHAKCAnalysis::functionIsTransferCandidate(Function *F,
+                                                     HAKCServerClient &Client) {
   auto Division = Client.GetDivision(F);
   return !IsNoTransferFunction(F) && !IsUncompartmentalizedSymbol(F, Client) &&
          !F->isDeclaration() && !IsCapabilityReassignmentFunc(F) &&
@@ -678,8 +647,8 @@ bool CommonHAKCAnalysis::PointerShouldBeConsideredCode(
   return false;
 }
 
-bool CommonHAKCAnalysis::IsUncompartmentalizedSymbol(
-    GlobalValue *GV, HAKCServerClient &Client) {
+bool CommonHAKCAnalysis::IsUncompartmentalizedSymbol(GlobalValue *GV,
+                                                     HAKCServerClient &Client) {
   auto Division = Client.GetDivision(GV);
   return Division.GetHAKCCompartment() ==
          Client.GetDefaultDivision().GetHAKCCompartment();

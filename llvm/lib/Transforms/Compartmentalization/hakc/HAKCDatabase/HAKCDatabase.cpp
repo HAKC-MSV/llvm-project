@@ -141,25 +141,23 @@ void HAKCDatabaseResponse::parse_result(json::Object *_result) {
   }
   // TODO: update if endpoints change
   if (response_endpoint ==
-      database_information.GetTerminateConnectionEndpoint()) {
+      SystemInformation.GetTerminateConnectionEndpoint()) {
     terminate_connection = true;
     return;
   }
-  if (response_endpoint == database_information.GetCompartmentEndpoint()) {
+  if (response_endpoint == SystemInformation.GetCompartmentEndpoint()) {
     auto payload = GetObject(_result, "Data");
     result.data = std::make_shared<HAKCCompartmentPayload>(payload);
-  } else if (response_endpoint == database_information.GetDivisionEndpoint()) {
+  } else if (response_endpoint == SystemInformation.GetDivisionEndpoint()) {
     auto payload = GetObject(_result, "Data");
     result.data = std::make_shared<HAKCDivisionPayload>(payload);
-  } else if (response_endpoint == database_information.GetSymbolDivisionEndpoint()) {
+  } else if (response_endpoint == SystemInformation.GetSymbolDivisionEndpoint()) {
     auto payload = GetObject(_result, "Data");
     result.data = std::make_shared<HAKCDivisionCompartmentPayload>(payload);
-  } else if (response_endpoint == database_information.GetValidTargetsEndpoint()) {
+  } else if (response_endpoint == SystemInformation.GetValidTargetsEndpoint()) {
     auto payload = GetObject(_result, "Data");
     result.data = std::make_shared<HAKCValidTargetsPayload>(payload);
-  } else if (response_endpoint == database_information.GetAddSymbolsEndpoint() ||
-             response_endpoint == database_information.GetAddFunctionEndpoint() ||
-             response_endpoint == database_information.GetAddGlobalVariableEndpoint()) {
+  } else if (response_endpoint == SystemInformation.GetAddSymbolsEndpoint()) {
     // These requests don't have a 'Data' field to extract, so just pass the result
     result.data = std::make_shared<HAKCPayload>(_result);
   } else {
@@ -171,10 +169,10 @@ void HAKCDatabaseResponse::parse_result(json::Object *_result) {
 }
 
 HAKCDatabaseResponse::HAKCDatabaseResponse(
-    const HAKCDatabaseInformation &database_information)
-    : Response(), Timeout(database_information.GetServerTimeout()),
+    const HAKCSystemInformation &SystemInformation)
+    : Response(), Timeout(SystemInformation.GetServerTimeout()),
       Success(false), response_endpoint(), result(HAKCResult()),
-      database_information(database_information), terminate_connection(false) {}
+      SystemInformation(SystemInformation), terminate_connection(false) {}
 
 
 void HAKCDatabaseRequest::operator>>(raw_ostream &OS) const {
@@ -255,12 +253,12 @@ void HAKCDatabaseResponse::operator<<(raw_socket_stream &OS) {
 }
 
 HAKCDatabaseConnection::HAKCDatabaseConnection(
-    const HAKCDatabaseInformation &DatabaseInformation, bool debug)
-    : Socket(nullptr), DatabaseInformation(DatabaseInformation), debug(debug) {}
+    const HAKCSystemInformation &SystemInformation, bool debug)
+    : Socket(nullptr), SystemInformation(SystemInformation), debug(debug) {}
 
 HAKCDatabaseResponse HAKCDatabaseConnection::HandleRequest(
     const HAKCDatabaseRequest &Request) const {
-  HAKCDatabaseResponse Response(DatabaseInformation);
+  HAKCDatabaseResponse Response(SystemInformation);
   Request >> *Socket;
   Response << *Socket;
   return Response;
@@ -288,7 +286,7 @@ bool HAKCDatabaseConnection::CheckConnection() const {
 void HAKCDatabaseConnection::connect() {
   close();
   unsigned current_try = 0;
-  auto TimeoutInSeconds = DatabaseInformation.GetServerTimeout().count() / 1000;
+  auto TimeoutInSeconds = SystemInformation.GetServerTimeout().count() / 1000;
   if (TimeoutInSeconds == 0) {
     TimeoutInSeconds = 1;
   }
@@ -297,24 +295,24 @@ void HAKCDatabaseConnection::connect() {
     try {
       CommonHAKCAnalysis::getLogger(Debug) << "...";
       auto NewConnection = raw_socket_stream::createConnectedUnix(
-          DatabaseInformation.GetServerURL());
+          SystemInformation.GetSocketPath());
       if (!NewConnection) {
         /* NB: calling consuming all the errors is required in order for the
          * Expected object to be properly destructed. llvm::toString does
          * this.
          */
         CommonHAKCAnalysis::getLogger(Verbose)
-            << "\nError connecting to " << DatabaseInformation.GetServerURL()
+            << "\nError connecting to " << SystemInformation.GetSocketPath()
             << ": " << llvm::toString(NewConnection.takeError()) << "\n";
         throw std::exception();
       }
       CommonHAKCAnalysis::getLogger(Debug)
-          << "Connected to " << DatabaseInformation.GetServerURL() << "\n";
+          << "Connected to " << SystemInformation.GetSocketPath() << "\n";
       Socket = std::move(*NewConnection);
       break;
     } catch (...) {
       current_try++;
-      if (current_try >= DatabaseInformation.GetMaxRetries()) {
+      if (current_try >= SystemInformation.GetMaxRetries()) {
         break;
       }
       sleep(TimeoutInSeconds);
@@ -323,7 +321,7 @@ void HAKCDatabaseConnection::connect() {
 
   if (!CheckConnection()) {
     CommonHAKCAnalysis::getLogger(Fatal)
-        << "Could not connect to " << DatabaseInformation.GetServerURL()
+        << "Could not connect to " << SystemInformation.GetSocketPath()
         << "\n";
     throw std::exception();
   }

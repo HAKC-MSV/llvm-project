@@ -113,7 +113,7 @@ class HAKCDatabaseResponse {
 public:
   friend HAKCResult;
   // read in the HAKCResponse structure from server
-  HAKCDatabaseResponse(const HAKCDatabaseInformation &database_information);
+  HAKCDatabaseResponse(const HAKCSystemInformation &SystemInformation);
   void parse_result(json::Object *_result);
 
   operator bool() const;
@@ -130,14 +130,14 @@ protected:
   bool Success;
   std::string response_endpoint;
   HAKCResult result;
-  const HAKCDatabaseInformation &database_information;
+  const HAKCSystemInformation &SystemInformation;
   bool terminate_connection;
   ssize_t ReadFromSocket(raw_socket_stream &OS, void *Dest, ssize_t Size);
 };
 
 class HAKCDatabaseConnection {
 public:
-  HAKCDatabaseConnection(const HAKCDatabaseInformation &DatabaseInformation,
+  HAKCDatabaseConnection(const HAKCSystemInformation &SystemInformation,
                          bool debug);
 
   HAKCDatabaseResponse HandleRequest(const HAKCDatabaseRequest &Request) const;
@@ -150,13 +150,13 @@ public:
 
   void connect();
 
-  const HAKCDatabaseInformation &GetDatabaseInformation() {
-    return DatabaseInformation;
+  const HAKCSystemInformation &GetSystemInformation() {
+    return SystemInformation;
   }
 
 protected:
   std::unique_ptr<raw_socket_stream> Socket;
-  const HAKCDatabaseInformation &DatabaseInformation;
+  const HAKCSystemInformation &SystemInformation;
   bool debug;
 
   bool CheckConnection() const;

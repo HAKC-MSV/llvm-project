@@ -48,7 +48,7 @@ public:
 
   virtual HAKCCompartmentDivision &GetDivision(GlobalValue *GV);
 
-  HAKCCompartmentP GetCompartment(hakc_compartment_id_t CompartmentID);
+  virtual HAKCCompartmentP GetCompartment(hakc_compartment_id_t CompartmentID);
 
   void GetValidTargets(HAKCCompartment &Compartment);
 
@@ -57,7 +57,6 @@ public:
 protected:
   HAKCModuleAnalysis &ModuleAnalysis;
   HAKCSystemInformation &SystemInformation;
-  const HAKCDatabaseInformation &DatabaseInformation;
   std::vector<HAKCCompartmentP> Compartments;
   std::vector<HAKCDivisionP> Divisions;
   HAKCDatabaseConnection Client;
@@ -87,6 +86,24 @@ protected:
                                      bool CheckForExisting);
 
   HAKCDivisionP FindCachedSymbolDivision(HAKCSymbolP Symbol) const;
+
+};
+
+class HAKCNullServerClient : public HAKCServerClient {
+public:
+  explicit HAKCNullServerClient(HAKCModuleAnalysis &ModuleAnalysis);
+
+  ~HAKCNullServerClient() override;
+
+  HAKCCompartmentDivision &GetDefaultDivision() override;
+
+  HAKCCompartmentDivision &GetDivision(GlobalValue *GV) override;
+
+  HAKCCompartmentP GetCompartment(hakc_compartment_id_t CompartmentID) override;
+
+protected:
+  std::shared_ptr<HAKCCompartmentDivision> DefaultCompartmentDivision;
+  HAKCCompartmentP DefaultCompartment;
 
 };
 

@@ -38,8 +38,6 @@ protected:
 
   HAKCSystemInformation SystemInfo;
 
-  // TODO remove below?
-  // HAKCWriter &HAKC_Writer;
   std::shared_ptr<HAKCLogger> _HAKCLog;
 
   static bool IsFunctionInHAKCTransferFunctionList(
@@ -48,22 +46,15 @@ protected:
   void InitConfig(StringRef ConfigPath);
 
 public:
-  bool abort = false;
 
   virtual ~CommonHAKCAnalysis() = default;
 
-  std::shared_ptr<HAKCLogger> get() { return _HAKCLog; }
-
-  // explicit CommonHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM,
-  //                             StringRef ConfigPath, HAKCWriter &HAKC_Writer);
   explicit CommonHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM,
                               StringRef ConfigPath);
 
   HAKCSystemInformation &GetSystemInfo();
 
   Module &GetModule() const;
-
-  ModuleAnalysisManager &GetMAM() const;
 
   Value *getDef(Value *V, bool followLoad);
 
@@ -118,13 +109,11 @@ public:
   static HAKCLogger &getLogger(HAKCLogLevel log_level,
                                bool suppress_output = false);
 
-  FunctionType *GetDataAuthenticationFunctionType(Module &M,
-                                                  unsigned AddrSpace = 0);
+  FunctionType *GetDataAuthenticationFunctionType(unsigned AddrSpace = 0);
 
-  FunctionType *GetCodeAuthenticationFunctionType(Module &M,
-                                                  unsigned AddrSpace = 0);
+  FunctionType *GetCodeAuthenticationFunctionType(unsigned AddrSpace = 0);
 
-  FunctionType *GetTransferFunctionType(Module &M, unsigned AddrSpace = 0);
+  FunctionType *GetTransferFunctionType(unsigned AddrSpace = 0);
 
   static bool FunctionIsComplexVariadic(Function *F);
 
@@ -195,7 +184,7 @@ public:
 
   static Function *GetOriginalFunctionFromTransferFunction(Function *F);
 
-  std::string createLogPath(StringRef DagAnalysisRootPath, HAKCPassModeTypeEnum PassMode);
+  std::string createLogPath(StringRef BuildPath, HAKCBuildModeTypeEnum BuildMode);
 
 private:
   static bool valueHasAttribute(Value *v, Attribute::AttrKind Kind);

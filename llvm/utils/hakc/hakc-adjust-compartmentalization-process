@@ -1,0 +1,76 @@
+#!/usr/bin/env python3
+import argparse
+import logging
+import signal
+import sys
+import time
+from typing import cast
+
+import yaml
+
+from hakc.HAKCCompartmentalization import HAKCCompartmentalization
+from hakc.HAKCConfig import HAKCConfig, HAKCBackingType
+from hakc.HAKCLogger import setup_logging, HAKCLogger
+from hakc.HAKCUtils import copy_database, delete_database
+
+logging.setLoggerClass(HAKCLogger)
+
+logger = cast(HAKCLogger, logging.getLogger('hakc.adjust-compartmentalization-process'))
+
+def cleanup_processes():
+    import subprocess
+    subprocess.run(['pkill', '-9', '-f','hakc-adjust-compartmentalization-process'])
+
+def main():
+    parser = argparse.ArgumentParser(description='HAKC Adjust Compartmentalization Process')
+    parser.add_argument('--config', help='Path to server config file', required=True)
+    args = parser.parse_args()
+
+    config = None
+
+    with open(args.config, 'r') as f:
+        config = HAKCConfig(**yaml.safe_load(f))
+
+    root_logger = logging.getLogger()
+    setup_logging(root_logger, log_level=config.log_level, log_file=config.log_dir + "/hakc.adjustments.log", log_mode=config.server_config.log_mode)
+    # logger.error(f"Adjustments: {config.server_config.adjustments}")
+    match config.server_config.backing_config.type:
+        case HAKCBackingType.KUZU:
+
+            if config.server_config.adjustments:
+                start = time.time()
+
+                adjusted_db_path = config.server_config.backing_config.path + "-adjusted"
+                delete_database(adjusted_db_path)
+                copy_database(config.server_config.backing_config.path, adjusted_db_path)
+                logger.error(f"Copied kuzu-db from {config.server_config.backing_config.path} to {adjusted_db_path}")
+
+                compartmentalization = HAKCCompartmentalization(db_dir=adjusted_db_path)
+                compartmentalization.perform_adjustments(config.server_config.adjustments)
+
+                end = time.time()
+                compartmentalization.conn.print_stats()
+
+                logger.info(f'Finished Adjusting Compartmentalization')
+                logger.info(f'    Total Time: {end - start} seconds')
+
+                compartmentalization.close_conn()
+
+        case HAKCBackingType.YAML:
+            logger.error(f"YAML Currently unsupported for adjustments")
+            pass
+
+
+
+if __name__ == "__main__":
+    def signal_handler(sig, frame):
+        # print("\nCtrl+C detected via signal handler. Exiting.")
+        # Perform cleanup here
+        print(f"Catching signal {sig} in frame {frame}")
+        cleanup_processes()
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTSTP, signal_handler)
+
+    main()

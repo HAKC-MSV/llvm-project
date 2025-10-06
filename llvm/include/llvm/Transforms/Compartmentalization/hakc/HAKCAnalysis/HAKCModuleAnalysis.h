@@ -63,16 +63,6 @@ public:
   bool FunctionIsInAnalysisSet(Function *F);
 
   void OutputYAML(raw_ostream &out) const;
-
-  void TemporalAnalysisHandleCall(CallInst *Call, HAKCFunctionP FP);
-
-  void TemporalAnalysisHandleLoad(LoadInst *Load, HAKCFunctionP FP);
-
-  void TemporalAnalysisHandleStore(StoreInst *Store, HAKCFunctionP FP);
-
-  void FunctionTemporalAnalysis(const DISubprogram *SubProg);
-
-  void TemporalAnalysis();
 };
 
 } // namespace llvm::hakc
