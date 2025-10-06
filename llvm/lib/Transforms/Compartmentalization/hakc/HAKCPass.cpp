@@ -1,7 +1,4 @@
-/**
- * @brief HAKC FunctionAnalysis and Transformation pass
- * @file HAKCPass.cpp
- */
+
 
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCPass.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/HAKCModuleAnalysis.h"

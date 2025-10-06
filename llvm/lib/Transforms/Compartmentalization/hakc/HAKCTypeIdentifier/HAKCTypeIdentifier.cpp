@@ -1,6 +1,4 @@
-//
-// Created by derrick on 9/8/21.
-//
+
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTypeIdentifier/HAKCTypeIdentifier.h"
 
 #include "llvm/AsmParser/Parser.h"
@@ -1718,29 +1716,12 @@ HAKCTypeIdentifier::FindGlobal(const GlobalVariable *GV,
 }
 
 std::shared_ptr<HAKCSymbolInfo>
-HAKCTypeIdentifier::FindSymbol(Value *V, bool SearchUnmapped) {
+HAKCTypeIdentifier::FindSymbol(Value *V, bool SearchSymbolsMissingDebug) {
   if (auto *GV = dyn_cast<GlobalVariable>(V)) {
-    return FindGlobal(GV, SearchUnmapped);
+    return FindGlobal(GV, SearchSymbolsMissingDebug);
   }
   if (const auto *F = dyn_cast<Function>(V)) {
-    return FindFunction(F, SearchUnmapped);
-  }
-  return nullptr;
-}
-
-HAKCSymbolP
-HAKCTypeIdentifier::FindYamlSymbol(const HAKCYamlSymbol &YamlSymbol) {
-  for (auto &it : globals) {
-    if (YamlSymbol == *it.second) { return it.second; }
-  }
-  for (auto &Unmapped : UnmappedGlobals) {
-    if (YamlSymbol == *Unmapped) { return Unmapped; }
-  }
-  for (auto &it : functions) {
-    if (YamlSymbol == *it.second) { return it.second; }
-  }
-  for (auto &Unmapped : UnmappedFunctions) {
-    if (YamlSymbol == *Unmapped) { return Unmapped; }
+    return FindFunction(F, SearchSymbolsMissingDebug);
   }
   return nullptr;
 }

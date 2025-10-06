@@ -9,9 +9,6 @@
 /// (debug types, llvm types, debug records, etc.)
 ///
 //===----------------------------------------------------------------------===//
-//
-// Created by derrick on 9/8/21.
-//
 
 #ifndef PMC_HAKCTYPEIDENTIFIER_H
 #define PMC_HAKCTYPEIDENTIFIER_H
@@ -39,16 +36,29 @@ typedef std::shared_ptr<HAKCGlobalInfo> HAKCGlobalP;
 class CommonHAKCAnalysis;
 class HAKCPointerBase;
 
+/// This class attempts to find specific type information for all pointers
+/// by utilizing DWARF debug info.  With LLVM Opaque pointer types missing
+/// the underlying data type, the debug information is needed to get size
+/// information for compartment transfers.
 class HAKCTypeIdentifier {
 public:
   explicit HAKCTypeIdentifier(CommonHAKCAnalysis &Analysis);
 
   void OutputYAML(raw_ostream &out) const;
 
-  HAKCSymbolP FindSymbol(Value *V, bool SearchUnmapped = false);
+  /// Find the HAKCSymbol associated with V if it exists
+  /// @param V
+  /// @param SearchSymbolsMissingDebug
+  /// @return The HAKCSymbol associated with V or nullptr if it could not
+  /// found
+  HAKCSymbolP FindSymbol(Value *V, bool SearchSymbolsMissingDebug = false);
 
-  HAKCSymbolP FindYamlSymbol(const HAKCYamlSymbol &YamlSymbol);
-
+  /// Attempts to find the HAKCType associated with the HAKCPointer if
+  /// it has not been found already.  Sets both the pointee type of the
+  /// newly found type and the type of HAKCPointer to the newly found
+  /// HAKCType
+  /// @param HAKCPointer
+  /// @return The HAKCType for the managed pointer
   HAKCTypeP FindType(HAKCPointerBase &HAKCPointer);
 
   HAKCTypeP FindHAKCType(Value *V);
@@ -63,8 +73,6 @@ public:
 
   Module &GetModule() const;
 
-  ModuleAnalysisManager &GetMAM() const;
-
   void GetHAKCTypes(SmallVectorImpl<HAKCTypeP> &Results) const;
 
   Type *GetTypeFromString(StringRef TypeStr) const;
@@ -75,7 +83,8 @@ public:
 
   std::set<HAKCGlobalP> GetUnmappedGlobals();
 
-  void ModifyTypeUse(Function* F, const std::shared_ptr<HAKCTypeInfo> &HAKCTy, TypePerms perm);
+  void ModifyTypeUse(Function *F, const std::shared_ptr<HAKCTypeInfo> &HAKCTy,
+                     TypePerms perm);
 
   std::map<const DISubprogram *, HAKCFunctionP> GetFunctions();
 
@@ -100,7 +109,9 @@ public:
   void AddTypeMapping(const DIType *type, const HAKCTypeP &HAKCType);
 
   static std::string GetTypeName(const DIType *type);
+
   static std::string GetTypeName(Type *Ty);
+
   static std::string GetDbgName(const HAKCTypeInfo &HAKCTy);
 
   HAKCGlobalP HandleGlobal(const DIGlobalVariable *DIGV);
@@ -111,8 +122,6 @@ public:
   GlobalVariable *FindGlobal(const DIGlobalVariable *DIGV) const;
 
   HAKCFunctionP HandleFunction(const DISubprogram *SubProg);
-
-  // void FunctionTemporalAnalysis(const DISubprogram *SubProg);
 
   void AddFunctionMapping(const DISubprogram *SubProg,
                           const HAKCFunctionP &HAKCFunction);
@@ -154,10 +163,11 @@ public:
 
   void FindIndirectCallSource(
       CallInst *CallI,
-      std::vector<std::shared_ptr<HAKCIndirectCallSourceLink>> &Path);
+      std::vector<std::shared_ptr<HAKCIndirectCallSourceLink> > &Path);
 
   void CreateIndirectCallSourceLink(
-      Value *V, std::vector<std::shared_ptr<HAKCIndirectCallSourceLink>> &Path);
+      Value *V,
+      std::vector<std::shared_ptr<HAKCIndirectCallSourceLink> > &Path);
 
   HAKCTypeP GetArgumentHAKCType(Argument *Arg);
 
@@ -186,7 +196,6 @@ public:
   std::map<const DIType *, HAKCTypeP> TypesWithDebugInfo;
   std::map<const DIGlobalVariable *, HAKCGlobalP> globals;
   std::map<const DISubprogram *, HAKCFunctionP> functions;
-  // std::map<Function *, HAKCFunctionP> FindHAKCFunctionMap;
   std::set<HAKCGlobalP> UnmappedGlobals;
   std::set<HAKCFunctionP> UnmappedFunctions;
   std::set<HAKCTypeP> TypesMissingDebugInfo;
