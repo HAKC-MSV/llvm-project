@@ -17,7 +17,7 @@ int bar(struct data_struct *);
 int foo(struct data_struct *a) {
   if (a) {
 // CHECK-LABEL: if.then
-// CHECK: call ptr @check_hakc_data_access(ptr %1, i64 1, i64 139264)
+// CHECK: call ptr @check_hakc_data_access(ptr %1, i64 1, i64 65536)
     (a->a)++;
 // CHECK: call i32 @bar(ptr noundef %5)
     return bar(a);
