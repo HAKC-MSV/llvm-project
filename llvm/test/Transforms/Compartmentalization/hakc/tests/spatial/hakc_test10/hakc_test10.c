@@ -1,7 +1,8 @@
 // RUN: %HAKC_PYTHON_VENV
 // RUN: %HAKC_START_ANALYSIS_SERVER
 // RUN: %HAKC_RUN_ANALYSIS_PASS
-// RUN: %HAKC_START_ENFORCEMENT_SERVER
+// sleep for n seconds to let server finish constructing dag
+// RUN: sleep 15
 // RUN: %HAKC_RUN_ENFORCEMENT_PASS
 // RUN: %HAKC_EVALUATE
 
