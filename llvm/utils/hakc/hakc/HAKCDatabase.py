@@ -221,16 +221,18 @@ class HAKCDatabase:
         RETURN DISTINCT {HAKCDivision.get_attrs()}, {HAKCCompartment.get_attrs()};
         """
         data = self.execute(cmd, Name=symbol.name, Scope=symbol.scope.scope)
+        if data.empty:
+            return None
         all_data = data.iloc[0]
         division_id = int(all_data[f'{HAKCDivision.get_table_name()}.DivisionID'])
         compartment_id = int(all_data[f'{HAKCCompartment.get_table_name()}.{str(HAKCCompartment.get_primary_key())}'])
 
-        return None if data.empty else (self.create_object_from_df(HAKCDivision, all_data,
-                                                                   AccessToken=self.get_division_access_token_from_id(
-                                                                       division_id, compartment_id)),
-                                        self.create_object_from_df(HAKCCompartment, all_data,
-                                                                   EntryToken=self.get_compartment_entry_token(
-                                                                       compartment_id)))
+        return (self.create_object_from_df(HAKCDivision, all_data,
+                                           AccessToken=self.get_division_access_token_from_id(
+                                               division_id, compartment_id)),
+                self.create_object_from_df(HAKCCompartment, all_data,
+                                           EntryToken=self.get_compartment_entry_token(
+                                               compartment_id)))
 
     def get_compartment_entry_token(self, compartment_id: int) -> int:
         cmd = f"""
