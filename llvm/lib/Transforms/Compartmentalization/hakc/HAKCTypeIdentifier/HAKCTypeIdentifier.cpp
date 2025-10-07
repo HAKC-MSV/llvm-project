@@ -1589,6 +1589,11 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
         auto *DebugFuncTy =
             dyn_cast<DISubroutineType>(HAKCFuncTy->GetDbgType());
         FoundType = FindType(DebugFuncTy->getTypeArray()[0]);
+      } else {
+        for (auto &U : CallI->uses()) {
+          FoundType = FindHAKCTypeForUse(U);
+          if (FoundType) { goto exit; }
+        }
       }
     }
   } else if (auto *ZExtI = dyn_cast<
