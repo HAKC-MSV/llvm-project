@@ -17,5 +17,3 @@ int foo() {
     }
     return 0;
 }
-
-// NOTE: Crashes, need to fix
