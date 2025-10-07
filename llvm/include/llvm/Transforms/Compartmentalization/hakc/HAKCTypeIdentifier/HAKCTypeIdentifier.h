@@ -191,6 +191,8 @@ public:
   DIDerivedType *FindUnionMember(const DICompositeType *UnionDef,
                                  unsigned MemberOffset) const;
 
+  bool IsLocalGlobal(GlobalObject *GO) const;
+
   CommonHAKCAnalysis &AnalysisHelper;
   DebugInfoFinder DbgInfoFinder;
   std::map<const DIType *, HAKCTypeP> TypesWithDebugInfo;

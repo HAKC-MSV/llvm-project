@@ -694,7 +694,7 @@ HAKCTypeIdentifier::AddNoDebugGlobal(GlobalObject *GlobalObj) {
   }
 }
 
-bool HAKCTypeIdentifier::IsLocalGlobal(GlobalObject *GO) {
+bool HAKCTypeIdentifier::IsLocalGlobal(GlobalObject *GO) const {
   std::set<GlobalValue::LinkageTypes> LocalLinkageTypes = {
       GlobalObject::InternalLinkage, GlobalObject::PrivateLinkage
   };
