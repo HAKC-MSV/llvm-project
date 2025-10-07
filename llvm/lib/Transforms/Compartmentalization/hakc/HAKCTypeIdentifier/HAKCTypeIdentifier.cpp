@@ -647,7 +647,7 @@ HAKCTypeIdentifier::AddNoDebugFunction(Function *F) {
   auto FuncInfo = std::make_shared<HAKCFunctionInfo>(
       AnalysisHelper, F->getName(), !SuppressOutput);
   FuncInfo->SetFunction(F);
-  FuncInfo->SetLocalScope(DefinitionLocationScope);
+  if (IsLocalGlobal(F)) { FuncInfo->SetLocalScope(DefinitionLocationScope); }
   auto HAKCType = FindCalledFunctionType(F->getFunctionType());
   if (!HAKCType) { HAKCType = CreateNoDebugType(F->getFunctionType()); }
 
@@ -682,8 +682,7 @@ HAKCTypeIdentifier::AddNoDebugGlobal(GlobalObject *GlobalObj) {
 
     GlobalInfo->SetGlobalVariable(GV);
     GlobalInfo->SetType(HAKCType);
-    if (GlobalObj->getLinkage() == GlobalObject::InternalLinkage || GlobalObj->
-        getLinkage() == GlobalObject::PrivateLinkage) {
+    if (IsLocalGlobal(GV)) {
       GlobalInfo->SetLocalScope(DefinitionLocationScope);
     }
     UnmappedGlobals.insert(GlobalInfo);
@@ -693,6 +692,13 @@ HAKCTypeIdentifier::AddNoDebugGlobal(GlobalObject *GlobalObj) {
         << "Unsupported GlobalObj: " << *GlobalObj << "\n";
     throw std::exception();
   }
+}
+
+bool HAKCTypeIdentifier::IsLocalGlobal(GlobalObject *GO) {
+  std::set<GlobalValue::LinkageTypes> LocalLinkageTypes = {
+      GlobalObject::InternalLinkage, GlobalObject::PrivateLinkage
+  };
+  return LocalLinkageTypes.contains(GO->getLinkage());
 }
 
 void HAKCTypeIdentifier::AddUsedGlobals(

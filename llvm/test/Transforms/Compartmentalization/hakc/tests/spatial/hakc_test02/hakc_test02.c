@@ -1,7 +1,8 @@
 // RUN: %HAKC_PYTHON_VENV
 // RUN: %HAKC_START_ANALYSIS_SERVER
 // RUN: %HAKC_RUN_ANALYSIS_PASS
-// RUN: %HAKC_START_ENFORCEMENT_SERVER
+// sleep for n seconds to let server finish constructing dag
+// RUN: sleep 15
 // RUN: %HAKC_RUN_ENFORCEMENT_PASS
 // RUN: %HAKC_EVALUATE
 
@@ -15,7 +16,7 @@ struct data {
 };
 
 void init_data(struct data *data) {
-// CHECK: call ptr @check_hakc_data_access(ptr %0, i64 1, i64 73728)
+// CHECK: call ptr @check_hakc_data_access(ptr %0, i64 1, i64 65536)
     data->data = 0;
 // CHECK: store ptr %list, ptr %7
     data->list.next = &data->list;
