@@ -15,9 +15,7 @@
 namespace llvm::hakc {
 HAKCModuleAnalysis::HAKCModuleAnalysis(CommonHAKCAnalysis &CommonAnalysis)
   : UsedCompartments(), CommonAnalysis(CommonAnalysis), AnalysisFunctions(),
-    TypeIdentifier(CommonAnalysis.GetSystemInfo().GetTypeIdentifier()) {
-
-}
+    TypeIdentifier(CommonAnalysis.GetSystemInfo().GetTypeIdentifier()) {}
 
 //
 // void HAKCModuleAnalysis::InitAnalysis() {
@@ -159,18 +157,6 @@ bool HAKCModuleAnalysis::functionEscapes(Function *F) {
 
 CommonHAKCAnalysis &HAKCModuleAnalysis::GetCommonAnalysis() const {
   return CommonAnalysis;
-}
-
-StringRef HAKCModuleAnalysis::GlobalInitTransferPrefix() {
-  return "hakc_glob_init_xfer_";
-}
-
-StringRef HAKCModuleAnalysis::GlobalInitTransferSectionName() const {
-  return ".hakc.glob_init.text";
-}
-
-StringRef HAKCModuleAnalysis::GlobalInitTransferPointerSectionName() const {
-  return ".hakc.global_init.data";
 }
 
 // Get the StructType representing a kernel (module) parameter
