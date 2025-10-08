@@ -190,8 +190,8 @@ class HAKCDatabase:
         RETURN DISTINCT {HAKCDivision.get_table_name()}.DivisionID as DivisionID;
         """
         return HAKCCompartment.compute_entry_token(compartment_id,
-                                                   [int(entry['DivisionID']) for _, entry in
-                                                    self.execute(cmd, compartment_id=compartment_id).iterrows()])
+                                                   set(int(entry['DivisionID']) for _, entry in
+                                                       self.execute(cmd, compartment_id=compartment_id).iterrows()))
 
     def get_division_access_token_from_id(self, division_id: int, compartment_id: int) -> Optional[int]:
         cmd = f"""
@@ -570,4 +570,90 @@ class HAKCDatabase:
         WHERE comp1.CompartmentID = $source_compartment_id
         return sym1.{str(HAKCSymbol.get_primary_key())} AS symbol_hash;
         """
-        return [entry['symbol_hash'] for _, entry in self.execute(cmd, source_compartment_id=compartment_id).iterrows()]
+        response = self.execute(cmd, source_compartment_id=int(compartment_id))
+        ret = response['symbol_hash'].to_list()
+        return ret
+
+    def get_compartment_symbol_count(self) -> dict[int, int]:
+        cmd = f"""
+        MATCH
+        (comp1:{HAKCCompartment.get_table_name()})
+        RETURN comp1.{str(HAKCCompartment.get_primary_key())} AS CompartmentID,  COUNT {{ MATCH (comp1)<-[:{HAKCDivision.relation_compartment}]-(:{HAKCDivision.get_table_name()})<-[:{HAKCSymbol.relation_division}]-(:{HAKCSymbol.get_table_name()}) }} AS Count
+        """
+        response = self.execute_prepared_stmt(cmd)
+        result = dict()
+        for _, row in response.get_as_df().iterrows():
+            compartment_id = int(row['CompartmentID'].item())
+            count = int(row['Count'].item())
+            result[compartment_id] = count
+
+        return result
+
+    def get_all_divisions_in_compartment(self, compartment_ids: set[int]) -> dict[int, list[HAKCDivision]]:
+        division_attrs = HAKCDivision.get_attrs()
+        compartment_attrs = HAKCCompartment.get_attrs()
+        cmd = f"""
+        MATCH ({HAKCCompartment.get_table_name()}:{HAKCCompartment.get_table_name()})<-[:{HAKCDivision.relation_compartment}]-({HAKCDivision.get_table_name()}:{HAKCDivision.get_table_name()})
+        WHERE {HAKCCompartment.get_table_name()}.{str(HAKCCompartment.get_primary_key())} IN [{','.join([str(i) for i in compartment_ids])}]
+        RETURN DISTINCT {division_attrs}, {compartment_attrs}
+        """
+        divisions = dict()
+        response = self.execute(cmd)
+        for _, data in response.iterrows():
+            div, comp = (HAKCDatabase.create_object_from_df(HAKCDivision, data),
+                         HAKCDatabase.create_object_from_df(HAKCCompartment, data))
+            if comp.compartment_id not in divisions:
+                divisions[comp.compartment_id] = []
+            divisions[comp.compartment_id].append(div)
+
+        return divisions
+
+    def merge_compartments(self, compartments_to_merge: dict[int, int]):
+        target_compartments = set(compartments_to_merge.values())
+        compartments_to_remove = set(compartments_to_merge.keys())
+        existing_divisions = self.get_all_divisions_in_compartment(target_compartments)
+
+        cmd = f"""
+            MATCH (sym:{HAKCSymbol.get_table_name()})-[e:{HAKCSymbol.relation_division}]->(div:{HAKCDivision.get_table_name()})-[:{HAKCDivision.relation_compartment}]->(c:{HAKCCompartment.get_table_name()})
+            WHERE c.{str(HAKCCompartment.get_primary_key())} IN [{','.join([str(i) for i in compartments_to_remove])}]
+            DELETE e
+            RETURN sym.{str(HAKCSymbol.get_primary_key())} AS SymbolHash, div.DivisionID AS DivisionID, c.{str(HAKCCompartment.get_primary_key())} AS CompartmentID;
+        """
+        result = self.execute_prepared_stmt(cmd)
+        data = result.get_as_df()
+        symbol_hashes = list()
+        division_hashes = list()
+
+        for _, row in data.iterrows():
+            division_id = row['DivisionID'].item()
+            symbol_hash = row['SymbolHash'].item()
+            old_compartment_id = row['CompartmentID'].item()
+
+            division_list = existing_divisions[compartments_to_merge[old_compartment_id]]
+            symbol_hashes.append(symbol_hash)
+
+            division_hash = hash(division_list[0])
+
+            for existing_division in division_list:
+                if existing_division.division_id == division_id:
+                    division_hash = hash(existing_division)
+            division_hashes.append(division_hash)
+
+        df = pd.DataFrame({
+            "from": symbol_hashes,
+            "to": division_hashes,
+        })
+        self.insert_from_dataframe(HAKCSymbol.relation_division, df)
+
+        cmd = f"""
+            MATCH (div:{HAKCDivision.get_table_name()})-[:{HAKCDivision.relation_compartment}]->(c:{HAKCCompartment.get_table_name()})
+            WHERE c.CompartmentID IN [{','.join([str(i) for i in compartments_to_remove])}]
+            DETACH DELETE div;
+        """
+        self.execute_prepared_stmt(cmd)
+        cmd = f"""
+            MATCH (c:{HAKCCompartment.get_table_name()})
+            WHERE c.CompartmentID IN [{','.join([str(i) for i in compartments_to_remove])}]
+            DETACH DELETE c;
+        """
+        self.execute_prepared_stmt(cmd)
