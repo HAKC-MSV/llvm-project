@@ -239,7 +239,7 @@ if (LLVM_ENABLE_HAKC)
     set(hakc_test_core_count    1) # run all tests in single threaded mode
 
     # HAKC Constants
-    set(hakc_configs_path       ${CMAKE_SOURCE_DIR}/configs)
+    set(hakc_configs_path           ${CMAKE_SOURCE_DIR}/llvm-project/llvm/utils/hakc/configs/)
 
     # top level HAKC settings
     set(hakc_backing_types          kuzu)
@@ -251,9 +251,9 @@ if (LLVM_ENABLE_HAKC)
     set(hakc_client_timeout         5)
     set(hakc_max_connection_retries 2)
 
-    set(hakc_config_in              ${HAKC_TEST_ROOT_DIR}/configs/hakc-config.yaml.in)
-    set(hakc_server_config_in       ${HAKC_TEST_ROOT_DIR}/configs/hakc-server-config.yaml.in)
-    set(hakc_client_config_in       ${HAKC_TEST_ROOT_DIR}/configs/hakc-client-config.yaml.in)
+    set(hakc_config_in              ${hakc_configs_path}/hakc-config.yaml.in)
+    set(hakc_server_config_in       ${hakc_configs_path}/hakc-server-config.yaml.in)
+    set(hakc_client_config_in       ${hakc_configs_path}/hakc-client-config.yaml.in)
     set(hakc_lit_config_in          ${HAKC_TEST_ROOT_DIR}/configs/hakc-lit.local.cfg.in)
 
     # adjustments in tests currently unsupported

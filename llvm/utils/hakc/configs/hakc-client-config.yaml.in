@@ -1,13 +1,13 @@
-arch: X86
-platform: Linux
-timeout: @hakc_client_timeout@
-console-log-level: Error
-file-log-level: Debug
+arch:                   X86
+platform:               Linux
+timeout:                @hakc_client_timeout@
+console-log-level:      Error
+file-log-level:         Debug
 max-connection-retries: @hakc_max_connection_retries@
 PreTargetActions:
   - { name: "get_hakc_address_color", label: "saved-color" }
 PostTargetActions:
-  - { name: "hakc_color_address", arguments: [ { idx: 1, label: "saved-color" } ] }
+  - { name: "hakc_color_address", arguments: [ { idx: 2, label: "saved-color" } ] }
 CustomTransferFunctions:
   - transfer-obj-type: "char *"
     name: hakc_transfer_string
@@ -96,7 +96,7 @@ CompartmentalizationSupportFunctions:
     name: hakc_color_address
     arguments:
       - { idx: 0, type: ptr, arg-use: signed-ptr }
-      - { idx: 1, type: i32, arg-use: division }
+      - { idx: 1, type: i64, arg-use: division }
       - { idx: 2, type: i64, arg-use: size }
   - return-type: i32
     name: get_hakc_color_by_name
