@@ -87,7 +87,6 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
                         new_symbol.indirect_calls.append(nbr)
                     elif edge_data == HAKCSymbol.relation_dag:
                         dag_weight = G.get_edge_data(symbol, nbr, HAKCSymbol.relation_dag)["weight"]
-                        # logger.error(f"Adding DAG Edge from {new_symbol} to {symbol_mapping[symbol]} with weight {dag_weight}")
                         self.add_dag_edge(new_symbol, symbol_mapping[nbr], dag_weight)
                     elif edge_data == HAKCSymbol.relation_symbol:
                         new_symbol.used_symbols.append(symbol_mapping[nbr])
@@ -141,9 +140,6 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
                 'definition_locations': len(self.get_definition_locations()),
                 'divisions': len(self.get_divisions()),
                 'compartments': len(self.get_compartments())}
-
-    def print_stats(self):
-        logger.info(self)
 
     def __str__(self):
         stats = self.get_stats()
@@ -351,7 +347,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             self.create_dag_singlethread()
         else:
             self.create_dag_multithread(core_count)
-        self.conn.print_stats()
+        logger.info(self.conn)
 
     def delete_detached_divisions_compartments(self):
         isolated_divisions = self.get_isolated_divisions()
@@ -592,20 +588,21 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
     def perform_adjustments(self, adjustments: HAKCAdjustments):
         if not self.conn:
             self.open_conn()
-        self.conn.print_stats()
+        logger.debug(self.conn)
         # do all initialization using the hakccompartmentalization object, then persist to database
         if adjustments.nec:
-            logger.error(f"Adding all symbols to No Enforcement Compartment (NEC)")
+            logger.info(f"Adding all symbols to No Enforcement Compartment ("
+                       f"NEC)")
             self.add_all_symbols_to_nec()
         # do all adjustments purely in the database
         for adjustment in adjustments.adjustment_entries:
-            logger.error(f"Processing {adjustment}")
+            logger.info(f"Processing {adjustment}")
             if isinstance(adjustment, HAKCCompartmentAdjustment):
                 self.adjust_spatial_compartmentalization(adjustment)
             else:
                 raise RuntimeError(f"Adjustment is invalid: {adjustment}")
-        logger.error(f'Done adjusting compartmentalization')
-        self.conn.print_stats()
+        logger.info(f'Done adjusting compartmentalization')
+        logger.debug(self.conn)
 
     def get_symbol_compartment_id(self, symbol: HAKCSymbol) -> int:
         for neighbor in self.neighbors(symbol):
@@ -676,7 +673,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             for node in nodes:
                 db_data = node.get_db_data()
                 if 0 < len(data_to_persist) != len(db_data):
-                    logger.error(
+                    raise RuntimeError(
                         f'Node {node} does not have all the data needed. Data needed is {" ".join(sorted(data_to_persist.keys()))} and data provided is {" ".join(sorted([column.column_name for column in db_data.keys()]))}')
                 for column, data in db_data.items():
                     if data is None:
@@ -760,7 +757,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         self._persist_edges(self.conn)
         logger.debug(f"Finished persisting nodes and edges to database")
         if not create_schema:
-            self.conn.print_stats()
+            logger.debug(self.conn)
 
     @staticmethod
     def create_schema(conn: HAKCDatabase) -> None:

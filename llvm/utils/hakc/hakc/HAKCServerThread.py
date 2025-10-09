@@ -4,18 +4,18 @@ import signal
 import socketserver
 import struct
 import threading
-import time
-from typing import cast, Optional
+from typing import cast
 
 import yaml
 
 from .HAKCBase import HAKCPrintableObj, HAKCResponse
+from .HAKCConfig import HAKCConfig, HAKCDataRequest, TimeoutException, TerminateConnectionException
 from .HAKCLogger import HAKCLogger
-from .HAKCConfig import HAKCConfig, HAKCServerConfig, HAKCDataRequest, TimeoutException, TerminateConnectionException
 
 logging.setLoggerClass(HAKCLogger)
 
 logger: HAKCLogger = cast(HAKCLogger, logging.getLogger('hakc.server'))
+
 
 # noinspection PyTypeChecker
 class HAKCServerThread(socketserver.StreamRequestHandler):
@@ -82,7 +82,6 @@ class HAKCServerThread(socketserver.StreamRequestHandler):
 
     # noinspection PyTypeChecker
     def handle_endpoint(self, hakc_request: HAKCDataRequest) -> HAKCResponse:
-        # logger.error(f"Handling {hakc_request}")
         endpoint = hakc_request.endpoint
         if endpoint not in self.endpoints:
             raise RuntimeError(f'Invalid Endpoint {endpoint}, endpoints available: {self.endpoints.keys()}')
@@ -114,20 +113,24 @@ class HAKCServerThread(socketserver.StreamRequestHandler):
             # raise TimeoutException
             return
         except ConnectionResetError:
-            self.logger.fatal(f'Client Reset Connection after returning {str(response)[0:min(len(str(response)),250)]}')
+            self.logger.fatal(
+                f'Client Reset Connection after returning {str(response)[0:min(len(str(response)), 250)]}')
             return
         except TimeoutException:
-            self.logger.fatal(f'Timeout received after returning {str(response)[0:min(len(str(response)),250)]}')
+            self.logger.fatal(f'Timeout received after returning {str(response)[0:min(len(str(response)), 250)]}')
             return
         except TerminateConnectionException:
-            self.logger.debug(f'Analysis Server Thread received terminate connection from Client; killing thread (TerminateConnectionException)')
+            self.logger.debug(
+                f'Analysis Server Thread received terminate connection from Client; killing thread (TerminateConnectionException)')
             self.logger.removeHandler(self.file_handler)
             return
         except Exception as e:
             if hakc_request:
                 if hakc_request.endpoint == "terminate-connection":
-                    self.logger.debug(f'Analysis Server Thread received terminate connection from Client; killing thread (General Fallthrough Exception)')
+                    self.logger.debug(
+                        f'Analysis Server Thread received terminate connection from Client; killing thread (General Fallthrough Exception)')
                     self.logger.removeHandler(self.file_handler)
                     return
-            self.logger.fatal(f"Error handling request: {str(response)[0:min(len(str(response)),250)]} with error: {e}")
+            self.logger.fatal(
+                f"Error handling request: {str(response)[0:min(len(str(response)), 250)]} with error: {e}")
             raise e

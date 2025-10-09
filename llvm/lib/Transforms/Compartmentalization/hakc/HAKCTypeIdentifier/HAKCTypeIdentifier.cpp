@@ -1,4 +1,3 @@
-
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTypeIdentifier/HAKCTypeIdentifier.h"
 
 #include "llvm/AsmParser/Parser.h"
@@ -1074,6 +1073,28 @@ HAKCTypeP HAKCTypeIdentifier::GetArgumentHAKCType(Argument *Arg) {
           break;
         }
       }
+    } else {
+      /* The called function type has not been analyzed and contains no debug
+       * information, so this is a function that has been declared but nothing
+       * else is known. So look at uses of F and try to find out the argument
+       * types
+       */
+      for (auto &U : F->uses()) {
+        if (auto *CallI = dyn_cast<CallInst>(U.getUser())) {
+          if (CallI->getFunction() == Arg->getParent())
+            continue;
+          auto *CallArg = CallI->getArgOperand(Arg->getArgNo());
+          CommonHAKCAnalysis::getLogger(Verbose) <<
+              "Attempting to find type of " << *CallArg << " from " << *CallI <<
+              "\n";
+          Result = FindHAKCType(CallArg);
+          if (Result) {
+            if (isa<GlobalVariable>(CallArg))
+              Result = Result->GetPointeeType();
+            break;
+          }
+        }
+      }
     }
   }
   return Result;
@@ -1589,6 +1610,11 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
         auto *DebugFuncTy =
             dyn_cast<DISubroutineType>(HAKCFuncTy->GetDbgType());
         FoundType = FindType(DebugFuncTy->getTypeArray()[0]);
+      } else {
+        for (auto &U : CallI->uses()) {
+          FoundType = FindHAKCTypeForUse(U);
+          if (FoundType) { goto exit; }
+        }
       }
     }
   } else if (auto *ZExtI = dyn_cast<

@@ -40,12 +40,6 @@ public:
 
   bool useEscapes(Use &U);
 
-  StringRef GlobalInitTransferSectionName() const;
-
-  StringRef GlobalInitTransferPointerSectionName() const;
-
-  static StringRef GlobalInitTransferPrefix();
-
   HAKCModuleAnalysis(CommonHAKCAnalysis &CommonAnalysis);
 
   StructType *GetKernelParamType();

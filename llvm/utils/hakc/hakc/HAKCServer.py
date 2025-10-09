@@ -22,6 +22,7 @@ logger: HAKCLogger = cast(HAKCLogger, logging.getLogger('hakc.server'))
 
 mp_conn: HAKCDatabase | None = None
 
+
 class HAKCEnforcementDataSource:
     def __init__(self, config: HAKCConfig, yaml_loader=yaml.Loader, **kwargs):
         self.config = config
@@ -30,8 +31,10 @@ class HAKCEnforcementDataSource:
                           config.endpoints.get_division_from_symbol_endpoint: self.get_symbol_division,
                           config.endpoints.get_valid_targets_from_compartment_id_endpoint: self.get_valid_targets_from_compartment_id}
         self.yaml_loader = yaml_loader
-        self.default_compartment = HAKCCompartment(config.default_compartment_id, **{'EntryToken':config.default_entry_token}) # need to use kwargs to set values
-        self.default_division = HAKCDivision(config.default_division_id, **{'Salt':0, 'AccessToken':config.default_access_token})
+        self.default_compartment = HAKCCompartment(config.default_compartment_id, **{
+            'EntryToken': config.default_entry_token})  # need to use kwargs to set values
+        self.default_division = HAKCDivision(config.default_division_id,
+                                             **{'Salt': 0, 'AccessToken': config.default_access_token})
 
     def _get_default_division(self) -> HAKCDivision:
         return self.default_division
@@ -45,7 +48,8 @@ class HAKCEnforcementDataSource:
     def _get_division_from_backing_store(self, division_id: int, compartment_id: int) -> Optional[HAKCDivision]:
         raise NotImplementedError
 
-    def _get_symbol_division_from_backing_store(self, symbol: HAKCSymbol) -> Optional[Tuple[HAKCDivision, HAKCCompartment]]:
+    def _get_symbol_division_from_backing_store(self, symbol: HAKCSymbol) -> Optional[
+        Tuple[HAKCDivision, HAKCCompartment]]:
         raise NotImplementedError
 
     def _get_valid_targets_from_compartment_id(self, compartment_id: int) -> Optional[list[int]]:
@@ -59,8 +63,10 @@ class HAKCEnforcementDataSource:
         division = self._get_division_from_backing_store(division_id, compartment_id)
         if division is None:
             division = self._get_default_division()
-        logger.debug(f"Returning Division {division} from (compartment_id, division_id): ({compartment_id}, {division_id})")
-        return HAKCResponse(HAKCResultSuccess(data=HAKCDivisionPayload(division)), self.config.endpoints.get_division_endpoint)
+        logger.debug(
+            f"Returning Division {division} from (compartment_id, division_id): ({compartment_id}, {division_id})")
+        return HAKCResponse(HAKCResultSuccess(data=HAKCDivisionPayload(division)),
+                            self.config.endpoints.get_division_endpoint)
 
     def get_compartment_by_id(self, **kwargs) -> HAKCResponse:
         # get-compartment-by-id endpoint
@@ -69,7 +75,8 @@ class HAKCEnforcementDataSource:
         if compartment is None:
             compartment = self._get_default_compartment()
         logger.debug(f"Returning Compartment {compartment} from input compartment {compartment_id}")
-        return HAKCResponse(HAKCResultSuccess(HAKCCompartmentPayload(compartment)), self.config.endpoints.get_compartment_endpoint)
+        return HAKCResponse(HAKCResultSuccess(HAKCCompartmentPayload(compartment)),
+                            self.config.endpoints.get_compartment_endpoint)
 
     def get_symbol_division(self, **kwargs) -> HAKCResponse:
         # get-division-from-symbol endpoint
@@ -77,12 +84,16 @@ class HAKCEnforcementDataSource:
         division_compartment_tuple = self._get_symbol_division_from_backing_store(symbol)
         # set the access token and entry token
         if not division_compartment_tuple:
-            logger.warning(f"Unable to find Compartment and Division from symbol {symbol}, so creating default Compartment and Division! (should we crash here?)")
-            return HAKCResponse(HAKCResultSuccess(HAKCDivisionCompartmentPayload(self._get_default_division(), self._get_default_compartment())),
-                                self.config.endpoints.get_division_from_symbol_endpoint)
-        logger.debug(f"Returning Division {division_compartment_tuple[0]} Compartment {division_compartment_tuple[1]} for symbol {symbol}")
-        return HAKCResponse(HAKCResultSuccess(HAKCDivisionCompartmentPayload(division_compartment_tuple[0], division_compartment_tuple[1])),
-                            self.config.endpoints.get_division_from_symbol_endpoint)
+            logger.warning(
+                f"Unable to find Compartment and Division from symbol {symbol}, so creating default Compartment and Division! (should we crash here?)")
+            return HAKCResponse(HAKCResultSuccess(
+                HAKCDivisionCompartmentPayload(self._get_default_division(), self._get_default_compartment())),
+                self.config.endpoints.get_division_from_symbol_endpoint)
+        logger.debug(
+            f"Returning Division {division_compartment_tuple[0]} Compartment {division_compartment_tuple[1]} for symbol {symbol}")
+        return HAKCResponse(HAKCResultSuccess(
+            HAKCDivisionCompartmentPayload(division_compartment_tuple[0], division_compartment_tuple[1])),
+            self.config.endpoints.get_division_from_symbol_endpoint)
 
     def get_valid_targets_from_compartment_id(self, **kwargs) -> HAKCResponse:
         # get-valid-targets-from-compartment-id
@@ -105,7 +116,8 @@ class NullHAKCEnforcementDataStore(HAKCEnforcementDataSource):
     def _get_division_from_backing_store(self, division_id: int, compartment_id: int) -> Optional[HAKCDivision]:
         return self._get_default_division()
 
-    def _get_symbol_division_from_backing_store(self, symbol: HAKCSymbol) -> Optional[Tuple[HAKCDivision, HAKCCompartment]]:
+    def _get_symbol_division_from_backing_store(self, symbol: HAKCSymbol) -> Optional[
+        Tuple[HAKCDivision, HAKCCompartment]]:
         return self._get_default_division(), self._get_default_compartment()
 
     def _get_valid_targets_from_compartment_id(self, compartment_id: int) -> Optional[list[int]]:
@@ -124,7 +136,8 @@ class YAMLHAKCEnforcementDataStore(HAKCEnforcementDataSource):
     def _get_division_from_backing_store(self, division_id: int, compartment_id: int) -> Optional[HAKCDivision]:
         return self.compartmentalization.get_division_node(division_id, compartment_id)
 
-    def _get_symbol_division_from_backing_store(self, symbol: HAKCSymbol) -> Optional[Tuple[HAKCDivision, HAKCCompartment]]:
+    def _get_symbol_division_from_backing_store(self, symbol: HAKCSymbol) -> Optional[
+        Tuple[HAKCDivision, HAKCCompartment]]:
         logger.debug(f"Trying to find symbol division, compartment for {symbol}")
         division = self.compartmentalization.get_division(symbol)
         if division is None:
@@ -133,8 +146,7 @@ class YAMLHAKCEnforcementDataStore(HAKCEnforcementDataSource):
         # compartment = self.compartmentalization.get_compartment_node(division.compartment_id)
         compartment = self.compartmentalization.get_compartment_from_division(division)
         if compartment is None:
-            logger.error(f'Could not find compartment for {division}')
-            raise RuntimeError()
+            raise RuntimeError(f'Could not find compartment for {division}')
 
         return division, compartment
 
@@ -173,10 +185,12 @@ class KUZUHAKCEnforcementDataStore(HAKCEnforcementDataSource):
         division = self.conn.get_division(division_id, compartment_id)
         if division is None:
             division = self._get_default_division()
-            logger.debug(f"Unable to find division for division_id {division_id}, so using default value of {division}!")
+            logger.debug(
+                f"Unable to find division for division_id {division_id}, so using default value of {division}!")
         return division
 
-    def _get_symbol_division_from_backing_store(self, symbol: HAKCSymbol) -> Optional[Tuple[HAKCDivision, HAKCCompartment]]:
+    def _get_symbol_division_from_backing_store(self, symbol: HAKCSymbol) -> Optional[
+        Tuple[HAKCDivision, HAKCCompartment]]:
         assert (isinstance(symbol, HAKCSymbol))
         logger.debug(f"Trying to get HAKCDivision object from backing store with symbol: {symbol}")
         compartment_id_division_id_tuple = self.conn.get_division_id_compartment_id_from_symbol(symbol)
@@ -194,11 +208,13 @@ class KUZUHAKCEnforcementDataStore(HAKCEnforcementDataSource):
         global mp_conn
         self.conn = mp_conn
         logger.debug(f"Thread connected to Kuzu")
-        self.conn.print_stats()
+        logger.debug(self.conn)
+
 
 # noinspection PyTypeChecker
 class HAKCServerThreadInstance(HAKCServerThread):
     size_fmt = "@L"
+
     def init(self):
         HAKCServerThread.init(self)
         # Note: handler() can be called before the actual __init__() function is called, so make a custom blocking init() for use in handler()
@@ -242,19 +258,21 @@ class HAKCServerThreadInstance(HAKCServerThread):
                 self.compartmentalization.add_global_variable(symbol)
             else:
                 logger.fatal(f"Invalid symbol: {symbol}")
-                return HAKCResponse(HAKCResultFail('Invalid request: object is not HAKCSymbol!'), self.hakc_server.config.endpoints.add_symbols_endpoint)
+                return HAKCResponse(HAKCResultFail('Invalid request: object is not HAKCSymbol!'),
+                                    self.hakc_server.config.endpoints.add_symbols_endpoint)
         return HAKCResponse(HAKCResultSuccess(), self.hakc_server.config.endpoints.add_symbols_endpoint)
+
 
 # noinspection PyTypeChecker
 class HAKCServer(socketserver.ThreadingUnixStreamServer):
-    def __init__(self, server_id: int, config: HAKCConfig, logger: HAKCLogger, server_gather_buckets = None, **kwargs):
+    def __init__(self, server_id: int, config: HAKCConfig, logger: HAKCLogger, server_gather_buckets=None, **kwargs):
         self.id = server_id
         self.logger = logger
         self.config = config
         self.server_gather_buckets = server_gather_buckets
         self.last_alive = time.time()
         if self.config.build_mode == HAKCBuildMode.ENFORCEMENT and config.server_config.backing_config.type == HAKCBackingType.KUZU:
-            logger.error(f"Starting database at {self.config.server_config.backing_config.path}")
+            logger.debug(f"Starting database at {self.config.server_config.backing_config.path}")
             self.init_mp_database(self.config.server_config.backing_config.path)
         self.logger.debug(f'Starting Server with socket {config.socket_path}')
         os.makedirs(os.path.dirname(config.socket_path), exist_ok=True)

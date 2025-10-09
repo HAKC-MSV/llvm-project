@@ -23,7 +23,7 @@
 
 #define HAKC_CONTEXT_COMPARTMENT_SHIFT 16
 
-#define DIVISION_ID_BIT_LENGTH 64
+#define DIVISION_ID_BIT_LENGTH 32
 #define COMPARTMENT_ID_BIT_LENGTH 64
 #define ENTRY_TOKEN_BIT_LENGTH 64
 #define EPOCH_ID_LENGTH 64
@@ -81,6 +81,7 @@ enum TypePerms {
 };
 
 typedef enum { hakc_global_scope, hakc_local_scope } hakc_scope_t;
+
 typedef enum { READ_ONLY = 0, READ_WRITE = 1 } epoch_perms_options_t;
 
 const hakc_compartment_id_t KERNEL_COMPARTMENT = 0;

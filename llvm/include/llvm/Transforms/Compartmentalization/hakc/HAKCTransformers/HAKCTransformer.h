@@ -21,10 +21,8 @@
 #include "HAKCTransferState.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstIterator.h"
-#include "llvm/IR/Module.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
-#include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/HAKCModuleAnalysis.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/ManagedHAKCPointer.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCDatabase/HAKCServerClient.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCFunctionDefinition/HAKCCustomTransfer.h"
@@ -41,7 +39,6 @@ namespace llvm::hakc {
  */
 class HAKCTransformer {
 public:
-
   HAKCTransformer(HAKCModuleAnalysis &ModuleAnalysis,
                   HAKCServerClient &Client);
 
@@ -153,7 +150,9 @@ public:
                            HAKCPointerManager *PointerManager = nullptr);
 
   Module &getModule() const;
+
   CommonHAKCAnalysis &getCommonAnalysis() const;
+
   HAKCSystemInformation &getSystemInfo() const;
 
   virtual Type *HAKCAuthenticationRetType(unsigned AddrSpace);
@@ -198,17 +197,15 @@ public:
 
   bool TransferFunctionShouldBeCreated(Function *F);
 
-  StructType *GetKernelParamType();
+  StructType *GetKernelParamType() const;
 
-  void CreateInitGlobalMemberTransfers();
+  bool FunctionDefinedInAssembly(Function *F) const;
 
-  bool FunctionDefinedInAssembly(Function *F);
-
-  Function *GetFunctionByName(StringRef Name, FunctionType *FuncTy);
+  Function *GetFunctionByName(StringRef Name, FunctionType *FuncTy) const;
 
   HAKCTransformer &GetTransformer();
 
-  bool FunctionIsInAnalysisSet(Function *F);
+  bool FunctionIsInAnalysisSet(Function *F) const;
 
 protected:
   HAKCModuleAnalysis &ModuleAnalysis;
@@ -231,18 +228,13 @@ protected:
 
   void RegisterUsedCompartment(HAKCCompartment &compartment);
 
-  std::string GlobalVariableROSectionName(GlobalVariable *GlobalVar);
-
-  void PopulateGlobalInitTransferFunc(Function *GlobTransfer,
-                                      GlobalVariable *GlobalVar);
-
   bool TransferIsNeeded(GlobalVariable *GlobalVar);
 
   bool ConstantStructTransferIsNeeded(ConstantStruct *ConstStruct);
 
   bool AliasShouldBeCreated(Function *F);
 
-  bool isModuleCompartmentalized();
+  bool isModuleCompartmentalized() const;
 
   void MoveGlobalsToHAKCSection();
 
