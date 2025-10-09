@@ -248,7 +248,7 @@ if (LLVM_ENABLE_HAKC)
     set(hakc_server_log_level ERROR)
     # Note: test timeouts should be much shorter than in the linux kernel
     set(hakc_server_timeout 15)
-    set(hakc_client_timeout 5)
+    set(hakc_client_timeout 15)
     set(hakc_max_connection_retries 2)
 
     set(hakc_config_in ${HAKC_TEST_ROOT_DIR}/configs/hakc-config.yaml.in)
