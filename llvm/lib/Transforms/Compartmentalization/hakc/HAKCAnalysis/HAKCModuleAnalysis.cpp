@@ -17,19 +17,6 @@ HAKCModuleAnalysis::HAKCModuleAnalysis(CommonHAKCAnalysis &CommonAnalysis)
   : UsedCompartments(), CommonAnalysis(CommonAnalysis), AnalysisFunctions(),
     TypeIdentifier(CommonAnalysis.GetSystemInfo().GetTypeIdentifier()) {}
 
-//
-// void HAKCModuleAnalysis::InitAnalysis() {
-//   for (auto &F : GetModule().functions()) {
-//     if (FunctionNeedsAnalysis(&F)) {
-//       auto &Division = Policy.GetDivision(&F);
-//       auto Compartment = Division.GetHAKCCompartment();
-//       RegisterUsedCompartment(Compartment);
-//       AnalysisFunctions.push_back(&F);
-//     }
-//   }
-//   CommonHAKCAnalysis::SortFunctionList(AnalysisFunctions);
-// }
-
 Module &HAKCModuleAnalysis::GetModule() const {
   return CommonAnalysis.GetSystemInfo().GetModule();
 }

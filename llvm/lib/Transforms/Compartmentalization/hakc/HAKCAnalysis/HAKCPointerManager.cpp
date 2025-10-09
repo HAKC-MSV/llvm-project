@@ -139,8 +139,6 @@ bool HAKCPointerManager::PointerIsEligibleForManagement(Use &U) {
            .GetModuleAnalysis()
            .GetCommonAnalysis()
            .ValueIsUsedAsPointer(Pointer);
-    // PointerIsEligibleForManagement(
-    //     LoadI->getOperandUse(LoadInst::getPointerOperandIndex()));
   } else if (auto *StoreI = dyn_cast<StoreInst>(U.getUser())) {
     GetLogger(Verbose, !DebugActive) << *Pointer << " is used in a StoreInst\n";
     for (auto &Op : StoreI->operands()) {
