@@ -1,0 +1,19 @@
+# the root config called by both the server and client
+server-config-path:         "@hakc_server_config_path@"
+client-config-path:         "@hakc_client_config_path@"
+build-dir:                  "@hakc_build_dir@"
+socket-dir:                 "@hakc_socket_dir@"
+log-dir:                    "@hakc_log_dir@"
+build-mode:                 "@hakc_build_mode@"
+server-core-count:          @hakc_server_core_count@
+default-compartment-id:     0
+default-division-id:        53
+default-access-token:       5353
+default-entry-token:        3535
+Endpoints:
+    get-compartment-by-id-endpoint:                 "get-compartment-by-id"
+    get-division-by-id-endpoint:                    "get-division-by-id"
+    get-division-from-symbol-endpoint:              "get-division-from-symbol"
+    get-valid-targets-from-compartment-id-endpoint: "get-valid-targets-from-compartment-id"
+    add-symbols-endpoint:                           "add-symbols"
+    terminate-connection-endpoint:                  "terminate-connection"
