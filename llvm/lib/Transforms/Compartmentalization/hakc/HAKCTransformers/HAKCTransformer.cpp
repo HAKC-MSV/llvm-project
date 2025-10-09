@@ -800,7 +800,7 @@ GlobalVariable *HAKCTransformer::GetValidTargetCompartments(Function *F) const {
 
 CallInst *HAKCTransformer::CreateCall(Function *Callee,
                                       ArrayRef<Value *> Args) {
-  CommonHAKCAnalysis::getLogger(Error) << "Creating function " << *Callee <<
+  CommonHAKCAnalysis::getLogger(Debug) << "Creating call to " << *Callee <<
       " with args:";
   for (auto arg : Args) { CommonHAKCAnalysis::getLogger(Error) << " " << *arg; }
   CommonHAKCAnalysis::getLogger(Error) << "\n";

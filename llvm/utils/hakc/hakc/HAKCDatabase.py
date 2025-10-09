@@ -100,7 +100,7 @@ class HAKCDatabase:
                                    EntryToken=EntryToken)
         raise RuntimeError(f"Trying to create invalid HAKC class from response: {cls} with data {data}")
 
-    def get_stats(self):
+    def get_stats(self) -> dict[str, int]:
         cmd = f"""
         MATCH (HAKCSymbol:HAKCSymbol)
         RETURN COUNT(HAKCSymbol) as symbols;
@@ -132,17 +132,18 @@ class HAKCDatabase:
         """
         compartments = self.execute(cmd, enable_cache=False)
 
-        return {'symbols': symbols['symbols'][0],
-                'types': types['types'][0],
-                'scopes': scopes['scopes'][0],
-                'definition_locations': definition_locations['definition_locations'][0],
-                'divisions': divisions['divisions'][0],
-                'compartments': compartments['compartments'][0]}
+        return {'symbols': int(symbols['symbols'][0]),
+                'types': int(types['types'][0]),
+                'scopes': int(scopes['scopes'][0]),
+                'definition_locations': int(definition_locations['definition_locations'][0]),
+                'divisions': int(divisions['divisions'][0]),
+                'compartments': int(compartments['compartments'][0])}
 
-    def print_stats(self):
+    def __str__(self):
         stats = self.get_stats()
-        logger.error(
-            f"hakc-db with {stats['symbols']} Symbols, {stats['types']} Types, {stats['scopes']} Scopes, {stats['definition_locations']} DefinitionLocations, {stats['divisions']} Divisions, {stats['compartments']} Compartments")
+        sorted_keys = sorted([k for k in stats.keys()])
+        stats_strings = [f'{stats[k]} {k}' for k in sorted_keys]
+        return f'hakc-db with {",".join(stats_strings)}'
 
     def get_query_cache(self, key):
         return self.query_cache[key] if key in self.query_cache else None
@@ -303,8 +304,8 @@ class HAKCDatabase:
             self.create_relationship_table(edge_type=db_relation)
 
     def delete_all_compartments(self):
-        logger.error(f"About to delete all compartments and divisions!")
-        self.print_stats()
+        logger.debug(f"About to delete all compartments and divisions!")
+        logger.debug(self)
         # Note: Dropping tables is much faster than a detach delete
         # drop each relation and node table associated with divisions and compartments
         self.execute_prepared_stmt(f"DROP TABLE {HAKCSymbol.relation_division};")
@@ -315,8 +316,8 @@ class HAKCDatabase:
         self.create_schema_for_object(HAKCCompartment)
         self.create_schema_for_object(HAKCDivision)
         self.create_schema_for_object(HAKCSymbol)
-        logger.error(f"Deleted all compartments and divisions")
-        self.print_stats()
+        logger.debug(f"Deleted all compartments and divisions")
+        logger.debug(self)
         self.clear_query_cache()
 
     def get_all_divisions(self) -> list[HAKCDivision]:
@@ -518,8 +519,8 @@ class HAKCDatabase:
         return self.execute(cmd, Name=Name, DefiningFile=DefiningFile, DefiningLine=DefiningLine)['symbol_hash'][0]
 
     def add_all_symbols_to_nec(self, nec_division: HAKCDivision, nec_compartment: HAKCCompartment):
-        logger.error(f"!!!Adding all symbols to NEC!!!")
-        self.print_stats()
+        logger.debug(f"!!!Adding all symbols to NEC!!!")
+        logger.debug(self)
         self.delete_all_compartments()
 
         cmd = f"CREATE (div:{HAKCDivision.get_table_name()} {{division_hash: $division_hash, DivisionID: $division_id, Salt: $salt}});"
@@ -534,8 +535,8 @@ class HAKCDatabase:
         """
         self.execute(cmd, division_hash=hash(nec_division), compartment_id=nec_compartment.compartment_id,
                      enable_cache=False)
-        logger.error(f"!!!Added all symbols to NEC!!!")
-        self.print_stats()
+        logger.debug(f"!!!Added all symbols to NEC!!!")
+        logger.debug(self)
         self.clear_query_cache()
 
     def set_division_compartment_id_by_symbol(self, symbol_hashes: list[int], new_division_id: int,
@@ -562,7 +563,6 @@ class HAKCDatabase:
         """
         self.execute(cmd, symbol_hashes=symbol_hashes, division_hash=hash(new_div), compartment_id=new_compartment_id,
                      enable_cache=False)
-        self.print_stats()
 
     def get_all_symbol_hashes_in_compartment(self, compartment_id: int) -> list[int]:
         cmd = f"""

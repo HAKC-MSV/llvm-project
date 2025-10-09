@@ -382,8 +382,6 @@ class HAKCScope(HashedHAKCDBNode, yaml.YAMLObject):
                 return self.scope < other.scope
         elif isinstance(other, HAKCType):
             return str(self) < str(other)
-        # I guess at some point a HAKCType is being compared to HAKCScope
-        logger.error(f"{other} is of type: {type(other)}")
         return hash(self) < hash(other)
 
     def get_hash_inputs(self) -> list[object]:
