@@ -1,9 +1,0 @@
-adjustments-path:       "@hakc_adjustments_path@"
-analysis-core-count:    @hakc_analysis_core_count@
-timeout:                @hakc_server_timeout@
-log-level:              "@hakc_server_log_level@"
-log-mode:               "w"
-profile:                false
-BackingConfig:
-    type:               "@hakc_backing_type@" # either 'yaml' or 'kuzu'
-    path:               "@hakc_backing_path@"
