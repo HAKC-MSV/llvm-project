@@ -17,4 +17,4 @@ int printstr(char *str) {
 }
 
 // CHECK-LABEL: HAKC_VARF_printf_0
-// CHECK: call ptr @hakc_transfer_string(ptr %0, i64 4, i64 13)
+// CHECK: call ptr @hakc_transfer_string(ptr %0, i64 4, i32 13)

@@ -35,6 +35,6 @@ int foo(struct data_struct __percpu *a) {
 
 // CHECK-LABEL: i32 @HAKC_XFER_foo(ptr noundef per_cpu_ptr %0) #0 section ".hakc.1.text"
 // CHECK: call i32 @get_hakc_address_color(ptr %0)
-// CHECK: call ptr @hakc_transfer_percpu_to_clique(ptr %0, i64 16, i64 1, i64 13)
+// CHECK: call ptr @hakc_transfer_percpu_to_clique(ptr %0, i64 16, i64 1, i32 13)
 // CHECK: call i32 @HAKC_ORIG_foo(ptr %2)
 // CHECK: call void @hakc_color_address(ptr %0, i32 %1, i64 16)

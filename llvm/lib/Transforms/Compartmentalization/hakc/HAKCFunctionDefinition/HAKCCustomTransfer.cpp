@@ -9,8 +9,7 @@
 hakc::HAKCCustomTransfer::HAKCCustomTransfer(
     Function *CustomFunction, const HAKCTypeP &TargetType,
     SmallVectorImpl<HAKCFunctionArgumentDefinition> &Args)
-    : HAKCFunctionDefinition(CustomFunction, Args), TypeToTransfer(TargetType) {
-}
+  : HAKCFunctionDefinition(CustomFunction, Args), TypeToTransfer(TargetType) {}
 
 hakc::HAKCTypeP hakc::HAKCCustomTransfer::GetTargetType() const {
   return TypeToTransfer;
@@ -37,6 +36,12 @@ Instruction *hakc::HAKCCustomTransfer::CreateTransfer(
     CallArgs.push_back(it->second);
   }
 
+  CommonHAKCAnalysis::getLogger(Debug) << "Creating call to " << GetFunction()
+      << " with args:\n";
+  for (auto &Arg : CallArgs) {
+    CommonHAKCAnalysis::getLogger(Debug) << Arg << "\n";
+  }
+  CommonHAKCAnalysis::getLogger(Debug) << "\n";
   auto *TransferCall = HAKCIRBuilder.CreateCall(GetFunction(), CallArgs);
   CommonHAKCAnalysis::getLogger(Debug)
       << "Created Custom Transfer " << *TransferCall << " for " << *Pointer

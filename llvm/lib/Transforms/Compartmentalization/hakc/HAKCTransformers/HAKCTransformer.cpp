@@ -801,9 +801,13 @@ GlobalVariable *HAKCTransformer::GetValidTargetCompartments(Function *F) const {
 CallInst *HAKCTransformer::CreateCall(Function *Callee,
                                       ArrayRef<Value *> Args) {
   CommonHAKCAnalysis::getLogger(Debug) << "Creating call to " << *Callee <<
+      " of type " << Callee->getFunctionType() <<
       " with args:";
-  for (auto arg : Args) { CommonHAKCAnalysis::getLogger(Error) << " " << *arg; }
-  CommonHAKCAnalysis::getLogger(Error) << "\n";
+  for (auto arg : Args) {
+    CommonHAKCAnalysis::getLogger(Debug) << " " << *arg << " of type " << arg->
+        getType() << "\n";
+  }
+  CommonHAKCAnalysis::getLogger(Debug) << "\n";
   auto *Call = HAKCIRBuilder.CreateCall(Callee, Args);
 
   /* The LLVM function checker throws an error when an inline-able function with
