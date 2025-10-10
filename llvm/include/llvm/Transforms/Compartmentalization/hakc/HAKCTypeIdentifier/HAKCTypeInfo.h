@@ -1,3 +1,14 @@
+//===----------------------------------------------------------------------===//
+//
+// Part of the MIT Lincoln Laboratory HAKC Compartmentalization Project.
+//
+//===----------------------------------------------------------------------===//
+///
+/// \file
+/// This file contains the information associated with a llvm type
+/// (debug types, llvm types, debug records, etc.)
+///
+//===----------------------------------------------------------------------===//
 //
 // Created by de29664 on 5/2/23.
 //
@@ -43,11 +54,13 @@ public:
 
   std::string GetYamlHeader(unsigned Indents) const override;
 
+  std::string GetYamlHeader(unsigned int Indents, unsigned RWX) const;
+
   StringRef GetYamlIdentifier() const override;
 
   static StringRef UnknownType;
 
-  bool IsPointerToPointer();
+  bool IsPointerToPointer() const;
 
   HAKCTypeP GetPointeeType() const;
 
@@ -59,6 +72,20 @@ public:
 
   bool IsFunctionType() const;
 
+  bool IsIgnoredType() const;
+
+  bool IsVoidPtrType() const;
+
+  bool IsStructType() const;
+
+  bool IsUnionType() const;
+
+  bool IsEnumType() const;
+
+  void SetIsIgnoredType(bool IsIgnored);
+
+  static const DIType *StripTypeModifiers(const DIType *DiType);
+
 protected:
   std::map<unsigned, std::set<std::shared_ptr<HAKCTypeInfo>>> Members;
   unsigned SizeInBits;
@@ -66,10 +93,11 @@ protected:
   Type *LLVMType;
   std::string DbgTypeName;
   HAKCTypeP PointeeType;
+  bool IsIgnored;
 
-  bool IsPointerToPointer(const DIType *DiType);
+  static bool IsPointerToPointer(const DIType *DiType);
 
-  const DIType *StripTypeModifiers(const DIType *DiType);
+  bool IsTag(dwarf::Tag Tag) const;
 
 public:
   friend bool operator==(const HAKCTypeInfo &Lhs, const HAKCTypeInfo &Rhs) {

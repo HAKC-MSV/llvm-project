@@ -1,3 +1,15 @@
+//===----------------------------------------------------------------------===//
+//
+// Part of the MIT Lincoln Laboratory HAKC Compartmentalization Project.
+//
+//===----------------------------------------------------------------------===//
+///
+/// \file
+/// This file contains the module analysis subclass class of common analysis.
+/// It contains specific functionality related to compartmentalization analysis
+/// at the module level.
+///
+//===----------------------------------------------------------------------===//
 //
 // Created by de29664 on 3/21/23.
 //
@@ -10,85 +22,43 @@
 
 namespace llvm::hakc {
 class HAKCModuleAnalysis {
-protected:
+public:
   SmallVector<HAKCCompartment, 8> UsedCompartments;
   CommonHAKCAnalysis &CommonAnalysis;
   FunctionList AnalysisFunctions;
   HAKCTypeIdentifier &TypeIdentifier;
-  HAKCCompartmentalizationPolicy &Policy;
-  HAKCTransformer Transformer;
-
-  void InitAnalysis();
 
   GlobalValue *ExtractGlobalFromKernelParam(GlobalVariable *GV);
 
-  void emitModParamGetCtx(GlobalValue *kernparam);
-
   bool functionEscapes(Function *F);
 
-  void RegisterUsedCompartment(HAKCCompartment &compartment);
-
-  std::string getGlobalHAKCSectionName(GlobalVariable *GV) const;
-
-  void TransformModule();
-
-  void TransformFunctions();
-
-  bool FunctionNeedsAnalysis(Function *F);
-
-  Function *CreateInitTransfer(GlobalVariable *GlobalVar);
-
-  StringRef GlobalInitTransferPrefix() const;
-
-  StringRef GlobalInitTransferSectionName() const;
-
-  StringRef GlobalInitTransferPointerSectionName() const;
-
-  std::string GlobalVariableROSectionName(GlobalVariable *GlobalVar);
-
-  void PopulateGlobalInitTransferFunc(Function *GlobTransfer,
-                                      GlobalVariable *GlobalVar);
-
-  bool TransferIsNeeded(GlobalVariable *GlobalVar);
+  bool FunctionNeedsAnalysis(Function *F) const;
 
   bool ConstantStructTransferIsNeeded(ConstantStruct *ConstStruct);
 
   bool AliasShouldBeCreated(Function *F);
 
-  bool isModuleCompartmentalized();
+  bool useEscapes(Use &U);
 
-  void MoveGlobalsToHAKCSection();
-
-  void AddTransferFunctions();
-
-public:
-  HAKCModuleAnalysis(CommonHAKCAnalysis &CommonAnalysis,
-                     HAKCCompartmentalizationPolicy &Policy);
-
-  void performTransformations();
-
-  void AddCompartmentMetadata();
-
-  bool TransferFunctionShouldBeCreated(Function *F);
+  HAKCModuleAnalysis(CommonHAKCAnalysis &CommonAnalysis);
 
   StructType *GetKernelParamType();
 
-  void CreateInitGlobalMemberTransfers();
-
-  Module &GetModule();
+  Module &GetModule() const;
 
   bool FunctionDefinedInAssembly(Function *F);
 
-  CommonHAKCAnalysis &GetCommonAnalysis();
+  CommonHAKCAnalysis &GetCommonAnalysis() const;
 
   Function *GetFunctionByName(StringRef Name, FunctionType *FuncTy);
 
-  HAKCTypeIdentifier &GetTypeIdentifier();
-
-  HAKCTransformer &GetTransformer();
+  HAKCTypeIdentifier &GetTypeIdentifier() const;
 
   bool FunctionIsInAnalysisSet(Function *F);
+
+  void OutputYAML(raw_ostream &out) const;
 };
+
 } // namespace llvm::hakc
 
 #endif // HAKC_HAKCMODULEANALYSIS_H

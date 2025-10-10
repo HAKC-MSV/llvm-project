@@ -1,4 +1,15 @@
+//===----------------------------------------------------------------------===//
 //
+// Part of the MIT Lincoln Laboratory HAKC Compartmentalization Project.
+//
+//===----------------------------------------------------------------------===//
+///
+/// \file
+/// This file contains the function analysis subclass class of common analysis.
+/// It contains specific functionality related to compartmentalization analysis
+/// at the function level.
+///
+//===----------------------------------------------------------------------===//
 // Created by de29664 on 3/21/23.
 //
 
@@ -12,7 +23,9 @@
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCTransformer.h"
 
 namespace llvm::hakc {
+
 class HAKCModuleAnalysis;
+class HAKCModuleTransform;
 
 class CommonHAKCAnalysis;
 
@@ -41,7 +54,8 @@ class HAKCPointerManager;
 class HAKCFunctionAnalysis {
 protected:
   HAKCModuleAnalysis &ModuleAnalysis;
-  HAKCCompartmentalizationPolicy &Policy;
+  HAKCTransformer &Transformer;
+  HAKCServerClient &Client;
   HAKCPointerManager PointerManager;
   bool DebugActive;
 
@@ -74,9 +88,10 @@ protected:
                                           const DebugLoc &debugLoc,
                                           Instruction *I, ConstantInt *Size);
 
-  bool userInFunction(Value *user);
+  bool userInFunction(Value *user) const;
 
-  BasicBlock *findDominatorUseBlock(Value *ptr, std::set<Instruction *> &users);
+  BasicBlock *findDominatorUseBlock(Value *ptr,
+                                    std::set<Instruction *> &users) const;
 
   void createAllAuthenticatedPointers();
 
@@ -95,19 +110,17 @@ protected:
 
   bool isPHIofGlobalsOnly(Value *ptr, std::set<PHINode *> &nodes);
 
-  void RegisterPointerDereference(Use &use);
-
   void handleLoad(LoadInst *load);
 
   void handleComparison(CmpInst *compare);
 
   void handleCall(CallInst *call);
 
-  void handleStore(StoreInst *store);
+  void handleStore(StoreInst *Store);
 
   void handleBinaryOperator(BinaryOperator *binOp);
 
-  bool globalShouldBeTransferred(Use &globalValueArg);
+  bool globalShouldBeTransferred(Use &globalValueArg) const;
 
   void relocateFunctionSection();
 
@@ -115,9 +128,9 @@ protected:
 
   void CheckForValidCompartmentTransitionAndUpdateIntraCompartmentCalls();
 
-  HAKCTransformer &getTransformer();
+  HAKCTransformer &getTransformer() const;
 
-  void AddManagedPointer(Value *HAKCPointer);
+  bool AddManagedPointer(Use &PointerUse);
 
   void ReplaceInstructionOperand(Instruction *I, unsigned ArgNo,
                                  Value *OldValue, Value *NewValue);
@@ -128,23 +141,35 @@ protected:
 
   void MaybeAddCompareToDirectUsers(CmpInst *CmpI);
 
-  void UpdateHAKCFunctionParameters();
+  void UpdateHAKCFunctionParameters() const;
 
   void AddInstrumentation(bool RelocateSection);
 
   void CheckAndReplaceArgument(Value *V, Instruction *I, unsigned ArgNo);
 
-  bool IsCallInIntrinsicSet(CallBase *Call, ArrayRef<Intrinsic::ID> IDs);
+  bool IsCallInIntrinsicSet(CallBase *Call, ArrayRef<Intrinsic::ID> IDs) const;
 
   void UpdateHAKCFunctionParameters(
       CallInst *CallI, const HAKCCompartment &TargetCompartment,
-      const hakc::function_def_t &HAKCTransferFunction);
+      const hakc::function_def_t &HAKCTransferFunction) const;
 
 public:
   virtual ~HAKCFunctionAnalysis() = default;
 
-  HAKCFunctionAnalysis(Function *F, HAKCModuleAnalysis &ModuleAnalysis,
-                       HAKCCompartmentalizationPolicy &Policy);
+  HAKCFunctionAnalysis(Function *F, HAKCModuleAnalysis &ModuleAnalysis, HAKCTransformer &Transformer,
+                       HAKCServerClient &Client);
+
+  HAKCTypeIdentifier& GetTypeIdentifier() const;
+
+  HAKCLogger &getLogger(HAKCLogLevel log_level) const;
+
+  void TemporalAnalysis();
+
+  void TemporalAnalysisHandleCall(ManagedHAKCPointerUseP Use);
+
+  void TemporalAnalysisHandleLoad(ManagedHAKCPointerUseP Use);
+
+  void TemporalAnalysisHandleStore(ManagedHAKCPointerUseP Use);
 
   bool modifiedFunction() const;
 
@@ -152,9 +177,10 @@ public:
 
   void setup();
 
-  Value *getDef(Value *, bool);
+  Value *getDef(Value *, bool) const;
 
-  Instruction *FindUseInsertionPoint(Value *v, std::set<Instruction *> &users);
+  Instruction *FindUseInsertionPoint(Value *v,
+                                     std::set<Instruction *> &users) const;
 
   Value *AddDataAuthCheckAtLocation(Value *signed_ptr, Instruction *location);
 
@@ -163,9 +189,9 @@ public:
   Value *AddSafePointerCreationAtLocation(Value *SignedPtr,
                                           Instruction *Location);
 
-  bool isCompartmentalizedFunction();
+  bool isCompartmentalizedFunction() const;
 
-  Function &getFunction();
+  Function &GetFunction() const;
 
   Instruction *CreateMissingTransfer(Instruction *PointerNeedingTransfer);
 
@@ -173,17 +199,29 @@ public:
 
   Instruction *GetFinalAllocaDef(AllocaInst *Alloca);
 
-  bool PointerShouldBeManaged(Use &use);
-
   bool IsPHIOfGlobalsOnly(Value *V);
 
-  HAKCModuleAnalysis &GetModuleAnalysis();
+  HAKCModuleAnalysis &GetModuleAnalysis() const;
 
-  bool IsIntrinsicNeedingAuthentication(CallBase *Call);
+  bool IsIntrinsicNeedingAuthentication(CallBase *Call) const;
 
-  bool IsIntrinsicNeedingCloning(CallBase *Call);
+  bool IsIntrinsicNeedingCloning(CallBase *Call) const;
 
-  bool IsIntrinsicToSkip(CallBase *Call);
+  void AddPermissionUse(const ManagedHAKCPointer &ManagedPointer, TypePerms perm) const;
+
+  bool IsIntrinsicToSkip(CallBase *Call) const;
+  // TicTac code
+  void AssignFunctionEpochs();
+
+  tictac_epoch_id_t GetEpoch(Value *V);
+  // std::map<Type*, std::shared_ptr<TICTACEpoch>> function_epochs;
+  Value *AddEpochDataAuthCheckAtLocation(Value *signed_ptr, Instruction *location);
+  Value *AddEpochCodeAuthCheckAtLocation(Value *SignedPtr, Instruction *Location);
+
+  HAKCWriter &getWriter();
+
+  HAKCWriter &getWriter(HAKCLogLevel log_level);
+
 };
 } // namespace llvm::hakc
 

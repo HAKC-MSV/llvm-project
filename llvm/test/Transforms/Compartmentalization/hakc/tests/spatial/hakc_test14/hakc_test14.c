@@ -1,0 +1,20 @@
+// RUN: %HAKC_PYTHON_VENV
+// RUN: %HAKC_START_ANALYSIS_SERVER
+// RUN: %HAKC_RUN_ANALYSIS_PASS
+// sleep for n seconds to let server finish constructing dag
+// RUN: sleep 25
+// RUN: %HAKC_RUN_ENFORCEMENT_PASS
+// RUN: %HAKC_EVALUATE
+
+#include <stdio.h>
+
+char *GlobalString = "hello world";
+
+// CHECK-LABEL: HAKC_ORIG_printstr
+int printstr(char *str) {
+  printf("%s %s\n", str, GlobalString);
+  return 0;
+}
+
+// CHECK-LABEL: HAKC_VARF_printf_0
+// CHECK: call ptr @hakc_transfer_string(ptr %0, i64 4, i32 13)

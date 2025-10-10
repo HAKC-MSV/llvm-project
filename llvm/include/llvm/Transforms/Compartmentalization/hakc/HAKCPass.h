@@ -1,6 +1,14 @@
+//===----------------------------------------------------------------------===//
 //
-// Created by derrick on 3/16/21.
+// Part of the MIT Lincoln Laboratory HAKC Compartmentalization Project.
 //
+//===----------------------------------------------------------------------===//
+///
+/// \file
+/// This file contains the top level declaration of the module level HAKC
+/// compartmentalization pass.
+///
+//===----------------------------------------------------------------------===//
 #ifndef PMC_HAKCPASS_H
 #define PMC_HAKCPASS_H
 
@@ -11,5 +19,5 @@ namespace llvm {
     public:
         PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM);
     };
-}
-#endif//PMC_HAKCPASS_H
+} // namespace llvm
+#endif // PMC_HAKCPASS_H

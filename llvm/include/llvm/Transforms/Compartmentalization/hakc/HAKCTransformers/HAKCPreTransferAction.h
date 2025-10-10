@@ -1,3 +1,14 @@
+//===----------------------------------------------------------------------===//
+//
+// Part of the MIT Lincoln Laboratory HAKC Compartmentalization Project.
+//
+//===----------------------------------------------------------------------===//
+///
+/// \file
+/// This file contains the pre transfer action class, e.g., what needs to be saved
+/// before a transfer is called, e.g., what was the previous compartment.
+///
+//===----------------------------------------------------------------------===//
 //
 // Created by al32163 on 02/27/25.
 //

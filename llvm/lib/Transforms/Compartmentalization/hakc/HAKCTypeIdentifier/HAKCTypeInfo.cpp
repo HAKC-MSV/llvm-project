@@ -13,20 +13,42 @@ namespace llvm::hakc {
 HAKCTypeInfo::HAKCTypeInfo(CommonHAKCAnalysis &Analysis, StringRef Name,
                            bool DebugActive)
     : HAKCInfo(Analysis, Name, DebugActive), Members(), SizeInBits(0),
-      DbgType(nullptr), LLVMType(nullptr), DbgTypeName(), PointeeType(nullptr) {
-}
+      DbgType(nullptr), LLVMType(nullptr), DbgTypeName(), PointeeType(nullptr),
+      IsIgnored(false) {}
 
 unsigned HAKCTypeInfo::GetSizeInBits() const {
+  unsigned SizeInBits = 0;
   if (DbgType) {
-    return DbgType->getSizeInBits();
+    SizeInBits = DbgType->getSizeInBits();
   }
-  return 0;
+
+  return SizeInBits > 0 ? SizeInBits : BITS_PER_BYTE;
+}
+
+bool HAKCTypeInfo::IsIgnoredType() const {
+  bool Result = IsIgnored;
+  if (!Result && IsPointerType() && PointeeType && !IsVoidPtrType()) {
+    Result = PointeeType->IsIgnoredType();
+  }
+  return Result;
+}
+void HAKCTypeInfo::SetIsIgnoredType(bool IsIgnored) {
+  this->IsIgnored = IsIgnored;
+}
+
+bool HAKCTypeInfo::IsVoidPtrType() const {
+  auto *StrippedDbgTy = StripTypeModifiers(DbgType);
+  if (isa_and_nonnull<DIDerivedType>(StrippedDbgTy)) {
+    return dyn_cast<DIDerivedType>(StrippedDbgTy)->getBaseType() == nullptr;
+  }
+  return false;
 }
 
 ConstantInt *HAKCTypeInfo::GetSizeInBytes() const {
   unsigned SizeInBits = GetSizeInBits();
   LLVMContext &Ctx = Analysis.GetModule().getContext();
-  return ConstantInt::get(IntegerType::get(Ctx, 64), SizeInBits, false);
+  return ConstantInt::get(IntegerType::get(Ctx, 64), SizeInBits / BITS_PER_BYTE,
+                          false);
 }
 
 const DIType *HAKCTypeInfo::GetDbgType() const { return DbgType; }
@@ -50,35 +72,70 @@ void HAKCTypeInfo::SetPointeeType(const HAKCTypeP &PointeeType) {
 
 bool HAKCTypeInfo::IsIntegerType() const {
   if (DbgType) {
-    if (auto *DiBasicTy = dyn_cast<DIBasicType>(DbgType)) {
-      ArrayRef<unsigned> IntegerEncodings = {
-          dwarf::DW_ATE_address, dwarf::DW_ATE_signed, dwarf::DW_ATE_unsigned};
-      auto Encoding = DiBasicTy->getEncoding();
-      auto Search = [Encoding](unsigned E) { return Encoding == E; };
-      return llvm::any_of(IntegerEncodings, Search);
+    auto *StrippedTy = StripTypeModifiers(DbgType);
+    if (auto *DiBasicTy = dyn_cast<DIBasicType>(StrippedTy)) {
+      auto IntegerEncodings = {dwarf::DW_ATE_address, dwarf::DW_ATE_signed,
+                               dwarf::DW_ATE_unsigned,
+                               dwarf::DW_ATE_unsigned_char};
+      for (const auto Encoding : IntegerEncodings) {
+        if (Encoding == DiBasicTy->getEncoding()) {
+          return true;
+        }
+      }
     }
   } else if (LLVMType) {
-    return LLVMType->isPointerTy();
+    return LLVMType->isIntegerTy();
   }
   return false;
 }
 
 bool HAKCTypeInfo::IsPointerType() const {
   if (DbgType) {
-    return DbgType->getTag() == dwarf::DW_TAG_pointer_type;
-  } else if (LLVMType) {
-    return LLVMType->isPointerTy();
+    return IsTag(dwarf::DW_TAG_pointer_type) || IsTag(dwarf::DW_TAG_array_type);
+  }
+  if (LLVMType) {
+    return LLVMType->isPointerTy() || LLVMType->isArrayTy();
   }
   return false;
 }
 
 bool HAKCTypeInfo::IsFunctionType() const {
   if (DbgType) {
-    return isa<DISubroutineType>(DbgType);
-  } else if (LLVMType) {
+    return isa<DISubroutineType>(StripTypeModifiers(DbgType));
+  }
+
+  if (LLVMType) {
     return isa<FunctionType>(LLVMType);
   }
   return false;
+}
+
+bool HAKCTypeInfo::IsStructType() const {
+  if (DbgType) {
+    return IsTag(dwarf::DW_TAG_array_type);
+  }
+
+  if (LLVMType) {
+    return isa<StructType>(LLVMType);
+  }
+
+  return false;
+}
+
+bool HAKCTypeInfo::IsEnumType() const {
+  return IsTag(dwarf::DW_TAG_enumeration_type);
+}
+
+bool HAKCTypeInfo::IsTag(dwarf::Tag Tag) const {
+  if (DbgType) {
+    auto *StrippedDbgTy = StripTypeModifiers(DbgType);
+    return StrippedDbgTy->getTag() == Tag;
+  }
+  return false;
+}
+
+bool HAKCTypeInfo::IsUnionType() const {
+  return IsTag(dwarf::DW_TAG_union_type);
 }
 
 std::shared_ptr<HAKCTypeInfo> HAKCTypeInfo::GetPointeeType() const {
@@ -87,15 +144,20 @@ std::shared_ptr<HAKCTypeInfo> HAKCTypeInfo::GetPointeeType() const {
 
 const DIType *HAKCTypeInfo::StripTypeModifiers(const DIType *DiType) {
   auto *Result = DiType;
+  if (!Result) {
+    return nullptr;
+  }
 
   if (auto *DiDerivedType = dyn_cast<DIDerivedType>(DiType)) {
     auto TagToFind = DiDerivedType->getTag();
 
-    auto Search = [TagToFind](dwarf::Tag Tag) { return Tag == TagToFind; };
+    auto Search = [TagToFind](const dwarf::Tag Tag) {
+      return Tag == TagToFind;
+    };
 
-    SmallVector<dwarf::Tag> TagsToRemove = {dwarf::DW_TAG_volatile_type,
-                                            dwarf::DW_TAG_const_type,
-                                            dwarf::DW_TAG_restrict_type};
+    SmallVector<dwarf::Tag> TagsToRemove = {
+        dwarf::DW_TAG_volatile_type, dwarf::DW_TAG_const_type,
+        dwarf::DW_TAG_restrict_type, dwarf::DW_TAG_typedef};
     if (llvm::any_of(TagsToRemove, Search)) {
       if (DiDerivedType->getBaseType()) {
         Result = StripTypeModifiers(DiDerivedType->getBaseType());
@@ -120,7 +182,7 @@ bool HAKCTypeInfo::IsPointerToPointer(const DIType *DiType) {
   return false;
 }
 
-bool HAKCTypeInfo::IsPointerToPointer() {
+bool HAKCTypeInfo::IsPointerToPointer() const {
   if (DbgType) {
     return IsPointerToPointer(DbgType);
   }
@@ -130,7 +192,7 @@ bool HAKCTypeInfo::IsPointerToPointer() {
 
 void HAKCTypeInfo::SetLLVMType(Type *Ty) {
   if (!Ty) {
-    CommonHAKCAnalysis::getWriter(true)
+    CommonHAKCAnalysis::getLogger(Fatal)
         << "Trying to set null LLVM Type for " << GetName() << "\n";
     throw std::exception();
   }
@@ -151,7 +213,7 @@ void HAKCTypeInfo::SetLLVMType(Type *Ty) {
       }
     }
 
-    CommonHAKCAnalysis::getWriter(true)
+    CommonHAKCAnalysis::getLogger(Fatal)
         << "Trying to change LLVM Type for " << GetName() << " from "
         << *LLVMType << " to " << *Ty << "\n";
     throw std::exception();
@@ -176,6 +238,43 @@ std::string HAKCTypeInfo::GetYamlHeader(unsigned int Indents) const {
   }
   sstream << "\"\n";
   sstream.indent(Indents + EntrySpaces()) << "LLVMType: \"";
+  if (LLVMType) {
+    if (auto *StructTy = dyn_cast<StructType>(LLVMType)) {
+      if (StructTy->hasName()) {
+        sstream << StructTy->getName();
+      } else {
+        sstream << *LLVMType;
+      }
+    } else {
+      sstream << *LLVMType;
+    }
+  } else {
+    sstream << UnknownType;
+  }
+  sstream << "\"";
+
+  return Yaml;
+}
+std::string HAKCTypeInfo::GetYamlHeader(unsigned int Indents, unsigned RWX) const {
+  // function to generate HAKCTypePerm yaml
+  std::string Yaml;
+  llvm::raw_string_ostream sstream(Yaml);
+
+  sstream << "!HAKCTypePerm\n";
+  sstream.indent(Indents + EntrySpaces()) << "RWX: " << RWX << "\n";
+  sstream.indent(Indents + EntrySpaces()) << "Type:\n";
+
+  sstream.indent(Indents + EntrySpaces() + 4) << HAKCInfo::GetYamlHeader(Indents + 4);
+
+  sstream << "\n";
+  sstream.indent(Indents + EntrySpaces() + 4) << "DebugType: \"";
+  if (!DbgTypeName.empty()) {
+    sstream << DbgTypeName;
+  } else {
+    sstream << UnknownType;
+  }
+  sstream << "\"\n";
+  sstream.indent(Indents + EntrySpaces() + 4) << "LLVMType: \"";
   if (LLVMType) {
     if (auto *StructTy = dyn_cast<StructType>(LLVMType)) {
       if (StructTy->hasName()) {

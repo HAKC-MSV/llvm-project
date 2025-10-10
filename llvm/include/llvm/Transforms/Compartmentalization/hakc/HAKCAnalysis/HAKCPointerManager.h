@@ -1,3 +1,15 @@
+//===----------------------------------------------------------------------===//
+//
+// Part of the MIT Lincoln Laboratory HAKC Compartmentalization Project.
+//
+//===----------------------------------------------------------------------===//
+///
+/// \file
+/// This file contains the base class that tracks pointers that are created
+/// during compartmentalization, e.g., a pointer that needs to be authenticated
+/// before allowing data to cross compartment boundaries
+///
+//===----------------------------------------------------------------------===//
 //
 // Created by de29664 on 11/14/23.
 //
@@ -6,7 +18,8 @@
 #define HAKC_HAKCPOINTERMANAGER_H
 
 #include "ManagedHAKCPointer.h"
-#include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartmentalizationPolicy.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCDatabase/HAKCServerClient.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCLogger.h"
 #include <memory>
 
 namespace llvm::hakc {
@@ -31,14 +44,16 @@ typedef std::vector<ManagedHAKCPointerUseP> ManagedHAKCPointerUseListType;
 class HAKCPointerManager {
 public:
   explicit HAKCPointerManager(HAKCFunctionAnalysis &Analysis,
-                              HAKCCompartmentalizationPolicy &Policy,
+                              HAKCServerClient &Client,
                               bool DebugActive);
 
-  bool ManagePointer(Value *V);
+  bool ManagePointer(Use &U);
+
+  bool PointerIsEligibleForManagement(Use &U);
 
   iterator_range<ManagedHAKCPointerListType::iterator> ManagedPointers();
 
-  HAKCFunctionAnalysis &GetFunctionAnalysis();
+  HAKCFunctionAnalysis &GetFunctionAnalysis() const;
 
   /**
    * Returns the ManagedHAKCPointer that corresponds to the definition V
@@ -46,10 +61,9 @@ public:
    * @return
    */
   ManagedHAKCPointerP GetManagedPointer(Value *V);
-
   bool empty() const;
 
-  Value *GetDef(Value *V);
+  Value *GetDef(Value *V) const;
 
   /**
    * Return the Authenticated version of Pointer
@@ -109,7 +123,7 @@ public:
 
   void SetFunctionIsCompartmentalized(bool FunctionIsCompartmentalized);
 
-  HAKCCompartmentalizationPolicy &GetPolicy() const;
+  HAKCServerClient &GetClient() const;
 
   Instruction *CloneInstruction(Instruction *I);
 
@@ -134,7 +148,7 @@ protected:
   ManagedHAKCPointerUseListType AnalyzedUses;
 
   HAKCFunctionAnalysis &HAKCAnalysis;
-  HAKCCompartmentalizationPolicy &Policy;
+  HAKCServerClient &Client;
 
   unsigned DataAuthenticationsAdded;
   unsigned CodeAuthenticationsAdded;
@@ -143,8 +157,6 @@ protected:
   bool IsCompartmentalized;
   bool DebugActive;
 
-  bool PointerIsEligibleForManagement(Value *Pointer);
-
   void AddHAKCPointerReplacement(ManagedHAKCPointerUseP &PtrUse,
                                  Value *Replacement,
                                  bool AddingAuthenticatedReplacements);
@@ -152,7 +164,7 @@ protected:
   Value *FindManagedValue(std::map<ManagedHAKCPointerUseP, Value *> &Storage,
                           Value *Target);
 
-  void ManageNewPointer(Value *V);
+  bool ManageNewPointer(Use &U);
 
   void ClassifyAllUsesOfDefinition(Value *Definition,
                                    ManagedHAKCPointer &ManagedPointer);
@@ -163,9 +175,9 @@ protected:
 
   static bool UseShouldBeCloned(Use &U);
 
-  bool UseShouldUtilizeAuthenticatedPointer(Use &U);
+  bool UseShouldUtilizeAuthenticatedPointer(Use &U) const;
 
-  bool UseShouldUtilizeSignedBasePointer(Use &U);
+  bool UseShouldUtilizeSignedBasePointer(Use &U) const;
 
   bool IsClonedUseNeedingAdditionalClassification(Use &U);
 
@@ -179,7 +191,9 @@ protected:
   CreateManagedPointerUse(ManagedHAKCPointer &ManagedPointer, User *U,
                           unsigned OperandNo);
 
-  bool IsConstantExprUsedInKernelCall(User *U);
+  bool IsConstantExprUsedInKernelCall(User *U) const;
+
+  HAKCLogger &GetLogger(HAKCLogLevel log_level, bool suppress_output) const;
 
 private:
   unsigned CurrentPointerID;

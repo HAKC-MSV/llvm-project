@@ -1,3 +1,14 @@
+//===----------------------------------------------------------------------===//
+//
+// Part of the MIT Lincoln Laboratory HAKC Compartmentalization Project.
+//
+//===----------------------------------------------------------------------===//
+///
+/// \file
+/// This file contains the post target action class, e.g., what needs to be set
+/// after a transfer function is called.
+///
+//===----------------------------------------------------------------------===//
 //
 // Created by de29664 on 3/21/23.
 //
@@ -10,11 +21,10 @@
 #include "HAKCTransferState.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstIterator.h"
-#include "llvm/IR/Module.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/ManagedHAKCPointer.h"
-#include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartmentalizationPolicy.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCDatabase/HAKCServerClient.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCFunctionDefinition/HAKCCustomTransfer.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCFunctionDefinition/HAKCFunctionDefinition.h"
 
@@ -29,8 +39,8 @@ namespace llvm::hakc {
  */
 class HAKCTransformer {
 public:
-  HAKCTransformer(HAKCCompartmentalizationPolicy &Policy,
-                  HAKCModuleAnalysis &HAKCAnalysis);
+  HAKCTransformer(HAKCModuleAnalysis &ModuleAnalysis,
+                  HAKCServerClient &Client);
 
   virtual ~HAKCTransformer() = default;
 
@@ -49,7 +59,7 @@ public:
    * @param I
    * @return
    */
-  virtual Value *CreateDataAuthentication(hakc::HAKCPointerBase &HAKCPointer,
+  virtual Value *CreateDataAuthentication(HAKCPointerBase &HAKCPointer,
                                           Instruction *I);
 
   /**
@@ -58,7 +68,7 @@ public:
    * @param I
    * @return
    */
-  virtual Value *CreateCodeAuthentication(hakc::HAKCPointerBase &HAKCPointer,
+  virtual Value *CreateCodeAuthentication(HAKCPointerBase &HAKCPointer,
                                           Instruction *I);
 
   /**
@@ -70,9 +80,10 @@ public:
    * @param IsData
    * @return
    */
-  virtual Instruction *
-  CreateCompartmentTransfer(hakc::HAKCPointerBase &HAKCPointer, Instruction *I,
-                            GlobalValue *Target, bool IsData);
+  virtual Instruction *CreateCompartmentTransfer(HAKCPointerBase &HAKCPointer,
+                                                 Instruction *I,
+                                                 GlobalValue *Target,
+                                                 bool IsData);
 
   /**
    * Creates a Compartment Transfer of ManagedHAKCPointer at I. The arguments to
@@ -94,9 +105,9 @@ public:
    * @return
    */
   virtual Instruction *
-  CreateSizedCompartmentTransfer(hakc::HAKCPointerBase &HAKCPointer,
-                                 Instruction *I, GlobalValue *Target,
-                                 bool IsData, ConstantInt *Size);
+  CreateSizedCompartmentTransfer(HAKCPointerBase &HAKCPointer, Instruction *I,
+                                 GlobalValue *Target, bool IsData,
+                                 ConstantInt *Size);
 
   /**
    * Creates a BitCastInst of Operand to TargetType at I
@@ -105,8 +116,8 @@ public:
    * @param I
    * @return
    */
-  virtual Value *CreateBitCast(hakc::HAKCPointerBase &HAKCPointer,
-                               Type *TargetType, Instruction *I);
+  virtual Value *CreateBitCast(HAKCPointerBase &HAKCPointer, Type *TargetType,
+                               Instruction *I);
 
   /**
    * Create a signed pointer using the color of HAKCPointer
@@ -116,9 +127,9 @@ public:
    * @param IsData
    * @return
    */
-  virtual Instruction *
-  CreateSignWithDivision(hakc::HAKCPointerBase &HAKCPointer, Instruction *I,
-                         GlobalValue *Target, bool IsData);
+  virtual Instruction *CreateSignWithDivision(HAKCPointerBase &HAKCPointer,
+                                              Instruction *I,
+                                              GlobalValue *Target, bool IsData);
 
   /**
    * Create a Outside Transfer Function
@@ -131,45 +142,18 @@ public:
    * Create a transfer function to a variadic function in a different
    * compartment
    * @param Call
+   * @param PointerManager
    * @return
    */
-  Function *CreateTransferToVariadic(CallInst *Call);
-
-  /**
-   * Create Architecture specific transformations for a new transfer function
-   * @param Original
-   * @param Transfer
-   */
-  //        void CreateTransferFunctionFinalize_Arch(Function *Original,
-  //        Function *Transfer);
-
-  /**
-   * Perform architecture specific transformations prior to an argument
-   * transfer to a target compartment
-   * @param F
-   * @param TransferFunction
-   * @param Arg
-   * @param TransferState
-   */
-  void CreateTransferFunctionArg_PreCall(Function *F,
-                                         Function *TransferFunction,
-                                         Argument *Arg,
-                                         HAKCTransferState &TransferState);
-
-  /**
-   * Perform architecture specific transformations after the cross
-   * compartment function call
-   * @param F
-   * @param TransformFunction
-   * @param Arg
-   * @param TransferState
-   */
-  void CreateTransferFunctionArg_PostCall(Function *F,
-                                          Function *TransformFunction,
-                                          Argument *Arg,
-                                          HAKCTransferState &TransferState);
+  Function *
+  CreateTransferToVariadic(CallInst *Call,
+                           HAKCPointerManager *PointerManager = nullptr);
 
   Module &getModule() const;
+
+  CommonHAKCAnalysis &getCommonAnalysis() const;
+
+  HAKCSystemInformation &getSystemInfo() const;
 
   virtual Type *HAKCAuthenticationRetType(unsigned AddrSpace);
 
@@ -191,7 +175,7 @@ public:
   //        virtual bool ValidateHAKCIntegerPointerSize(ManagedHAKCPointerP
   //        HAKCPointer);
 
-  virtual unsigned GetPointerAddrSpace(hakc::HAKCPointerBase &HAKCPointer);
+  virtual unsigned GetPointerAddrSpace(HAKCPointerBase &HAKCPointer);
 
   static unsigned GetPointerAddrSpace(Value *V);
 
@@ -205,15 +189,56 @@ public:
   AddCompartmentMetadataEntry(HAKCCompartment &Compartment);
 
   virtual Function *PopulateGlobalTransfer(Function *GlobalTransfer,
-                                           GlobalVariable *GlobalVar,
-                                           bool Debug);
+                                           GlobalVariable *GlobalVar);
+
+  void performTransformations();
+
+  void AddCompartmentMetadata();
+
+  bool TransferFunctionShouldBeCreated(Function *F);
+
+  StructType *GetKernelParamType() const;
+
+  bool FunctionDefinedInAssembly(Function *F) const;
+
+  Function *GetFunctionByName(StringRef Name, FunctionType *FuncTy) const;
+
+  HAKCTransformer &GetTransformer();
+
+  bool FunctionIsInAnalysisSet(Function *F) const;
 
 protected:
-  IRBuilder<> HAKCIRBuilder;
-  HAKCCompartmentalizationPolicy &CompartmentalizationPolicy;
   HAKCModuleAnalysis &ModuleAnalysis;
+  HAKCServerClient &Client;
+  IRBuilder<> HAKCIRBuilder;
 
   std::map<Function *, Function *> VariadicTransferFunctions;
+
+  void InitAnalysis();
+
+  void TransformModule();
+
+  void TransformFunctions();
+
+  void emitModParamGetCtx(GlobalValue *kernparam);
+
+  std::string getGlobalHAKCSectionName(GlobalVariable *GV) const;
+
+  Function *CreateInitTransfer(GlobalVariable *GlobalVar);
+
+  void RegisterUsedCompartment(HAKCCompartment &compartment);
+
+  bool TransferIsNeeded(GlobalVariable *GlobalVar);
+
+  bool ConstantStructTransferIsNeeded(ConstantStruct *ConstStruct);
+
+  bool AliasShouldBeCreated(Function *F);
+
+  bool isModuleCompartmentalized() const;
+
+  void MoveGlobalsToHAKCSection();
+
+  void AddTransferFunctions();
 
   /**
    * Checks that ManagedHAKCPointer and I are valid, and sets the HAKCIRBuilder
@@ -242,8 +267,7 @@ protected:
    */
   CallInst *CreateCall(StringRef name, Type *RetTy, ArrayRef<Value *> Args);
 
-  CallInst *CreateCall(const hakc::function_def_t &Callee,
-                       ArrayRef<Value *> Args);
+  CallInst *CreateCall(const function_def_t &Callee, ArrayRef<Value *> Args);
 
   CallInst *CreateCall(Function *Callee, ArrayRef<Value *> Args);
 
@@ -280,7 +304,7 @@ protected:
    * @param I
    * @return
    */
-  virtual void CreateDataAuthArguments(hakc::HAKCPointerBase &HAKCPointer,
+  virtual void CreateDataAuthArguments(HAKCPointerBase &HAKCPointer,
                                        Instruction *I,
                                        SmallVectorImpl<Value *> &Result);
 
@@ -290,7 +314,7 @@ protected:
    * @param I
    * @return
    */
-  virtual void CreateCodeAuthArguments(hakc::HAKCPointerBase &HAKCPointer,
+  virtual void CreateCodeAuthArguments(HAKCPointerBase &HAKCPointer,
                                        Instruction *I,
                                        SmallVectorImpl<Value *> &Result);
 
@@ -302,7 +326,7 @@ protected:
    * @param Size
    * @return
    */
-  virtual void CreateTransferArguments(hakc::HAKCPointerBase &HAKCPointer,
+  virtual void CreateTransferArguments(HAKCPointerBase &HAKCPointer,
                                        GlobalValue *Target, bool IsData,
                                        ConstantInt *Size,
                                        SmallVector<Value *> &Result);
@@ -316,7 +340,7 @@ protected:
    * @param Size
    * @return
    */
-  virtual Instruction *CreateDefaultTransfer(hakc::HAKCPointerBase &HAKCPointer,
+  virtual Instruction *CreateDefaultTransfer(HAKCPointerBase &HAKCPointer,
                                              GlobalValue *Target, bool IsData,
                                              ConstantInt *Size);
 
@@ -328,16 +352,16 @@ protected:
    * @param Size
    * @return
    */
-  virtual Instruction *CreateCustomTransfer(hakc::HAKCPointerBase &HAKCPointer,
+  virtual Instruction *CreateCustomTransfer(HAKCPointerBase &HAKCPointer,
                                             GlobalValue *Target, bool IsData,
                                             ConstantInt *Size);
 
-  bool HAKCPointerHasCustomTransfer(hakc::HAKCPointerBase &HAKCPointer);
+  bool HAKCPointerHasCustomTransfer(HAKCPointerBase &HAKCPointer);
 
-  Value *CreatePointerCast(hakc::HAKCPointerBase &HAKCPointer,
+  Value *CreatePointerCast(HAKCPointerBase &HAKCPointer,
                            PointerType *PointerTy);
 
-  Value *CreateReturnCast(hakc::HAKCPointerBase &HAKCPointer, Value *V);
+  Value *CreateReturnCast(HAKCPointerBase &HAKCPointer, Value *V);
 
   /**
    * Return the custom transfer function if one exists
@@ -345,7 +369,7 @@ protected:
    * @return
    */
   virtual custom_transfer_def_t
-  GetCustomTransferFunction(hakc::HAKCPointerBase &HAKCPointer);
+  GetCustomTransferFunction(HAKCPointerBase &HAKCPointer);
 
   void ValidateLocation(Instruction *I);
 
@@ -353,8 +377,10 @@ protected:
 
   Function *CreateNonVariadicTransferFunction(Function *F);
 
-  Function *PopulateTransferFunction(Function *Target,
-                                     Function *TransferFunction);
+  Function *
+  PopulateTransferFunction(Function *Target, Function *TransferFunction,
+                           CallInst *CallSite = nullptr,
+                           HAKCPointerManager *PointerManager = nullptr);
 
   Function *GetTransferFunction(Function *F) const;
 
@@ -362,17 +388,15 @@ protected:
 
   virtual void TransferStructMembers(ConstantStruct *ConstStruct,
                                      Function *GlobalTransfer,
-                                     GlobalValue *GlobalVar, bool Debug);
+                                     GlobalValue *GlobalVar);
 
   virtual bool TransferShouldBeCreated(Value *V, GlobalValue *Target);
-
-  bool DebugIsActive() const;
 
   virtual custom_transfer_def_t
   GetCustomTransferFunctionForType(HAKCTypeP HAKCType);
 
   virtual Instruction *
-  CreateVoidCastCompartmentTransfer(hakc::HAKCPointerBase &HAKCPointer,
+  CreateVoidCastCompartmentTransfer(HAKCPointerBase &HAKCPointer,
                                     Instruction *I, GlobalValue *Target,
                                     HAKCTypeP TypeToUse);
 
@@ -384,6 +408,9 @@ protected:
 
   Value *CreateActionCall(HAKCTransferAction &TransferAction,
                           HAKCTransferState &TransferState);
+
+  HAKCTypeP InferHAKCType(Argument &Arg, CallInst *CallSite,
+                          HAKCPointerManager *PointerManager) const;
 };
 } // namespace llvm::hakc
 

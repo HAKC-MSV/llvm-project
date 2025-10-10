@@ -11,7 +11,7 @@ HAKCFunctionArgumentDefinition::HAKCFunctionArgumentDefinition(
     Type *ArgTy, unsigned Idx, HAKCFunctionArgumentUse Use)
     : ArgTy(ArgTy), Idx(Idx), ArgUse(Use) {
   if (!ArgTy) {
-    CommonHAKCAnalysis::getWriter(true) << "ArgTy is null\n";
+    CommonHAKCAnalysis::getLogger(Fatal) << "ArgTy is null\n";
     throw std::exception();
   }
 }
@@ -20,7 +20,7 @@ HAKCFunctionDefinition::HAKCFunctionDefinition(
     Function *F, SmallVectorImpl<HAKCFunctionArgumentDefinition> &Args)
     : F(F), ArgList(Args.begin(), Args.end()) {
   if (!F) {
-    CommonHAKCAnalysis::getWriter(true) << "F is null\n";
+    CommonHAKCAnalysis::getLogger(Fatal) << "F is null\n";
     throw std::exception();
   }
   llvm::sort(ArgList.begin(), ArgList.end(),
@@ -81,6 +81,7 @@ HAKCArgumentArgumentUseStringMap() {
           {hakc::AccessToken, "access-token"},
           {hakc::ValidTargets, "valid-targets"},
           {hakc::ValidTargetSize, "valid-target-size"},
+          {hakc::Epoch, "epoch"},
           {hakc::Other, "other"}};
 }
 } // namespace llvm::hakc

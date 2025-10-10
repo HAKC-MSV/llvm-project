@@ -1,0 +1,101 @@
+!HAKCCompartmentalization
+directed: true
+edges:
+- key: has_type
+  persisted: true
+  source: &id001 !HAKCFunction
+    IsFunction: true
+    Name: bar
+    symbol_hash: 48648553248832338
+  target: &id006 !HAKCType
+    DebugType: int (struct data_struct*)
+    LLVMType: i32 (ptr)
+    type_hash: 4174430841417300
+- key: has_scope
+  persisted: true
+  source: *id001
+  target: &id007 !HAKCScope
+    LocalScopeName: @HAKC_TEST_DIR@/hakc_test4.c
+    Scope: local
+    scope_hash: 70901590580816197
+- key: has_division
+  persisted: true
+  source: *id001
+  target: &id004 !HAKCDivision
+    AccessToken: 73728
+    DivisionID: 13
+    Salt: 3899268771177943974
+- key: has_type
+  persisted: true
+  source: &id002 !HAKCFunction
+    IsFunction: true
+    Name: ftrace_stub
+    symbol_hash: 21007283099217594
+  target: !HAKCType
+    DebugType: int (struct data_struct*)
+    LLVMType: i32 (ptr)
+    type_hash: 4174430841417300
+- key: has_scope
+  persisted: true
+  source: *id002
+  target: &id008 !HAKCScope
+    LocalScopeName: global
+    Scope: global
+    scope_hash: 36030731704165644
+- key: has_symbol
+  persisted: true
+  source: *id002
+  target: &id003 !HAKCFunction
+    IsFunction: true
+    Name: bar
+    symbol_hash: 48648553248832338
+- key: has_direct_calls
+  persisted: true
+  source: *id002
+  target: *id003
+- key: has_dag
+  persisted: true
+  source: *id002
+  target: *id003
+  weight: 2
+- key: has_division
+  persisted: true
+  source: *id002
+  target: &id005 !HAKCDivision
+    AccessToken: 139264
+    DivisionID: 13
+    Salt: 3440061819793215055
+- key: has_compartment
+  persisted: true
+  source: *id004
+  target: &id009 !HAKCCompartment
+    CompartmentID: 1
+    EntryToken: 65536
+- key: has_compartment
+  persisted: true
+  source: *id005
+  target: &id010 !HAKCCompartment
+    CompartmentID: 2
+    EntryToken: 131072
+graph: {}
+max_division_count: 16
+multigraph: true
+nodes:
+- id: *id001
+  persisted: true
+- id: *id006
+  persisted: true
+- id: *id007
+  persisted: true
+- id: *id002
+  persisted: true
+- id: *id008
+  persisted: true
+- id: *id004
+  persisted: true
+- id: *id009
+  persisted: true
+- id: *id005
+  persisted: true
+- id: *id010
+  persisted: true

@@ -1,3 +1,14 @@
+//===----------------------------------------------------------------------===//
+//
+// Part of the MIT Lincoln Laboratory HAKC Compartmentalization Project.
+//
+//===----------------------------------------------------------------------===//
+///
+/// \file
+/// This file contains the helper class that contains useful information for
+/// outputting symbols to yaml (double check)
+///
+//===----------------------------------------------------------------------===//
 //
 // Created by de29664 on 5/2/23.
 //
@@ -33,7 +44,7 @@ public:
 
   static unsigned int EntrySpaces();
 
-  CommonHAKCAnalysis &GetCommonHAKCAnalysis();
+  CommonHAKCAnalysis &GetCommonHAKCAnalysis() const;
 
 protected:
   CommonHAKCAnalysis &Analysis;

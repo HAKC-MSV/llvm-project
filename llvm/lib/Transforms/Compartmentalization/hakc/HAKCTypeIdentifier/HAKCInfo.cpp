@@ -10,12 +10,12 @@ HAKCInfo::HAKCInfo(CommonHAKCAnalysis &Analysis, StringRef Name,
                    bool DebugActive)
     : Analysis(Analysis), DebugActive(DebugActive), Name(Name.str()) {
   if (Name.empty()) {
-    CommonHAKCAnalysis::getWriter(DebugActive) << "Name is empty!\n";
+    CommonHAKCAnalysis::getLogger(Fatal) << "Name is empty!\n";
     throw std::exception();
   }
 }
 
-CommonHAKCAnalysis &HAKCInfo::GetCommonHAKCAnalysis() { return Analysis; }
+CommonHAKCAnalysis &HAKCInfo::GetCommonHAKCAnalysis() const { return Analysis; }
 
 StringRef HAKCInfo::GetName() const { return Name; }
 
@@ -35,7 +35,7 @@ unsigned int HAKCInfo::EntrySpaces() { return 2; }
 
 std::string HAKCInfo::GetYamlHeader(unsigned int Indents) const {
   std::string Yaml;
-  llvm::raw_string_ostream sstream(Yaml);
+  raw_string_ostream sstream(Yaml);
 
   sstream << GetYamlIdentifier() << "\n";
   sstream.indent(Indents + EntrySpaces()) << "Name: \"" << GetName() << "\"";

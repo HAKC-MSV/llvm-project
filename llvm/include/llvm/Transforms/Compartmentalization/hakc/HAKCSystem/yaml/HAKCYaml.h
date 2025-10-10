@@ -1,3 +1,13 @@
+//===----------------------------------------------------------------------===//
+//
+// Part of the MIT Lincoln Laboratory HAKC Compartmentalization Project.
+//
+//===----------------------------------------------------------------------===//
+///
+/// \file
+/// This file contains pass configuration parsing
+///
+//===----------------------------------------------------------------------===//
 //
 // Created by de29664 on 11/12/24.
 //
@@ -8,8 +18,9 @@
 #include <string>
 #include <vector>
 
-#include "llvm/AsmParser/Parser.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCFunctionDefinition/HAKCFunctionDefinition.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTypeIdentifier/HAKCTypeIdentifier.h"
 
 typedef std::string HAKCYAMLStringType;
@@ -19,6 +30,17 @@ template <typename Ty> using HAKCYAMLSequence = std::vector<Ty>;
 typedef HAKCYAMLSequence<HAKCYAMLStringType> HAKCYAMLStringSequenceType;
 
 namespace llvm::hakc {
+
+enum HAKCLogLevel {
+  Disabled = 0,
+  Verbose = 1,
+  Debug = 2,
+  Info = 3,
+  Warning = 4,
+  Error = 5,
+  Fatal = 10,
+};
+
 enum HAKCAllocationTypeEnum {
   InvalidAllocationType,
   SimpleArgumentSize,
@@ -28,33 +50,48 @@ enum HAKCAllocationTypeEnum {
   ArgumentGEP
 };
 
-enum HAKCPassModeTypeEnum {
-  InvalidPassModeType,
-  RunDataAccessGraphAnalysis,
-  RunCompartmentalization
+enum HAKCBuildModeTypeEnum {
+  InvalidBuildModeType,
+  Analysis,
+  Enforcement,
+  RunConfigAndExit
 };
 
-enum HAKCTestModeTypeEnum {
-  InvalidTestModeType,
-  TestModeDisabled,
-  TestModeDefault,
-  TestModeSuppliedDAG
+inline std::map<HAKCBuildModeTypeEnum, std::string> BuildModeToString = {
+  {InvalidBuildModeType, "invalid-build-mode-type"},
+  {Analysis, "analysis"},
+  {Enforcement, "enforcement"},
+  {RunConfigAndExit, "run-config-and-exit"}
 };
 
-struct HAKCYAMLAllocationType {
-  HAKCYAMLStringType FunctionName;
+struct HAKCYAMLSymbolDeclaration {
+  HAKCYAMLStringType SymbolName;
+
+  HAKCYAMLSymbolDeclaration() {}
+};
+
+struct HAKCYAMLAllocationType : public HAKCYAMLSymbolDeclaration {
   HAKCAllocationTypeEnum AllocationType;
   HAKCYAMLStringSequenceType Arguments;
 
-  HAKCYAMLAllocationType()
-      : FunctionName(), AllocationType(InvalidAllocationType), Arguments() {}
+  HAKCYAMLAllocationType() : AllocationType(InvalidAllocationType) {}
 };
 
 struct HAKCYAMLFileType {
   HAKCYAMLStringType PathRoot;
   HAKCYAMLStringSequenceType Files;
 
-  HAKCYAMLFileType() : PathRoot(), Files() {}
+  HAKCYAMLFileType() {}
+
+  void AddAllFiles(SmallVectorImpl<std::string> &Results) {
+    for (auto &FilePath : Files) {
+      SmallString<256> Filename;
+      llvm::sys::path::append(Filename, PathRoot);
+      llvm::sys::path::append(Filename, FilePath);
+
+      Results.push_back(Filename.str().str());
+    }
+  }
 };
 
 // the function argument values (the parameter values set when called)
@@ -65,20 +102,20 @@ struct HAKCYAMLFunctionArgument {
 
   HAKCYAMLFunctionArgument() : Idx(), TypeStr(), ArgUse(Other) {}
 
-  Type *GetType(const HAKCTypeIdentifier &TypeIdentifier) {
+  Type *GetType(const HAKCTypeIdentifier &TypeIdentifier) const {
     return TypeIdentifier.GetTypeFromString(TypeStr);
   }
 };
 
-struct HAKCYAMLFunctionDefinition {
+struct HAKCYAMLFunctionDefinition : public HAKCYAMLSymbolDeclaration {
   HAKCYAMLStringType ReturnType;
-  HAKCYAMLStringType Name;
   HAKCYAMLSequence<HAKCYAMLFunctionArgument> Arguments;
 
-  HAKCYAMLFunctionDefinition() : ReturnType(), Name(), Arguments() {}
+  HAKCYAMLFunctionDefinition()
+      : HAKCYAMLSymbolDeclaration(), ReturnType(), Arguments() {}
 
   bool IsValid() {
-    bool Result = !ReturnType.empty() || !Name.empty();
+    bool Result = !ReturnType.empty() || !SymbolName.empty();
     if (Result) {
       auto ByIndex = [&](const HAKCYAMLFunctionArgument &Arg0,
                          const HAKCYAMLFunctionArgument &Arg1) {
@@ -98,7 +135,7 @@ struct HAKCYAMLFunctionDefinition {
     return Result;
   }
 
-  Function *GetFunction(HAKCTypeIdentifier &TypeIdentifier) {
+  Function *GetFunction(const HAKCTypeIdentifier &TypeIdentifier) {
     if (!IsValid()) {
       return nullptr;
     }
@@ -118,7 +155,7 @@ struct HAKCYAMLFunctionDefinition {
 
     auto *FType = FunctionType::get(ReturnTy, ArgTys, false);
     auto *F = dyn_cast<Function>(TypeIdentifier.GetModule()
-                                     .getOrInsertFunction(Name, FType)
+                                     .getOrInsertFunction(SymbolName, FType)
                                      .getCallee());
     return F;
   }
@@ -136,59 +173,88 @@ struct HAKCYAMLActionArgument {
   unsigned Idx;
 };
 
-struct HAKCYAMLActionType {
-  HAKCYAMLStringType FunctionName;
+struct HAKCYAMLActionType : public HAKCYAMLSymbolDeclaration {
   HAKCYAMLStringType Label;
   HAKCYAMLSequence<HAKCYAMLActionArgument> Arguments;
 
-  HAKCYAMLActionType() : FunctionName(), Label(), Arguments() {}
+  HAKCYAMLActionType() : HAKCYAMLSymbolDeclaration(), Label(), Arguments() {}
 };
 
-struct HAKCYamlDatabaseConfig {
-  HAKCYAMLStringType ServerURL;
+struct HAKCYAMLEndpoints {
   HAKCYAMLStringType GetCompartmentEndpoint;
   HAKCYAMLStringType GetDivisionEndpoint;
   HAKCYAMLStringType GetSymbolDivisionEndpoint;
   HAKCYAMLStringType GetValidTargetsEndpoint;
-  unsigned ServerTimeout;
+  HAKCYAMLStringType AddSymbolsEndpoint;
+  HAKCYAMLStringType AddFunctionEndpoint;
+  HAKCYAMLStringType AddGlobalVariableEndpoint;
+  HAKCYAMLStringType TerminateConnectionEndpoint;
 };
 
-struct HAKCYamlConfig {
-  HAKCTestModeTypeEnum TestMode;
+// TODO: need to figure out how we will specify symbols in the config
+struct HAKCYAMLEpochPerms {
+  epoch_perms_options_t perm;
+  uint64_t offset;
+};
+
+struct HAKCYAMLEpoch {
+  uint64_t epoch_id;
+  uint64_t next_epoch_id;
+  HAKCYAMLStringType entry_symbol;
+  HAKCYAMLStringType exit_symbol;
+  HAKCYAMLStringType type;
+  HAKCYAMLSequence<HAKCYAMLEpochPerms> perms;
+};
+
+struct HAKCYAMLClientConfig {
   HAKCYAMLStringType Arch;
   HAKCYAMLStringType Platform;
-  HAKCYAMLStringType SourcePath;
-  HAKCYAMLStringType BuildPath;
-  HAKCYAMLStringType DagAnalysisRootPath;
+  unsigned Timeout;
+  HAKCLogLevel ConsoleLogLevel;
+  HAKCLogLevel FileLogLevel;
   HAKCYAMLFunctionDefinition CodeValidationFunction;
   HAKCYAMLFunctionDefinition DataValidationFunction;
-  HAKCPassModeTypeEnum PassMode;
-  HAKCYAMLStringSequenceType NoTransferFunctions;
-  HAKCYAMLStringSequenceType SafeTransitionFunctions;
-  HAKCYAMLStringSequenceType IgnoredGlobals;
+  HAKCYAMLSequence<HAKCYAMLSymbolDeclaration> SafeTransitionFunctions;
+  HAKCYAMLSequence<HAKCYAMLSymbolDeclaration> IgnoredGlobals;
   HAKCYAMLStringSequenceType TransferFunctions;
   HAKCYAMLStringSequenceType PassDebugSymbols;
   HAKCYAMLStringSequenceType SeparateNamespacePathsList;
   HAKCYAMLStringSequenceType HAKCSourcePathsList;
-  HAKCYAMLStringSequenceType IncludePathsList;
-  bool OutputAllDebugInfo;
-  HAKCYamlDatabaseConfig DatabaseConfig;
-
-  // HAKCYAMLSequence <HAKCYAMLFunctionDefinitionType> NoTransferFunctions;
+  HAKCYAMLStringSequenceType TransferFunctionCandidates;
+  bool DebugDatabase;
+  HAKCYAMLSequence<HAKCYAMLSymbolDeclaration> NoTransferFunctions;
   HAKCYAMLSequence<HAKCYAMLCustomTransferType> CustomTransferFunctions;
-  HAKCYAMLSequence<HAKCYAMLFunctionDefinition>
-      CompartmentalizationSupportFunctions;
+  HAKCYAMLSequence<HAKCYAMLFunctionDefinition> CompartmentalizationSupportFunctions;
   HAKCYAMLSequence<HAKCYAMLAllocationType> AllocationFunctions;
   HAKCYAMLSequence<HAKCYAMLFileType> SeparateNamespacePaths;
   HAKCYAMLSequence<HAKCYAMLFileType> HAKCSourcePaths;
-  HAKCYAMLSequence<HAKCYAMLActionType> PreTransferActions;
+  HAKCYAMLSequence<HAKCYAMLActionType> PreTargetActions;
   HAKCYAMLSequence<HAKCYAMLActionType> PostTargetActions;
+  HAKCYAMLSequence<HAKCYAMLEpoch> Epochs;
   HAKCYAMLStringSequenceType IgnoredTypes;
   // TODO: revert to transfer type?
   HAKCYAMLFunctionDefinition DefaultCompartmentTransfer;
   HAKCYAMLFunctionDefinition SignWithDivision;
   HAKCYAMLFunctionDefinition PerCPUCompartmentTransfer;
+  unsigned MaxConnectionRetries;
 };
+
+struct HAKCYAMLConfig {
+  HAKCYAMLClientConfig ClientConfig;
+  HAKCYAMLStringType ClientConfigPath;
+  HAKCYAMLStringType BuildDir;
+  HAKCYAMLStringType SocketDir;
+  HAKCYAMLStringType LogDir;
+  HAKCBuildModeTypeEnum BuildMode;
+  bool TemporalAnalysisEnabled;
+  unsigned ServerCoreCount;
+  unsigned DefaultCompartmentID;
+  unsigned DefaultDivisionID;
+  unsigned DefaultEntryToken;
+  unsigned DefaultAccessToken;
+  HAKCYAMLEndpoints Endpoints;
+};
+
 } // namespace llvm::hakc
 
 LLVM_YAML_IS_SEQUENCE_VECTOR(hakc::HAKCYAMLAllocationType)
@@ -205,6 +271,20 @@ LLVM_YAML_IS_SEQUENCE_VECTOR(hakc::HAKCYAMLActionType)
 
 LLVM_YAML_IS_SEQUENCE_VECTOR(hakc::HAKCYAMLActionArgument)
 
+LLVM_YAML_IS_SEQUENCE_VECTOR(hakc::HAKCYAMLSymbolDeclaration)
+
+static void YAMLFunctionDeclarationMapping(
+    yaml::IO &io, hakc::HAKCYAMLSymbolDeclaration &FunctionDeclaration) {
+  io.mapRequired("name", FunctionDeclaration.SymbolName);
+}
+
+template <> struct yaml::MappingTraits<hakc::HAKCYAMLSymbolDeclaration> {
+  static void mapping(yaml::IO &io,
+                      hakc::HAKCYAMLSymbolDeclaration &FunctionDefinition) {
+    YAMLFunctionDeclarationMapping(io, FunctionDefinition);
+  }
+};
+
 template <> struct yaml::ScalarEnumerationTraits<hakc::HAKCAllocationTypeEnum> {
   static void enumeration(IO &io, hakc::HAKCAllocationTypeEnum &value) {
     io.enumCase(value, "SimpleArgumentSize", hakc::SimpleArgumentSize);
@@ -212,6 +292,18 @@ template <> struct yaml::ScalarEnumerationTraits<hakc::HAKCAllocationTypeEnum> {
     io.enumCase(value, "StaticPlusArgument", hakc::StaticPlusArgument);
     io.enumCase(value, "MultiplyTwoArguments", hakc::MultiplyTwoArguments);
     io.enumCase(value, "ArgumentGEP", hakc::ArgumentGEP);
+  }
+};
+
+template <> struct yaml::ScalarEnumerationTraits<hakc::HAKCLogLevel> {
+  static void enumeration(IO &io, hakc::HAKCLogLevel &value) {
+    io.enumCase(value, "Disabled", hakc::Disabled);
+    io.enumCase(value, "Verbose", hakc::Verbose);
+    io.enumCase(value, "Debug", hakc::Debug);
+    io.enumCase(value, "Info", hakc::Info);
+    io.enumCase(value, "Warning", hakc::Warning);
+    io.enumCase(value, "Error", hakc::Error);
+    io.enumCase(value, "Fatal", hakc::Fatal);
   }
 };
 
@@ -224,28 +316,21 @@ struct yaml::ScalarEnumerationTraits<hakc::HAKCFunctionArgumentUse> {
   }
 };
 
-template <> struct yaml::ScalarEnumerationTraits<hakc::HAKCPassModeTypeEnum> {
-  static void enumeration(IO &io, hakc::HAKCPassModeTypeEnum &value) {
-    io.enumCase(value, "RunDataAccessGraphAnalysis",
-                hakc::RunDataAccessGraphAnalysis);
-    io.enumCase(value, "RunCompartmentalization",
-                hakc::RunCompartmentalization);
-  }
-};
-
-template <> struct yaml::ScalarEnumerationTraits<hakc::HAKCTestModeTypeEnum> {
-  static void enumeration(IO &io, hakc::HAKCTestModeTypeEnum &value) {
-    io.enumCase(value, "InvalidTestModeType", hakc::InvalidTestModeType);
-    io.enumCase(value, "TestModeDisabled", hakc::TestModeDisabled);
-    io.enumCase(value, "TestModeDefault", hakc::TestModeDefault);
-    io.enumCase(value, "TestModeSuppliedDAG", hakc::TestModeSuppliedDAG);
+template <> struct yaml::ScalarEnumerationTraits<hakc::HAKCBuildModeTypeEnum> {
+  static void enumeration(IO &io, hakc::HAKCBuildModeTypeEnum &value) {
+    io.enumCase(value, "analysis",
+                hakc::Analysis);
+    io.enumCase(value, "enforcement",
+                hakc::Enforcement);
+    io.enumCase(value, "run-config-and-exit",
+    hakc::RunConfigAndExit);
   }
 };
 
 template <> struct yaml::MappingTraits<hakc::HAKCYAMLAllocationType> {
   static void mapping(yaml::IO &io,
                       hakc::HAKCYAMLAllocationType &AllocationType) {
-    io.mapRequired("name", AllocationType.FunctionName);
+    YAMLFunctionDeclarationMapping(io, AllocationType);
     io.mapRequired("type", AllocationType.AllocationType);
     io.mapRequired("arguments", AllocationType.Arguments);
   }
@@ -260,7 +345,7 @@ template <> struct yaml::MappingTraits<hakc::HAKCYAMLActionArgument> {
 
 template <> struct yaml::MappingTraits<hakc::HAKCYAMLActionType> {
   static void mapping(yaml::IO &io, hakc::HAKCYAMLActionType &ActionType) {
-    io.mapRequired("name", ActionType.FunctionName);
+    YAMLFunctionDeclarationMapping(io, ActionType);
     io.mapOptional("label", ActionType.Label, "");
     io.mapOptional("arguments", ActionType.Arguments);
   }
@@ -269,7 +354,7 @@ template <> struct yaml::MappingTraits<hakc::HAKCYAMLActionType> {
 static void
 YAMLFunctionMapping(yaml::IO &io,
                     hakc::HAKCYAMLFunctionDefinition &FunctionDefinition) {
-  io.mapRequired("name", FunctionDefinition.Name);
+  YAMLFunctionDeclarationMapping(io, FunctionDefinition);
   io.mapRequired("return-type", FunctionDefinition.ReturnType);
   io.mapOptional("arguments", FunctionDefinition.Arguments);
 }
@@ -306,110 +391,99 @@ template <> struct yaml::MappingTraits<hakc::HAKCYAMLCustomTransferType> {
   }
 };
 
-template <> struct yaml::MappingTraits<hakc::HAKCYamlDatabaseConfig> {
-  static void mapping(yaml::IO &Io, hakc::HAKCYamlDatabaseConfig &YamlConfig) {
-    Io.mapRequired("server-url", YamlConfig.ServerURL);
-    Io.mapOptional("server-timeout", YamlConfig.ServerTimeout, 1000);
+template <> struct yaml::MappingTraits<hakc::HAKCYAMLEndpoints> {
+  static void mapping(yaml::IO &Io, hakc::HAKCYAMLEndpoints &Endpoints) {
     Io.mapOptional("get-compartment-by-id-endpoint",
-                   YamlConfig.GetCompartmentEndpoint, "get-compartment-id");
+                   Endpoints.GetCompartmentEndpoint, "get-compartment-id");
     Io.mapOptional("get-division-by-id-endpoint",
-                   YamlConfig.GetDivisionEndpoint, "get-division-id");
+                   Endpoints.GetDivisionEndpoint, "get-division-id");
     Io.mapOptional("get-division-from-symbol-endpoint",
-                   YamlConfig.GetSymbolDivisionEndpoint,
+                   Endpoints.GetSymbolDivisionEndpoint,
                    "get-division-from-symbol");
     Io.mapOptional("get-valid-targets-from-compartment-id-endpoint",
-                   YamlConfig.GetValidTargetsEndpoint,
+                   Endpoints.GetValidTargetsEndpoint,
                    "get-valid-targets-from-compartment-id");
+    Io.mapOptional("add-function-endpoint",
+                   Endpoints.AddFunctionEndpoint,
+                   "add-function");
+    Io.mapOptional("add-symbols-endpoint",
+                   Endpoints.AddSymbolsEndpoint,
+                   "add-symbols");
+    Io.mapOptional("add-global-variable-endpoint",
+                   Endpoints.AddGlobalVariableEndpoint,
+                   "add-global-variable");
+    Io.mapOptional("terminate-connection-endpoint",
+                   Endpoints.TerminateConnectionEndpoint,
+                   "terminate-connection");
   }
 };
 
-template <> struct yaml::MappingTraits<hakc::HAKCYamlConfig> {
-  static void mapping(yaml::IO &io, hakc::HAKCYamlConfig &YamlConfig) {
-    io.mapOptional("TestMode", YamlConfig.TestMode, hakc::TestModeDisabled);
+template <> struct yaml::MappingTraits<hakc::HAKCYAMLClientConfig> {
+  static void mapping(IO &io, hakc::HAKCYAMLClientConfig &ClientConfig) {
 
-    if (YamlConfig.TestMode == hakc::InvalidTestModeType) {
-      errs() << "Supplied TestMode is invalid\n";
+    io.mapRequired("arch", ClientConfig.Arch);
+    io.mapRequired("platform", ClientConfig.Platform);
+    io.mapOptional("timeout", ClientConfig.Timeout, 100);
+    io.mapOptional("console-log-level", ClientConfig.ConsoleLogLevel,
+                   hakc::HAKCLogLevel::Error);
+    io.mapOptional("file-log-level", ClientConfig.FileLogLevel,
+                   hakc::HAKCLogLevel::Error);
+
+    io.mapOptional("max-connection-retries", ClientConfig.MaxConnectionRetries, 1);
+    io.mapRequired("CodeValidationFunction",
+                   ClientConfig.CodeValidationFunction);
+    io.mapRequired("DataValidationFunction",
+                   ClientConfig.DataValidationFunction);
+    io.mapRequired("DefaultCompartmentTransferFunction",
+                   ClientConfig.DefaultCompartmentTransfer);
+    io.mapRequired("SignWithDivisionFunction", ClientConfig.SignWithDivision);
+    io.mapOptional("CompartmentalizationSupportFunctions",
+                   ClientConfig.CompartmentalizationSupportFunctions);
+    io.mapOptional("NoTransferFunctions", ClientConfig.NoTransferFunctions);
+    io.mapOptional("SeparateNamespacePaths",
+                   ClientConfig.SeparateNamespacePaths);
+    io.mapOptional("HAKCSourcePaths", ClientConfig.HAKCSourcePaths);
+    io.mapOptional("SafeTransitionFunctions",
+                   ClientConfig.SafeTransitionFunctions);
+    io.mapOptional("IgnoredTypes", ClientConfig.IgnoredTypes);
+    io.mapOptional("IgnoredGlobals", ClientConfig.IgnoredGlobals);
+    io.mapOptional("AllocationFunctions", ClientConfig.AllocationFunctions);
+    io.mapOptional("DebugDatabase", ClientConfig.DebugDatabase, false);
+    io.mapOptional("DebugOutputSymbols", ClientConfig.PassDebugSymbols);
+    io.mapOptional("PerCPUCompartmentTransferFunction",
+                   ClientConfig.PerCPUCompartmentTransfer);
+    io.mapOptional("CustomTransferFunctions",
+                   ClientConfig.CustomTransferFunctions);
+    io.mapOptional("PreTargetActions", ClientConfig.PreTargetActions);
+    io.mapOptional("PostTargetActions", ClientConfig.PostTargetActions);
+    io.mapOptional("TransferFunctionCandidates",
+                   ClientConfig.TransferFunctionCandidates);
+  }
+};
+
+template <> struct yaml::MappingTraits<hakc::HAKCYAMLConfig> {
+  static void mapping(IO &io, hakc::HAKCYAMLConfig &YamlConfig) {
+    std::string ignore0;
+    io.mapOptional("server-config-path", ignore0);
+    io.mapOptional("client-config-path", YamlConfig.ClientConfigPath);
+    // read in server config (we only get the path from the yaml file)
+    ErrorOr<std::unique_ptr<MemoryBuffer>> mb = MemoryBuffer::getFile(YamlConfig.ClientConfigPath);
+    Input yin(mb.get()->getMemBufferRef().getBuffer());
+    yin >> YamlConfig.ClientConfig;
+    if (yin.error()) {
+      errs() << "Error parsing config file " << YamlConfig.ClientConfigPath << "\n";
       throw std::exception();
-    } else if (YamlConfig.TestMode == hakc::TestModeDisabled) {
-      io.mapRequired("Arch", YamlConfig.Arch);
-      io.mapRequired("Platform", YamlConfig.Platform);
-      io.mapRequired("SourcePath", YamlConfig.SourcePath);
-      io.mapRequired("BuildPath", YamlConfig.BuildPath);
-      io.mapRequired("DagAnalysisRootPath", YamlConfig.DagAnalysisRootPath);
-      io.mapRequired("PassMode", YamlConfig.PassMode);
-      io.mapRequired("IncludePaths", YamlConfig.IncludePathsList);
-      io.mapRequired("CodeValidationFunction",
-                     YamlConfig.CodeValidationFunction);
-      io.mapRequired("DataValidationFunction",
-                     YamlConfig.DataValidationFunction);
-      io.mapRequired("DefaultCompartmentTransferFunction",
-                     YamlConfig.DefaultCompartmentTransfer);
-      io.mapRequired("SignWithDivisionFunction", YamlConfig.SignWithDivision);
-
-      io.mapOptional("CompartmentalizationSupportFunctions",
-                     YamlConfig.CompartmentalizationSupportFunctions);
-      io.mapOptional("NoTransferFunctions", YamlConfig.NoTransferFunctions);
-      io.mapOptional("SeparateNamespacePathList",
-                     YamlConfig.SeparateNamespacePaths);
-      io.mapOptional("HAKCSourcePathList", YamlConfig.HAKCSourcePaths);
-      io.mapOptional("SafeTransitionFunctions",
-                     YamlConfig.SafeTransitionFunctions);
-      io.mapOptional("IgnoredTypes", YamlConfig.IgnoredTypes);
-      io.mapOptional("IgnoredGlobals", YamlConfig.IgnoredGlobals);
-      io.mapOptional("AllocationFunctions", YamlConfig.AllocationFunctions);
-      io.mapOptional("OutputDebugInfo", YamlConfig.OutputAllDebugInfo, false);
-      io.mapOptional("DebugOutputSymbols", YamlConfig.PassDebugSymbols);
-      io.mapOptional("PerCPUCompartmentTransferFunction",
-                     YamlConfig.PerCPUCompartmentTransfer);
-      io.mapOptional("CustomTransferFunctions",
-                     YamlConfig.CustomTransferFunctions);
-      io.mapOptional("PreTransferActions", YamlConfig.PreTransferActions);
-      io.mapOptional("PostTargetActions", YamlConfig.PostTargetActions);
-
-      if (YamlConfig.PassMode == hakc::RunCompartmentalization) {
-        io.mapRequired("Database", YamlConfig.DatabaseConfig);
-      } else if (YamlConfig.PassMode == hakc::RunDataAccessGraphAnalysis) {
-        io.mapOptional("Database", YamlConfig.DatabaseConfig);
-      }
-    } else if (YamlConfig.TestMode == hakc::TestModeDefault) {
-      io.mapRequired("Arch", YamlConfig.Arch);
-      io.mapRequired("Platform", YamlConfig.Platform);
-      io.mapRequired("SourcePath", YamlConfig.SourcePath);
-      io.mapRequired("BuildPath", YamlConfig.BuildPath);
-      io.mapOptional("DagAnalysisRootPath", YamlConfig.DagAnalysisRootPath);
-      io.mapOptional("PassMode", YamlConfig.PassMode);
-      io.mapOptional("IncludePaths", YamlConfig.IncludePathsList);
-      io.mapOptional("CodeValidationFunction",
-                     YamlConfig.CodeValidationFunction);
-      io.mapOptional("DataValidationFunction",
-                     YamlConfig.DataValidationFunction);
-      io.mapOptional("DefaultCompartmentTransferFunction",
-                     YamlConfig.DefaultCompartmentTransfer);
-      io.mapOptional("SignWithDivisionFunction", YamlConfig.SignWithDivision);
-
-      io.mapOptional("CompartmentalizationSupportFunctions",
-                     YamlConfig.CompartmentalizationSupportFunctions);
-      io.mapOptional("NoTransferFunctions", YamlConfig.NoTransferFunctions);
-      io.mapOptional("SeparateNamespacePathList",
-                     YamlConfig.SeparateNamespacePaths);
-      io.mapOptional("HAKCSourcePathList", YamlConfig.HAKCSourcePaths);
-      io.mapOptional("SafeTransitionFunctions",
-                     YamlConfig.SafeTransitionFunctions);
-      io.mapOptional("IgnoredTypes", YamlConfig.IgnoredTypes);
-      io.mapOptional("IgnoredGlobals", YamlConfig.IgnoredGlobals);
-      io.mapOptional("AllocationFunctions", YamlConfig.AllocationFunctions);
-      io.mapOptional("OutputDebugInfo", YamlConfig.OutputAllDebugInfo, false);
-      io.mapOptional("DebugOutputSymbols", YamlConfig.PassDebugSymbols);
-      io.mapOptional("PerCPUCompartmentTransferFunction",
-                     YamlConfig.PerCPUCompartmentTransfer);
-      io.mapOptional("CustomTransferFunctions",
-                     YamlConfig.CustomTransferFunctions);
-      io.mapOptional("Database", YamlConfig.DatabaseConfig);
-      io.mapOptional("PreTransferActions", YamlConfig.PreTransferActions);
-      io.mapOptional("PostTargetActions", YamlConfig.PostTargetActions);
-    } else if (YamlConfig.TestMode == hakc::TestModeSuppliedDAG) {
-      // TODO
     }
+    io.mapRequired("build-dir", YamlConfig.BuildDir);
+    io.mapRequired("socket-dir", YamlConfig.SocketDir);
+    io.mapRequired("log-dir", YamlConfig.LogDir);
+    io.mapRequired("build-mode", YamlConfig.BuildMode);
+    io.mapOptional("server-core-count", YamlConfig.ServerCoreCount, 64);
+    io.mapOptional("default-compartment-id", YamlConfig.DefaultCompartmentID);
+    io.mapOptional("default-division-id", YamlConfig.DefaultDivisionID);
+    io.mapOptional("default-entry-token", YamlConfig.DefaultEntryToken);
+    io.mapOptional("default-access-token", YamlConfig.DefaultAccessToken);
+    io.mapRequired("Endpoints", YamlConfig.Endpoints);
   }
 };
 

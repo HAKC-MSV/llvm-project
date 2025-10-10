@@ -1,0 +1,121 @@
+!HAKCCompartmentalization
+directed: true
+edges:
+- key: has_type
+  persisted: true
+  source: &id001 !HAKCGlobalVariable
+    IsFunction: false
+    Name: kmalloc_caches
+    symbol_hash: 17478629311797491
+  target: &id007 !HAKCType
+    DebugType: int*
+    LLVMType: ptr
+    type_hash: 29349049320289013
+- key: has_scope
+  persisted: true
+  source: *id001
+  target: &id008 !HAKCScope
+    LocalScopeName: global
+    Scope: global
+    scope_hash: 36030731704165644
+- key: has_division
+  persisted: true
+  source: *id001
+  target: &id004 !HAKCDivision
+    AccessToken: 73728
+    DivisionID: 13
+    Salt: 2326630189450831425
+- key: has_type
+  persisted: true
+  source: &id002 !HAKCGlobalVariable
+    IsFunction: false
+    Name: somevar
+    symbol_hash: 32847396734032598
+  target: !HAKCType
+    DebugType: int*
+    LLVMType: ptr
+    type_hash: 29349049320289013
+- key: has_scope
+  persisted: true
+  source: *id002
+  target: !HAKCScope
+    LocalScopeName: global
+    Scope: global
+    scope_hash: 36030731704165644
+- key: has_division
+  persisted: true
+  source: *id002
+  target: &id005 !HAKCDivision
+    AccessToken: 139264
+    DivisionID: 13
+    Salt: 3915810659815601877
+- key: has_type
+  persisted: true
+  source: &id003 !HAKCFunction
+    IsFunction: true
+    Name: foo
+    symbol_hash: 24346991618265989
+  target: &id009 !HAKCType
+    DebugType: int (struct data_struct2*, int*, int*)
+    LLVMType: i32 (ptr, ptr, ptr)
+    type_hash: 52281066598212137
+- key: has_scope
+  persisted: true
+  source: *id003
+  target: !HAKCScope
+    LocalScopeName: global
+    Scope: global
+    scope_hash: 36030731704165644
+- key: has_division
+  persisted: true
+  source: *id003
+  target: &id006 !HAKCDivision
+    AccessToken: 204800
+    DivisionID: 13
+    Salt: 6900230862792164914
+- key: has_compartment
+  persisted: true
+  source: *id004
+  target: &id010 !HAKCCompartment
+    CompartmentID: 1
+    EntryToken: 65536
+- key: has_compartment
+  persisted: true
+  source: *id005
+  target: &id011 !HAKCCompartment
+    CompartmentID: 2
+    EntryToken: 131072
+- key: has_compartment
+  persisted: true
+  source: *id006
+  target: &id012 !HAKCCompartment
+    CompartmentID: 3
+    EntryToken: 196608
+graph: {}
+max_division_count: 16
+multigraph: true
+nodes:
+- id: *id001
+  persisted: true
+- id: *id007
+  persisted: true
+- id: *id008
+  persisted: true
+- id: *id002
+  persisted: true
+- id: *id003
+  persisted: true
+- id: *id009
+  persisted: true
+- id: *id004
+  persisted: true
+- id: *id010
+  persisted: true
+- id: *id005
+  persisted: true
+- id: *id011
+  persisted: true
+- id: *id006
+  persisted: true
+- id: *id012
+  persisted: true

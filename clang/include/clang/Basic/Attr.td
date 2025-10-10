@@ -4492,6 +4492,20 @@ def EnforceTCBLeaf : InheritableAttr {
   bit InheritEvenIfAlreadyPresent = 1;
 }
 
+def KernelUserPtr : InheritableAttr {
+  let Spellings = [GCC<"kernel_user_ptr">];
+  let Subjects = SubjectList<[Named, Value]>;
+  let Documentation = [KernelUserPtrDocs];
+  bit InheritEvenIfAlreadyPresent = 1;
+}
+
+def PerCPUPtr : InheritableAttr {
+  let Spellings = [GCC<"per_cpu_ptr">];
+  let Subjects = SubjectList<[Named, Value]>;
+  let Documentation = [PerCPUPtrDocs];
+  bit InheritEvenIfAlreadyPresent = 1;
+}
+
 def Error : InheritableAttr {
   let Spellings = [GCC<"error">, GCC<"warning">];
   let Accessors = [Accessor<"isError", [GCC<"error">]>,
