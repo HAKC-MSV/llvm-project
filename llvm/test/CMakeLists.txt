@@ -295,7 +295,7 @@ if (LLVM_ENABLE_HAKC)
             #   Note: python/ contains a single test case which merely calls the python unittests and doesn't need additional configuration
             foreach (build_mode ${build_modes})
                 foreach (hakc_backing_type ${hakc_backing_types})
-                    set(hakc_socket_dir ${CMAKE_BINARY_DIR}/tests/${test_prefix}/${hakc_backing_type}/hakc-sockets)
+                    set(hakc_socket_dir ${HAKC_SOCKET_ROOT}/${test_prefix}/${hakc_backing_type}/hakc-sockets)
                     string(LENGTH "${hakc_socket_dir}/___" socket_path_length)
                     if (socket_path_length GREATER_EQUAL 107)
                         message(WARNING "hakc_socket_dir ${hakc_socket_dir} is too long")
