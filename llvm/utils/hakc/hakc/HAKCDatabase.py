@@ -89,7 +89,8 @@ class HAKCDatabase:
                                       DefinitionLocation=HAKCDefinitionLocation(
                                           DefiningFile=data['HAKCDefinitionLocation.DefiningFile'],
                                           DefiningLine=int(data[
-                                                               'has_definition_location.DefiningLine'])) if 'has_definition_location.DefiningLine' in data else None)
+                                                               'has_definition_location.DefiningLine'])) if 'has_definition_location.DefiningLine' in data and not numpy.isnan(
+                                          data['has_definition_location.DefiningLine']) else None)
         elif cls == HAKCDivision:
             # Note: double check AccessToken, EntryToken
             return HAKCDivision(DivisionID=int(data['HAKCDivision.DivisionID']),
@@ -600,8 +601,8 @@ class HAKCDatabase:
         divisions = dict()
         response = self.execute(cmd)
         for _, data in response.iterrows():
-            div, comp = (HAKCDatabase.create_object_from_df(HAKCDivision, data),
-                         HAKCDatabase.create_object_from_df(HAKCCompartment, data))
+            div, comp = (self.create_object_from_df(HAKCDivision, data),
+                         self.create_object_from_df(HAKCCompartment, data))
             if comp.compartment_id not in divisions:
                 divisions[comp.compartment_id] = []
             divisions[comp.compartment_id].append(div)
