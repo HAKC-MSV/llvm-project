@@ -4,33 +4,22 @@
 
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCSystemInformation.h"
 
+#include "llvm/Support/Threading.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/CommonHAKCAnalysis.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/yaml/HAKCYaml.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCPostTargetAction.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCPreTransferAction.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCTransferAction.h"
-#include "llvm/Support/Threading.h"
 
 namespace llvm::hakc {
 
 HAKCSystemInformation::HAKCSystemInformation(CommonHAKCAnalysis &CommonAnalysis)
-    : CommonAnalysis(CommonAnalysis), NoTransferFunctionList(),
-      SafeTransitionFunctionList(), AllocationFunctionList(),
-      CustomTransferList(), CompartmentalizationSupportFunctionList(),
-      IgnoredGlobalList(), ConsoleLogLevel(Verbose), FileLogLevel(Verbose),
+    : CommonAnalysis(CommonAnalysis), ConsoleLogLevel(Verbose), FileLogLevel(Verbose),
       BuildMode(InvalidBuildModeType),
-      PostTargetActionList(), PreTransferActionList(), HAKCSourcePathList(),
-      IncludePathsList(), SeparateNamespacePathList(), StructList(),
-      SymbolsToOutputDebugInfo(), CompartmentTransferFunctionList(),
       TypeIdentifier(CommonAnalysis), DebugDatabase(),
       CodeValidationFunction(nullptr), DataValidationFunction(nullptr),
       DefaultCompartmentTransfer(nullptr), PerCPUCompartmentTransfer(nullptr),
-      SignWithDivisionFunction(nullptr), Timeout(), AddFunctionEndpoint(),
-      AddGlobalVariableEndpoint(), AddSymbolsEndpoint(), Arch(), BuildPath(),
-      CompartmentEndpoint(), DivisionEndpoint(), Platform(), RootPath(),
-      SetDagFilenameEndpoint(), SingleSourceFile(), SocketPath(), LogPath(),
-      SymbolDivisionEndpoint(), TerminateConnectionEndpoint(),
-      ValidTargetsEndpoint(), DefaultAccessToken(), DefaultCompartmentID(),
+      SignWithDivisionFunction(nullptr), Timeout(), DefaultAccessToken(), DefaultCompartmentID(),
       DefaultDivisionID(), DefaultEntryToken(), MaxConnectionRetries(),
       ServerCoreCount() {}
 
@@ -43,12 +32,15 @@ StringRef HAKCSystemInformation::GetLogPath() const { return LogPath; }
 unsigned HAKCSystemInformation::GetDefaultDivisionID() const {
   return DefaultDivisionID;
 }
+
 unsigned HAKCSystemInformation::GetDefaultCompartmentID() const {
   return DefaultCompartmentID;
 }
+
 unsigned HAKCSystemInformation::GetDefaultEntryToken() const {
   return DefaultEntryToken;
 }
+
 unsigned HAKCSystemInformation::GetDefaultAccessToken() const {
   return DefaultAccessToken;
 }
@@ -117,7 +109,7 @@ function_def_t HAKCSystemInformation::CreateHAKCFunction(
 }
 
 custom_transfer_def_t HAKCSystemInformation::CreateCustomTransferFunction(
-    HAKCYAMLCustomTransferType &YAMLCustomTransfer, HAKCTypeP HAKCTy) {
+    HAKCYAMLCustomTransferType &YAMLCustomTransfer, HAKCTypeP HAKCTy) const {
   auto *TransferFunc = YAMLCustomTransfer.GetFunction(TypeIdentifier);
   if (!TransferFunc) {
     CommonHAKCAnalysis::getLogger(Fatal)
@@ -154,13 +146,37 @@ void HAKCSystemInformation::PopulateHAKCFunctionArgs(
 }
 
 void HAKCSystemInformation::GetAllDefinedHAKCFunctions(
-    SmallVectorImpl<hakc::function_def_t> &Results) {
+    SmallVectorImpl<function_def_t> &Results) {
   Results.append({CodeValidationFunction, DataValidationFunction,
                   SignWithDivisionFunction, DefaultCompartmentTransfer,
                   PerCPUCompartmentTransfer});
   Results.append(CustomTransferList.begin(), CustomTransferList.end());
   Results.append(CompartmentalizationSupportFunctionList.begin(),
                  CompartmentalizationSupportFunctionList.end());
+}
+
+
+
+bool HAKCSystemInformation::ShouldSkipCurrentFile() {
+  const StringRef CurrentSourceName(GetModule().getSourceFileName());
+  for (auto &path : HAKCSourcePaths()) {
+    if (CurrentSourceName.contains(path)) {
+      CommonHAKCAnalysis::getLogger(Warning) << "Skipping hakc source " << CurrentSourceName << "\n";
+      return true;
+    }
+  }
+
+  for (auto &path : SeparateNamespacePaths()) {
+    if (CurrentSourceName.contains(path)) {
+      CommonHAKCAnalysis::getLogger(Warning) << "Skipping separate namespace source " << CurrentSourceName << "\n";
+      return true;
+    }
+  }
+  return false;
+}
+
+bool HAKCSystemInformation::GetSkipCurrentFile() const {
+  return skip_current_file;
 }
 
 void HAKCSystemInformation::operator<<(HAKCYAMLConfig &Config) {
@@ -171,6 +187,26 @@ void HAKCSystemInformation::operator<<(HAKCYAMLConfig &Config) {
   if (BuildMode == RunConfigAndExit) {
     return;
   }
+
+  // parse config files first to check whether a file should be skipped or a log stream should be created
+  for (auto &FileType : Config.ClientConfig.SeparateNamespacePaths) {
+    FileType.AddAllFiles(SeparateNamespacePathList);
+  }
+
+  for (auto &FileType : Config.ClientConfig.HAKCSourcePaths) {
+    FileType.AddAllFiles(HAKCSourcePathList);
+  }
+
+  if (ShouldSkipCurrentFile()) {
+    skip_current_file = true;
+    return;
+  }
+
+  // Creating fd log as soon as possible
+  CommonAnalysis.getHAKCLoggerObject().SetConsoleConfiguredLogLevels(Config.ClientConfig.ConsoleLogLevel); // setting the errs() stream to
+  // the configured log level
+  CommonAnalysis.getHAKCLoggerObject().addStream(CommonAnalysis.createLogPath(Config.BuildDir, BuildMode), Config.ClientConfig.FileLogLevel); // setting the fd_ostream to configured log level
+
   SocketPath = Config.SocketDir + "/" +
                std::to_string(get_threadid() % Config.ServerCoreCount);
   LogPath = Config.LogDir;
@@ -230,13 +266,7 @@ void HAKCSystemInformation::operator<<(HAKCYAMLConfig &Config) {
     throw std::exception();
   }
 
-  for (auto &FileType : Config.ClientConfig.SeparateNamespacePaths) {
-    FileType.AddAllFiles(SeparateNamespacePathList);
-  }
 
-  for (auto &FileType : Config.ClientConfig.HAKCSourcePaths) {
-    FileType.AddAllFiles(HAKCSourcePathList);
-  }
 
   for (auto &SafeFunction : Config.ClientConfig.SafeTransitionFunctions) {
     if (auto *F = GetModule().getFunction(SafeFunction.SymbolName)) {
@@ -294,7 +324,7 @@ void HAKCSystemInformation::operator<<(HAKCYAMLConfig &Config) {
     }
   }
 
-  SmallVector<hakc::function_def_t> DefinedFunctions;
+  SmallVector<function_def_t> DefinedFunctions;
   GetAllDefinedHAKCFunctions(DefinedFunctions);
   for (auto &PreTransferActionDefinition : Config.ClientConfig.PreTargetActions) {
     for (auto &FuncDef : DefinedFunctions) {
@@ -374,7 +404,7 @@ HAKCTypeIdentifier &HAKCSystemInformation::GetTypeIdentifier() {
   return TypeIdentifier;
 }
 
-function_def_t HAKCSystemInformation::CompartmentTransfer(bool PerCPU) const {
+function_def_t HAKCSystemInformation::CompartmentTransfer(const bool PerCPU) const {
   if (PerCPU) {
     return PerCPUCompartmentTransfer;
   }

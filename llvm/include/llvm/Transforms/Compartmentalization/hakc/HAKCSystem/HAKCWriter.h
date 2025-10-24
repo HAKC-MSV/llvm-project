@@ -48,7 +48,7 @@ protected:
 
 public:
   explicit HAKCWriter(HAKCLogLevel log_level)
-      : os(), log_path(""), ConfiguredLogLevel(log_level) {
+      : log_path(""), ConfiguredLogLevel(log_level) {
     // errs() << "CREATING HAKC WRITER0\n";
     // allow using shared ptr to errs() but force it to not try to destroy
     // errs()
@@ -57,13 +57,13 @@ public:
                                         // no-op deleter to prevent delete on
                                         // singleton
                                       });
-    disabled = (log_level == Disabled);
+    disabled = log_level == Disabled;
   }
   explicit HAKCWriter(StringRef log_path, HAKCLogLevel log_level)
-      : os(), log_path(log_path), ConfiguredLogLevel(log_level) {
+      : log_path(log_path), ConfiguredLogLevel(log_level) {
     // errs() << "CREATING HAKC WRITER1\n";
     CreateLog();
-    disabled = (log_level == Disabled);
+    disabled = log_level == Disabled;
   }
   ~HAKCWriter() {
     // errs() << "DESTROYING HAKC WRITER\n";
@@ -73,7 +73,7 @@ public:
 
   void SetConfiguredLogLevel(HAKCLogLevel log_level) {
     ConfiguredLogLevel = log_level;
-    disabled = (log_level == Disabled);
+    disabled = log_level == Disabled;
   }
 
   HAKCLogLevel GetConfiguredLogLevel() const { return ConfiguredLogLevel; }
@@ -137,7 +137,7 @@ public:
 
   HAKCWriter &operator<<(const HAKCTypeInfo &TypeInfo);
 
-  HAKCWriter &operator<<(const enum HAKCAllocationTypeEnum AllocationType);
+  HAKCWriter &operator<<(HAKCAllocationTypeEnum AllocationType);
 
   HAKCWriter &operator<<(const ManagedHAKCPointerUse &HAKCPointerUse);
 
@@ -155,7 +155,7 @@ public:
 
   HAKCWriter &operator<<(const HAKCFunctionArgumentDefinition &Arg);
 
-  HAKCWriter &operator<<(const enum HAKCFunctionArgumentUse ArgUse);
+  HAKCWriter &operator<<(HAKCFunctionArgumentUse ArgUse);
 
   HAKCWriter &operator<<(const HAKCTransferAction &TransferAction);
 

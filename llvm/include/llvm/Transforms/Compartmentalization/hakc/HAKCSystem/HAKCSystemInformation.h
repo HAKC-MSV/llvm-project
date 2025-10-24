@@ -99,17 +99,21 @@ public:
   unsigned GetMaxRetries() const;
   unsigned GetServerCoreCount() const;
   void operator<<(HAKCYAMLConfig &Config);
+  bool GetSkipCurrentFile() const;
+
 
 protected:
   function_def_t
   CreateHAKCFunction(HAKCYAMLFunctionDefinition &YAMLFunctionDef) const;
   custom_transfer_def_t
   CreateCustomTransferFunction(HAKCYAMLCustomTransferType &YAMLCustomTransfer,
-                               HAKCTypeP HAKCTy);
+                               HAKCTypeP HAKCTy) const;
   void PopulateHAKCFunctionArgs(
       SmallVectorImpl<HAKCFunctionArgumentDefinition> &Args,
       HAKCYAMLFunctionDefinition &YAMLFunctionDef) const;
   void GetAllDefinedHAKCFunctions(SmallVectorImpl<function_def_t> &Results);
+
+  bool ShouldSkipCurrentFile();
 
   CommonHAKCAnalysis &CommonAnalysis;
   FunctionList NoTransferFunctionList;
@@ -159,6 +163,7 @@ protected:
   unsigned DefaultEntryToken;
   unsigned MaxConnectionRetries;
   unsigned ServerCoreCount;
+  bool skip_current_file = false;
 };
 } // namespace llvm::hakc
 
