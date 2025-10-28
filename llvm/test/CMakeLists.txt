@@ -256,9 +256,6 @@ if (LLVM_ENABLE_HAKC)
     set(hakc_client_config_in ${hakc_configs_path}/hakc-client-config.yaml.in)
     set(hakc_lit_config_in ${HAKC_TEST_ROOT_DIR}/configs/hakc-lit.local.cfg.in)
 
-    # adjustments in tests currently unsupported
-    set(hakc_adjustments_path_out "")
-
     set(hakc_server_process ${LLVM_MAIN_SRC_DIR}/utils/hakc/hakc-server-process)
 
     list(APPEND HAKC_TEST_INPUTS
@@ -295,16 +292,21 @@ if (LLVM_ENABLE_HAKC)
             #   Note: python/ contains a single test case which merely calls the python unittests and doesn't need additional configuration
             foreach (build_mode ${build_modes})
                 foreach (hakc_backing_type ${hakc_backing_types})
-                    set(hakc_socket_dir ${HAKC_SOCKET_ROOT}/${test_prefix}/${hakc_backing_type}/hakc-sockets)
+                    set(hakc_build_dir ${test_build_path})
+                    set(hakc_socket_dir ${CMAKE_BINARY_DIR}/hakc/tests/${test_prefix}/hakc-sockets)
                     string(LENGTH "${hakc_socket_dir}/___" socket_path_length)
                     if (socket_path_length GREATER_EQUAL 107)
                         message(WARNING "hakc_socket_dir ${hakc_socket_dir} is too long")
                     endif ()
-
-                    set(hakc_build_dir ${test_build_path})
                     set(hakc_config_path ${hakc_build_dir}/${hakc_backing_type}/${build_mode}/hakc-config.yaml)
                     set(hakc_server_config_path ${hakc_build_dir}/${hakc_backing_type}/${build_mode}/hakc-server-config.yaml)
                     set(hakc_client_config_path ${hakc_build_dir}/${hakc_backing_type}/${build_mode}/hakc-client-config.yaml)
+                    if(EXISTS ${hakc_test_path}/hakc-adjustments.yaml)
+                        set(hakc_adjustments_path ${hakc_test_path}/hakc-adjustments.yaml)
+                    else()
+                        set(hakc_adjustments_path "")
+                    endif()
+                    set(hakc_graph_svg_path ${hakc_build_dir}/${hakc_backing_type}/${build_mode}/hakc-graph.svg)
                     set(hakc_log_dir ${hakc_build_dir}/${hakc_backing_type}/${build_mode})
                     set(hakc_lit_config_path ${hakc_build_dir}/${hakc_backing_type}/lit.local.cfg)
                     set(hakc_build_mode ${build_mode})
