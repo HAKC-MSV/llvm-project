@@ -469,7 +469,7 @@ void HAKCTransformer::CreateDataAuthArguments(
   auto *AccessToken = Division.GetAccessToken();
   unsigned AddrSpace = GetPointerAddrSpace(HAKCPointer);
   auto *DataAuthFuncTy = getCommonAnalysis().
-      GetDataAuthenticationFunctionType(AddrSpace);
+      GetDataAuthenticationFunctionType();
 
   if (HAKCPointer.GetBaseDefinition()->getType()->isIntegerTy()) {
     HAKCPointerBitCast = HAKCIRBuilder.CreateIntToPtr(
@@ -666,7 +666,7 @@ Value *HAKCTransformer::CreateDataAuthentication(HAKCPointerBase &HAKCPointer,
   SmallVector<Value *> Args;
   unsigned AddrSpace = GetPointerAddrSpace(HAKCPointer);
   auto *DataAuthFuncTy = getCommonAnalysis().
-      GetDataAuthenticationFunctionType(AddrSpace);
+      GetDataAuthenticationFunctionType();
   CreateDataAuthArguments(HAKCPointer, I, Args);
   for (unsigned i = 0; i < DataAuthFuncTy->getNumParams(); i++) {
     if (Args[i]->getType() != DataAuthFuncTy->getParamType(i)) {

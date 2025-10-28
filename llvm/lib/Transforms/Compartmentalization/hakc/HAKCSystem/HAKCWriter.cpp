@@ -12,7 +12,7 @@
 
 namespace llvm::hakc {
 
-void HAKCWriter::printDIType(const DIType *type, unsigned indents) const {
+void HAKCWriter::printDIType(const DIType *type, const unsigned indents) const {
   if (!type) {
     return;
   }
@@ -56,7 +56,7 @@ HAKCWriter &HAKCWriter::operator<<(const Use &U) {
   return *this;
 }
 
-HAKCWriter &HAKCWriter::operator<<(double d) {
+HAKCWriter &HAKCWriter::operator<<(const double d) {
   *os << d;
   return *this;
 }
@@ -71,27 +71,27 @@ HAKCWriter &HAKCWriter::operator<<(Value &V) {
   return *this;
 }
 
-HAKCWriter &HAKCWriter::operator<<(StringRef str) {
+HAKCWriter &HAKCWriter::operator<<(const StringRef str) {
   *os << str;
   return *this;
 }
 
-HAKCWriter &HAKCWriter::operator<<(unsigned int i) {
+HAKCWriter &HAKCWriter::operator<<(const unsigned int i) {
   *os << i;
   return *this;
 }
 
-HAKCWriter &HAKCWriter::operator<<(unsigned long i) {
+HAKCWriter &HAKCWriter::operator<<(const unsigned long i) {
   *os << i;
   return *this;
 }
 
-HAKCWriter &HAKCWriter::operator<<(ssize_t i) {
+HAKCWriter &HAKCWriter::operator<<(const ssize_t i) {
   *os << i;
   return *this;
 }
 
-HAKCWriter &HAKCWriter::operator<<(bool b) {
+HAKCWriter &HAKCWriter::operator<<(const bool b) {
   *os << (b ? "True" : "False");
   return *this;
 }
@@ -174,7 +174,7 @@ HAKCWriter &HAKCWriter::operator<<(const HAKCTypeInfo &TypeInfo) {
 }
 
 HAKCWriter &
-HAKCWriter::operator<<(const enum HAKCAllocationTypeEnum AllocationType) {
+HAKCWriter::operator<<(const HAKCAllocationTypeEnum AllocationType) {
   switch (AllocationType) {
   case InvalidAllocationType:
     *os << "InvalidAllocationType";
@@ -256,10 +256,10 @@ HAKCWriter &HAKCWriter::operator<<(const HAKCFunctionArgumentDefinition &Arg) {
   return *this;
 }
 
-HAKCWriter &HAKCWriter::operator<<(const enum HAKCFunctionArgumentUse ArgUse) {
-  for (auto &it : HAKCArgumentArgumentUseStringMap()) {
-    if (it.first == ArgUse) {
-      *this << it.second;
+HAKCWriter &HAKCWriter::operator<<(const HAKCFunctionArgumentUse ArgUse) {
+  for (const auto &[fst, snd] : HAKCArgumentArgumentUseStringMap()) {
+    if (fst == ArgUse) {
+      *this << snd;
       break;
     }
   }
