@@ -24,11 +24,12 @@ def parse_log_level(level_string: str) -> LoggingLevelEnum:
             return level
     raise RuntimeError(f'Invalid log level {level_string}')
 
+
 class HAKCLogger(logging.Logger):
     """
     Custom HAKC logging.Logger
     """
-    log_fmt = "%(asctime)s [%(processName)s, %(threadName)-10.10s] [%(levelname)-3.3s]%(message)s"
+    log_fmt = "%(asctime)s [%(processName)s, %(threadName)-10.10s] [%(levelname)-3.3s] %(message)s"
 
     @staticmethod
     def get_formatter() -> logging.Formatter:
@@ -58,7 +59,8 @@ class HAKCLogger(logging.Logger):
         return file_handler
 
 
-def setup_logging(logger: HAKCLogger | logging.Logger, log_file: str = "", log_level: LoggingLevelEnum = LoggingLevelEnum.WARNING,
+def setup_logging(logger: HAKCLogger | logging.Logger, log_file: str = "",
+                  log_level: LoggingLevelEnum = LoggingLevelEnum.WARNING,
                   log_mode: str = 'w') -> None:
     logger.setLevel(log_level.value)
     if log_file and len(log_file) > 0:
