@@ -123,12 +123,16 @@ class HAKCDivision(HashedHAKCDBNode, yaml.YAMLObject):
         return [self.division_id, self.salt]
 
     @staticmethod
+    def DivisionIDColumnName() -> str:
+        return "DivisionID"
+
+    @staticmethod
     def get_primary_key() -> HAKCDBColumn:
         return HAKCDBColumn('division_hash', 'UINT64')
 
     @classmethod
     def get_data_columns(cls) -> list[HAKCDBColumn]:
-        return [HAKCDBColumn('DivisionID', 'UINT64'), HAKCDBColumn("Salt", 'UINT64')]
+        return [HAKCDBColumn(cls.DivisionIDColumnName(), 'UINT64'), HAKCDBColumn("Salt", 'UINT64')]
 
     @staticmethod
     def get_table_name() -> str:
