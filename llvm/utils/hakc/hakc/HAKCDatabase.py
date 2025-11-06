@@ -92,7 +92,7 @@ class HAKCDatabase:
                                                                'has_definition_location.DefiningLine'])) if 'has_definition_location.DefiningLine' in data else None)
         elif cls == HAKCDivision:
             # Note: double check AccessToken, EntryToken
-            return HAKCDivision(DivisionID=int(data['HAKCDivision.DivisionID']),
+            return HAKCDivision(DivisionID=int(data[f'HAKCDivision.{HAKCDivision.DivisionIDColumnName()}']),
                                 Salt=int(data['HAKCDivision.Salt']),
                                 AccessToken=AccessToken)
         elif cls == HAKCCompartment:
@@ -188,7 +188,7 @@ class HAKCDatabase:
         cmd = f"""
         MATCH (comp:{HAKCCompartment.get_table_name()})<-[:{str(HAKCDivision.relation_compartment)}]-({HAKCDivision.get_table_name()}:{HAKCDivision.get_table_name()})<-[:{str(HAKCSymbol.relation_division)}]-(:{HAKCSymbol.get_table_name()})-[:{HAKCSymbol.relation_dag}]->(:{HAKCSymbol.get_table_name()})
         WHERE comp.{str(HAKCCompartment.get_primary_key())} = $compartment_id
-        RETURN DISTINCT {HAKCDivision.get_table_name()}.DivisionID as DivisionID;
+        RETURN DISTINCT {HAKCDivision.get_table_name()}.{HAKCDivision.DivisionIDColumnName()} as DivisionID;
         """
         return HAKCCompartment.compute_entry_token(compartment_id,
                                                    set(int(entry['DivisionID']) for _, entry in
@@ -196,10 +196,13 @@ class HAKCDatabase:
 
     def get_division_access_token_from_id(self, division_id: int, compartment_id: int) -> Optional[int]:
         cmd = f"""
-        MATCH
-        (comp:{HAKCCompartment.get_table_name()})<-[:{str(HAKCDivision.relation_compartment)}]-(div1:{HAKCDivision.get_table_name()})<-[:{str(HAKCSymbol.relation_division)}]-(:{HAKCSymbol.get_table_name()})-[:{HAKCSymbol.relation_dag}]->(:{HAKCSymbol.get_table_name()})-[:{str(HAKCSymbol.relation_division)}]->(div2:{HAKCDivision.get_table_name()})-[:{str(HAKCDivision.relation_compartment)}]->(comp)
-        WHERE comp.{str(HAKCCompartment.get_primary_key())} = $compartment_id AND div1.DivisionID = $division_id
-        RETURN DISTINCT div2.DivisionID AS DivisionID;
+        MATCH (comp:{HAKCCompartment.get_table_name()} {{{str(HAKCCompartment.get_primary_key())}: $compartment_id}}) 
+        MATCH (div1:{HAKCDivision.get_table_name()} {{{HAKCDivision.DivisionIDColumnName()}: $division_id}})-[:{HAKCDivision.relation_compartment}]->(comp) 
+        MATCH (div2:{HAKCDivision.get_table_name()})-[:{HAKCDivision.relation_compartment}]->(comp) 
+        WHERE EXISTS {{ 
+            MATCH (div2)<-[:{HAKCSymbol.relation_division}]-(:{HAKCSymbol.get_table_name()})<-[:{HAKCSymbol.relation_dag}]-(:{HAKCSymbol.get_table_name()})-[:{HAKCSymbol.relation_division}]->(div1) 
+        }} 
+        RETURN div2.{HAKCDivision.DivisionIDColumnName()} AS DivisionID
         """
         database_ids = self.execute(cmd, division_id=division_id, compartment_id=compartment_id)['DivisionID'].tolist()
         return HAKCDivision.compute_access_token(compartment_id, {int(entry) for entry in database_ids})
@@ -207,8 +210,8 @@ class HAKCDatabase:
     def get_division(self, division_id: int, compartment_id: int) -> Optional[HAKCDivision]:
         cmd = f"""
         MATCH ({HAKCDivision.get_table_name()}:{HAKCDivision.get_table_name()})-[:{HAKCDivision.relation_compartment}]->({HAKCCompartment.get_table_name()}:{HAKCCompartment.get_table_name()})
-        WHERE {HAKCDivision.get_table_name()}.{HAKCDivision.get_primary_key()} = $division_id AND {HAKCCompartment.get_table_name()}.{HAKCCompartment.get_primary_key()} = $compartment_id
-        RETURN DISTINCT {HAKCDivision.get_table_name()}.DivisionID, {HAKCDivision.get_table_name()}.Salt;
+        WHERE {HAKCDivision.get_table_name()}.{HAKCDivision.DivisionIDColumnName()} = $division_id AND {HAKCCompartment.get_table_name()}.{HAKCCompartment.get_primary_key()} = $compartment_id
+        RETURN DISTINCT {HAKCDivision.get_table_name()}.{HAKCDivision.DivisionIDColumnName()}, {HAKCDivision.get_table_name()}.Salt;
         """
         data = self.execute(cmd, division_id=int(division_id), compartment_id=int(compartment_id))
         return self.create_object_from_df(HAKCDivision, data.iloc[0], AccessToken=int(
@@ -225,7 +228,7 @@ class HAKCDatabase:
         if data.empty:
             return None
         all_data = data.iloc[0]
-        division_id = int(all_data[f'{HAKCDivision.get_table_name()}.DivisionID'])
+        division_id = int(all_data[f'{HAKCDivision.get_table_name()}.{HAKCDivision.DivisionIDColumnName()}'])
         compartment_id = int(all_data[f'{HAKCCompartment.get_table_name()}.{str(HAKCCompartment.get_primary_key())}'])
 
         return (self.create_object_from_df(HAKCDivision, all_data,
@@ -240,7 +243,7 @@ class HAKCDatabase:
         MATCH (:{HAKCSymbol.get_table_name()})-[:{HAKCSymbol.relation_symbol}]->(:{HAKCSymbol.get_table_name()})-[:{HAKCSymbol.relation_division}]->(d:{HAKCDivision.get_table_name()})-[:{HAKCDivision.relation_compartment}]->(c:{HAKCCompartment.get_table_name()}),
         (:{HAKCSymbol.get_table_name()})-[:{HAKCFunction.relation_indirect_calls}]->(:{HAKCType.get_table_name()})<-[:{HAKCSymbol.relation_type}]-(:{HAKCSymbol.get_table_name()})-[:{HAKCSymbol.relation_division}]->(d)-[:{HAKCDivision.relation_compartment}]->(c)
         WHERE c.{str(HAKCCompartment.get_primary_key())} = $compartment_id
-        RETURN DISTINCT d.DivisionID AS DivisionID
+        RETURN DISTINCT d.{HAKCDivision.DivisionIDColumnName()} AS DivisionID
         """
         division_ids = set(self.execute(cmd, compartment_id=compartment_id)['DivisionID'].tolist())
         return HAKCCompartment.compute_entry_token(compartment_id=compartment_id, entry_divisions=division_ids)
@@ -252,8 +255,8 @@ class HAKCDatabase:
         # comp1 <- div1 <- symbol1 -(Dag2)-> symbol2 -> div2 -> comp2
         cmd = f"""
         MATCH (comp1:{HAKCCompartment.get_table_name()})<-[:{HAKCDivision.relation_compartment}]-(div1:{HAKCDivision.get_table_name()})<-[:{HAKCSymbol.relation_division}]-(sym1:{HAKCSymbol.get_table_name()})-[:{HAKCSymbol.relation_dag}]->(sym2:{HAKCSymbol.get_table_name()})-[:{HAKCSymbol.relation_division}]->(div2:{HAKCDivision.get_table_name()})-[:{HAKCDivision.relation_compartment}]->(comp2:{HAKCCompartment.get_table_name()})
-        WHERE comp1.CompartmentID = $source_compartment_id
-        RETURN DISTINCT comp2.CompartmentID AS CompartmentID;
+        WHERE comp1.{str(HAKCCompartment.get_primary_key())} = $source_compartment_id
+        RETURN DISTINCT comp2.{str(HAKCCompartment.get_primary_key())} AS CompartmentID;
         """
         return [int(entry['CompartmentID']) for _, entry in
                 self.execute(cmd, source_compartment_id=source_compartment_id).iterrows()]
@@ -523,7 +526,7 @@ class HAKCDatabase:
         logger.debug(self)
         self.delete_all_compartments()
 
-        cmd = f"CREATE (div:{HAKCDivision.get_table_name()} {{division_hash: $division_hash, DivisionID: $division_id, Salt: $salt}});"
+        cmd = f"CREATE (div:{HAKCDivision.get_table_name()} {{division_hash: $division_hash, {HAKCDivision.DivisionIDColumnName()}: $division_id, Salt: $salt}});"
         self.execute(cmd, division_hash=hash(nec_division), division_id=nec_division.division_id,
                      salt=nec_division.salt, enable_cache=False)
         cmd = f"CREATE (comp:{HAKCCompartment.get_table_name()} {{CompartmentID: $compartment_id}});"
@@ -551,7 +554,7 @@ class HAKCDatabase:
         # create new division, compartment if they don't exist
         cmd = f"""
         MERGE (comp:{HAKCCompartment.get_table_name()} {{CompartmentID: $compartment_id}}),
-        (div:{HAKCDivision.get_table_name()} {{division_hash: $division_hash, DivisionID: $division_id, Salt: $salt}})-[:{HAKCDivision.relation_compartment}]->(comp);
+        (div:{HAKCDivision.get_table_name()} {{division_hash: $division_hash, {HAKCDivision.DivisionIDColumnName()}: $division_id, Salt: $salt}})-[:{HAKCDivision.relation_compartment}]->(comp);
         """
         new_div = HAKCDivision(int(new_division_id))
         self.execute_prepared_stmt(cmd, division_hash=hash(new_div), division_id=new_division_id, salt=new_div.salt,
@@ -617,7 +620,7 @@ class HAKCDatabase:
             MATCH (sym:{HAKCSymbol.get_table_name()})-[e:{HAKCSymbol.relation_division}]->(div:{HAKCDivision.get_table_name()})-[:{HAKCDivision.relation_compartment}]->(c:{HAKCCompartment.get_table_name()})
             WHERE c.{str(HAKCCompartment.get_primary_key())} IN [{','.join([str(i) for i in compartments_to_remove])}]
             DELETE e
-            RETURN sym.{str(HAKCSymbol.get_primary_key())} AS SymbolHash, div.DivisionID AS DivisionID, c.{str(HAKCCompartment.get_primary_key())} AS CompartmentID;
+            RETURN sym.{str(HAKCSymbol.get_primary_key())} AS SymbolHash, div.{HAKCDivision.DivisionIDColumnName()} AS DivisionID, c.{str(HAKCCompartment.get_primary_key())} AS CompartmentID;
         """
         result = self.execute_prepared_stmt(cmd)
         data = result.get_as_df()

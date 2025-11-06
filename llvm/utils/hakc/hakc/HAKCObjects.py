@@ -13,6 +13,7 @@ from .HAKCLogger import HAKCLogger
 
 logger: HAKCLogger = cast(HAKCLogger, logging.getLogger('hakc.dag'))
 
+
 class HAKCDefinitionLocation(HAKCDBNode, yaml.YAMLObject):
     yaml_tag = "!HAKCDefinitionLocation"
 
@@ -30,7 +31,8 @@ class HAKCDefinitionLocation(HAKCDBNode, yaml.YAMLObject):
 
     @staticmethod
     def get_attrs():
-        return ", ".join([f"{HAKCDefinitionLocation.get_table_name()}.{x.column_name}" for x in HAKCDefinitionLocation.get_data_columns()] +
+        return ", ".join([f"{HAKCDefinitionLocation.get_table_name()}.{x.column_name}" for x in
+                          HAKCDefinitionLocation.get_data_columns()] +
                          [f"{HAKCDefinitionLocation.get_table_name()}.{HAKCDefinitionLocation.get_primary_key()}"])
 
     def pretty_print(self):
@@ -121,12 +123,16 @@ class HAKCDivision(HashedHAKCDBNode, yaml.YAMLObject):
         return [self.division_id, self.salt]
 
     @staticmethod
+    def DivisionIDColumnName() -> str:
+        return "DivisionID"
+
+    @staticmethod
     def get_primary_key() -> HAKCDBColumn:
         return HAKCDBColumn('division_hash', 'UINT64')
 
     @classmethod
     def get_data_columns(cls) -> list[HAKCDBColumn]:
-        return [HAKCDBColumn('DivisionID', 'UINT64'), HAKCDBColumn("Salt", 'UINT64')]
+        return [HAKCDBColumn(cls.DivisionIDColumnName(), 'UINT64'), HAKCDBColumn("Salt", 'UINT64')]
 
     @staticmethod
     def get_table_name() -> str:
@@ -174,8 +180,9 @@ class HAKCCompartment(HAKCDBNode, yaml.YAMLObject):
 
     @staticmethod
     def get_attrs():
-        return ", ".join([f"{HAKCCompartment.get_table_name()}.{x.column_name}" for x in HAKCCompartment.get_data_columns()] +
-                         [f"{HAKCCompartment.get_table_name()}.{HAKCCompartment.get_primary_key()}"])
+        return ", ".join(
+            [f"{HAKCCompartment.get_table_name()}.{x.column_name}" for x in HAKCCompartment.get_data_columns()] +
+            [f"{HAKCCompartment.get_table_name()}.{HAKCCompartment.get_primary_key()}"])
 
     def pretty_print(self):
         return f"{self.get_table_name()}({self.compartment_id})"
@@ -236,6 +243,7 @@ class HAKCCompartment(HAKCDBNode, yaml.YAMLObject):
 class HAKCType(HashedHAKCDBNode, yaml.YAMLObject):
     yaml_tag = "!HAKCType"
     unknown_type = "@UNKNOWN@"
+
     def __init__(self, LLVMType: str, DebugType: Optional[str] = unknown_type, **kwargs):
         yaml.YAMLObject.__init__(self)
         if 'Name' not in kwargs:
@@ -330,6 +338,7 @@ class HAKCType(HashedHAKCDBNode, yaml.YAMLObject):
             schema[1]: self.debug_type,
             schema[2]: self.llvm_type
         }
+
 
 class HAKCScope(HashedHAKCDBNode, yaml.YAMLObject):
     yaml_tag = "!HAKCScope"
@@ -579,8 +588,9 @@ class HAKCGlobalVariable(HAKCSymbol):
 
     @staticmethod
     def get_attrs():
-        return ", ".join([f"{HAKCGlobalVariable.get_table_name()}.{x.column_name}" for x in HAKCGlobalVariable.get_data_columns()] +
-                         [f"{HAKCGlobalVariable.get_table_name()}.{HAKCGlobalVariable.get_primary_key()}"])
+        return ", ".join(
+            [f"{HAKCGlobalVariable.get_table_name()}.{x.column_name}" for x in HAKCGlobalVariable.get_data_columns()] +
+            [f"{HAKCGlobalVariable.get_table_name()}.{HAKCGlobalVariable.get_primary_key()}"])
 
     def pretty_print(self):
         return f"HAKCGlobalVariable({self.name})"
@@ -604,6 +614,7 @@ class HAKCAdjustment(yaml.YAMLObject):
     def from_yaml(cls, loader: yaml.CLoader, node):
         return cls(**loader.construct_mapping(node, deep=True))
 
+
 class HAKCCompartmentAdjustment(HAKCAdjustment):
     yaml_tag = "!HAKCCompartmentAdjustment"
 
@@ -615,13 +626,14 @@ class HAKCCompartmentAdjustment(HAKCAdjustment):
         self.compartment_id = kwargs.get('compartment-id', 0)
 
     def __str__(self):
-        out =  f'HAKCCompartmentAdjustment('
+        out = f'HAKCCompartmentAdjustment('
         out += f' {self.path},' if self.path else ''
         out += f' {self.symbol},' if self.symbol else ''
         out += f' {self.division_id},' if self.division_id else ''
         out += f' {self.compartment_id}' if self.compartment_id else ''
         out += ')'
         return out
+
 
 class HAKCAdjustments(yaml.YAMLObject):
     yaml_tag = "!HAKCAdjustments"
@@ -641,6 +653,7 @@ class HAKCAdjustments(yaml.YAMLObject):
             {f'nec: {self.nec}' if self.nec else ''}
             {[f'{str(adjustment_entry)}' for adjustment_entry in self.adjustment_entries]}
         '''
+
 
 class HAKCIndirectSourceLink(HAKCPrintableObj, yaml.YAMLObject):
     yaml_tag = "!HAKCIndirectSourceLink"
@@ -748,6 +761,7 @@ class HAKCValidTargetsPayload(HAKCPayload):
     def __init__(self, valid_targets: list[int]):
         assert isinstance(valid_targets, list)
         HAKCPayload.__init__(self, {'ValidTargets': valid_targets if valid_targets else []})
+
 
 def add_yaml_constructors() -> None:
     for loader in [yaml.Loader, yaml.CLoader, yaml.SafeLoader]:
