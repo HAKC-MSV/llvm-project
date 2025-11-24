@@ -244,8 +244,7 @@ class HAKCServerThreadInstance(HAKCServerThread):
     def terminate_connection(self, **kwargs):
         # override terminate_connection function to add compartmentalization to queue
         assert len(self.compartmentalization) > 0
-        if self.hakc_server.server_gather_buckets:
-            self.hakc_server.server_gather_buckets[self.hakc_server.id].put(self.compartmentalization)
+        self.hakc_server.add_compartmentalization(self.compartmentalization)
         HAKCServerThread.terminate_connection(self)
 
     def add_symbols(self, **kwargs) -> HAKCResponse:
@@ -265,21 +264,37 @@ class HAKCServerThreadInstance(HAKCServerThread):
 
 # noinspection PyTypeChecker
 class HAKCServer(socketserver.ThreadingUnixStreamServer):
-    def __init__(self, server_id: int, config: HAKCConfig, logger: HAKCLogger, server_gather_buckets=None, **kwargs):
+    def __init__(self, server_id: int, config: HAKCConfig, logger_to_use: HAKCLogger, server_gather_buckets=None,
+                 **kwargs):
         self.id = server_id
-        self.logger = logger
+        self.logger = logger_to_use
         self.config = config
         self.server_gather_buckets = server_gather_buckets
         self.last_alive = time.time()
+        self.socket_path = os.path.join(config.socket_dir, str(self.id))
+        if os.path.exists(self.socket_path):
+            os.unlink(self.socket_path)
+        self.compartmentalizations: list[HAKCCompartmentalization] = list()
         if self.config.build_mode == HAKCBuildMode.ENFORCEMENT and config.server_config.backing_config.type == HAKCBackingType.KUZU:
-            logger.debug(f"Starting database at {self.config.server_config.backing_config.path}")
+            logger_to_use.debug(f"Starting database at {self.config.server_config.backing_config.path}")
             self.init_mp_database(self.config.server_config.backing_config.path)
-        self.logger.debug(f'Starting Server with socket {config.socket_path}')
-        os.makedirs(os.path.dirname(config.socket_path), exist_ok=True)
-        socketserver.ThreadingUnixStreamServer.__init__(self, str(config.socket_path), HAKCServerThreadInstance)
+        self.logger.debug(f'Starting Server with socket {self.socket_path}')
+        os.makedirs(os.path.dirname(self.socket_path), exist_ok=True)
+        socketserver.ThreadingUnixStreamServer.__init__(self, str(self.socket_path), HAKCServerThreadInstance)
 
     def __del__(self):
         logger.debug(f"Closing HAKCServer")
+
+    def add_compartmentalization(self, compartmentalization: HAKCCompartmentalization):
+        self.compartmentalizations.append(compartmentalization)
+
+    @property
+    def compartmentalization(self):
+        compartmentalization = HAKCCompartmentalization()
+        for subgraph in self.compartmentalizations:
+            compartmentalization.update(edges=subgraph.edges(data=True, keys=True),
+                                        nodes=subgraph.nodes(data=True))
+        return compartmentalization
 
     def handle_error(self, request, client):
         import traceback
