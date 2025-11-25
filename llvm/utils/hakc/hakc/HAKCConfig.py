@@ -121,8 +121,6 @@ class HAKCConfig:
     def __init__(self, **hakc_config):
         add_yaml_constructors()
         self.server_config = HAKCServerConfig(**read_sub_config(get_arg_or_error('server-config-path', **hakc_config)))
-        # ignore pass_config_path
-        # self.build_path = Path(get_arg_or_error('build-path', **hakc_config))
         self.socket_dir = Path(get_arg_or_error('socket-dir', **hakc_config))
         self.build_mode = parse_build_mode(get_arg_or_error('build-mode', **hakc_config))
         self.temporal_analysis_enabled = hakc_config.get('temporal-analysis-enabled', False)
@@ -135,6 +133,7 @@ class HAKCConfig:
         self.endpoints = HAKCEndpoints(**hakc_config)
         self.timeout = self.server_config.timeout
         self.log_level = self.server_config.log_level
+        self.root_config_path = Path(hakc_config['root-file-path']) if 'root-file-path' in hakc_config else None
 
     def __str__(self):
         return f"""

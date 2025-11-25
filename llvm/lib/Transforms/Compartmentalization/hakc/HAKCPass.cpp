@@ -1,5 +1,3 @@
-
-
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCPass.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/HAKCModuleAnalysis.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCDatabase/HAKCServerClient.h"
@@ -12,13 +10,15 @@
 
 #include <llvm/Support/ScopedPrinter.h>
 
-// critical reference guide for cl:
-// https://llvm.org/docs/CommandLine.html#internal-vs-external-storage
-std::string HAKC_CONFIG_PATH;
 
-static cl::opt<std::string, true>
-    HAKC_CONFIG_CL("hakc-config", cl::desc("Path to HAKC Configuration File"),
-                   cl::location(HAKC_CONFIG_PATH), cl::Optional);
+static cl::opt<std::string>
+HAKCConfigPath("hakc-config", cl::desc("Path to HAKC Configuration File"),
+               cl::value_desc("string"),
+               cl::init(""));
+static cl::opt<std::string>
+HAKCServerPath("hakc-server-path", cl::desc("Path to the HAKC Server socket"),
+               cl::value_desc("string"), cl::init(""), cl::Optional);
+
 using namespace llvm::hakc;
 
 namespace llvm {
@@ -44,7 +44,7 @@ bool skip_current_file(CommonHAKCAnalysis &HAKCAnalysis) {
   return false;
 }
 
-bool ShouldSendSymbolsToServer(HAKCTypeIdentifier& TypeIdentifier) {
+bool ShouldSendSymbolsToServer(HAKCTypeIdentifier &TypeIdentifier) {
   auto FunctionCount = TypeIdentifier.GetFunctions().size() +
                        TypeIdentifier.GetUnmappedFunctions().size();
   auto GlobalCount = TypeIdentifier.GetGlobals().size() +
@@ -53,9 +53,7 @@ bool ShouldSendSymbolsToServer(HAKCTypeIdentifier& TypeIdentifier) {
 }
 
 static bool runEnforcement(CommonHAKCAnalysis &HAKCAnalysis) {
-  if (skip_current_file(HAKCAnalysis)) {
-    return false;
-  }
+  if (skip_current_file(HAKCAnalysis)) { return false; }
   CommonHAKCAnalysis::getLogger(Info) << "Running Enforcement Pass Mode!\n";
   HAKCModuleAnalysis ModuleAnalysis(HAKCAnalysis);
   HAKCServerClient Client(ModuleAnalysis);
@@ -67,9 +65,7 @@ static bool runEnforcement(CommonHAKCAnalysis &HAKCAnalysis) {
 }
 
 static bool runAnalysis(CommonHAKCAnalysis &HAKCAnalysis) {
-  if (skip_current_file(HAKCAnalysis)) {
-    return false;
-  }
+  if (skip_current_file(HAKCAnalysis)) { return false; }
   CommonHAKCAnalysis::getLogger(Info) << "Running Analysis Pass Mode!\n";
   HAKCModuleAnalysis ModuleAnalysis(HAKCAnalysis);
 
@@ -86,12 +82,13 @@ static bool runAnalysis(CommonHAKCAnalysis &HAKCAnalysis) {
 }
 
 static bool RunHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM) {
-  if (HAKC_CONFIG_PATH.empty()) {
+  if (HAKCConfigPath.getValue().empty()) {
     CommonHAKCAnalysis::getLogger(Fatal) << "no hakc-config pass specified\n";
     throw std::exception();
   }
 
-  CommonHAKCAnalysis HAKCAnalysis(M, MAM, HAKC_CONFIG_PATH);
+  CommonHAKCAnalysis HAKCAnalysis(M, MAM, HAKCConfigPath.getValue(),
+                                  HAKCServerPath.getValue());
   switch (HAKCAnalysis.GetSystemInfo().GetBuildMode()) {
   case Analysis:
     return runAnalysis(HAKCAnalysis);
@@ -107,7 +104,8 @@ static bool RunHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM) {
 } // namespace hakc
 
 PreservedAnalyses HAKCPass::run(Module &M, ModuleAnalysisManager &MAM) {
-  return RunHAKCAnalysis(M, MAM) ? PreservedAnalyses::none()
-                                 : PreservedAnalyses::all();
+  return RunHAKCAnalysis(M, MAM)
+           ? PreservedAnalyses::none()
+           : PreservedAnalyses::all();
 }
 } // namespace llvm

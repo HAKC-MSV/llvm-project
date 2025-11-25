@@ -7,6 +7,7 @@ import json
 import logging
 import multiprocessing as mp
 import pstats
+import shlex
 import signal
 import subprocess
 import sys
@@ -112,16 +113,22 @@ def launch_reduce_proc(reduce_id: int, server_gather_buckets: type[mp.Manager.__
             raise e
 
 
-def run_compilation_target(database_entry: dict, logger_to_use: HAKCLogger):
-    cmd = database_entry['command'].split(' ')
+def run_compilation_target(database_entry: dict, logger_to_use: HAKCLogger, socket_path: str, config_path: str):
+    cmd: list[str] = shlex.split(database_entry['command'])
+
+    if '--enable-hakc' in cmd:
+        if '--hakc-config' not in cmd:
+            cmd.insert(len(cmd) - 1, "-mllvm")
+            cmd.insert(len(cmd) - 1, f"--hakc-config={config_path}")
+
+        if "--hakc-server-path" not in cmd:
+            cmd.insert(len(cmd) - 1, '-mllvm')
+            cmd.insert(len(cmd) - 1, f'--hakc-server-path={socket_path}')
 
     logger_to_use.debug(f'Running {cmd}')
 
-    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=False,
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True,
                             cwd=database_entry['directory'])
-    if result.returncode != 0:
-        logger_to_use.error(f'Failed to run {" ".join(cmd)}: {result.stderr}')
-        raise subprocess.CalledProcessError(returncode=result.returncode, cmd=" ".join(cmd))
 
 
 def perform_analysis(task_id: int, config: HAKCConfig, logger_to_use: HAKCLogger, files_to_analyze: set[str]):
@@ -140,14 +147,28 @@ def perform_analysis(task_id: int, config: HAKCConfig, logger_to_use: HAKCLogger
         compilation_file = database_entry['file']
         if compilation_file in files_to_analyze:
             try:
-                run_compilation_target(database_entry, logger_to_use)
+                run_compilation_target(database_entry, logger_to_use, str(server.socket_path),
+                                       str(config.root_config_path))
             except Exception as e:
                 logger_to_use.error(f'Failed to compile {compilation_file}: {e}')
 
-    server.shutdown()
-    server.server_close()
+    result = server.compartmentalization
+    try:
+        server.shutdown()
+    except Exception as e:
+        logger.error(f'Failed to shutdown server')
 
-    return server.compartmentalization
+    try:
+        server.server_close()
+    except Exception as e:
+        logger.error(f'Failed to close server')
+
+    try:
+        server_thread.join()
+    except Exception as e:
+        logger.error(f'Failed to join server thread')
+
+    return result
 
 
 def launch_server_gather_proc(server_id: int, config: HAKCConfig, ServerMainLogger: HAKCLogger,
@@ -293,6 +314,41 @@ def launch_progress_bars(server_gather_procs_completed: type[mp.Value], local_re
         time.sleep(1)
 
 
+def perform_analysis_with_compilation_database(config: HAKCConfig,
+                                               server_main_logger: HAKCLogger) -> Optional[HAKCCompartmentalization]:
+    compartmentalization = HAKCCompartmentalization()
+    with open(config.server_config.compilation_database, 'r') as f:
+        compilation_database = json.load(f)
+    files = [db_entry['file'] for db_entry in compilation_database]
+    successful_creation = True
+    batch_size = 100
+
+    with concurrent.futures.ProcessPoolExecutor(max_workers=config.server_config.analysis_core_count) as executor:
+        futures = list()
+        task_id = 0
+        for batched_files in batched(files, batch_size):
+            futures.append(
+                executor.submit(perform_analysis, task_id, config, server_main_logger, set(batched_files)))
+            task_id += 1
+
+        with server_main_logger.progress_bar(desc="Processing results", total=len(futures)) as pbar:
+            for future in concurrent.futures.as_completed(futures):
+                pbar.update(1)
+                try:
+                    subcompartmentalization = future.result()
+                    if subcompartmentalization:
+                        compartmentalization.update(edges=subcompartmentalization.edges(data=True, keys=True),
+                                                    nodes=subcompartmentalization.nodes(data=True))
+                except Exception as e:
+                    successful_creation = False
+                    server_main_logger.error(f'Error creating sub compartmentalizations: {e}')
+    if not successful_creation:
+        logger.error(f'Failed to create compartmentalization. Please try again.')
+        return None
+
+    return compartmentalization
+
+
 # noinspection PyTypeChecker
 def main():
     parser = argparse.ArgumentParser(description='HAKC Server Process')
@@ -306,7 +362,10 @@ def main():
     profile = None
 
     with open(args.config, 'r') as f:
-        config = HAKCConfig(**yaml.safe_load(f))
+        config_inputs = yaml.safe_load(f)
+        config_inputs['root-file-path'] = args.config
+
+        config = HAKCConfig(**config_inputs)
 
     root_logger = logging.getLogger()
     setup_logging(root_logger, log_level=config.log_level,
@@ -322,33 +381,10 @@ def main():
     start = time.time()
 
     if config.server_config.compilation_database is not None:
-        compartmentalization = HAKCCompartmentalization()
-        with open(config.server_config.compilation_database, 'r') as f:
-            compilation_database = json.load(f)
-        files = [db_entry['file'] for db_entry in compilation_database]
-        successful_creation = True
-        with concurrent.futures.ProcessPoolExecutor(max_workers=config.server_config.analysis_core_count) as executor:
-            futures = list()
-            task_id = 0
-            for batched_files in batched(files, 100):
-                futures.append(
-                    executor.submit(perform_analysis, task_id, config, server_main_logger, set(batched_files)))
-                task_id += 1
-
-            with server_main_logger.progress_bar(desc="Processing results", total=len(futures)) as pbar:
-                for future in concurrent.futures.as_completed(futures):
-                    pbar.update(1)
-                    try:
-                        subcompartmentalization = future.result()
-                        compartmentalization.update(edges=subcompartmentalization.edges(data=True, keys=True),
-                                                    nodes=subcompartmentalization.nodes(data=True))
-                    except Exception as e:
-                        successful_creation = False
-                        server_main_logger.error(f'Error creating sub compartmentalizations: {e}')
-        if not successful_creation:
-            logger.error(f'Failed to create compartmentalization. Please try again.')
+        compartmentalization = perform_analysis_with_compilation_database(config, server_main_logger)
+        if compartmentalization is None:
+            logger.error(f'Failed to create compartmentalization. Exiting.')
             sys.exit(1)
-
     else:
         # Spawn mp manager to share resources amongst processes
         with mp.Manager() as manager:

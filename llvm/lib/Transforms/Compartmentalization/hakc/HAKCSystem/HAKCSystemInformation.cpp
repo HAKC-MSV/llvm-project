@@ -14,25 +14,25 @@
 namespace llvm::hakc {
 
 HAKCSystemInformation::HAKCSystemInformation(CommonHAKCAnalysis &CommonAnalysis)
-    : CommonAnalysis(CommonAnalysis), NoTransferFunctionList(),
-      SafeTransitionFunctionList(), AllocationFunctionList(),
-      CustomTransferList(), CompartmentalizationSupportFunctionList(),
-      IgnoredGlobalList(), ConsoleLogLevel(Verbose), FileLogLevel(Verbose),
-      BuildMode(InvalidBuildModeType),
-      PostTargetActionList(), PreTransferActionList(), HAKCSourcePathList(),
-      IncludePathsList(), SeparateNamespacePathList(), StructList(),
-      SymbolsToOutputDebugInfo(), CompartmentTransferFunctionList(),
-      TypeIdentifier(CommonAnalysis), DebugDatabase(),
-      CodeValidationFunction(nullptr), DataValidationFunction(nullptr),
-      DefaultCompartmentTransfer(nullptr), PerCPUCompartmentTransfer(nullptr),
-      SignWithDivisionFunction(nullptr), Timeout(), AddFunctionEndpoint(),
-      AddGlobalVariableEndpoint(), AddSymbolsEndpoint(), Arch(), BuildPath(),
-      CompartmentEndpoint(), DivisionEndpoint(), Platform(), RootPath(),
-      SetDagFilenameEndpoint(), SingleSourceFile(), SocketPath(), LogPath(),
-      SymbolDivisionEndpoint(), TerminateConnectionEndpoint(),
-      ValidTargetsEndpoint(), DefaultAccessToken(), DefaultCompartmentID(),
-      DefaultDivisionID(), DefaultEntryToken(), MaxConnectionRetries(),
-      ServerCoreCount() {}
+  : CommonAnalysis(CommonAnalysis), NoTransferFunctionList(),
+    SafeTransitionFunctionList(), AllocationFunctionList(),
+    CustomTransferList(), CompartmentalizationSupportFunctionList(),
+    IgnoredGlobalList(), ConsoleLogLevel(Verbose), FileLogLevel(Verbose),
+    BuildMode(InvalidBuildModeType),
+    PostTargetActionList(), PreTransferActionList(), HAKCSourcePathList(),
+    IncludePathsList(), SeparateNamespacePathList(), StructList(),
+    SymbolsToOutputDebugInfo(), CompartmentTransferFunctionList(),
+    TypeIdentifier(CommonAnalysis), DebugDatabase(),
+    CodeValidationFunction(nullptr), DataValidationFunction(nullptr),
+    DefaultCompartmentTransfer(nullptr), PerCPUCompartmentTransfer(nullptr),
+    SignWithDivisionFunction(nullptr), Timeout(), AddFunctionEndpoint(),
+    AddGlobalVariableEndpoint(), AddSymbolsEndpoint(), Arch(), BuildPath(),
+    CompartmentEndpoint(), DivisionEndpoint(), Platform(), RootPath(),
+    SetDagFilenameEndpoint(), SingleSourceFile(), SocketPath(), LogPath(),
+    SymbolDivisionEndpoint(), TerminateConnectionEndpoint(),
+    ValidTargetsEndpoint(), DefaultAccessToken(), DefaultCompartmentID(),
+    DefaultDivisionID(), DefaultEntryToken(), MaxConnectionRetries(),
+    ServerCoreCount() {}
 
 StringRef HAKCSystemInformation::GetRootPath() const { return RootPath; }
 
@@ -43,12 +43,15 @@ StringRef HAKCSystemInformation::GetLogPath() const { return LogPath; }
 unsigned HAKCSystemInformation::GetDefaultDivisionID() const {
   return DefaultDivisionID;
 }
+
 unsigned HAKCSystemInformation::GetDefaultCompartmentID() const {
   return DefaultCompartmentID;
 }
+
 unsigned HAKCSystemInformation::GetDefaultEntryToken() const {
   return DefaultEntryToken;
 }
+
 unsigned HAKCSystemInformation::GetDefaultAccessToken() const {
   return DefaultAccessToken;
 }
@@ -163,14 +166,16 @@ void HAKCSystemInformation::GetAllDefinedHAKCFunctions(
                  CompartmentalizationSupportFunctionList.end());
 }
 
+void HAKCSystemInformation::SetSocketPath(StringRef SocketPath) {
+  this->SocketPath = SocketPath.str();
+}
+
 void HAKCSystemInformation::operator<<(HAKCYAMLConfig &Config) {
   auto Endpoints = Config.Endpoints;
 
   BuildPath = Config.BuildDir;
   BuildMode = Config.BuildMode;
-  if (BuildMode == RunConfigAndExit) {
-    return;
-  }
+  if (BuildMode == RunConfigAndExit) { return; }
   SocketPath = Config.SocketDir + "/" +
                std::to_string(get_threadid() % Config.ServerCoreCount);
   LogPath = Config.LogDir;
@@ -249,9 +254,7 @@ void HAKCSystemInformation::operator<<(HAKCYAMLConfig &Config) {
   if (Config.ClientConfig.PerCPUCompartmentTransfer.IsValid()) {
     PerCPUCompartmentTransfer =
         CreateHAKCFunction(Config.ClientConfig.PerCPUCompartmentTransfer);
-  } else {
-    PerCPUCompartmentTransfer = DefaultCompartmentTransfer;
-  }
+  } else { PerCPUCompartmentTransfer = DefaultCompartmentTransfer; }
 
   for (auto &Global : Config.ClientConfig.IgnoredGlobals) {
     if (auto *GV = GetModule().getGlobalVariable(Global.SymbolName, true)) {
@@ -263,9 +266,7 @@ void HAKCSystemInformation::operator<<(HAKCYAMLConfig &Config) {
        Config.ClientConfig.AllocationFunctions) {
     auto Allocation =
         HAKCAllocationSize::FromYaml(AllocationDefinition, GetModule());
-    if (Allocation) {
-      AllocationFunctionList.push_back(Allocation);
-    }
+    if (Allocation) { AllocationFunctionList.push_back(Allocation); }
   }
 
   SmallVector<HAKCTypeP> Types;
@@ -296,7 +297,8 @@ void HAKCSystemInformation::operator<<(HAKCYAMLConfig &Config) {
 
   SmallVector<hakc::function_def_t> DefinedFunctions;
   GetAllDefinedHAKCFunctions(DefinedFunctions);
-  for (auto &PreTransferActionDefinition : Config.ClientConfig.PreTargetActions) {
+  for (auto &PreTransferActionDefinition : Config.ClientConfig.
+       PreTargetActions) {
     for (auto &FuncDef : DefinedFunctions) {
       if (FuncDef->GetName() == PreTransferActionDefinition.SymbolName) {
         auto Action = std::make_shared<HAKCPreTransferAction>(
@@ -306,7 +308,8 @@ void HAKCSystemInformation::operator<<(HAKCYAMLConfig &Config) {
       }
     }
   }
-  for (auto &PostTargetActionDefinition : Config.ClientConfig.PostTargetActions) {
+  for (auto &PostTargetActionDefinition : Config.ClientConfig.
+       PostTargetActions) {
     for (auto &FuncDef : DefinedFunctions) {
       if (FuncDef->GetName() == PostTargetActionDefinition.SymbolName) {
         SmallVector<HAKCActionArgument> Arguments;
@@ -340,9 +343,7 @@ bool HAKCSystemInformation::OutputDebugInfo(GlobalValue *GV) const {
   // will always try to output debug info if there are no symbols specified
   auto Search = [GV](const GlobalValue *Symbol) { return Symbol == GV; };
   if (any_of(SymbolsToOutputDebugInfo, Search) ||
-      SymbolsToOutputDebugInfo.empty()) {
-    return true;
-  }
+      SymbolsToOutputDebugInfo.empty()) { return true; }
   return false;
 }
 
@@ -375,23 +376,19 @@ HAKCTypeIdentifier &HAKCSystemInformation::GetTypeIdentifier() {
 }
 
 function_def_t HAKCSystemInformation::CompartmentTransfer(bool PerCPU) const {
-  if (PerCPU) {
-    return PerCPUCompartmentTransfer;
-  }
+  if (PerCPU) { return PerCPUCompartmentTransfer; }
   return DefaultCompartmentTransfer;
 }
 
 bool HAKCSystemInformation::OutputDebugInfo(StringRef SymbolName) const {
   auto Search = [SymbolName](const GlobalValue *Symbol) {
     errs() << "Checking " << Symbol->getName() << " =?= " << SymbolName << ": "
-           << (Symbol->getName() == SymbolName) << "\n";
+        << (Symbol->getName() == SymbolName) << "\n";
     return Symbol->getName() == SymbolName;
   };
 
   if (any_of(SymbolsToOutputDebugInfo, Search) ||
-      SymbolsToOutputDebugInfo.empty()) {
-    return true;
-  }
+      SymbolsToOutputDebugInfo.empty()) { return true; }
   return false;
 }
 
