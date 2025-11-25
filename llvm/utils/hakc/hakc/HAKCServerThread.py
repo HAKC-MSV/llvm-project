@@ -14,8 +14,6 @@ from .HAKCLogger import HAKCLogger
 
 logging.setLoggerClass(HAKCLogger)
 
-logger: HAKCLogger = cast(HAKCLogger, logging.getLogger('hakc.server'))
-
 
 # noinspection PyTypeChecker
 class HAKCServerThread(socketserver.StreamRequestHandler):
@@ -24,7 +22,7 @@ class HAKCServerThread(socketserver.StreamRequestHandler):
     def init(self):
         # Note: handler() can be called before the actual __init__() function is called, so make a custom blocking init() for use in handler()
         # Initialize thread specific data
-        self.logger = cast(HAKCLogger, logging.getLogger(str(threading.get_ident())))
+        self.logger = cast(HAKCLogger, logging.getLogger(f'hakc-server-thread-{str(threading.get_ident())}'))
         # Maybe use CLoader because it's faster (but may have some compatability issues)
         self.yaml_loader = yaml.CLoader
         self.file_handler = None
@@ -75,9 +73,9 @@ class HAKCServerThread(socketserver.StreamRequestHandler):
         return bytes_written
 
     def reset_alarm(self):
-        # cancel existing alarm
-        signal.alarm(0)
         if self.hakc_server.config.timeout > 0:
+            # cancel existing alarm
+            signal.alarm(0)
             signal.alarm(self.hakc_server.config.timeout)
 
     # noinspection PyTypeChecker
@@ -98,7 +96,7 @@ class HAKCServerThread(socketserver.StreamRequestHandler):
 
     def handle(self):
         # self.init()
-        logger.debug(f'Handling request')
+        self.logger.debug(f'Handling request')
         hakc_request = None
         response = None
         try:
