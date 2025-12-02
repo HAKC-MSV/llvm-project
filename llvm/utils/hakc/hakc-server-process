@@ -2,6 +2,7 @@
 import argparse
 import cProfile
 import concurrent.futures
+import faulthandler
 import io
 import json
 import logging
@@ -25,6 +26,8 @@ from hakc.HAKCConfig import HAKCConfig, TimeoutException, HAKCBackingType
 from hakc.HAKCLogger import setup_logging
 from hakc.HAKCServer import HAKCServer, HAKCBuildMode
 from hakc.HAKCUtils import batched
+
+faulthandler.enable()
 
 logging.setLoggerClass(HAKCLogger)
 
@@ -168,12 +171,7 @@ def do_perform_analysis(task_id: int, config: HAKCConfig, logger_to_use: HAKCLog
         compilation_file = database_entry['file']
         if compilation_file in files_to_analyze:
             file_count += 1
-            if task_id == 9:
-                logger_to_use.error(
-                    f'{len(files_to_analyze) - file_count} Files remain. Database entry: {database_entry}')
             try:
-                if task_id == 9:
-                    logger_to_use.error(f'server_thread status is {"Alive" if server_thread.is_alive() else "Dead"}')
                 run_compilation_target(database_entry, logger_to_use, str(server.socket_path),
                                        str(config.root_config_path))
                 logger_to_use.debug(f'Compilation task completed')
@@ -208,8 +206,6 @@ def do_perform_analysis(task_id: int, config: HAKCConfig, logger_to_use: HAKCLog
 def make_worker_logger(name: str, task_id: int) -> logging.Logger:
     logger = logging.getLogger(name)
     logger.setLevel(logging.ERROR)
-    if task_id == 9:
-        logger.setLevel(logging.DEBUG)
     logger.propagate = False
 
     # remove any existing handlers to avoid duplicates on re-entry
@@ -227,15 +223,9 @@ def perform_analysis(task_id: int, config: HAKCConfig, files_to_analyze: set[str
     logger_to_use = cast(HAKCLogger, make_worker_logger(f'hakc.server-worker-{task_id}', task_id))
     try:
         compartmentalization = do_perform_analysis(task_id, config, logger_to_use, files_to_analyze)
-    except Exception as e:
-        logger_to_use.exception(f'Analysis failed for task {task_id}: {e}')
-        return {"ok": False, "error": traceback.format_exc()}
-
-    try:
-        import pickle
-        logger_to_use.error(f'returning a graph of length {len(pickle.dumps(compartmentalization))}')
         return {"ok": True, "result": compartmentalization}
     except Exception as e:
+        logger_to_use.exception(f'Analysis failed for task {task_id}: {e}')
         return {"ok": False, "error": traceback.format_exc()}
 
 
