@@ -138,8 +138,6 @@ namespace llvm::hakc {
 
         iterator_range<HAKCTransferList::iterator> CompartmentTransferFunctions();
 
-        std::chrono::milliseconds GetServerTimeout() const;
-
         unsigned GetMaxRetries() const;
 
         unsigned GetServerCoreCount() const;
@@ -186,7 +184,6 @@ namespace llvm::hakc {
         function_def_t DefaultCompartmentTransfer;
         function_def_t PerCPUCompartmentTransfer;
         function_def_t SignWithDivisionFunction;
-        std::chrono::milliseconds Timeout;
         std::string AddFunctionEndpoint;
         std::string AddGlobalVariableEndpoint;
         std::string AddSymbolsEndpoint;

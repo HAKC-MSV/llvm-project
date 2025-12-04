@@ -24,7 +24,7 @@ namespace llvm::hakc {
               TypeIdentifier(CommonAnalysis), DebugDatabase(),
               CodeValidationFunction(nullptr), DataValidationFunction(nullptr),
               DefaultCompartmentTransfer(nullptr), PerCPUCompartmentTransfer(nullptr),
-              SignWithDivisionFunction(nullptr), Timeout(), AddFunctionEndpoint(),
+              SignWithDivisionFunction(nullptr), AddFunctionEndpoint(),
               AddGlobalVariableEndpoint(), AddSymbolsEndpoint(), Arch(), BuildPath(),
               CompartmentEndpoint(), DivisionEndpoint(), Platform(), RootPath(),
               SetDagFilenameEndpoint(), SingleSourceFile(), SocketPath(), LogPath(),
@@ -125,10 +125,6 @@ namespace llvm::hakc {
         SmallVector<HAKCFunctionArgumentDefinition> Args;
         PopulateHAKCFunctionArgs(Args, YAMLCustomTransfer);
         return std::make_shared<HAKCCustomTransfer>(TransferFunc, HAKCTy, Args);
-    }
-
-    std::chrono::milliseconds HAKCSystemInformation::GetServerTimeout() const {
-        return Timeout;
     }
 
     unsigned HAKCSystemInformation::GetMaxRetries() const {
@@ -317,8 +313,6 @@ namespace llvm::hakc {
                 }
             }
         }
-        // Note: Timeout is in ms, so multiply by 1000
-        Timeout = std::chrono::milliseconds(Config.ClientConfig.Timeout * 1000);
         MaxConnectionRetries = Config.ClientConfig.MaxConnectionRetries;
     }
 

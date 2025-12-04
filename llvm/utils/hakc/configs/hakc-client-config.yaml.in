@@ -1,6 +1,5 @@
 arch: X86
 platform: Linux
-timeout: @hakc_client_timeout@
 console-log-level: Error
 file-log-level: Debug
 max-connection-retries: @hakc_max_connection_retries@

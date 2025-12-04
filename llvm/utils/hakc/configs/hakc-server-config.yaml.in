@@ -1,7 +1,6 @@
 adjustments-path: "@hakc_adjustments_path@"
 analysis-core-count: @hakc_analysis_core_count@
 compilation-database-path: "@compilation_db_path@"
-timeout: @hakc_server_timeout@
 log-level: "@hakc_server_log_level@"
 log-mode: "w"
 profile: false

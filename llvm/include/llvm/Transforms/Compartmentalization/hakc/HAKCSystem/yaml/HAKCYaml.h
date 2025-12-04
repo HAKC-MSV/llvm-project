@@ -195,7 +195,6 @@ namespace llvm::hakc {
     struct HAKCYAMLClientConfig {
         HAKCYAMLStringType Arch;
         HAKCYAMLStringType Platform;
-        unsigned Timeout;
         HAKCLogLevel ConsoleLogLevel;
         HAKCLogLevel FileLogLevel;
         HAKCYAMLFunctionDefinition CodeValidationFunction;
@@ -410,7 +409,6 @@ struct yaml::MappingTraits<hakc::HAKCYAMLClientConfig> {
 
         io.mapRequired("arch", ClientConfig.Arch);
         io.mapRequired("platform", ClientConfig.Platform);
-        io.mapOptional("timeout", ClientConfig.Timeout, 100);
         io.mapOptional("console-log-level", ClientConfig.ConsoleLogLevel,
                        hakc::HAKCLogLevel::Error);
         io.mapOptional("file-log-level", ClientConfig.FileLogLevel,
