@@ -37,12 +37,14 @@ class HAKCBuildMode(Enum):
     ANALYSIS = "analysis"
     ENFORCEMENT = "enforcement"
 
+    @staticmethod
+    def from_str(s: str) -> HAKCBuildMode:
+        compare_value = s.lower()
+        for e in HAKCBuildMode:
+            if compare_value == e.value.lower():
+                return e
 
-def parse_build_mode(build_mode: str) -> HAKCBuildMode:
-    for mode in HAKCBuildMode:
-        if mode.value.upper() == build_mode.upper():
-            return mode
-    raise RuntimeError(f'Invalid build mode {build_mode}')
+        raise ValueError(f'Invalid string {s}')
 
 
 class HAKCDataRequest:
@@ -122,7 +124,6 @@ class HAKCConfig:
         add_yaml_constructors()
         self.server_config = HAKCServerConfig(**read_sub_config(get_arg_or_error('server-config-path', **hakc_config)))
         self.socket_dir = Path(get_arg_or_error('socket-dir', **hakc_config))
-        self.build_mode = parse_build_mode(get_arg_or_error('build-mode', **hakc_config))
         self.temporal_analysis_enabled = hakc_config.get('temporal-analysis-enabled', False)
         self.server_core_count = hakc_config.get('server-core-count', 64)
         self.default_compartment_id = hakc_config.get('default-compartment-id', 0)
@@ -139,7 +140,6 @@ class HAKCConfig:
         return f"""
         Config:
             {self.server_config}
-            build-mode:                         {self.build_mode}
             temporal-analysis-enabled:          {self.temporal_analysis_enabled}
             server-core-count:                  {self.server_core_count}"""
 

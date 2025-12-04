@@ -218,18 +218,18 @@ class HAKCServerThreadInstance(HAKCServerThread):
         # Note: handler() can be called before the actual __init__() function is called, so make a custom blocking init() for use in handler()
         # Initialize thread specific data
         self.config = self.hakc_server.config
-        self.logger.debug(f"Spinning up Server Thread Instance in {self.config.build_mode} mode")
+        self.logger.debug(f"Spinning up Server Thread Instance in {self.hakc_server.server_mode} mode")
         self.endpoints = {self.hakc_server.config.endpoints.add_symbols_endpoint: self.add_symbols,
                           self.hakc_server.config.endpoints.terminate_connection_endpoint: self.terminate_connection}
 
-        match self.config.build_mode:
+        match self.hakc_server.server_mode:
             case HAKCBuildMode.ANALYSIS:
                 self.compartmentalization = HAKCCompartmentalization()
             case HAKCBuildMode.ENFORCEMENT:
                 self.enforcement_source = HAKCServer.init_data_source(self.hakc_server.config)
                 for endpoint_str, endpoint_fn in self.enforcement_source.endpoints.items():
                     self.endpoints[endpoint_str] = endpoint_fn
-        self.logger.debug(f"Finished initializing {self.config.build_mode.name} Server Thread")
+        self.logger.debug(f"Finished initializing {self.hakc_server.server_mode.name} Server Thread")
 
     def handle(self):
         self.init()
@@ -260,18 +260,18 @@ class HAKCServerThreadInstance(HAKCServerThread):
 
 # noinspection PyTypeChecker
 class HAKCServer(socketserver.ThreadingUnixStreamServer):
-    def __init__(self, server_id: int, config: HAKCConfig, logger_to_use: HAKCLogger, server_gather_buckets=None,
+    def __init__(self, server_id: int, config: HAKCConfig, server_mode: HAKCBuildMode, logger_to_use: HAKCLogger,
                  **kwargs):
         self.id = server_id
         self.logger = logger_to_use
         self.config = config
-        self.server_gather_buckets = server_gather_buckets
+        self.server_mode = server_mode
         self.last_alive = time.time()
         self.socket_path = os.path.join(config.socket_dir, str(self.id))
         if os.path.exists(self.socket_path):
             os.unlink(self.socket_path)
         self.compartmentalization = None
-        if self.config.build_mode == HAKCBuildMode.ENFORCEMENT and config.server_config.backing_config.type == HAKCBackingType.KUZU:
+        if self.server_mode == HAKCBuildMode.ENFORCEMENT and config.server_config.backing_config.type == HAKCBackingType.KUZU:
             logger_to_use.debug(f"Starting database at {self.config.server_config.backing_config.path}")
             self.init_mp_database(self.config.server_config.backing_config.path)
         self.logger.debug(f'Starting Server with socket {self.socket_path}')

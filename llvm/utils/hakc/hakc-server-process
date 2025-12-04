@@ -2,7 +2,6 @@
 import argparse
 import cProfile
 import concurrent.futures
-import faulthandler
 import io
 import json
 import logging
@@ -10,34 +9,21 @@ import multiprocessing as mp
 import os
 import pstats
 import shlex
-import signal
 import subprocess
 import sys
 import threading
 import time
-import traceback
-from queue import Empty
 from typing import cast, Optional
 
 import yaml
 
 from hakc import HAKCCompartmentalization, HAKCDatabase, HAKCLogger
-from hakc.HAKCConfig import HAKCConfig, TimeoutException, HAKCBackingType
+from hakc.HAKCConfig import HAKCConfig, HAKCBackingType
 from hakc.HAKCLogger import setup_logging
 from hakc.HAKCServer import HAKCServer, HAKCBuildMode
 from hakc.HAKCUtils import batched
 
-faulthandler.enable()
-
 logging.setLoggerClass(HAKCLogger)
-
-logger = cast(HAKCLogger, logging.getLogger('hakc'))
-
-server_gather_procs: dict[int, mp.Process] = {}  # used in analysis mode
-local_reduce_procs: dict[int, mp.Process] = {}  # used in analysis mode
-global_reduce_proc: dict[int, mp.Process] = {}  # used in analysis mode; size 1
-server_procs: dict[int, mp.Process] = {}  # used in enforcement mode
-progress_bars_proc: Optional[mp.Process] = None
 
 mp_conn: HAKCDatabase | None = None
 
@@ -47,73 +33,11 @@ def init_mp_database(db_dir: str):
     mp_conn = HAKCDatabase(db_dir, read_only=True)
 
 
-def timeout_handler(signum, frame):
-    raise TimeoutException
-
-
-def output_profile_stats(profile):
+def output_profile_stats(profile, logger_to_use: HAKCLogger):
     s = io.StringIO()
     ps = pstats.Stats(profile, stream=s).sort_stats('tottime')
     ps.print_stats()
-    logger.info(s.getvalue())
-
-
-def launch_global_reduce_proc(comp, db_dir: str, local_reduce_done: type[mp.Event],
-                              global_reduce_bucket: type[mp.Manager.__dict__]):
-    # import traceback
-    logger.debug(f"Spinning up global reduce process!")
-    compartmentalization = HAKCCompartmentalization(db_dir=db_dir)
-
-    while True:
-        # queue must be empty before thread can exit
-        try:
-            sub_g = global_reduce_bucket.get(block=False, timeout=1)
-            if sub_g:
-                if len(compartmentalization) == 0:
-                    logger.debug(f"Starting global reduce")
-                compartmentalization.update(edges=sub_g.edges(data=True, keys=True),
-                                            nodes=sub_g.nodes(data=True))
-                logger.debug(f"global reduce {compartmentalization}")
-        except Empty:
-            if local_reduce_done.is_set() and global_reduce_bucket.empty():
-                # if len(compartmentalization) == 0:
-                #     continue
-                assert len(compartmentalization) > 0, f"Global reduce has no elements to save!"
-                assert global_reduce_bucket.empty(), f"Server gather buckets should be empty!"
-                comp.put(compartmentalization)
-                logger.debug(f"Finished global reduce!")
-                return
-        except Exception as e:
-            # traceback.print_exc()
-            logger.fatal(f"global reduce got an exception: {e}")
-            sys.exit(1)
-
-
-def launch_reduce_proc(reduce_id: int, server_gather_buckets: type[mp.Manager.__dict__],
-                       local_reduce_procs_completed: type[mp.Value], global_reduce_bucket: type[mp.Manager.__dict__]):
-    logger.info(f"Spinning up reduce process {reduce_id}!")
-    local_reduce_compartmentalization = HAKCCompartmentalization()
-    while True:
-        # if all threads have been gathered
-        try:
-            sub_g = server_gather_buckets[reduce_id].get(block=False, timeout=1)
-            if sub_g is None and server_gather_buckets[reduce_id].empty():
-                assert len(local_reduce_compartmentalization) > 0, f"Local reduce has no elements to save!"
-                assert server_gather_buckets[reduce_id].empty(), f"Server gather buckets should be empty!"
-                logger.debug(f"\t\tFinished local reduce {local_reduce_compartmentalization}")
-                global_reduce_bucket.put(local_reduce_compartmentalization)
-                local_reduce_procs_completed.value += 1
-                return
-            if len(local_reduce_compartmentalization) == 0:
-                logger.debug(f"\tStarting local reduce")
-            local_reduce_compartmentalization.update(edges=sub_g.edges(data=True, keys=True),
-                                                     nodes=sub_g.nodes(data=True))
-            logger.debug(f"\t{local_reduce_compartmentalization}")
-        except Empty:
-            pass
-        except Exception as e:
-            logger.fatal(f"local reduce error: {e}")
-            sys.exit(1)
+    logger_to_use.info(s.getvalue())
 
 
 def run_compilation_target(database_entry: dict, logger_to_use: HAKCLogger, socket_path: str, config_path: str):
@@ -128,15 +52,10 @@ def run_compilation_target(database_entry: dict, logger_to_use: HAKCLogger, sock
             cmd.insert(len(cmd) - 1, '-mllvm')
             cmd.insert(len(cmd) - 1, f'--hakc-server-path={socket_path}')
 
-    logger_to_use.debug(f'Running {" ".join(cmd)} from {database_entry['directory']}')
+    cwd = database_entry["directory"]
+    logger_to_use.debug(f'Running {" ".join(cmd)} from {cwd}')
 
-    if database_entry['file'] == '/home/de29664/code/HAKC/linux/drivers/gpu/drm/i915/display/intel_dpll_mgr.c':
-        with open(os.path.join(database_entry['directory'], 'debug.txt'), 'w') as f:
-            result = subprocess.run(cmd, stdout=f, stderr=f, text=True, check=True, cwd=database_entry['directory'])
-            logger_to_use.error(f'Result {result.returncode}')
-    else:
-        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, text=True, check=True,
-                       cwd=database_entry['directory'])
+    subprocess.run(cmd, text=True, check=True, stderr=subprocess.STDOUT, stdout=subprocess.PIPE, cwd=cwd)
 
 
 def safe_serve_forever(server, logger_to_use):
@@ -146,8 +65,18 @@ def safe_serve_forever(server, logger_to_use):
         logger_to_use.error(f'Server ended: {e}')
 
 
-def do_perform_analysis(task_id: int, config: HAKCConfig, logger_to_use: HAKCLogger, files_to_analyze: set[str]):
-    logger_to_use.error(f'Starting analysis task')
+def start_hakc_server(server_id: int, server_mode: HAKCBuildMode, config: HAKCConfig, logger_to_use: HAKCLogger) -> (
+        HAKCServer, threading.Thread):
+    logger_to_use.debug(f'Starting server')
+    server = HAKCServer(server_id=server_id, server_mode=server_mode, config=config, logger_to_use=logger_to_use)
+    server_thread = threading.Thread(target=safe_serve_forever, args=(server, logger_to_use))
+    server_thread.start()
+    return server, server_thread
+
+
+def do_compilation_tasks(task_id: int, config: HAKCConfig, logger_to_use: HAKCLogger, files_to_analyze: set[str],
+                         server_mode: HAKCBuildMode):
+    logger_to_use.debug(f'Starting analysis task')
 
     if config.server_config.compilation_database is None:
         raise RuntimeError(f'Compilation Database is required')
@@ -156,50 +85,46 @@ def do_perform_analysis(task_id: int, config: HAKCConfig, logger_to_use: HAKCLog
         compilation_database = json.load(f)
 
     try:
-        logger_to_use.error(f'Starting server')
-        config.server_config.timeout = -1
-        server = HAKCServer(task_id, config, logger_to_use)
-        server_thread = threading.Thread(target=safe_serve_forever, args=(server, logger_to_use))
-        server_thread.start()
+        server, server_thread = start_hakc_server(task_id, server_mode, config, logger_to_use)
     except Exception as e:
         logger_to_use.error(f'Failed to start server {task_id}: {e}')
         return None
 
-    logger_to_use.error(f'Compiling {len(files_to_analyze)} files')
-    file_count = 0
+    logger_to_use.debug(f'Compiling {len(files_to_analyze)} files')
     for database_entry in compilation_database:
         compilation_file = database_entry['file']
         if compilation_file in files_to_analyze:
-            file_count += 1
             try:
                 run_compilation_target(database_entry, logger_to_use, str(server.socket_path),
                                        str(config.root_config_path))
                 logger_to_use.debug(f'Compilation task completed')
-            except Exception as e:
-                logger_to_use.error(f'failed to compile {compilation_file}: {e}')
+            except subprocess.CalledProcessError as e:
+                err_file = compilation_file + ".err"
+                with open(err_file, 'w') as f:
+                    logger_to_use.error(f'failed to compile {compilation_file}. Output logged to {err_file}')
+                    print(e.stdout, file=f)
 
-    logger_to_use.error(f'Shutting down everything')
+    logger_to_use.debug(f'Shutting down everything')
     if not server_thread.is_alive():
-        logger_to_use.error(f'server_thread is not alive')
         raise RuntimeError(f'{task_id} server thread is dead')
 
     result = server.compartmentalization
     try:
         server.shutdown()
     except Exception as e:
-        logger_to_use.error(f'Failed to shutdown server')
+        logger_to_use.error(f'Failed to shutdown server: {e}')
 
     try:
         server.server_close()
     except Exception as e:
-        logger_to_use.error(f'Failed to close server')
+        logger_to_use.error(f'Failed to close server: {e}')
 
     try:
         server_thread.join()
     except Exception as e:
-        logger_to_use.error(f'Failed to join server thread')
+        logger_to_use.error(f'Failed to join server thread: {e}')
 
-    logger_to_use.error(f'returning')
+    logger_to_use.debug(f'returning')
     return result
 
 
@@ -221,172 +146,67 @@ def make_worker_logger(name: str, task_id: int) -> logging.Logger:
 
 def perform_analysis(task_id: int, config: HAKCConfig, files_to_analyze: set[str]):
     logger_to_use = cast(HAKCLogger, make_worker_logger(f'hakc.server-worker-{task_id}', task_id))
-    try:
-        compartmentalization = do_perform_analysis(task_id, config, logger_to_use, files_to_analyze)
-        return {"ok": True, "result": compartmentalization}
-    except Exception as e:
-        logger_to_use.exception(f'Analysis failed for task {task_id}: {e}')
-        return {"ok": False, "error": traceback.format_exc()}
+    compartmentalization = do_compilation_tasks(task_id, config, logger_to_use, files_to_analyze,
+                                                HAKCBuildMode.ANALYSIS)
+    return compartmentalization
 
 
-def launch_server_gather_proc(server_id: int, config: HAKCConfig, ServerMainLogger: HAKCLogger,
-                              server_gather_buckets: type[mp.Manager.__dict__],
-                              server_gather_procs_completed: type[mp.Value]):
-    logger.debug(f"Spinning up server gather process {server_id}!")
-
-    with HAKCServer(server_id, config, ServerMainLogger, server_gather_buckets=server_gather_buckets) as server:
-        try:
-            if config.timeout > 0:
-                signal.signal(signal.SIGALRM, timeout_handler)
-                signal.alarm(config.timeout)
-            server.serve_forever()
-        except TimeoutException:
-            server_gather_buckets[server_id].put(None)
-            server_gather_procs_completed.value += 1
-            ServerMainLogger.debug(f'Finished gathering')
-        except Exception as e:
-            ServerMainLogger.error(f'Server received generic Exception: {e}')
-            sys.exit(1)
-        finally:
-            server.server_close()
+def perform_enforcement(task_id: int, config: HAKCConfig, files_to_instrument: set[str]):
+    logger_to_use = cast(HAKCLogger, make_worker_logger(f'hakc.server-worker-{task_id}', task_id))
+    do_compilation_tasks(task_id, config, logger_to_use, files_to_instrument, HAKCBuildMode.ENFORCEMENT)
 
 
-def launch_server_proc(server_id: int, config: HAKCConfig, ServerMainLogger: HAKCLogger):
-    logger.debug(f"Spinning up server process {server_id} on socket {config.socket_dir}!")
+def get_batched_files(compilation_database: dict, batch_size: int):
+    files = set()
+    for db_entry in compilation_database:
+        if os.path.exists(db_entry['file']):
+            files.add(db_entry['file'])
 
-    with HAKCServer(server_id, config, ServerMainLogger) as server:
-        try:
-            if config.timeout > 0:
-                signal.signal(signal.SIGALRM, timeout_handler)
-                signal.alarm(config.timeout)
-            server.serve_forever()
-        except TimeoutException:
-            ServerMainLogger.debug(f'Closing server')
-        except Exception as e:
-            ServerMainLogger.error(f'Server received generic Exception: {e}')
-        finally:
-            server.server_close()
+    for batched_files in batched(files, batch_size):
+        yield batched_files
 
 
-def cleanup_processes():
-    import subprocess
-    subprocess.run(['pkill', '-f', 'hakc-server-process'])
-
-
-def spin_up_local_reduce_procs(config: HAKCConfig, server_gather_buckets: type[mp.Manager.__dict__],
-                               local_reduce_procs_completed: type[mp.Value],
-                               global_reduce_bucket: type[mp.Manager.__dict__]):
-    global local_reduce_procs
-    local_reduce_procs = {local_reduce_id: mp.Process(target=launch_reduce_proc,
-                                                      args=(local_reduce_id, server_gather_buckets,
-                                                            local_reduce_procs_completed, global_reduce_bucket,),
-                                                      name=f"local reduce  {f'{local_reduce_id}'.zfill(2)}") for
-                          local_reduce_id in range(config.server_core_count)}
-    [proc.start() for _, proc in local_reduce_procs.items()]
-
-
-def join_local_reduce_procs():
-    global local_reduce_procs
-    [proc.join() for _, proc in local_reduce_procs.items()]
-
-
-def spin_up_global_reduce_proc(comp, db_dir, local_reduce_done, global_reduce_bucket):
-    global global_reduce_proc
-    global_reduce_proc = {0: mp.Process(target=launch_global_reduce_proc,
-                                        args=(comp, db_dir, local_reduce_done, global_reduce_bucket,),
-                                        name=f"global reduce")}
-    [proc.start() for _, proc in global_reduce_proc.items()]
-
-
-def join_global_reduce_proc(global_reduce_proc_completed: type[mp.Value]):
-    global global_reduce_proc
-    [proc.join() for _, proc in global_reduce_proc.items()]
-    global_reduce_proc_completed.value = 1
-
-
-def spin_up_server_gather_procs(config: HAKCConfig, server_gather_buckets: type[mp.Manager.__dict__],
-                                server_gather_procs_completed: type[mp.Value], ServerMainLogger: HAKCLogger):
-    global server_gather_procs
-    server_gather_procs = {server_id: mp.Process(target=launch_server_gather_proc,
-                                                 args=(server_id, config, ServerMainLogger, server_gather_buckets,
-                                                       server_gather_procs_completed,),
-                                                 name=f"gather server {f'{server_id}'.zfill(2)}") for server_id in
-                           range(config.server_core_count)}
-    [proc.start() for _, proc in server_gather_procs.items()]
-
-
-def spin_up_server_procs(config: HAKCConfig, ServerMainLogger: HAKCLogger):
-    global server_procs
-    config.build_mode = HAKCBuildMode.ENFORCEMENT
-    server_procs = {server_id: mp.Process(target=launch_server_proc,
-                                          args=(server_id, config, ServerMainLogger,),
-                                          name=f"server {f'{server_id}'.zfill(2)}") for server_id in
-                    range(config.server_core_count)}
-    [proc.start() for _, proc in server_procs.items()]
-
-
-def join_server_procs():
-    global server_procs
-    [proc.join() for _, proc in server_procs.items()]
-
-
-def join_server_gather_procs():
-    global server_gather_procs
-    [proc.join() for _, proc in server_gather_procs.items()]
-
-
-def spin_up_progress_bars(server_gather_procs_completed: type[mp.Value], local_reduce_procs_completed: type[mp.Value],
-                          global_reduce_proc_completed: type[mp.Value], max_server_processes: int):
-    global progress_bars_proc
-    progress_bars_proc = mp.Process(target=launch_progress_bars,
-                                    args=(server_gather_procs_completed, local_reduce_procs_completed,
-                                          global_reduce_proc_completed, max_server_processes,),
-                                    name=f"progress bars proc")
-    progress_bars_proc.start()
-
-
-def join_progress_bars():
-    global progress_bars_proc
-    progress_bars_proc.kill()
-    progress_bars_proc.join()
-
-
-def launch_progress_bars(server_gather_procs_completed: type[mp.Value], local_reduce_procs_completed: type[mp.Value],
-                         global_reduce_proc_completed: type[mp.Value], max_server_processes: int):
-    server_gather_procs_completed_pbar = logger.progress_bar(total=max_server_processes,
-                                                             desc='Server Gather Processes Completed')
-    local_reduce_procs_completed_pbar = logger.progress_bar(total=max_server_processes,
-                                                            desc='Local Reduce Processes Completed')
-    global_reduce_proc_completed_pbar = logger.progress_bar(total=1, desc='Global Reduce Process Completed')
-
-    while True:
-        if server_gather_procs_completed.value > 0:
-            server_gather_procs_completed_pbar.update(1)
-            server_gather_procs_completed.value -= 1
-        if local_reduce_procs_completed.value > 0:
-            local_reduce_procs_completed_pbar.update(1)
-            local_reduce_procs_completed.value -= 1
-        if global_reduce_proc_completed.value == 1:
-            global_reduce_proc_completed_pbar.update(1)
-            global_reduce_proc_completed_pbar.close()
-        time.sleep(1)
-
-
-def perform_analysis_with_compilation_database(config: HAKCConfig,
-                                               server_main_logger: HAKCLogger) -> Optional[HAKCCompartmentalization]:
-    compartmentalization = HAKCCompartmentalization()
-    with open(config.server_config.compilation_database, 'r') as f:
-        compilation_database = json.load(f)
-    files = [db_entry['file'] for db_entry in compilation_database]
-    successful_creation = True
-    batch_size = 100
-
+def create_enforcement_obj_files(compilation_database: dict, batch_size: int, config: HAKCConfig,
+                                 server_main_logger: HAKCLogger):
     ctx = mp.get_context("spawn")
-    with concurrent.futures.ProcessPoolExecutor(max_workers=config.server_config.analysis_core_count // 2,
-                                                mp_context=ctx) as executor:
+    worker_count = config.server_config.analysis_core_count // 2
+    successful_enforcement = True
+    with concurrent.futures.ProcessPoolExecutor(max_workers=worker_count, mp_context=ctx) as executor:
         futures = dict()
         task_id = 0
-        for batched_files in batched(files, batch_size):
+        for batched_files in get_batched_files(compilation_database, batch_size):
+            future = executor.submit(perform_enforcement, task_id, config, set(batched_files))
+            futures[future] = task_id
+            task_id += 1
+
+        with server_main_logger.progress_bar(desc="Processing results", total=len(futures)) as pbar:
+            for future in concurrent.futures.as_completed(futures):
+                pbar.update(1)
+                try:
+                    task_id = futures[future]
+                    future.result()
+                except Exception as e:
+                    successful_enforcement = False
+                    server_main_logger.exception(f'Error in task {task_id}: {e}')
+
+    if not successful_enforcement:
+        server_main_logger.error(f'Failed to successfully add enforcement. Quitting')
+        sys.exit(1)
+
+
+def perform_analysis_with_compilation_database(config: HAKCConfig, compilation_database: dict, batch_size: int,
+                                               server_main_logger: HAKCLogger) -> Optional[HAKCCompartmentalization]:
+    db_dir = config.server_config.backing_config.path if config.server_config.backing_config.type == HAKCBackingType.KUZU else ''
+    compartmentalization = HAKCCompartmentalization(db_dir=db_dir)
+
+    successful_creation = True
+
+    ctx = mp.get_context("spawn")
+    worker_count = config.server_config.analysis_core_count // 2
+    with concurrent.futures.ProcessPoolExecutor(max_workers=worker_count, mp_context=ctx) as executor:
+        futures = dict()
+        task_id = 0
+        for batched_files in get_batched_files(compilation_database, batch_size):
             future = executor.submit(perform_analysis, task_id, config, set(batched_files))
             futures[future] = task_id
             task_id += 1
@@ -397,33 +217,68 @@ def perform_analysis_with_compilation_database(config: HAKCConfig,
                 try:
                     task_id = futures[future]
                     result = future.result()
-                    if result['ok']:
-                        subcompartmentalization = result['result']
+                    if result:
+                        subcompartmentalization = result
                         compartmentalization.update(edges=subcompartmentalization.edges(data=True, keys=True),
                                                     nodes=subcompartmentalization.nodes(data=True))
-                    else:
-                        server_main_logger.error(f"Process failed: {result['error']}")
                 except Exception as e:
                     successful_creation = False
-                    server_main_logger.exception(f'Error in task {task_id} creating sub compartmentalizations:')
+                    server_main_logger.exception(f'Error in task {task_id} creating sub compartmentalizations: {e}')
     if not successful_creation:
         server_main_logger.error(f'Failed to create compartmentalization. Please try again.')
         return None
 
+    server_main_logger.info(f'Finished creating initial {compartmentalization}')
     return compartmentalization
+
+
+def create_dag(config: HAKCConfig, compilation_database: dict, logger_to_use: HAKCLogger, batch_size: int):
+    start = time.time()
+    compartmentalization = perform_analysis_with_compilation_database(config, compilation_database, batch_size,
+                                                                      logger_to_use)
+    if compartmentalization is None:
+        logger_to_use.error(f'Failed to create compartmentalization. Exiting.')
+        sys.exit(1)
+
+    match config.server_config.backing_config.type:
+        case HAKCBackingType.KUZU:
+            compartmentalization.delete_db()
+            # Note: manually opening a connection requires manual closure later
+            compartmentalization.open_conn()
+        case HAKCBackingType.YAML:
+            sys.exit(1)
+
+        # Note: an open database connection is required to add default compartmentalization or create dag
+    logger_to_use.info(f'{compartmentalization} was created')
+    compartmentalization.add_default_compartmentalization(create_schema=True)
+    compartmentalization.create_dag(config.server_config.analysis_core_count)
+
+    if config.server_config.adjustments:
+        compartmentalization.perform_adjustments(config.server_config.adjustments)
+
+    compartmentalization.close_conn()
+
+    end = time.time()
+    logger_to_use.info(f'Finished constructing DAG {compartmentalization}')
+    logger_to_use.info(f'    Total Time: {end - start} seconds')
 
 
 # noinspection PyTypeChecker
 def main():
     parser = argparse.ArgumentParser(description='HAKC Server Process')
     parser.add_argument('--config', help='Path to server config file', required=True)
+    parser.add_argument('--mode', help=f'Mode to start the HAKC server in ({[e.value for e in HAKCBuildMode]})',
+                        required=True, type=HAKCBuildMode.from_str)
+    parser.add_argument('--batch-size', help='Number of tasks to submit to processes', type=int, dest='batch_size',
+                        default=100)
     args = parser.parse_args()
 
     # setting up root logger, which all other loggers should inherit its properties (unless we overwrite them later)
     # need to set up server logger here, or else all the initialization stuff will happen without debugging
     # loggers that are used in the data_source files need to be initialized BEFORE the init_data_source function is called
-    config = None
     profile = None
+
+    server_mode = args.mode
 
     with open(args.config, 'r') as f:
         config_inputs = yaml.safe_load(f)
@@ -431,108 +286,27 @@ def main():
 
         config = HAKCConfig(**config_inputs)
 
-    root_logger = logging.getLogger()
-    setup_logging(root_logger, log_level=config.log_level,
-                  log_file=config.log_dir + "/hakc.server." + config.build_mode.value + ".log",
-                  log_mode=config.server_config.log_mode)
+    with open(config.server_config.compilation_database, 'r') as f:
+        compilation_database = json.load(f)
 
     server_main_logger: HAKCLogger = cast(HAKCLogger, logging.getLogger('hakc.server-main'))
+    setup_logging(server_main_logger, log_level=config.log_level,
+                  log_file=config.log_dir + "/hakc.server." + server_mode.value + ".log",
+                  log_mode=config.server_config.log_mode)
 
     if config.server_config.profile:
         profile = cProfile.Profile()
         profile.enable()
 
-    start = time.time()
-
-    if config.server_config.compilation_database is not None:
-        compartmentalization = perform_analysis_with_compilation_database(config, server_main_logger)
-        if compartmentalization is None:
-            logger.error(f'Failed to create compartmentalization. Exiting.')
-            sys.exit(1)
-    else:
-        # Spawn mp manager to share resources amongst processes
-        with mp.Manager() as manager:
-            if config.build_mode == HAKCBuildMode.ANALYSIS:
-                server_gather_procs_completed: type[mp.Value] = mp.Value('i', 0)
-                local_reduce_procs_completed: type[mp.Value] = mp.Value('i', 0)
-                global_reduce_proc_completed: type[mp.Value] = mp.Value('i', 0)
-                spin_up_progress_bars(server_gather_procs_completed, local_reduce_procs_completed,
-                                      global_reduce_proc_completed, config.server_core_count)
-                # initialize shared data structures
-                # contains queues for each add-symbols resulting compartmentalization
-
-                server_gather_buckets = manager.dict(
-                    {server_id: manager.Queue() for server_id in range(config.server_core_count)})
-                # Note: need to wrap compartmentalization object in a process safe structure or value will not update correctly
-                comp = manager.Queue()
-                local_reduce_done = manager.Event()
-                global_reduce_bucket = manager.Queue()
-
-                spin_up_server_gather_procs(config, server_gather_buckets, server_gather_procs_completed,
-                                            server_main_logger)
-                spin_up_local_reduce_procs(config, server_gather_buckets, local_reduce_procs_completed,
-                                           global_reduce_bucket)
-                # launch final merger to combine all the compartmentalizations from other mergers
-                spin_up_global_reduce_proc(comp, config.server_config.backing_config.path, local_reduce_done,
-                                           global_reduce_bucket)
-
-                join_server_gather_procs()
-                join_local_reduce_procs()
-
-                # only send 'done' signal once all the local reductions finish
-                local_reduce_done.set()
-                join_global_reduce_proc(global_reduce_proc_completed)
-                join_progress_bars()
-
-                # Creating initial compartmentalization is finished, now do post-processing
-                try:
-                    compartmentalization = comp.get(timeout=5)
-                except Exception as e:
-                    print(f"An error occurred while trying to get compartmentalization: {e}")
-                    sys.exit(1)
-
-        match config.server_config.backing_config.type:
-            case HAKCBackingType.KUZU:
-                compartmentalization.delete_db()
-                # Note: manually opening a connection requires manual closure later
-                compartmentalization.open_conn()
-            case HAKCBackingType.YAML:
-                sys.exit(1)
-        # Note: an open database connection is required to add default compartmentalization or create dag
-        compartmentalization.add_default_compartmentalization(create_schema=True)
-        compartmentalization.create_dag(config.server_config.analysis_core_count)
-
-        if config.server_config.adjustments:
-            match config.server_config.backing_config.type:
-                case HAKCBackingType.KUZU:
-                    compartmentalization.perform_adjustments(config.server_config.adjustments)
-                case HAKCBackingType.YAML:
-                    logger.error(f"YAML Currently unsupported for adjustments")
-                    sys.exit(1)
-
-        compartmentalization.close_conn()
-
-        end = time.time()
-        logger.info(f'Finished constructing DAG {compartmentalization}')
-        logger.info(f'    Total Time: {end - start} seconds')
-
-        logger.error(f"Starting Enforcement Server")
-        spin_up_server_procs(config, server_main_logger)
-        join_server_procs()
+    if server_mode == HAKCBuildMode.ANALYSIS:
+        create_dag(config, compilation_database, server_main_logger, args.batch_size)
+    elif server_mode == HAKCBuildMode.ENFORCEMENT:
+        create_enforcement_obj_files(compilation_database, args.batch_size, config, server_main_logger)
 
     if config.server_config.profile:
         profile.disable()
-        output_profile_stats(profile)
+        output_profile_stats(profile, server_main_logger)
 
 
 if __name__ == "__main__":
-    def signal_handler(sig, frame):
-        # print("\nCtrl+C detected via signal handler. Exiting.")
-        # Perform cleanup here
-        cleanup_processes()
-        sys.exit(0)
-
-
-    signal.signal(signal.SIGINT, signal_handler)
-
     main()

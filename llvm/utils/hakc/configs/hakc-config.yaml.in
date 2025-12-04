@@ -4,7 +4,6 @@ client-config-path:         "@hakc_client_config_path@"
 build-dir:                  "@hakc_build_dir@"
 socket-dir:                 "@hakc_socket_dir@"
 log-dir:                    "@hakc_log_dir@"
-build-mode:                 "@hakc_build_mode@"
 server-core-count:          @hakc_server_core_count@
 default-compartment-id:     0
 default-division-id:        53

@@ -53,8 +53,6 @@ namespace llvm::hakc {
 
         HAKCLogLevel GetFileLogLevel() const;
 
-        HAKCBuildModeTypeEnum GetBuildMode() const;
-
         HAKCStructList GetStructList() const;
 
         HAKCTypeIdentifier &GetTypeIdentifier();
@@ -159,8 +157,8 @@ namespace llvm::hakc {
                                      HAKCTypeP HAKCTy);
 
         void PopulateHAKCFunctionArgs(
-            SmallVectorImpl<HAKCFunctionArgumentDefinition> &Args,
-            HAKCYAMLFunctionDefinition &YAMLFunctionDef) const;
+                SmallVectorImpl<HAKCFunctionArgumentDefinition> &Args,
+                HAKCYAMLFunctionDefinition &YAMLFunctionDef) const;
 
         void GetAllDefinedHAKCFunctions(SmallVectorImpl<function_def_t> &Results);
 
@@ -173,7 +171,6 @@ namespace llvm::hakc {
         HAKCGlobalVariableList IgnoredGlobalList;
         HAKCLogLevel ConsoleLogLevel;
         HAKCLogLevel FileLogLevel;
-        HAKCBuildModeTypeEnum BuildMode;
         HAKCPostTargetActionList PostTargetActionList;
         HAKCPreTransferActionList PreTransferActionList;
         HAKCStringList HAKCSourcePathList;
