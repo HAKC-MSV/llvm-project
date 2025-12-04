@@ -6,8 +6,6 @@
 #include "llvm/Support/Timer.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/CommonHAKCAnalysis.h"
-#include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartmentDivision.h"
-#include <unistd.h>
 
 namespace llvm::hakc {
 
@@ -45,7 +43,7 @@ namespace llvm::hakc {
     }
 
     std::vector<unsigned> GetIntegerArray(json::Object *payload, StringRef key) {
-        auto json_array = payload->getArray(key);
+        auto *json_array = payload->getArray(key);
         std::vector<unsigned> array;
         for (const auto &element: *json_array) {
             // TODO: add value check here, but it should really never fail
@@ -60,7 +58,7 @@ namespace llvm::hakc {
             CommonHAKCAnalysis::getLogger(Fatal) << "Payload is null!\n";
             throw std::exception();
         }
-        auto obj = payload->getObject(key);
+        auto *obj = payload->getObject(key);
         if (!obj) {
             CommonHAKCAnalysis::getLogger(Fatal) << "Unable to get " << key << " object from payload!\n";
             throw std::exception();
@@ -89,7 +87,7 @@ namespace llvm::hakc {
 
     HAKCDivisionPayload::HAKCDivisionPayload(json::Object *payload)
             : HAKCPayload(payload), DivisionID(0), Salt(0), AccessToken(0) {
-        auto division = GetObject(payload, "Division");
+        auto *division = GetObject(payload, "Division");
         DivisionID = GetInteger(division, "DivisionID");
         Salt = GetInteger(division, "Salt");
         AccessToken = GetInteger(division, "AccessToken");
@@ -97,7 +95,7 @@ namespace llvm::hakc {
 
     HAKCCompartmentPayload::HAKCCompartmentPayload(json::Object *payload)
             : HAKCPayload(payload), CompartmentID(), EntryToken() {
-        auto compartment = GetObject(payload, "Compartment");
+        auto *compartment = GetObject(payload, "Compartment");
         CompartmentID = GetInteger(compartment, "CompartmentID");
         EntryToken = GetInteger(compartment, "EntryToken");
     }
@@ -105,8 +103,8 @@ namespace llvm::hakc {
     HAKCDivisionCompartmentPayload::HAKCDivisionCompartmentPayload(
             json::Object *payload)
             : HAKCPayload(payload) {
-        auto division = GetObject(payload, "Division");
-        auto compartment = GetObject(payload, "Compartment");
+        auto *division = GetObject(payload, "Division");
+        auto *compartment = GetObject(payload, "Compartment");
         DivisionID = GetInteger(division, "DivisionID");
         Salt = GetInteger(division, "Salt");
         AccessToken = GetInteger(division, "AccessToken");
@@ -147,16 +145,16 @@ namespace llvm::hakc {
             return;
         }
         if (response_endpoint == SystemInformation.GetCompartmentEndpoint()) {
-            auto payload = GetObject(_result, "Data");
+            auto *payload = GetObject(_result, "Data");
             result.data = std::make_shared<HAKCCompartmentPayload>(payload);
         } else if (response_endpoint == SystemInformation.GetDivisionEndpoint()) {
-            auto payload = GetObject(_result, "Data");
+            auto *payload = GetObject(_result, "Data");
             result.data = std::make_shared<HAKCDivisionPayload>(payload);
         } else if (response_endpoint == SystemInformation.GetSymbolDivisionEndpoint()) {
-            auto payload = GetObject(_result, "Data");
+            auto *payload = GetObject(_result, "Data");
             result.data = std::make_shared<HAKCDivisionCompartmentPayload>(payload);
         } else if (response_endpoint == SystemInformation.GetValidTargetsEndpoint()) {
-            auto payload = GetObject(_result, "Data");
+            auto *payload = GetObject(_result, "Data");
             result.data = std::make_shared<HAKCValidTargetsPayload>(payload);
         } else if (response_endpoint == SystemInformation.GetAddSymbolsEndpoint()) {
             // These requests don't have a 'Data' field to extract, so just pass the result
@@ -235,7 +233,7 @@ namespace llvm::hakc {
         }
 
         // now unpack the first wrapper (result, response_endpoint)
-        auto hakc_response = parsed_json->getAsObject();
+        auto *hakc_response = parsed_json->getAsObject();
         if (!hakc_response) {
             CommonHAKCAnalysis::getLogger(Fatal) << "Unable to get HAKCResponse!\n";
             throw std::exception();
@@ -243,7 +241,7 @@ namespace llvm::hakc {
 
         // response_endpoint = GetValue<StringRef>(hakc_response, "ResponseEndpoint");
         response_endpoint = GetString(hakc_response, "ResponseEndpoint");
-        auto hakc_result = hakc_response->getObject("Result");
+        auto *hakc_result = hakc_response->getObject("Result");
         if (!hakc_result) {
             CommonHAKCAnalysis::getLogger(Fatal) << "Unable to get HAKCResult!\n";
             throw std::exception();

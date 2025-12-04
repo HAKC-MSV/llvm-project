@@ -58,7 +58,8 @@ namespace llvm::hakc {
     }
 
     void CommonHAKCAnalysis::InitConfig(StringRef ConfigPath,
-                                        StringRef ServerSocketPath) {
+                                        StringRef ServerSocketPath,
+                                        HAKCPassModeEnum PassMode) {
         if (!sys::fs::exists(ConfigPath)) {
             getLogger(Fatal) << "Could not find YAML file " << ConfigPath << "\n";
             throw std::exception();
@@ -86,7 +87,7 @@ namespace llvm::hakc {
         // setting the errs() stream to
         // the configured log level
         HAKCLog->addStream(
-                createLogPath(SystemConfig.BuildDir, SystemConfig.BuildMode),
+                createLogPath(SystemConfig.BuildDir, PassMode),
                 SystemConfig.ClientConfig
                         .FileLogLevel); // setting the fd_ostream to configured log level
 
@@ -98,20 +99,38 @@ namespace llvm::hakc {
 
     CommonHAKCAnalysis::CommonHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM,
                                            StringRef ConfigPath,
-                                           StringRef ServerSocketPath)
+                                           StringRef ServerSocketPath,
+                                           HAKCPassModeEnum PassMode)
             : M(M), MAM(MAM), SystemInfo(*this) {
         _HAKCLog = HAKCLog;
-        InitConfig(ConfigPath, ServerSocketPath);
+        InitConfig(ConfigPath, ServerSocketPath, PassMode);
+    }
+
+    HAKCPassModeEnum CommonHAKCAnalysis::ParsePassMode(StringRef mode) {
+        auto it = PassModeToString.find(mode);
+        if (it != PassModeToString.end()) {
+            return it->second;
+        }
+
+        throw std::invalid_argument("Invalid pass mode: " + mode.str());
     }
 
     std::string CommonHAKCAnalysis::createLogPath(StringRef BuildPath,
-                                                  HAKCBuildModeTypeEnum BuildMode) {
+                                                  HAKCPassModeEnum BuildMode) {
         SmallString<256> Path;
         SmallString<256> ModulePath;
         GetModuleFullPath(M, ModulePath);
         sys::path::append(Path, BuildPath);
         sys::path::append(Path, ModulePath);
-        sys::path::replace_extension(Path, BuildModeToString[BuildMode] + ".log");
+
+        std::string PassModeString = "";
+        for (auto &it: PassModeToString) {
+            if (it.second == BuildMode) {
+                PassModeString = it.first.str();
+            }
+        }
+
+        sys::path::replace_extension(Path, PassModeString + ".log");
 
         sys::path::make_preferred(Path);
         return std::string(Path);

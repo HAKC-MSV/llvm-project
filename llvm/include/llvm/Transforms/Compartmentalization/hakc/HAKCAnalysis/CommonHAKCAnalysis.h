@@ -28,6 +28,20 @@ namespace llvm::hakc {
 
     typedef std::function<Value *(Value *)> hakc_allocation_size_map_t;
 
+    enum HAKCPassModeEnum {
+        InvalidBuildModeType,
+        Analysis,
+        Enforcement,
+        RunConfigAndExit
+    };
+
+    const std::map<StringRef, HAKCPassModeEnum> PassModeToString = {
+            {"invalid-build-mode-type", InvalidBuildModeType},
+            {"analysis",                Analysis},
+            {"enforcement",             Enforcement},
+            {"run-config-and-exit",     RunConfigAndExit}
+    };
+
     class CommonHAKCAnalysis {
     protected:
         Module &M;
@@ -41,15 +55,15 @@ namespace llvm::hakc {
         std::shared_ptr<HAKCLogger> _HAKCLog;
 
         static bool IsFunctionInHAKCTransferFunctionList(
-            Function *F, iterator_range<HAKCTransferList::iterator> Range);
+                Function *F, iterator_range<HAKCTransferList::iterator> Range);
 
-        void InitConfig(StringRef ConfigPath, StringRef ServerSocketPath);
+        void InitConfig(StringRef ConfigPath, StringRef ServerSocketPath, HAKCPassModeEnum PassMode);
 
     public:
         virtual ~CommonHAKCAnalysis() = default;
 
         explicit CommonHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM,
-                                    StringRef ConfigPath, StringRef ServerSocketPath);
+                                    StringRef ConfigPath, StringRef ServerSocketPath, HAKCPassModeEnum PassMode);
 
         HAKCSystemInformation &GetSystemInfo();
 
@@ -81,6 +95,8 @@ namespace llvm::hakc {
         std::string GetOutsideTransferName(Function *F);
 
         static bool FunctionIsModParamGetCtx(Function *F);
+
+        static HAKCPassModeEnum ParsePassMode(StringRef mode);
 
         bool
         ValueShouldBeReplacedWithTransfer(Value *V,
@@ -184,7 +200,7 @@ namespace llvm::hakc {
 
         static Function *GetOriginalFunctionFromTransferFunction(Function *F);
 
-        std::string createLogPath(StringRef BuildPath, HAKCBuildModeTypeEnum BuildMode);
+        std::string createLogPath(StringRef BuildPath, HAKCPassModeEnum PassMode);
 
     private:
         static bool valueHasAttribute(Value *v, Attribute::AttrKind Kind);

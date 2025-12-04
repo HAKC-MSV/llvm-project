@@ -19,35 +19,12 @@ static cl::opt<std::string>
         HAKCServerPath("hakc-server-path", cl::desc("Path to the HAKC Server socket"),
                        cl::value_desc("string"), cl::init(""), cl::Optional);
 static cl::opt<std::string> PassModeArg("pass-mode", cl::desc("Running server mode"), cl::value_desc("string"),
-                                          cl::init(""))
+                                        cl::init(""));
 
 using namespace llvm::hakc;
 
 namespace llvm {
     namespace hakc {
-
-        enum HAKCPassModeEnum {
-            InvalidBuildModeType,
-            Analysis,
-            Enforcement,
-            RunConfigAndExit
-        };
-
-        static std::map<StringRef, HAKCPassModeEnum> PassModeToString = {
-                {"invalid-build-mode-type", InvalidBuildModeType},
-                {"analysis",                Analysis},
-                {"enforcement",             Enforcement},
-                {"run-config-and-exit",     RunConfigAndExit}
-        };
-
-        HAKCPassModeEnum ParsePassMode(StringRef mode) {
-            auto it = PassModeToString.find(mode);
-            if (it != PassModeToString.end()) {
-                return it->second;
-            }
-
-            throw std::invalid_argument("Invalid pass mode: " + mode.str());
-        }
 
         bool skip_current_file(CommonHAKCAnalysis &HAKCAnalysis) {
             StringRef CurrentSourceName(HAKCAnalysis.GetModule().getSourceFileName());
@@ -112,9 +89,9 @@ namespace llvm {
                 throw std::exception();
             }
 
+            auto PassMode = CommonHAKCAnalysis::ParsePassMode(PassModeArg.getValue());
             CommonHAKCAnalysis HAKCAnalysis(M, MAM, HAKCConfigPath.getValue(),
-                                            HAKCServerPath.getValue());
-            auto PassMode = ParsePassMode(PassModeArg.getValue());
+                                            HAKCServerPath.getValue(), PassMode);
             switch (PassMode) {
                 case Analysis:
                     return runAnalysis(HAKCAnalysis);
@@ -130,7 +107,7 @@ namespace llvm {
     } // namespace hakc
 
     PreservedAnalyses HAKCPass::run(Module &M, ModuleAnalysisManager &MAM) {
-        return RunHAKCAnalysis(M, MAM)
+        return hakc::RunHAKCAnalysis(M, MAM)
                ? PreservedAnalyses::none()
                : PreservedAnalyses::all();
     }

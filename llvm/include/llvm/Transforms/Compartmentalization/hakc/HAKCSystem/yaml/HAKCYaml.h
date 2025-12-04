@@ -230,7 +230,6 @@ namespace llvm::hakc {
         HAKCYAMLStringType BuildDir;
         HAKCYAMLStringType SocketDir;
         HAKCYAMLStringType LogDir;
-        HAKCBuildModeTypeEnum BuildMode;
         bool TemporalAnalysisEnabled;
         unsigned ServerCoreCount;
         unsigned DefaultCompartmentID;
@@ -463,7 +462,6 @@ struct yaml::MappingTraits<hakc::HAKCYAMLConfig> {
         io.mapRequired("build-dir", YamlConfig.BuildDir);
         io.mapRequired("socket-dir", YamlConfig.SocketDir);
         io.mapRequired("log-dir", YamlConfig.LogDir);
-        io.mapRequired("build-mode", YamlConfig.BuildMode);
         io.mapOptional("server-core-count", YamlConfig.ServerCoreCount, 64);
         io.mapOptional("default-compartment-id", YamlConfig.DefaultCompartmentID);
         io.mapOptional("default-division-id", YamlConfig.DefaultDivisionID);
