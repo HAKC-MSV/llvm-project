@@ -481,6 +481,23 @@ void HAKCPointerManager::ClassifyAllUsesOfDefinition(
     }
     AnalyzedUses.push_back(UPtr);
     GetLogger(Verbose, !DebugActive) << "Classifying " << *UPtr << "\n";
+
+    if (const auto *AllocaI = dyn_cast<AllocaInst>(Definition)) {
+      for (const auto &arg: GetFunctionAnalysis().GetFunction().args()) {
+        if (const auto &StoreI = dyn_cast<StoreInst>(User)) {
+          const Value* StorePtr = StoreI->getPointerOperand();
+          const Value* StoreVal = StoreI->getValueOperand();
+          const Value* _arg = dyn_cast<Value>(&arg);
+          const Value* _AllocaI = dyn_cast<Value>(AllocaI);
+          if (StoreVal == _arg && StorePtr == _AllocaI) {
+            GetLogger(Debug, !DebugActive) << "Adding ProtectedUse for function argument " << _arg << " that is immediately stored to stack allocated variable " << AllocaI << " and must be tracked.\n";
+            ManagedPointer.AddProtectedUse(UPtr);
+            return;
+          }
+        }
+      }
+    }
+
     if (UseShouldBeIgnored(U)) {
       GetLogger(Verbose, !DebugActive) << *UPtr << " is being ignored\n";
       continue;
