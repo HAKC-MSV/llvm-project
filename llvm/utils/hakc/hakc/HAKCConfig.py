@@ -36,15 +36,29 @@ def parse_backing_type(backing_type: str) -> HAKCBackingType:
 class HAKCBuildMode(Enum):
     ANALYSIS = "analysis"
     ENFORCEMENT = "enforcement"
+    IR_ANALYSIS = "ir-analysis"
+    IR_ENFORCEMENT = "ir-enforcement"
 
     @staticmethod
-    def from_str(s: str) -> HAKCBuildMode:
+    def from_str(s: str) -> 'HAKCBuildMode':
         compare_value = s.lower()
         for e in HAKCBuildMode:
             if compare_value == e.value.lower():
                 return e
 
         raise ValueError(f'Invalid string {s}')
+
+    @property
+    def is_analysis_mode(self) -> bool:
+        return self in [HAKCBuildMode.ANALYSIS, HAKCBuildMode.IR_ANALYSIS]
+
+    @property
+    def is_enforcement_mode(self) -> bool:
+        return self in [HAKCBuildMode.ENFORCEMENT, HAKCBuildMode.IR_ENFORCEMENT]
+
+    @property
+    def output_ir(self) -> bool:
+        return self in [HAKCBuildMode.IR_ANALYSIS, HAKCBuildMode.IR_ENFORCEMENT]
 
 
 class HAKCDataRequest:
@@ -133,8 +147,11 @@ class HAKCConfig:
         self.log_dir = hakc_config.get('log-dir', '')
         self.endpoints = HAKCEndpoints(**hakc_config)
         self.timeout = self.server_config.timeout
-        self.log_level = self.server_config.log_level
         self.root_config_path = Path(hakc_config['root-file-path']) if 'root-file-path' in hakc_config else None
+
+    @property
+    def log_level(self):
+        return self.server_config.log_level
 
     def __str__(self):
         return f"""

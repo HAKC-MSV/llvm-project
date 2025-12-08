@@ -223,9 +223,9 @@ class HAKCServerThreadInstance(HAKCServerThread):
                           self.hakc_server.config.endpoints.terminate_connection_endpoint: self.terminate_connection}
 
         match self.hakc_server.server_mode:
-            case HAKCBuildMode.ANALYSIS:
+            case HAKCBuildMode.ANALYSIS | HAKCBuildMode.IR_ANALYSIS:
                 self.compartmentalization = HAKCCompartmentalization()
-            case HAKCBuildMode.ENFORCEMENT:
+            case HAKCBuildMode.ENFORCEMENT | HAKCBuildMode.IR_ENFORCEMENT:
                 self.enforcement_source = HAKCServer.init_data_source(self.hakc_server.config)
                 for endpoint_str, endpoint_fn in self.enforcement_source.endpoints.items():
                     self.endpoints[endpoint_str] = endpoint_fn
@@ -271,7 +271,7 @@ class HAKCServer(socketserver.ThreadingUnixStreamServer):
         if os.path.exists(self.socket_path):
             os.unlink(self.socket_path)
         self.compartmentalization = None
-        if self.server_mode == HAKCBuildMode.ENFORCEMENT and config.server_config.backing_config.type == HAKCBackingType.KUZU:
+        if self.server_mode.is_enforcement_mode and config.server_config.backing_config.type == HAKCBackingType.KUZU:
             logger_to_use.debug(f"Starting database at {self.config.server_config.backing_config.path}")
             self.init_mp_database(self.config.server_config.backing_config.path)
         self.logger.debug(f'Starting Server with socket {self.socket_path}')

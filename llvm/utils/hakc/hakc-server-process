@@ -19,7 +19,7 @@ import yaml
 
 from hakc import HAKCCompartmentalization, HAKCDatabase, HAKCLogger
 from hakc.HAKCConfig import HAKCConfig, HAKCBackingType
-from hakc.HAKCLogger import setup_logging
+from hakc.HAKCLogger import setup_logging, LoggingLevelEnum
 from hakc.HAKCServer import HAKCServer, HAKCBuildMode
 from hakc.HAKCUtils import batched
 
@@ -40,17 +40,31 @@ def output_profile_stats(profile, logger_to_use: HAKCLogger):
     logger_to_use.info(s.getvalue())
 
 
-def run_compilation_target(database_entry: dict, logger_to_use: HAKCLogger, socket_path: str, config_path: str):
+def add_argument_to_command_list(cmd: list[str], argument: str):
+    if argument not in shlex.join(cmd):
+        for tok in shlex.split(argument):
+            cmd.insert(len(cmd) - 1, tok)
+
+
+def run_compilation_target(database_entry: dict, logger_to_use: HAKCLogger, socket_path: str, config_path: str,
+                           output_ir: bool, pass_mode: str):
     cmd: list[str] = shlex.split(database_entry['command'])
 
-    if '--enable-hakc' in cmd:
-        if '--hakc-config' not in cmd:
-            cmd.insert(len(cmd) - 1, "-mllvm")
-            cmd.insert(len(cmd) - 1, f"--hakc-config={config_path}")
+    add_argument_to_command_list(cmd, f'-mllvm --enable-hakc')
 
-        if "--hakc-server-path" not in cmd:
-            cmd.insert(len(cmd) - 1, '-mllvm')
-            cmd.insert(len(cmd) - 1, f'--hakc-server-path={socket_path}')
+    add_argument_to_command_list(cmd, f"-mllvm --hakc-config={config_path}")
+
+    add_argument_to_command_list(cmd, f'-mllvm --hakc-server-path={socket_path}')
+
+    add_argument_to_command_list(cmd, f'-mllvm --pass-mode={pass_mode}')
+
+    if output_ir:
+        add_argument_to_command_list(cmd, '-S -emit-llvm')
+        for i in range(len(cmd)):
+            if cmd[i] == '-o':
+                base, _ = os.path.splitext(cmd[i + 1])
+                cmd[i + 1] = base + ".ll"
+                break
 
     cwd = database_entry["directory"]
     logger_to_use.debug(f'Running {" ".join(cmd)} from {cwd}')
@@ -67,7 +81,7 @@ def safe_serve_forever(server, logger_to_use):
 
 def start_hakc_server(server_id: int, server_mode: HAKCBuildMode, config: HAKCConfig, logger_to_use: HAKCLogger) -> (
         HAKCServer, threading.Thread):
-    logger_to_use.debug(f'Starting server')
+    logger_to_use.debug(f'Starting server in {server_mode.value} mode')
     server = HAKCServer(server_id=server_id, server_mode=server_mode, config=config, logger_to_use=logger_to_use)
     server_thread = threading.Thread(target=safe_serve_forever, args=(server, logger_to_use))
     server_thread.start()
@@ -76,7 +90,7 @@ def start_hakc_server(server_id: int, server_mode: HAKCBuildMode, config: HAKCCo
 
 def do_compilation_tasks(task_id: int, config: HAKCConfig, logger_to_use: HAKCLogger, files_to_analyze: set[str],
                          server_mode: HAKCBuildMode):
-    logger_to_use.debug(f'Starting analysis task')
+    logger_to_use.debug(f'Starting compilation tasks')
 
     if config.server_config.compilation_database is None:
         raise RuntimeError(f'Compilation Database is required')
@@ -96,10 +110,13 @@ def do_compilation_tasks(task_id: int, config: HAKCConfig, logger_to_use: HAKCLo
         if compilation_file in files_to_analyze:
             try:
                 run_compilation_target(database_entry, logger_to_use, str(server.socket_path),
-                                       str(config.root_config_path))
+                                       str(config.root_config_path), server_mode.output_ir,
+                                       'analysis' if server_mode.is_analysis_mode else 'enforcement')
                 logger_to_use.debug(f'Compilation task completed')
             except subprocess.CalledProcessError as e:
-                err_file = compilation_file + ".err"
+                err_file = os.path.join(database_entry['directory'], 'error-logs',
+                                        os.path.basename(compilation_file) + ".err")
+                os.makedirs(os.path.dirname(err_file), exist_ok=True)
                 with open(err_file, 'w') as f:
                     logger_to_use.error(f'failed to compile {compilation_file}. Output logged to {err_file}')
                     print(e.stdout, file=f)
@@ -128,9 +145,9 @@ def do_compilation_tasks(task_id: int, config: HAKCConfig, logger_to_use: HAKCLo
     return result
 
 
-def make_worker_logger(name: str, task_id: int) -> logging.Logger:
+def make_worker_logger(name: str, task_id: int, log_level: LoggingLevelEnum) -> logging.Logger:
     logger = logging.getLogger(name)
-    logger.setLevel(logging.ERROR)
+    logger.setLevel(log_level.value)
     logger.propagate = False
 
     # remove any existing handlers to avoid duplicates on re-entry
@@ -144,16 +161,10 @@ def make_worker_logger(name: str, task_id: int) -> logging.Logger:
     return logger
 
 
-def perform_analysis(task_id: int, config: HAKCConfig, files_to_analyze: set[str]):
-    logger_to_use = cast(HAKCLogger, make_worker_logger(f'hakc.server-worker-{task_id}', task_id))
-    compartmentalization = do_compilation_tasks(task_id, config, logger_to_use, files_to_analyze,
-                                                HAKCBuildMode.ANALYSIS)
-    return compartmentalization
-
-
-def perform_enforcement(task_id: int, config: HAKCConfig, files_to_instrument: set[str]):
-    logger_to_use = cast(HAKCLogger, make_worker_logger(f'hakc.server-worker-{task_id}', task_id))
-    do_compilation_tasks(task_id, config, logger_to_use, files_to_instrument, HAKCBuildMode.ENFORCEMENT)
+def create_logger_and_compile_files(task_id: int, config: HAKCConfig, files: set[str], server_mode: HAKCBuildMode):
+    logger_to_use = cast(HAKCLogger, make_worker_logger(f'hakc.server-worker-{task_id}', task_id, config.log_level))
+    result = do_compilation_tasks(task_id, config, logger_to_use, files, server_mode)
+    return result
 
 
 def get_batched_files(compilation_database: dict, batch_size: int):
@@ -167,15 +178,15 @@ def get_batched_files(compilation_database: dict, batch_size: int):
 
 
 def create_enforcement_obj_files(compilation_database: dict, batch_size: int, config: HAKCConfig,
-                                 server_main_logger: HAKCLogger):
-    ctx = mp.get_context("spawn")
-    worker_count = config.server_config.analysis_core_count // 2
+                                 server_main_logger: HAKCLogger, server_mode: HAKCBuildMode):
+    assert (server_mode.is_enforcement_mode)
+    worker_count = max(1, config.server_config.analysis_core_count // 2)
     successful_enforcement = True
-    with concurrent.futures.ProcessPoolExecutor(max_workers=worker_count, mp_context=ctx) as executor:
+    with concurrent.futures.ProcessPoolExecutor(max_workers=worker_count) as executor:
         futures = dict()
         task_id = 0
         for batched_files in get_batched_files(compilation_database, batch_size):
-            future = executor.submit(perform_enforcement, task_id, config, set(batched_files))
+            future = executor.submit(create_logger_and_compile_files, task_id, config, set(batched_files), server_mode)
             futures[future] = task_id
             task_id += 1
 
@@ -195,19 +206,20 @@ def create_enforcement_obj_files(compilation_database: dict, batch_size: int, co
 
 
 def perform_analysis_with_compilation_database(config: HAKCConfig, compilation_database: dict, batch_size: int,
-                                               server_main_logger: HAKCLogger) -> Optional[HAKCCompartmentalization]:
+                                               server_main_logger: HAKCLogger, server_mode: HAKCBuildMode) -> Optional[
+    HAKCCompartmentalization]:
+    assert (server_mode.is_analysis_mode)
     db_dir = config.server_config.backing_config.path if config.server_config.backing_config.type == HAKCBackingType.KUZU else ''
     compartmentalization = HAKCCompartmentalization(db_dir=db_dir)
 
     successful_creation = True
 
-    ctx = mp.get_context("spawn")
-    worker_count = config.server_config.analysis_core_count // 2
-    with concurrent.futures.ProcessPoolExecutor(max_workers=worker_count, mp_context=ctx) as executor:
+    worker_count = max(1, config.server_config.analysis_core_count // 2)
+    with concurrent.futures.ProcessPoolExecutor(max_workers=worker_count) as executor:
         futures = dict()
         task_id = 0
         for batched_files in get_batched_files(compilation_database, batch_size):
-            future = executor.submit(perform_analysis, task_id, config, set(batched_files))
+            future = executor.submit(create_logger_and_compile_files, task_id, config, set(batched_files), server_mode)
             futures[future] = task_id
             task_id += 1
 
@@ -232,10 +244,11 @@ def perform_analysis_with_compilation_database(config: HAKCConfig, compilation_d
     return compartmentalization
 
 
-def create_dag(config: HAKCConfig, compilation_database: dict, logger_to_use: HAKCLogger, batch_size: int):
+def create_dag(config: HAKCConfig, compilation_database: dict, logger_to_use: HAKCLogger, batch_size: int,
+               server_mode: HAKCBuildMode):
     start = time.time()
     compartmentalization = perform_analysis_with_compilation_database(config, compilation_database, batch_size,
-                                                                      logger_to_use)
+                                                                      logger_to_use, server_mode)
     if compartmentalization is None:
         logger_to_use.error(f'Failed to create compartmentalization. Exiting.')
         sys.exit(1)
@@ -298,10 +311,10 @@ def main():
         profile = cProfile.Profile()
         profile.enable()
 
-    if server_mode == HAKCBuildMode.ANALYSIS:
-        create_dag(config, compilation_database, server_main_logger, args.batch_size)
-    elif server_mode == HAKCBuildMode.ENFORCEMENT:
-        create_enforcement_obj_files(compilation_database, args.batch_size, config, server_main_logger)
+    if server_mode.is_analysis_mode:
+        create_dag(config, compilation_database, server_main_logger, args.batch_size, server_mode)
+    elif server_mode.is_enforcement_mode:
+        create_enforcement_obj_files(compilation_database, args.batch_size, config, server_main_logger, server_mode)
 
     if config.server_config.profile:
         profile.disable()
