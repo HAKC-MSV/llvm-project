@@ -126,7 +126,7 @@ def do_compilation_tasks(task_id: int, config: HAKCConfig, logger_to_use: HAKCLo
                                         os.path.basename(compilation_file) + "." + str(int(time.time())) + ".err")
                 os.makedirs(os.path.dirname(err_file), exist_ok=True)
                 with open(err_file, 'w') as f:
-                    logger_to_use.error(f'Failed to compile {compilation_file}. Output logged to {err_file}')
+                    logger_to_use.info(f'Failed to compile {compilation_file}. Output logged to {err_file}')
                     print(f'Command: {" ".join(e.cmd)}', file=f)
                     print(f'Directory: {database_entry['directory']}', file=f)
                     print(e.stdout, file=f)
