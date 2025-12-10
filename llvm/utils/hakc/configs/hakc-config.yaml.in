@@ -6,7 +6,7 @@ socket-dir: "@hakc_socket_dir@"
 log-dir: "@hakc_log_dir@"
 server-core-count: @hakc_server_core_count@
 default-compartment-id: 0
-default-division-id: 53
+default-division-id: 13
 Endpoints:
   get-compartment-by-id-endpoint: "get-compartment-by-id"
   get-division-by-id-endpoint: "get-division-by-id"

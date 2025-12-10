@@ -1,7 +1,0 @@
-[
-  {
-    "directory": "@HAKC_TEST_DIR@",
-    "command": "@HAKC_TEST_BUILD_COMMAND@",
-    "file": "@HAKC_TEST_FILE@"
-  }
-]

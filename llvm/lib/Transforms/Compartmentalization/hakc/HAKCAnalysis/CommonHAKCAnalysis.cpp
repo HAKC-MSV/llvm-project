@@ -21,7 +21,7 @@ namespace llvm::hakc {
 
     hakc_access_token_t CommonHAKCAnalysis::GetDefaultDivisionAccessToken(hakc_compartment_id_t CompartmentID,
                                                                           hakc_compartment_division_t DivisionID) {
-        return CompartmentID << SystemInfo.GetDivisionIDBitCount() & DivisionID;
+        return CompartmentID << SystemInfo.GetDivisionIDBitCount() | DivisionID;
     }
 
     bool CommonHAKCAnalysis::IsFunctionInFunctionList(

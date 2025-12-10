@@ -405,6 +405,8 @@ namespace llvm::hakc {
     }
 
     void FakeServerClient::GetValidTargets(HAKCCompartment &Compartment) {
-        return;
+        for (auto &ExistingCompartment: Compartments) {
+            Compartment.AddTarget(ExistingCompartment->GetCompartmentID());
+        }
     }
 } // namespace llvm::hakc

@@ -1,8 +1,3 @@
-// RUN: %HAKC_PYTHON_VENV
-// RUN: %HAKC_START_ANALYSIS_SERVER
-// RUN: %HAKC_RUN_ANALYSIS_PASS
-// sleep for n seconds to let server finish constructing dag
-// RUN: sleep 15
 // RUN: %HAKC_RUN_ENFORCEMENT_PASS
 // RUN: %HAKC_EVALUATE
 
@@ -22,13 +17,13 @@ struct data_struct2 {
 int foo(struct data_struct2 *a, int* v1, int* v2) {
     if (a) {
 // CHECK-LABEL: if.then
-// CHECK: call ptr @check_hakc_data_access(ptr %1, i64 1, i64 65536)
+// CHECK: call ptr @check_hakc_data_access(ptr %1, i64 1, i64 65549)
         *v1++;
-// CHECK: call ptr @check_hakc_data_access(ptr %4, i64 1, i64 65536)
+// CHECK: call ptr @check_hakc_data_access(ptr %4, i64 1, i64 65549)
         *v2++;
         struct data_struct b;
         b.a = 0;
-// CHECK: call ptr @check_hakc_code_access(ptr %8, i64 1, i64 65536, ptr @entry_tokens_1, i64 2)
+// CHECK: call ptr @check_hakc_code_access(ptr %8, i64 1, i64 65549, ptr @entry_tokens_1, i64 1)
         return a->f(&b);
     }
     return 0;
