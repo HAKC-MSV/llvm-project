@@ -20,93 +20,119 @@
 
 #include "llvm/Support/JSON.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartment.h"
-#include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartmentDivision.h"
 
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCSystemInformation.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCDatabase/HAKCDatabase.h"
 
 namespace llvm::hakc {
-class HAKCModuleAnalysis;
-class HAKCModuleTransform;
-class HAKCSystemInformation;
+    class HAKCModuleAnalysis;
+    class HAKCModuleTransform;
+    class HAKCSystemInformation;
 
-class HAKCServerClient {
-public:
-  explicit HAKCServerClient(HAKCModuleAnalysis &ModuleAnalysis);
+    class HAKCServerClientBase {
+    public:
+        explicit HAKCServerClientBase(HAKCModuleAnalysis &ModuleAnalysis);
 
-  virtual ~HAKCServerClient();
+        virtual ~HAKCServerClientBase();
 
-  void add_symbols(ArrayRef<std::shared_ptr<HAKCFunctionInfo>> FIs, ArrayRef<std::shared_ptr<HAKCGlobalInfo>> GIs);
+        virtual void add_symbols(ArrayRef<std::shared_ptr<HAKCFunctionInfo> > FIs,
+                                 ArrayRef<std::shared_ptr<HAKCGlobalInfo> > GIs) = 0;
 
-  void add_function(const HAKCFunctionInfo &Function);
+        virtual void SendSymbolsToAnalysisServer(HAKCTypeIdentifier &TypeIdentifier) = 0;
 
-  void add_global_variable(const HAKCGlobalInfo &Global);
+        virtual void CloseConnection() = 0;
 
-  void SendSymbolsToAnalysisServer(HAKCTypeIdentifier &TypeIdentifier);
+        virtual HAKCCompartmentDivision &GetDivision(GlobalValue *GV) = 0;
 
-  void CloseConnection();
+        virtual void GetValidTargets(HAKCCompartment &Compartment) = 0;
 
-  virtual HAKCCompartmentDivision &GetDivision(GlobalValue *GV);
+        virtual HAKCCompartmentP GetCompartment(hakc_compartment_id_t CompartmentID);
 
-  virtual HAKCCompartmentP GetCompartment(hakc_compartment_id_t CompartmentID);
+        virtual HAKCCompartmentDivision &GetDefaultDivision();
 
-  void GetValidTargets(HAKCCompartment &Compartment);
+    protected:
+        HAKCModuleAnalysis &ModuleAnalysis;
+        HAKCSystemInformation &SystemInformation;
+        std::vector<HAKCCompartmentP> Compartments;
+        std::vector<HAKCDivisionP> Divisions;
 
-  virtual HAKCCompartmentDivision &GetDefaultDivision();
+        virtual HAKCDivisionP GetDivision(hakc_compartment_id_t CompartmentID,
+                                          hakc_compartment_division_t DivisionID);
 
-protected:
-  HAKCModuleAnalysis &ModuleAnalysis;
-  HAKCSystemInformation &SystemInformation;
-  std::vector<HAKCCompartmentP> Compartments;
-  std::vector<HAKCDivisionP> Divisions;
-  HAKCDatabaseConnection Client;
-  std::map<HAKCSymbolP, HAKCDivisionP> SymbolDivisionMap;
-  std::set<hakc_compartment_id_t> RetrievedTargetCompartments;
+        HAKCCompartmentP CreateCompartment(hakc_compartment_id_t CompartmentID, hakc_access_token_t EntryToken);
 
-  void CheckConnection() const;
+        HAKCDivisionP FindCachedDivision(hakc_compartment_id_t CompartmentID,
+                                         hakc_compartment_division_t DivisionID);
 
-  void ConnectToDatabase();
+        HAKCCompartmentP FindCachedCompartment(hakc_compartment_id_t CompartmentID);
 
-  void DisconnectFromDatabase();
+        HAKCDivisionP CreateDivision(hakc_compartment_id_t CompartmentID, hakc_compartment_division_t DivisionID,
+                                     hakc_access_token_t AccessToken);
+    };
 
-  HAKCResult Execute(StringRef Endpoint, json::Object &Parameters) ;
+    class HAKCServerClient : public HAKCServerClientBase {
+    public:
+        explicit HAKCServerClient(HAKCModuleAnalysis &ModuleAnalysis);
 
-  void SendTerminateConnection() const;
+        ~HAKCServerClient() override;
 
-  HAKCDivisionP GetDivision(hakc_compartment_id_t CompartmentID,
-                            hakc_compartment_division_t DivisionID);
+        void add_symbols(ArrayRef<std::shared_ptr<HAKCFunctionInfo> > FIs,
+                         ArrayRef<std::shared_ptr<HAKCGlobalInfo> > GIs) override;
 
-  HAKCDivisionP FindCachedDivision(hakc_compartment_id_t CompartmentID,
-                                   hakc_compartment_division_t DivisionID);
+        void SendSymbolsToAnalysisServer(HAKCTypeIdentifier &TypeIdentifier) override;
 
-  HAKCCompartmentP FindCachedCompartment(hakc_compartment_id_t CompartmentID);
+        void CloseConnection() override;
 
-  HAKCCompartmentP CreateCompartment(hakc_compartment_id_t CompartmentID,
-                                     hakc_access_token_t AccessToken,
-                                     bool CheckForExisting);
+        HAKCCompartmentDivision &GetDivision(GlobalValue *GV) override;
 
-  HAKCDivisionP FindCachedSymbolDivision(HAKCSymbolP Symbol) const;
+        HAKCCompartmentP GetCompartment(hakc_compartment_id_t CompartmentID) override;
 
-};
+        void GetValidTargets(HAKCCompartment &Compartment) override;
 
-class HAKCNullServerClient : public HAKCServerClient {
-public:
-  explicit HAKCNullServerClient(HAKCModuleAnalysis &ModuleAnalysis);
+    protected:
+        HAKCDatabaseConnection Client;
+        std::map<HAKCSymbolP, HAKCDivisionP> SymbolDivisionMap;
+        std::set<hakc_compartment_id_t> RetrievedTargetCompartments;
 
-  ~HAKCNullServerClient() override;
+        void CheckConnection() const;
 
-  HAKCCompartmentDivision &GetDefaultDivision() override;
+        void ConnectToDatabase();
 
-  HAKCCompartmentDivision &GetDivision(GlobalValue *GV) override;
+        void DisconnectFromDatabase();
 
-  HAKCCompartmentP GetCompartment(hakc_compartment_id_t CompartmentID) override;
+        HAKCResult Execute(StringRef Endpoint, json::Object &Parameters);
 
-protected:
-  std::shared_ptr<HAKCCompartmentDivision> DefaultCompartmentDivision;
-  HAKCCompartmentP DefaultCompartment;
+        void SendTerminateConnection() const;
 
-};
+        HAKCDivisionP GetDivision(hakc_compartment_id_t CompartmentID,
+                                  hakc_compartment_division_t DivisionID) override;
 
+        HAKCCompartmentP CreateCompartment(hakc_compartment_id_t CompartmentID,
+                                           hakc_access_token_t AccessToken,
+                                           bool CheckForExisting);
+
+        HAKCDivisionP FindCachedSymbolDivision(HAKCSymbolP Symbol) const;
+    };
+
+    class FakeServerClient : public HAKCServerClientBase {
+    public:
+        explicit FakeServerClient(HAKCModuleAnalysis &ModuleAnalysis);
+
+        void add_symbols(ArrayRef<std::shared_ptr<HAKCFunctionInfo> > FIs,
+                         ArrayRef<std::shared_ptr<HAKCGlobalInfo> > GIs) override;
+
+        void SendSymbolsToAnalysisServer(HAKCTypeIdentifier &TypeIdentifier) override;
+
+        void CloseConnection() override;
+
+        HAKCCompartmentDivision &GetDivision(GlobalValue *GV) override;
+
+        void GetValidTargets(HAKCCompartment &Compartment) override;
+
+    protected:
+        unsigned CurrentComaprtmentID;
+        std::map<GlobalValue *, HAKCDivisionP> SymbolDivisionMap;
+    };
 } // namespace llvm::hakc
 
 #endif // HAKC_HAKCSERVERCLIENT_H

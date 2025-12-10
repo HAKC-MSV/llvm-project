@@ -19,6 +19,11 @@ namespace llvm::hakc {
         return IsFunctionInFunctionList(F, SystemInfo.NoTransferFunctions());
     }
 
+    hakc_access_token_t CommonHAKCAnalysis::GetDefaultDivisionAccessToken(hakc_compartment_id_t CompartmentID,
+                                                                          hakc_compartment_division_t DivisionID) {
+        return CompartmentID << SystemInfo.GetDivisionIDBitCount() & DivisionID;
+    }
+
     bool CommonHAKCAnalysis::IsFunctionInFunctionList(
         Function *F, iterator_range<HAKCFunctionList::iterator> Range) {
         if (!F) { return false; }
@@ -491,7 +496,7 @@ namespace llvm::hakc {
     }
 
     bool CommonHAKCAnalysis::ValueShouldBeReplacedWithTransfer(
-        Value *V, HAKCServerClient &Client) {
+        Value *V, HAKCServerClientBase &Client) {
         if (auto *F = dyn_cast<Function>(V)) {
             return functionIsTransferCandidate(F, Client);
         } else if (auto *BCO = dyn_cast<BitCastOperator>(V)) {
@@ -556,7 +561,7 @@ namespace llvm::hakc {
     }
 
     bool CommonHAKCAnalysis::IsCompartmentalizedFunction(Function *F,
-                                                         HAKCServerClient &Client) {
+                                                         HAKCServerClientBase &Client) {
         return !IsUncompartmentalizedSymbol(F, Client) && !IsOutsideTransferFunc(F);
     }
 
@@ -585,7 +590,7 @@ namespace llvm::hakc {
     }
 
     bool CommonHAKCAnalysis::functionIsTransferCandidate(Function *F,
-                                                         HAKCServerClient &Client) {
+                                                         HAKCServerClientBase &Client) {
         auto Division = Client.GetDivision(F);
         return !IsNoTransferFunction(F) && !IsUncompartmentalizedSymbol(F, Client) &&
                !F->isDeclaration() && !IsCapabilityReassignmentFunc(F) &&
@@ -645,7 +650,7 @@ namespace llvm::hakc {
     }
 
     bool CommonHAKCAnalysis::IsUncompartmentalizedSymbol(GlobalValue *GV,
-                                                         HAKCServerClient &Client) {
+                                                         HAKCServerClientBase &Client) {
         auto Division = Client.GetDivision(GV);
         return Division.GetHAKCCompartment() ==
                Client.GetDefaultDivision().GetHAKCCompartment();
@@ -668,7 +673,7 @@ namespace llvm::hakc {
     }
 
     bool CommonHAKCAnalysis::FunctionsAreInSameCompartment(
-        Function *F, Function *G, HAKCServerClient &Client) {
+        Function *F, Function *G, HAKCServerClientBase &Client) {
         auto FCompartment = Client.GetDivision(F).GetHAKCCompartment();
         auto GCompartment = Client.GetDivision(G).GetHAKCCompartment();
         return FCompartment == GCompartment;

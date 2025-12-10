@@ -44,7 +44,7 @@ typedef std::vector<ManagedHAKCPointerUseP> ManagedHAKCPointerUseListType;
 class HAKCPointerManager {
 public:
   explicit HAKCPointerManager(HAKCFunctionAnalysis &Analysis,
-                              HAKCServerClient &Client,
+                              HAKCServerClientBase &Client,
                               bool DebugActive);
 
   bool ManagePointer(Use &U);
@@ -123,7 +123,7 @@ public:
 
   void SetFunctionIsCompartmentalized(bool FunctionIsCompartmentalized);
 
-  HAKCServerClient &GetClient() const;
+  HAKCServerClientBase &GetClient() const;
 
   Instruction *CloneInstruction(Instruction *I);
 
@@ -148,7 +148,7 @@ protected:
   ManagedHAKCPointerUseListType AnalyzedUses;
 
   HAKCFunctionAnalysis &HAKCAnalysis;
-  HAKCServerClient &Client;
+  HAKCServerClientBase &Client;
 
   unsigned DataAuthenticationsAdded;
   unsigned CodeAuthenticationsAdded;

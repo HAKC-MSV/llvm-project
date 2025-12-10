@@ -25,12 +25,12 @@
 
 typedef std::string HAKCYAMLStringType;
 
-template<typename Ty> using HAKCYAMLSequence = std::vector<Ty>;
+template<typename Ty>
+using HAKCYAMLSequence = std::vector<Ty>;
 
 typedef HAKCYAMLSequence<HAKCYAMLStringType> HAKCYAMLStringSequenceType;
 
 namespace llvm::hakc {
-
     enum HAKCLogLevel {
         Disabled = 0,
         Verbose = 1,
@@ -53,21 +53,24 @@ namespace llvm::hakc {
     struct HAKCYAMLSymbolDeclaration {
         HAKCYAMLStringType SymbolName;
 
-        HAKCYAMLSymbolDeclaration() {}
+        HAKCYAMLSymbolDeclaration() {
+        }
     };
 
     struct HAKCYAMLAllocationType : public HAKCYAMLSymbolDeclaration {
         HAKCAllocationTypeEnum AllocationType;
         HAKCYAMLStringSequenceType Arguments;
 
-        HAKCYAMLAllocationType() : AllocationType(InvalidAllocationType) {}
+        HAKCYAMLAllocationType() : AllocationType(InvalidAllocationType) {
+        }
     };
 
     struct HAKCYAMLFileType {
         HAKCYAMLStringType PathRoot;
         HAKCYAMLStringSequenceType Files;
 
-        HAKCYAMLFileType() {}
+        HAKCYAMLFileType() {
+        }
 
         void AddAllFiles(SmallVectorImpl<std::string> &Results) {
             for (auto &FilePath: Files) {
@@ -80,13 +83,14 @@ namespace llvm::hakc {
         }
     };
 
-// the function argument values (the parameter values set when called)
+    // the function argument values (the parameter values set when called)
     struct HAKCYAMLFunctionArgument {
         unsigned Idx;
         HAKCYAMLStringType TypeStr;
         HAKCFunctionArgumentUse ArgUse;
 
-        HAKCYAMLFunctionArgument() : Idx(), TypeStr(), ArgUse(Other) {}
+        HAKCYAMLFunctionArgument() : Idx(), TypeStr(), ArgUse(Other) {
+        }
 
         Type *GetType(const HAKCTypeIdentifier &TypeIdentifier) const {
             return TypeIdentifier.GetTypeFromString(TypeStr);
@@ -95,10 +99,11 @@ namespace llvm::hakc {
 
     struct HAKCYAMLFunctionDefinition : public HAKCYAMLSymbolDeclaration {
         HAKCYAMLStringType ReturnType;
-        HAKCYAMLSequence <HAKCYAMLFunctionArgument> Arguments;
+        HAKCYAMLSequence<HAKCYAMLFunctionArgument> Arguments;
 
         HAKCYAMLFunctionDefinition()
-                : HAKCYAMLSymbolDeclaration(), ReturnType(), Arguments() {}
+            : HAKCYAMLSymbolDeclaration(), ReturnType(), Arguments() {
+        }
 
         bool IsValid() {
             bool Result = !ReturnType.empty() || !SymbolName.empty();
@@ -141,8 +146,8 @@ namespace llvm::hakc {
 
             auto *FType = FunctionType::get(ReturnTy, ArgTys, false);
             auto *F = dyn_cast<Function>(TypeIdentifier.GetModule()
-                                                 .getOrInsertFunction(SymbolName, FType)
-                                                 .getCallee());
+                .getOrInsertFunction(SymbolName, FType)
+                .getCallee());
             return F;
         }
     };
@@ -151,7 +156,8 @@ namespace llvm::hakc {
         HAKCYAMLStringType TransferObjectTypeName;
 
         HAKCYAMLCustomTransferType()
-                : HAKCYAMLFunctionDefinition(), TransferObjectTypeName() {}
+            : HAKCYAMLFunctionDefinition(), TransferObjectTypeName() {
+        }
     };
 
     struct HAKCYAMLActionArgument {
@@ -161,9 +167,10 @@ namespace llvm::hakc {
 
     struct HAKCYAMLActionType : public HAKCYAMLSymbolDeclaration {
         HAKCYAMLStringType Label;
-        HAKCYAMLSequence <HAKCYAMLActionArgument> Arguments;
+        HAKCYAMLSequence<HAKCYAMLActionArgument> Arguments;
 
-        HAKCYAMLActionType() : HAKCYAMLSymbolDeclaration(), Label(), Arguments() {}
+        HAKCYAMLActionType() : HAKCYAMLSymbolDeclaration(), Label(), Arguments() {
+        }
     };
 
     struct HAKCYAMLEndpoints {
@@ -177,7 +184,7 @@ namespace llvm::hakc {
         HAKCYAMLStringType TerminateConnectionEndpoint;
     };
 
-// TODO: need to figure out how we will specify symbols in the config
+    // TODO: need to figure out how we will specify symbols in the config
     struct HAKCYAMLEpochPerms {
         epoch_perms_options_t perm;
         uint64_t offset;
@@ -189,7 +196,7 @@ namespace llvm::hakc {
         HAKCYAMLStringType entry_symbol;
         HAKCYAMLStringType exit_symbol;
         HAKCYAMLStringType type;
-        HAKCYAMLSequence <HAKCYAMLEpochPerms> perms;
+        HAKCYAMLSequence<HAKCYAMLEpochPerms> perms;
     };
 
     struct HAKCYAMLClientConfig {
@@ -199,23 +206,23 @@ namespace llvm::hakc {
         HAKCLogLevel FileLogLevel;
         HAKCYAMLFunctionDefinition CodeValidationFunction;
         HAKCYAMLFunctionDefinition DataValidationFunction;
-        HAKCYAMLSequence <HAKCYAMLSymbolDeclaration> SafeTransitionFunctions;
-        HAKCYAMLSequence <HAKCYAMLSymbolDeclaration> IgnoredGlobals;
+        HAKCYAMLSequence<HAKCYAMLSymbolDeclaration> SafeTransitionFunctions;
+        HAKCYAMLSequence<HAKCYAMLSymbolDeclaration> IgnoredGlobals;
         HAKCYAMLStringSequenceType TransferFunctions;
         HAKCYAMLStringSequenceType PassDebugSymbols;
         HAKCYAMLStringSequenceType SeparateNamespacePathsList;
         HAKCYAMLStringSequenceType HAKCSourcePathsList;
         HAKCYAMLStringSequenceType TransferFunctionCandidates;
         bool DebugDatabase;
-        HAKCYAMLSequence <HAKCYAMLSymbolDeclaration> NoTransferFunctions;
-        HAKCYAMLSequence <HAKCYAMLCustomTransferType> CustomTransferFunctions;
-        HAKCYAMLSequence <HAKCYAMLFunctionDefinition> CompartmentalizationSupportFunctions;
-        HAKCYAMLSequence <HAKCYAMLAllocationType> AllocationFunctions;
-        HAKCYAMLSequence <HAKCYAMLFileType> SeparateNamespacePaths;
-        HAKCYAMLSequence <HAKCYAMLFileType> HAKCSourcePaths;
-        HAKCYAMLSequence <HAKCYAMLActionType> PreTargetActions;
-        HAKCYAMLSequence <HAKCYAMLActionType> PostTargetActions;
-        HAKCYAMLSequence <HAKCYAMLEpoch> Epochs;
+        HAKCYAMLSequence<HAKCYAMLSymbolDeclaration> NoTransferFunctions;
+        HAKCYAMLSequence<HAKCYAMLCustomTransferType> CustomTransferFunctions;
+        HAKCYAMLSequence<HAKCYAMLFunctionDefinition> CompartmentalizationSupportFunctions;
+        HAKCYAMLSequence<HAKCYAMLAllocationType> AllocationFunctions;
+        HAKCYAMLSequence<HAKCYAMLFileType> SeparateNamespacePaths;
+        HAKCYAMLSequence<HAKCYAMLFileType> HAKCSourcePaths;
+        HAKCYAMLSequence<HAKCYAMLActionType> PreTargetActions;
+        HAKCYAMLSequence<HAKCYAMLActionType> PostTargetActions;
+        HAKCYAMLSequence<HAKCYAMLEpoch> Epochs;
         HAKCYAMLStringSequenceType IgnoredTypes;
         // TODO: revert to transfer type?
         HAKCYAMLFunctionDefinition DefaultCompartmentTransfer;
@@ -234,11 +241,9 @@ namespace llvm::hakc {
         unsigned ServerCoreCount;
         unsigned DefaultCompartmentID;
         unsigned DefaultDivisionID;
-        unsigned DefaultEntryToken;
-        unsigned DefaultAccessToken;
         HAKCYAMLEndpoints Endpoints;
+        unsigned DivisionIDBitCount;
     };
-
 } // namespace llvm::hakc
 
 LLVM_YAML_IS_SEQUENCE_VECTOR(hakc::HAKCYAMLAllocationType)
@@ -258,7 +263,7 @@ LLVM_YAML_IS_SEQUENCE_VECTOR(hakc::HAKCYAMLActionArgument)
 LLVM_YAML_IS_SEQUENCE_VECTOR(hakc::HAKCYAMLSymbolDeclaration)
 
 static void YAMLFunctionDeclarationMapping(
-        yaml::IO &io, hakc::HAKCYAMLSymbolDeclaration &FunctionDeclaration) {
+    yaml::IO &io, hakc::HAKCYAMLSymbolDeclaration &FunctionDeclaration) {
     io.mapRequired("name", FunctionDeclaration.SymbolName);
 }
 
@@ -405,7 +410,6 @@ struct yaml::MappingTraits<hakc::HAKCYAMLEndpoints> {
 template<>
 struct yaml::MappingTraits<hakc::HAKCYAMLClientConfig> {
     static void mapping(IO &io, hakc::HAKCYAMLClientConfig &ClientConfig) {
-
         io.mapRequired("arch", ClientConfig.Arch);
         io.mapRequired("platform", ClientConfig.Platform);
         io.mapOptional("console-log-level", ClientConfig.ConsoleLogLevel,
@@ -452,7 +456,7 @@ struct yaml::MappingTraits<hakc::HAKCYAMLConfig> {
         io.mapOptional("server-config-path", ignore0);
         io.mapOptional("client-config-path", YamlConfig.ClientConfigPath);
         // read in server config (we only get the path from the yaml file)
-        ErrorOr<std::unique_ptr<MemoryBuffer>> mb = MemoryBuffer::getFile(YamlConfig.ClientConfigPath);
+        ErrorOr<std::unique_ptr<MemoryBuffer> > mb = MemoryBuffer::getFile(YamlConfig.ClientConfigPath);
         Input yin(mb.get()->getMemBufferRef().getBuffer());
         yin >> YamlConfig.ClientConfig;
         if (yin.error()) {
@@ -465,9 +469,8 @@ struct yaml::MappingTraits<hakc::HAKCYAMLConfig> {
         io.mapOptional("server-core-count", YamlConfig.ServerCoreCount, 64);
         io.mapOptional("default-compartment-id", YamlConfig.DefaultCompartmentID);
         io.mapOptional("default-division-id", YamlConfig.DefaultDivisionID);
-        io.mapOptional("default-entry-token", YamlConfig.DefaultEntryToken);
-        io.mapOptional("default-access-token", YamlConfig.DefaultAccessToken);
         io.mapRequired("Endpoints", YamlConfig.Endpoints);
+        io.mapOptional("division-id-bit-count", YamlConfig.DivisionIDBitCount, 16);
     }
 };
 

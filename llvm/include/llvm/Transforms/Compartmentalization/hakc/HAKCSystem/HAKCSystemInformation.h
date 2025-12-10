@@ -146,6 +146,8 @@ namespace llvm::hakc {
 
         void SetSocketPath(StringRef SocketPath);
 
+        unsigned GetDivisionIDBitCount() const;
+
     protected:
         function_def_t
         CreateHAKCFunction(HAKCYAMLFunctionDefinition &YAMLFunctionDef) const;
@@ -155,8 +157,8 @@ namespace llvm::hakc {
                                      HAKCTypeP HAKCTy);
 
         void PopulateHAKCFunctionArgs(
-                SmallVectorImpl<HAKCFunctionArgumentDefinition> &Args,
-                HAKCYAMLFunctionDefinition &YAMLFunctionDef) const;
+            SmallVectorImpl<HAKCFunctionArgumentDefinition> &Args,
+            HAKCYAMLFunctionDefinition &YAMLFunctionDef) const;
 
         void GetAllDefinedHAKCFunctions(SmallVectorImpl<function_def_t> &Results);
 
@@ -200,12 +202,11 @@ namespace llvm::hakc {
         std::string SymbolDivisionEndpoint;
         std::string TerminateConnectionEndpoint;
         std::string ValidTargetsEndpoint;
-        unsigned DefaultAccessToken;
         unsigned DefaultCompartmentID;
         unsigned DefaultDivisionID;
-        unsigned DefaultEntryToken;
         unsigned MaxConnectionRetries;
         unsigned ServerCoreCount;
+        unsigned DivisionIDBitCount;
     };
 } // namespace llvm::hakc
 

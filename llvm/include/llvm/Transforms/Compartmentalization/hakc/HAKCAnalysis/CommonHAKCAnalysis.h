@@ -36,10 +36,10 @@ namespace llvm::hakc {
     };
 
     const std::map<StringRef, HAKCPassModeEnum> PassModeToString = {
-            {"invalid-build-mode-type", InvalidBuildModeType},
-            {"analysis",                Analysis},
-            {"enforcement",             Enforcement},
-            {"run-config-and-exit",     RunConfigAndExit}
+        {"invalid-build-mode-type", InvalidBuildModeType},
+        {"analysis", Analysis},
+        {"enforcement", Enforcement},
+        {"run-config-and-exit", RunConfigAndExit}
     };
 
     class CommonHAKCAnalysis {
@@ -55,7 +55,7 @@ namespace llvm::hakc {
         std::shared_ptr<HAKCLogger> _HAKCLog;
 
         static bool IsFunctionInHAKCTransferFunctionList(
-                Function *F, iterator_range<HAKCTransferList::iterator> Range);
+            Function *F, iterator_range<HAKCTransferList::iterator> Range);
 
         void InitConfig(StringRef ConfigPath, StringRef ServerSocketPath, HAKCPassModeEnum PassMode);
 
@@ -100,7 +100,7 @@ namespace llvm::hakc {
 
         bool
         ValueShouldBeReplacedWithTransfer(Value *V,
-                                          HAKCServerClient &Client);
+                                          HAKCServerClientBase &Client);
 
         bool IsSafeTransitionFunction(Function *F);
 
@@ -119,7 +119,7 @@ namespace llvm::hakc {
         bool IsAllocationFunction(Function *F);
 
         bool functionIsTransferCandidate(Function *F,
-                                         HAKCServerClient &Client);
+                                         HAKCServerClientBase &Client);
 
         static HAKCLogger &getLogger(HAKCLogLevel log_level,
                                      bool suppress_output = false);
@@ -140,7 +140,7 @@ namespace llvm::hakc {
 
         static bool
         FunctionsAreInSameCompartment(Function *F, Function *G,
-                                      HAKCServerClient &Client);
+                                      HAKCServerClientBase &Client);
 
         bool IsSafeTransitionCall(CallBase *call);
 
@@ -148,7 +148,7 @@ namespace llvm::hakc {
 
         static bool
         IsCompartmentalizedFunction(Function *F,
-                                    HAKCServerClient &Client);
+                                    HAKCServerClientBase &Client);
 
         static bool IsStringType(Type *Ty);
 
@@ -173,7 +173,7 @@ namespace llvm::hakc {
 
         static bool
         IsUncompartmentalizedSymbol(GlobalValue *GV,
-                                    HAKCServerClient &Client);
+                                    HAKCServerClientBase &Client);
 
         static void VerifyFunction(Function *F);
 
@@ -201,6 +201,9 @@ namespace llvm::hakc {
         static Function *GetOriginalFunctionFromTransferFunction(Function *F);
 
         std::string createLogPath(StringRef BuildPath, HAKCPassModeEnum PassMode);
+
+        hakc_access_token_t GetDefaultDivisionAccessToken(hakc_compartment_id_t CompartmentID,
+                                                          hakc_compartment_division_t DivisionID);
 
     private:
         static bool valueHasAttribute(Value *v, Attribute::AttrKind Kind);

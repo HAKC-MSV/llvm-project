@@ -40,7 +40,7 @@ namespace llvm::hakc {
 class HAKCTransformer {
 public:
   HAKCTransformer(HAKCModuleAnalysis &ModuleAnalysis,
-                  HAKCServerClient &Client);
+                  HAKCServerClientBase &Client);
 
   virtual ~HAKCTransformer() = default;
 
@@ -209,7 +209,7 @@ public:
 
 protected:
   HAKCModuleAnalysis &ModuleAnalysis;
-  HAKCServerClient &Client;
+  HAKCServerClientBase &Client;
   IRBuilder<> HAKCIRBuilder;
 
   std::map<Function *, Function *> VariadicTransferFunctions;

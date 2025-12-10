@@ -14,7 +14,7 @@
 namespace llvm::hakc {
 HAKCFunctionAnalysis::HAKCFunctionAnalysis(
     Function *F, HAKCModuleAnalysis &ModuleAnalysis,
-    HAKCTransformer &Transformer, HAKCServerClient &Client)
+    HAKCTransformer &Transformer, HAKCServerClientBase &Client)
   : ModuleAnalysis(ModuleAnalysis), Transformer(Transformer), Client(Client),
     PointerManager(
         *this, Client,
