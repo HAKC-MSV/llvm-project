@@ -235,10 +235,6 @@ class HAKCServerThreadInstance(HAKCServerThread):
         self.init()
         HAKCServerThread.handle(self)
 
-    @property
-    def hakc_server(self) -> 'HAKCServer':
-        return cast(HAKCServer, self.server)
-
     def terminate_connection(self, **kwargs):
         self.hakc_server.add_compartmentalization(self.compartmentalization)
         HAKCServerThread.terminate_connection(self)

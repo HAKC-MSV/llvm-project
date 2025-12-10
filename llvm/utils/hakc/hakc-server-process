@@ -5,10 +5,10 @@ import concurrent.futures
 import io
 import json
 import logging
-import multiprocessing as mp
 import os
 import pstats
 import shlex
+import shutil
 import subprocess
 import sys
 import threading
@@ -48,7 +48,11 @@ def add_argument_to_command_list(cmd: list[str], argument: str):
 
 def run_compilation_target(database_entry: dict, logger_to_use: HAKCLogger, socket_path: str, config_path: str,
                            output_ir: bool, pass_mode: str):
-    cmd: list[str] = shlex.split(database_entry['command'])
+    cmd: list[str] = list()
+    if 'command' in database_entry:
+        cmd = shlex.split(database_entry['command'])
+    if 'arguments' in database_entry:
+        cmd = database_entry['arguments']
 
     add_argument_to_command_list(cmd, f'-mllvm --enable-hakc')
 
@@ -88,6 +92,10 @@ def start_hakc_server(server_id: int, server_mode: HAKCBuildMode, config: HAKCCo
     return server, server_thread
 
 
+def get_error_log_dir_path(config: HAKCConfig, server_mode: HAKCBuildMode):
+    return os.path.join(config.log_dir, 'error-logs', server_mode.value)
+
+
 def do_compilation_tasks(task_id: int, config: HAKCConfig, logger_to_use: HAKCLogger, files_to_analyze: set[str],
                          server_mode: HAKCBuildMode):
     logger_to_use.debug(f'Starting compilation tasks')
@@ -114,11 +122,13 @@ def do_compilation_tasks(task_id: int, config: HAKCConfig, logger_to_use: HAKCLo
                                        'analysis' if server_mode.is_analysis_mode else 'enforcement')
                 logger_to_use.debug(f'Compilation task completed')
             except subprocess.CalledProcessError as e:
-                err_file = os.path.join(database_entry['directory'], 'error-logs',
-                                        os.path.basename(compilation_file) + ".err")
+                err_file = os.path.join(get_error_log_dir_path(config, server_mode),
+                                        os.path.basename(compilation_file) + "." + str(int(time.time())) + ".err")
                 os.makedirs(os.path.dirname(err_file), exist_ok=True)
                 with open(err_file, 'w') as f:
-                    logger_to_use.error(f'failed to compile {compilation_file}. Output logged to {err_file}')
+                    logger_to_use.error(f'Failed to compile {compilation_file}. Output logged to {err_file}')
+                    print(f'Command: {" ".join(e.cmd)}', file=f)
+                    print(f'Directory: {database_entry['directory']}', file=f)
                     print(e.stdout, file=f)
 
     logger_to_use.debug(f'Shutting down everything')
@@ -270,6 +280,8 @@ def create_dag(config: HAKCConfig, compilation_database: dict, logger_to_use: HA
         compartmentalization.perform_adjustments(config.server_config.adjustments)
 
     compartmentalization.close_conn()
+    if len(compartmentalization) == 0:
+        raise RuntimeError(f'Created an empty compartmentalization')
 
     end = time.time()
     logger_to_use.info(f'Finished constructing DAG {compartmentalization}')
@@ -299,12 +311,15 @@ def main():
 
         config = HAKCConfig(**config_inputs)
 
+    if os.path.exists(get_error_log_dir_path(config, server_mode)):
+        shutil.rmtree(get_error_log_dir_path(config, server_mode))
+
     with open(config.server_config.compilation_database, 'r') as f:
         compilation_database = json.load(f)
 
     server_main_logger: HAKCLogger = cast(HAKCLogger, logging.getLogger('hakc.server-main'))
     setup_logging(server_main_logger, log_level=config.log_level,
-                  log_file=config.log_dir + "/hakc.server." + server_mode.value + ".log",
+                  log_file=os.path.join(config.log_dir, "hakc.server." + server_mode.value + ".log"),
                   log_mode=config.server_config.log_mode)
 
     if config.server_config.profile:
