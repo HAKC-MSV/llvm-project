@@ -1,3 +1,14 @@
+//===----------------------------------------------------------------------===//
+//
+// Part of the MIT Lincoln Laboratory HAKC Compartmentalization Project.
+//
+//===----------------------------------------------------------------------===//
+///
+/// \file
+/// This file contains the base class for information associated with a symbol.
+/// Note that both functions and global variables are subclasses of a symbol.
+///
+//===----------------------------------------------------------------------===//
 //
 // Created by de29664 on 6/11/24.
 //
@@ -30,7 +41,7 @@ public:
 
   void SetLocalScope(const DIScope *Scope);
 
-  StringRef GetLocalScopePath() const;
+  void GetLocalScopePath(SmallVectorImpl<char> &Result) const;
 
   friend bool operator==(const HAKCYamlSymbol &YamlSymbol,
                          const HAKCSymbolInfo &SymbolInfo) {
@@ -60,12 +71,11 @@ protected:
   const DIFile *DefiningLocation;
   unsigned DefiningLine;
   const DIScope *LocalScope;
-  SmallString<128> LocalScopeStr;
 
   void SetGlobalObj(GlobalObject *GlobalObj);
 
-  void GetTransformedPathName(const DIFile *File,
-                              SmallVectorImpl<char> &Result) const;
+  static void GetTransformedPathName(const DIFile *File,
+                                     SmallVectorImpl<char> &Result);
 
   bool Matches(const HAKCYamlSymbol &YamlSymbol) const;
 };

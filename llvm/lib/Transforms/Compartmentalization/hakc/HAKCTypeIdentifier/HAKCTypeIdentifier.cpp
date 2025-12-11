@@ -1,6 +1,3 @@
-//
-// Created by derrick on 9/8/21.
-//
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTypeIdentifier/HAKCTypeIdentifier.h"
 
 #include "llvm/AsmParser/Parser.h"
@@ -15,1257 +12,2004 @@
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/BinaryFormat/Dwarf.h"
+#include "llvm/IR/Constants.h"
+#include "llvm/IR/DebugInfoMetadata.h"
 #include "llvm/IR/DerivedTypes.h"
 
-std::shared_ptr<hakc::HAKCTypeInfo>
-hakc::HAKCTypeIdentifier::FindType(const DIType *type) {
-  if (!type) {
-    CommonHAKCAnalysis::getWriter(true) << "Trying to find null type\n";
-    throw std::exception();
-  }
-  CommonHAKCAnalysis::getWriter(
-      AnalysisHelper.GetSystemInfo().OutputDebugInfo())
-      << "Finding HAKCTypeInfo for " << *type << "\n";
-  auto it = types.find(type);
-  if (it == types.end()) {
-    return nullptr;
-  }
-  return it->second;
-}
+#include "llvm/Analysis/CallGraph.h"
 
-void hakc::HAKCTypeIdentifier::AddTypeMapping(
-    const DIType *type, const std::shared_ptr<HAKCTypeInfo> &HAKCType) {
-  CommonHAKCAnalysis::getWriter(
-      AnalysisHelper.GetSystemInfo().OutputDebugInfo())
-      << "Adding mapping " << *type << " -> " << HAKCType->GetName() << "\n";
-  HAKCType->SetDbgType(type);
-  auto DbgTypeName = GetTypeName(type);
-  HAKCType->SetDbgTypeName(DbgTypeName);
-  types[type] = HAKCType;
-}
-
-unsigned hakc::HAKCTypeIdentifier::GetAnonymousID(const DIType *type) {
-  unsigned ID;
-  if (AnonymousNumberMapping.contains(type)) {
-    AnonymousNumberMapping[type] = CurrentAnonID;
-    ID = CurrentAnonID;
-    CurrentAnonID++;
-  } else {
-    ID = AnonymousNumberMapping[type];
-  }
-
-  return ID;
-}
-
-std::string hakc::HAKCTypeIdentifier::GetTypeName(const DIType *type) {
-  std::string Name;
-  llvm::raw_string_ostream out(Name);
-
-  if (auto *SubroutineTy = dyn_cast<DISubroutineType>(type)) {
-    for (unsigned i = 0; i < SubroutineTy->getTypeArray()->getNumOperands();
-         i++) {
-      auto *CurrTy = SubroutineTy->getTypeArray()[i];
-      if (!CurrTy) {
-        if (i == 0) {
-          out << "void";
-        } else if (i == SubroutineTy->getTypeArray()->getNumOperands() - 1) {
-          out << "...";
-        } else {
-          CommonHAKCAnalysis::getWriter(true)
-              << "Null operand at " << i << " for " << *type << "\n"
-              << "Current type: " << Name << "\n";
-          throw std::exception();
-        }
-      } else {
-        out << GetTypeName(CurrTy);
-      }
-
-      if (i == 0) {
-        out << " (";
-      } else if (i < SubroutineTy->getTypeArray()->getNumOperands() - 1) {
-        out << ", ";
-      }
-    }
-    out << ")";
-  } else if (auto *DerivedTy = dyn_cast<DIDerivedType>(type)) {
-    if (DerivedTy->getTag() == dwarf::DW_TAG_pointer_type) {
-      if (!DerivedTy->getBaseType()) {
-        out << "void";
-      } else {
-        out << GetTypeName(DerivedTy->getBaseType());
-      }
-      out << "*";
-    } else if (DerivedTy->getTag() == dwarf::DW_TAG_typedef) {
-      out << GetTypeName(DerivedTy->getBaseType());
-    } else if (DerivedTy->getTag() == dwarf::DW_TAG_volatile_type) {
-      out << "volatile ";
-      if (!DerivedTy->getBaseType()) {
-        out << "void";
-      } else {
-        out << GetTypeName(DerivedTy->getBaseType());
-      }
-    } else if (DerivedTy->getTag() == dwarf::DW_TAG_const_type) {
-      out << "const ";
-      if (!DerivedTy->getBaseType()) {
-        out << "void";
-      } else {
-        out << GetTypeName(DerivedTy->getBaseType());
-      }
-    } else if (DerivedTy->getTag() == dwarf::DW_TAG_restrict_type) {
-      out << "restrict ";
-      if (!DerivedTy->getBaseType()) {
-        out << "void";
-      } else {
-        out << GetTypeName(DerivedTy->getBaseType());
-      }
-    } else {
-      CommonHAKCAnalysis::getWriter(true) << "Unhandled DIDerivedType tag\n"
-                                          << DerivedTy << "\n";
-      throw std::exception();
-    }
-  } else if (auto *CompositeTy = dyn_cast<DICompositeType>(type)) {
-    if (CompositeTy->getTag() == dwarf::DW_TAG_array_type) {
-      out << GetTypeName(CompositeTy->getBaseType()) << "[]";
-    } else if (CompositeTy->getTag() == dwarf::DW_TAG_structure_type) {
-      out << "struct ";
-      if (CompositeTy->getName().empty()) {
-        out << "anon." << GetAnonymousID(CompositeTy);
-      } else {
-        out << CompositeTy->getName();
-      }
-    } else if (CompositeTy->getTag() == dwarf::DW_TAG_union_type) {
-      out << "union ";
-      if (CompositeTy->getName().empty()) {
-        out << "anon." << GetAnonymousID(CompositeTy);
-      } else {
-        out << CompositeTy->getName();
-      }
-    } else if (CompositeTy->getTag() == dwarf::DW_TAG_enumeration_type) {
-      out << "enum " << CompositeTy->getName();
-    } else {
-      CommonHAKCAnalysis::getWriter(true) << "Unhandled DICompositeType tag\n"
-                                          << CompositeTy << "\n";
-      throw std::exception();
-    }
-  } else if (auto *BaseTy = dyn_cast<DIBasicType>(type)) {
-    if (BaseTy->getEncoding() == dwarf::DW_ATE_boolean) {
-      out << "bool";
-    } else {
-      out << BaseTy->getName();
-    }
-  } else {
-    CommonHAKCAnalysis::getWriter(true) << "Unhandled DIType\n" << type << "\n";
-    throw std::exception();
-  }
-
-  return Name;
-}
-
-Type *hakc::HAKCTypeIdentifier::GetLLVMType(const DIType *Ty) {
-  auto &Ctx = GetModule().getContext();
-  if (!Ty) {
-    return Type::getVoidTy(Ctx);
-  } else if (Ty->getTag() == dwarf::DW_TAG_pointer_type) {
-    return PointerType::get(Ctx, 0);
-  } else if (auto *BasicTy = dyn_cast<DIBasicType>(Ty)) {
-    return IntegerType::get(Ctx, BasicTy->getSizeInBits());
-  }
-  return nullptr;
-}
-
-FunctionType *hakc::HAKCTypeIdentifier::GetLLVMFunctionTy(
-    const DISubroutineType *FunctionTy) {
-  auto &Ctx = GetModule().getContext();
-  auto *ReturnTy = Type::getVoidTy(Ctx);
-  auto TyArray = FunctionTy->getTypeArray();
-  if (TyArray[0]) {
-    ReturnTy = GetLLVMType(TyArray[0]);
-  }
-  SmallVector<Type *> ArgTys;
-
-  for (unsigned i = 1; i < TyArray.size(); i++) {
-    auto *Ty = GetLLVMType(TyArray[i]);
-    if (!Ty) {
-      CommonHAKCAnalysis::getWriter(true)
-          << "Could not find LLVM Type for " << TyArray[i] << "\n";
-      throw std::exception();
-    }
-    ArgTys.push_back(Ty);
-  }
-
-  auto *LLVMTy = FunctionType::get(ReturnTy, ArgTys, false);
-  CommonHAKCAnalysis::getWriter(
-      AnalysisHelper.GetSystemInfo().OutputDebugInfo())
-      << "Found LLVM Type " << LLVMTy << " for " << FunctionTy << "\n";
-
-  return LLVMTy;
-}
-
-std::shared_ptr<hakc::HAKCTypeInfo>
-hakc::HAKCTypeIdentifier::HandleType(const DIType *type) {
-  auto debug = AnalysisHelper.GetSystemInfo().OutputDebugInfo();
-
-  CommonHAKCAnalysis::getWriter(debug) << "Analyzing DIType " << *type << "\n";
-  auto TypeP = FindType(type);
-  if (TypeP) {
-    CommonHAKCAnalysis::getWriter(debug) << "Already created " << *type << "\n";
-    return TypeP;
-  }
-  if (isa<DICompositeType>(type) || isa<DISubroutineType>(type) ||
-      isa<DIBasicType>(type)) {
-    CommonHAKCAnalysis::getWriter(debug) << "Creating HAKCTypeInfo for\n"
-                                         << type << "\n";
-    auto TypeName = GetTypeName(type);
-    TypeP = std::make_shared<HAKCTypeInfo>(AnalysisHelper, TypeName, debug);
-    if (auto *BasicType = dyn_cast<DIBasicType>(type)) {
-      auto *IntTy = IntegerType::get(GetModule().getContext(),
-                                     BasicType->getSizeInBits());
-      TypeP->SetLLVMType(IntTy);
-    } else if (auto *CompositeTy = dyn_cast<DICompositeType>(type)) {
-      std::string SearchName = ".";
-      SearchName += CompositeTy->getName();
-      StructType *LLVMTy = nullptr;
-      for (auto *StructTy : GetModule().getIdentifiedStructTypes()) {
-        if (StructTy->getName().ends_with(SearchName)) {
-          LLVMTy = StructTy;
-          break;
-        }
-      }
-
-      if (LLVMTy) {
-        TypeP->SetLLVMType(LLVMTy);
-      }
-    } else if (auto *SubRoutineTy = dyn_cast<DISubroutineType>(type)) {
-      for (auto *FuncTy : SubRoutineTy->getTypeArray()) {
-        if (FuncTy) {
-          HandleType(FuncTy);
-        }
-      }
-      auto *LLVMTy = GetLLVMFunctionTy(SubRoutineTy);
-      if (LLVMTy) {
-        TypeP->SetLLVMType(LLVMTy);
-      }
-    }
-    AddTypeMapping(type, TypeP);
-  } else if (auto *DerivedTy = dyn_cast<DIDerivedType>(type)) {
-    if (DerivedTy->getTag() == dwarf::DW_TAG_member) {
-      if (DerivedTy->getBaseType()) {
-        HandleType(DerivedTy->getBaseType());
-      }
-    } else {
-      std::set<unsigned> TagsToConsider = {
-          dwarf::DW_TAG_pointer_type,  dwarf::DW_TAG_array_type,
-          dwarf::DW_TAG_const_type,    dwarf::DW_TAG_typedef,
-          dwarf::DW_TAG_volatile_type, dwarf::DW_TAG_restrict_type,
-      };
-      if (TagsToConsider.contains(DerivedTy->getTag())) {
-        CommonHAKCAnalysis::getWriter(debug) << "Creating HAKCTypeInfo for\n"
-                                             << type << "\n";
-        auto TypeName = GetTypeName(type);
-        TypeP = std::make_shared<HAKCTypeInfo>(AnalysisHelper, TypeName, debug);
-        // TODO: is this right derrick?
-        auto *LLVMTy = GetLLVMType(DerivedTy);
-        TypeP->SetLLVMType(LLVMTy);
-        AddTypeMapping(type, TypeP);
-      } else {
-        CommonHAKCAnalysis::getWriter(debug)
-            << "Not handling DITYpe " << type << "\n";
-      }
-    }
-  }
-  return TypeP;
-}
-
-GlobalVariable *
-hakc::HAKCTypeIdentifier::FindGlobal(const DIGlobalVariable *DIGV) const {
-  auto *Scope = DIGV->getScope();
-  std::string Name;
-  llvm::raw_string_ostream sstream(Name);
-  if (auto *SubProg = dyn_cast<DISubprogram>(Scope)) {
-    sstream << SubProg->getName() << ".";
-  }
-  sstream << DIGV->getName();
-
-  return GetModule().getGlobalVariable(Name, true);
-}
-
-std::shared_ptr<hakc::HAKCGlobalInfo>
-hakc::HAKCTypeIdentifier::HandleGlobal(const DIGlobalVariable *DIGV) {
-  auto debug = AnalysisHelper.GetSystemInfo().OutputDebugInfo(DIGV->getName());
-  CommonHAKCAnalysis::getWriter(debug) << "Analyzing Global " << *DIGV << "\n";
-
-  auto *GV = FindGlobal(DIGV);
-  if (!GV) {
-    CommonHAKCAnalysis::getWriter(debug)
-        << "\nCould not find Global " << DIGV->getName() << "\n";
-    return nullptr;
-  }
-  auto DIGVTy = FindType(DIGV->getType());
-  if (!DIGVTy) {
-    DIGVTy = HandleType(DIGV->getType());
-    if (!DIGVTy) {
-      CommonHAKCAnalysis::getWriter(true)
-          << "Unable to handle DIType " << *DIGV->getType() << " for Global "
-          << *DIGV << "\n";
-      throw std::exception();
-    }
-  }
-  if (!DIGVTy->GetLLVMType()) {
-    DIGVTy->SetLLVMType(GV->getValueType());
-  }
-
-  auto GVP =
-      std::make_shared<HAKCGlobalInfo>(AnalysisHelper, DIGV->getName(), debug);
-  GVP->SetType(DIGVTy);
-  GVP->SetGlobalVariable(GV);
-  GVP->SetDefiningLocation(DIGV->getFile(), DIGV->getLine());
-  if (DIGV->isLocalToUnit()) {
-    GVP->SetLocalScope(DIGV->getScope());
-  }
-  AddGlobalMapping(DIGV, GVP);
-
-  return GVP;
-}
-
-void hakc::HAKCTypeIdentifier::AddGlobalMapping(
-    const DIGlobalVariable *DIGV,
-    const std::shared_ptr<HAKCGlobalInfo> &HAKCSymbol) {
-  CommonHAKCAnalysis::getWriter(
-      AnalysisHelper.GetSystemInfo().OutputDebugInfo(DIGV->getName()))
-      << "Adding mapping " << *DIGV << " -> " << HAKCSymbol->GetName() << "\n";
-  globals[DIGV] = HAKCSymbol;
-}
-
-std::shared_ptr<hakc::HAKCFunctionInfo>
-hakc::HAKCTypeIdentifier::HandleFunction(const DISubprogram *SubProg) {
-  auto debug =
-      AnalysisHelper.GetSystemInfo().OutputDebugInfo(SubProg->getName());
-
-  CommonHAKCAnalysis::getWriter(debug)
-      << "Handling DISubprogram " << *SubProg << "\n";
-
-  auto *F = GetModule().getFunction(SubProg->getName());
-  if (!F) {
-    for (auto &FM : GetModule().functions()) {
-      if (FM.getSubprogram() == SubProg) {
-        F = &FM;
-        break;
-      }
-    }
-  }
-
-  if (!F) {
-    CommonHAKCAnalysis::getWriter(debug)
-        << "\nCould not find Function " << SubProg->getName() << "\n";
-    return nullptr;
-  }
-  if (F->getSubprogram() != SubProg) {
-    CommonHAKCAnalysis::getWriter(debug)
-        << *F << " SubProgram does equal " << *SubProg << "\n";
-  } else {
-    CommonHAKCAnalysis::getWriter(debug)
-        << F->getSubprogram() << " == " << SubProg << "\n";
-  }
-
-  if (CommonHAKCAnalysis::IsOutsideTransferFunc(F) || F->isIntrinsic()) {
-    CommonHAKCAnalysis::getWriter(debug)
-        << SubProg->getName() << " is a HAKC Transfer function\n";
-    return nullptr;
-  }
-  auto DIGVTy = FindType(SubProg->getType());
-  if (!DIGVTy) {
-    CommonHAKCAnalysis::getWriter(true)
-        << GetModule() << "Could not find HAKCType of " << F->getName()
-        << " with DIType " << *SubProg->getType() << "\n";
-    throw std::exception();
-  }
-
-  if (!DIGVTy->GetLLVMType()) {
-    DIGVTy->SetLLVMType(F->getFunctionType());
-  }
-  auto FP = std::make_shared<HAKCFunctionInfo>(AnalysisHelper,
-                                               SubProg->getName(), debug);
-  FP->SetType(DIGVTy);
-  FP->SetFunction(F);
-  FP->SetDefiningLocation(SubProg->getFile(), SubProg->getLine());
-  if (SubProg->isLocalToUnit()) {
-    FP->SetLocalScope(SubProg->getScope());
-  }
-  AddFunctionMapping(SubProg, FP);
-
-  return FP;
-}
-
-void hakc::HAKCTypeIdentifier::AddFunctionMapping(
-    const DISubprogram *SubProg,
-    const std::shared_ptr<HAKCFunctionInfo> &HAKCFunction) {
-  CommonHAKCAnalysis::getWriter(
-      AnalysisHelper.GetSystemInfo().OutputDebugInfo(SubProg->getName()))
-      << "Adding mapping " << *SubProg << " -> " << *HAKCFunction << "\n";
-  functions[SubProg] = HAKCFunction;
-  HAKCFunction->GetType()->SetLLVMType(
-      HAKCFunction->GetFunction()->getFunctionType());
-}
-
-void hakc::HAKCTypeIdentifier::FindAllGlobalsUsed(
-    Value *V, std::set<GlobalObject *> &GlobalSet) {
-  if (auto *ConstStruct = dyn_cast<ConstantStruct>(V)) {
-    for (auto &Member : ConstStruct->operands()) {
-      auto *MemberDef = AnalysisHelper.getDef(Member.get(), false);
-      if (auto *GlobalObj = dyn_cast<GlobalObject>(MemberDef)) {
-        GlobalSet.insert(GlobalObj);
-      } else {
-        FindAllGlobalsUsed(MemberDef, GlobalSet);
-      }
-    }
-  } else if (auto *GlobalObj = dyn_cast<GlobalObject>(V)) {
-    GlobalSet.insert(GlobalObj);
-  } else if (auto *ConstArray = dyn_cast<ConstantArray>(V)) {
-    for (auto &Member : ConstArray->operands()) {
-      auto MemberDef = AnalysisHelper.getDef(Member.get(), false);
-      if (auto *GlobalMember = dyn_cast<GlobalObject>(MemberDef)) {
-        GlobalSet.insert(GlobalMember);
-      } else {
-        FindAllGlobalsUsed(MemberDef, GlobalSet);
-      }
-    }
-  } else if (auto *I = dyn_cast<Instruction>(V)) {
-    for (auto &Op : I->operands()) {
-      auto MemberDef = AnalysisHelper.getDef(Op.get(), false);
-      if (auto *GlobalMember = dyn_cast<GlobalObject>(MemberDef)) {
-        GlobalSet.insert(GlobalMember);
-      }
-    }
-  }
-}
-
-std::shared_ptr<hakc::HAKCFunctionInfo>
-hakc::HAKCTypeIdentifier::AddUnmappedFunction(Function *F) {
-  auto debug = AnalysisHelper.GetSystemInfo().OutputDebugInfo(F);
-
-  for (const auto &UnmappedFunc : UnmappedFunctions) {
-    if (UnmappedFunc->GetFunction() == F) {
-      return UnmappedFunc;
-    }
-  }
-  CommonHAKCAnalysis::getWriter(debug)
-      << "Adding unmapped Function " << F->getName() << "\n";
-  auto FuncInfo =
-      std::make_shared<HAKCFunctionInfo>(AnalysisHelper, F->getName(), debug);
-  FuncInfo->SetFunction(F);
-  auto HAKCType = FindCalledFunctionType(F->getFunctionType());
-  if (!HAKCType) {
-    HAKCType = CreateNoDebugType(F->getFunctionType());
-  }
-
-  CommonHAKCAnalysis::getWriter(debug)
-      << "HAKCType exists for " << F->getName() << "\n";
-
-  if (!HAKCType->GetLLVMType()) {
-    HAKCType->SetLLVMType(F->getFunctionType());
-  }
-  FuncInfo->SetType(HAKCType);
-  UnmappedFunctions.insert(FuncInfo);
-  return FuncInfo;
-}
-
-std::shared_ptr<hakc::HAKCSymbolInfo>
-hakc::HAKCTypeIdentifier::AddUnmappedGlobal(GlobalObject *GlobalObj) {
-  auto debug = AnalysisHelper.GetSystemInfo().OutputDebugInfo(GlobalObj);
-  if (CommonHAKCAnalysis::IsStringType(GlobalObj->getValueType())) {
-    return nullptr;
-  }
-  if (auto *F = dyn_cast<Function>(GlobalObj)) {
-    return AddUnmappedFunction(F);
-  } else if (auto *GV = dyn_cast<GlobalVariable>(GlobalObj)) {
-    for (auto UnmappedGlobal : UnmappedGlobals) {
-      if (UnmappedGlobal->GetGlobalVariable() == GV) {
-        return UnmappedGlobal;
-      }
-    }
-    CommonHAKCAnalysis::getWriter(debug)
-        << "Adding unmapped Global Variable " << GV->getName() << "\n";
-    auto GlobalInfo = std::make_shared<HAKCGlobalInfo>(
-        AnalysisHelper, GlobalObj->getName(), debug);
-    auto HAKCType = FindType(GlobalObj->getValueType());
-    if (!HAKCType) {
-      HAKCType = CreateNoDebugType(GlobalObj->getValueType());
-      //            AddLLVMTypeMapping(HAKCType, HAKCType->GetLLVMType());
-    }
-    CommonHAKCAnalysis::getWriter(debug)
-        << "HAKCType exists for " << GV->getName() << "\n";
-    if (!HAKCType->GetLLVMType()) {
-      HAKCType->SetLLVMType(GV->getValueType());
-    }
-    GlobalInfo->SetGlobalVariable(GV);
-    GlobalInfo->SetType(HAKCType);
-    UnmappedGlobals.insert(GlobalInfo);
-    return GlobalInfo;
-  } else {
-    CommonHAKCAnalysis::getWriter(true)
-        << "Unsupported GlobalObj: " << *GlobalObj << "\n";
-    throw std::exception();
-  }
-}
-
-void hakc::HAKCTypeIdentifier::AddUsedGlobals(
-    const std::set<GlobalObject *> &GlobalObjects,
-    const std::shared_ptr<hakc::HAKCSymbolInfo> &UserSymbol) {
-  for (auto *UsedGlobal : GlobalObjects) {
-    auto debug = AnalysisHelper.GetSystemInfo().OutputDebugInfo(UsedGlobal);
-    auto Symbol = FindSymbol(UsedGlobal);
-    if (!Symbol) {
-      CommonHAKCAnalysis::getWriter(debug)
-          << "\nGlobal " << UsedGlobal->getName() << " is used in "
-          << UserSymbol->GetGlobalObj()->getName()
-          << " but the Symbol could not be found\n";
-      Symbol = AddUnmappedGlobal(UsedGlobal);
-    }
-    CommonHAKCAnalysis::getWriter(debug)
-        << "Found Symbol " << Symbol->GetName() << "\n";
-    if (Symbol) {
-      UserSymbol->AddSymbolUse(Symbol);
-    }
-  }
-}
-
-void hakc::HAKCTypeIdentifier::FindUsesInGlobals() {
-  for (auto &it : globals) {
-    auto *GV = it.second->GetGlobalVariable();
-
-    if (GV->hasInitializer()) {
-      CommonHAKCAnalysis::getWriter(
-          AnalysisHelper.GetSystemInfo().OutputDebugInfo(GV))
-          << "Searching for globals in " << *GV << "\n";
-      std::set<GlobalObject *> GlobalsUsed;
-      FindAllGlobalsUsed(GV->getInitializer(), GlobalsUsed);
-      AddUsedGlobals(GlobalsUsed, it.second);
-    }
-  }
-}
-
-void hakc::HAKCTypeIdentifier::CreateIndirectCallSourceLink(
-    Value *V, std::vector<std::shared_ptr<HAKCIndirectCallSourceLink>> &Path) {
-  if (auto *Arg = dyn_cast<Argument>(V)) {
-    auto HAKCType = FindType(Arg->getType());
-    if (!HAKCType) {
-      CommonHAKCAnalysis::getWriter(
-          AnalysisHelper.GetSystemInfo().OutputDebugInfo(Arg->getParent()))
-          << "Could not find HAKCType for Argument " << Arg->getArgNo()
-          << " of Function " << Arg->getParent()->getName() << "\n";
-      return;
-    }
-    if (!HAKCType->GetLLVMType()) {
-      HAKCType->SetLLVMType(Arg->getType());
-    }
-    auto Link = std::make_shared<HAKCIndirectCallSourceLink>(
-        Arg, HAKCType,
-        AnalysisHelper.GetSystemInfo().OutputDebugInfo(Arg->getParent()));
-    Path.push_back(Link);
-  } else if (auto *GV = dyn_cast<GlobalVariable>(V)) {
-    auto HAKCSymbol = FindGlobal(GV, true);
-    if (!HAKCSymbol) {
-      CommonHAKCAnalysis::getWriter(
-          AnalysisHelper.GetSystemInfo().OutputDebugInfo(GV))
-          << "Could not find HAKC Symbol for " << *GV << "\n";
-      return;
-    }
-    auto Link = std::make_shared<HAKCIndirectCallSourceLink>(
-        HAKCSymbol, AnalysisHelper.GetSystemInfo().OutputDebugInfo(GV));
-    Path.push_back(Link);
-  } else if (auto *Load = dyn_cast<LoadInst>(V)) {
-    auto *Pointer = Load->getPointerOperand();
-    auto debug =
-        AnalysisHelper.GetSystemInfo().OutputDebugInfo(Load->getFunction());
-    if (auto *GEP = dyn_cast<GEPOperator>(Pointer)) {
-      auto *TyToCheck = GEP->getSourceElementType();
-      auto HAKCType = FindType(TyToCheck);
-      if (HAKCType /*&& GEP->hasAllConstantIndices()*/) {
-        APInt Offset(64, 0);
-        GEP->stripAndAccumulateInBoundsConstantOffsets(
-            GetModule().getDataLayout(), Offset);
-        CommonHAKCAnalysis::getWriter(debug)
-            << "Offset in bits for " << *GEP << ": " << Offset.getZExtValue()
-            << "\n";
-        if (!HAKCType->GetLLVMType()) {
-          HAKCType->SetLLVMType(TyToCheck);
-        }
-        auto Link = std::make_shared<HAKCIndirectCallSourceLink>(
-            HAKCType, Offset.getSExtValue(), debug);
-        Path.push_back(Link);
-        CreateIndirectCallSourceLink(GEP->getPointerOperand(), Path);
-      }
-      if (!GEP->hasAllConstantIndices()) {
-        CommonHAKCAnalysis::getWriter(debug)
-            << "GEP does not have all constant indices: " << *GEP << "\n";
-      } else {
-        CommonHAKCAnalysis::getWriter(debug)
-            << "Could not find Load Pointer HAKC Type for " << *TyToCheck
-            << "\n";
-      }
-    } else if (auto *GVal = dyn_cast<GlobalValue>(Pointer)) {
-      auto HAKCSymbol = FindSymbol(GVal, true);
-      if (!HAKCSymbol) {
-        CommonHAKCAnalysis::getWriter(debug)
-            << "Unable to find Global " << GVal->getName() << "\n";
-        return;
-      }
-      auto Link =
-          std::make_shared<HAKCIndirectCallSourceLink>(HAKCSymbol, debug);
-      Path.push_back(Link);
-    } else {
-      CommonHAKCAnalysis::getWriter(debug)
-          << "Unhandled Load Pointer Operand type: " << *Pointer << "\n";
-      auto *LoadTy = Load->getPointerOperand()->getType();
-      auto HAKCType = FindType(LoadTy);
-      if (HAKCType) {
-        auto Link =
-            std::make_shared<HAKCIndirectCallSourceLink>(HAKCType, 0, debug);
-        Path.push_back(Link);
-      }
-    }
-  } else if (auto *IntToPtr = dyn_cast<IntToPtrInst>(V)) {
-    CommonHAKCAnalysis::getWriter(
-        AnalysisHelper.GetSystemInfo().OutputDebugInfo(IntToPtr->getFunction()))
-        << "Adding IntToPtr Link\n";
-    CreateIndirectCallSourceLink(IntToPtr->getOperand(0), Path);
-  } else if (auto *CallI = dyn_cast<CallInst>(V)) {
-    CommonHAKCAnalysis::getWriter(
-        AnalysisHelper.GetSystemInfo().OutputDebugInfo(CallI->getFunction()))
-        << "Adding Call Link\n";
-    CreateIndirectCallSourceLink(CallI->getCalledOperand(), Path);
-  } else {
-    CommonHAKCAnalysis::getWriter(
-        AnalysisHelper.GetSystemInfo().OutputDebugInfo())
-        << "Unhandled Link type: " << V << "\n";
-  }
-}
-
-void hakc::HAKCTypeIdentifier::FindIndirectCallSource(
-    CallInst *CallI,
-    std::vector<std::shared_ptr<HAKCIndirectCallSourceLink>> &Path) {
-  if (!CallI->isIndirectCall()) {
-    CommonHAKCAnalysis::getWriter(true)
-        << *CallI << " is not an indirect call\n";
-    throw std::exception();
-  }
-
-  CreateIndirectCallSourceLink(CallI->getCalledOperand(), Path);
-  CommonHAKCAnalysis::getWriter(
-      AnalysisHelper.GetSystemInfo().OutputDebugInfo(CallI->getFunction()))
-      << "Found " << Path.size() << " path links for "
-      << *CallI->getCalledOperand() << "\n";
-}
-
-FunctionType *
-hakc::HAKCTypeIdentifier::GetIndirectCallFunctionType(const CallInst *CallI) {
-  if (!CallI->isIndirectCall()) {
-    CommonHAKCAnalysis::getWriter(true)
-        << "Trying to get type from a Call that is not an indirect call\n";
-    throw std::exception();
-  }
-  return CallI->getFunctionType();
-}
-
-void hakc::HAKCTypeIdentifier::FindUsesInFunctions() {
-  for (auto &it : functions) {
-    auto *F = it.second->GetFunction();
-    auto debug = AnalysisHelper.GetSystemInfo().OutputDebugInfo(F);
-    CommonHAKCAnalysis::getWriter(debug)
-        << "Searching for globals in Function " << F->getName() << "\n";
-
-    std::set<GlobalObject *> GlobalsUsed;
-    for (auto InstIt = inst_begin(F); InstIt != inst_end(F); ++InstIt) {
-      auto *I = &(*InstIt);
-      if (I->isDebugOrPseudoInst() || isa<IntrinsicInst>(I) ||
-          isa<BranchInst>(I)) {
-        continue;
-      }
-      FindAllGlobalsUsed(I, GlobalsUsed);
-    }
-    AddUsedGlobals(GlobalsUsed, it.second);
-
-    for (auto InstIt = inst_begin(F); InstIt != inst_end(F); ++InstIt) {
-      auto *I = &(*InstIt);
-      if (I->isDebugOrPseudoInst() || isa<IntrinsicInst>(I) ||
-          isa<BranchInst>(I)) {
-        continue;
-      }
-      if (auto *Call = dyn_cast<CallInst>(I)) {
-        if (Call->getCalledFunction()) {
-          auto FoundFunction = FindFunction(Call->getCalledFunction(), true);
-          if (!FoundFunction) {
-            CommonHAKCAnalysis::getWriter(debug)
-                << "Could not find HAKC Symbol for Function "
-                << Call->getCalledFunction()->getName() << "\n";
-            FoundFunction = AddUnmappedFunction(Call->getCalledFunction());
-          }
-          it.second->AddDirectCall(FoundFunction);
-        } else if (Call->isIndirectCall()) {
-          auto *FunctionTy = GetIndirectCallFunctionType(Call);
-          CommonHAKCAnalysis::getWriter(debug)
-              << "Source of indirect call operand in Function " << F->getName()
-              << ": " << AnalysisHelper.getDef(Call->getCalledOperand(), true)
-              << "\n";
-          auto HAKCType = FindCalledFunctionType(FunctionTy);
-          if (!HAKCType) {
-            CommonHAKCAnalysis::getWriter(true)
-                << "Could not find called HAKCType for " << *Call
-                << " with Searched Type " << *FunctionTy << " in Function "
-                << F->getName() << "\n";
-            HAKCType = FindType(Call->getCalledOperand()->getType());
-            if (HAKCType) {
-              CommonHAKCAnalysis::getWriter(true)
-                  << "But the Pointer HAKCType exists: " << HAKCType->GetName()
-                  << "\n";
-            }
+namespace llvm::hakc {
+    std::shared_ptr<HAKCTypeInfo> HAKCTypeIdentifier::FindType(const DIType *type) {
+        if (!type) {
+            CommonHAKCAnalysis::getLogger(Fatal) << "Trying to find null type\n";
             throw std::exception();
-          }
-          std::vector<std::shared_ptr<HAKCIndirectCallSourceLink>> SourcePath;
-          if (!HAKCType->GetLLVMType()) {
-            HAKCType->SetLLVMType(FunctionTy);
-          }
-          FindIndirectCallSource(Call, SourcePath);
-          auto Source = std::make_shared<HAKCIndirectCallSource>(
-              SourcePath, HAKCType, debug);
-          it.second->AddIndirectCall(Source);
         }
-      }
-    }
-  }
-}
-
-std::shared_ptr<hakc::HAKCTypeInfo>
-hakc::HAKCTypeIdentifier::FindType(Type *Ty) {
-  // remove this functionality, because it would only work for non pointers and
-  // is logically incorrect
-  if (isa<PointerType>(Ty)) {
-    return nullptr;
-  }
-  CommonHAKCAnalysis::getWriter(
-      AnalysisHelper.GetSystemInfo().OutputDebugInfo())
-      << "Trying to find HAKCTypeInfo for " << *Ty << "\n";
-
-  for (auto &it : types) {
-    if (it.second->GetLLVMType() && it.second->GetLLVMType() == Ty) {
-      return it.second;
-    }
-  }
-
-  return nullptr;
-}
-
-hakc::HAKCTypeP
-hakc::HAKCTypeIdentifier::FindType(HAKCPointerBase &HAKCPointer) {
-  HAKCTypeP ReturnTy = nullptr;
-  if (HAKCPointer.GetType()) {
-    ReturnTy = HAKCPointer.GetType();
-  } else {
-    ReturnTy = FindHAKCType(HAKCPointer.GetBaseDefinition());
-  }
-  if (ReturnTy) {
-    if (ReturnTy->IsPointerType() && !ReturnTy->GetPointeeType()) {
-      auto PointeeType = FindPointeeType(*ReturnTy);
-      if (PointeeType) {
-        ReturnTy->SetPointeeType(PointeeType);
-      }
-    }
-    HAKCPointer.SetType(ReturnTy);
-  }
-  return ReturnTy;
-}
-
-hakc::HAKCTypeP
-hakc::HAKCTypeIdentifier::FindPointeeType(HAKCPointerBase &HAKCPointer) {
-  if (HAKCPointer.GetType() && HAKCPointer.GetType()->GetPointeeType()) {
-    return HAKCPointer.GetType()->GetPointeeType();
-  }
-
-  HAKCTypeP BaseType = HAKCPointer.GetType();
-  HAKCTypeP PointeeType = nullptr;
-  if (!BaseType) {
-    BaseType = FindType(HAKCPointer);
-  }
-
-  if (BaseType) {
-    PointeeType = FindPointeeType(*BaseType);
-    BaseType->SetPointeeType(PointeeType);
-  }
-
-  return PointeeType;
-}
-
-hakc::HAKCTypeP
-hakc::HAKCTypeIdentifier::FindPointeeType(const HAKCTypeInfo &BaseType) {
-  if (BaseType.GetPointeeType()) {
-    return BaseType.GetPointeeType();
-  }
-
-  auto Debug = AnalysisHelper.GetSystemInfo().OutputDebugInfo();
-  CommonHAKCAnalysis::getWriter(Debug)
-      << "Finding Pointee Type for " << BaseType << "\n";
-  DIType *TypeToFind = nullptr;
-  if (BaseType.GetDbgType() &&
-      BaseType.GetDbgType()->getTag() == dwarf::DW_TAG_pointer_type) {
-    TypeToFind = dyn_cast<DIDerivedType>(BaseType.GetDbgType())->getBaseType();
-  }
-  if (!TypeToFind) {
-    CommonHAKCAnalysis::getWriter(Debug) << "Could not find PointeeType\n";
-    return nullptr;
-  }
-
-  for (auto &it : types) {
-    auto *DebugTy = it.first;
-    if (DebugTy == TypeToFind) {
-      CommonHAKCAnalysis::getWriter(Debug)
-          << "Found PointeeType " << *it.second << "\n";
-      return it.second;
-    }
-  }
-  CommonHAKCAnalysis::getWriter(Debug)
-      << "PointeeType " << TypeToFind << " not found\n";
-  return nullptr;
-}
-
-hakc::HAKCTypeP hakc::HAKCTypeIdentifier::GetArgumentHAKCType(Argument *Arg) {
-  auto *F = Arg->getParent();
-  if (AnalysisHelper.IsOutsideTransferFunc(F)) {
-    F = AnalysisHelper.GetOriginalFunctionFromTransferFunction(F);
-  }
-
-  auto *DISubprog = F->getSubprogram();
-  HAKCTypeP Result = nullptr;
-  if (DISubprog) {
-    Result = GetArgumentHAKCType(DISubprog->getType(), Arg->getArgNo());
-  }
-
-  return Result;
-}
-
-hakc::HAKCTypeP hakc::HAKCTypeIdentifier::GetArgumentHAKCType(
-    const DISubroutineType *FunctionTy, unsigned ArgNo) {
-  HAKCTypeP Result = nullptr;
-  if (FunctionTy) {
-    // The + 1 comes from the fact that the type array stores the return type
-    // (including void, which is a null pointer) at index 0
-    auto *ArgDIType = FunctionTy->getTypeArray()[ArgNo + 1];
-    Result = FindType(ArgDIType);
-  }
-  return Result;
-}
-
-hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCTypeForUse(Use &U) {
-  CommonHAKCAnalysis::getWriter(
-      AnalysisHelper.GetSystemInfo().OutputDebugInfo())
-      << "Attempting to find HAKCTypeInfo for Use " << U << "\n";
-  HAKCTypeP Result = nullptr;
-  if (auto *CallI = dyn_cast<CallInst>(U.getUser())) {
-    auto CallTy = FindCalledFunctionType(CallI->getFunctionType());
-    if (CallTy) {
-      if (U.getOperandNo() == CallI->getCalledOperandUse().getOperandNo()) {
-        auto FuncTy =
-            FindType(dyn_cast<DISubroutineType>(CallTy->GetDbgType()));
-        Result = FindPointerType(FuncTy);
-      } else {
-        Result = GetArgumentHAKCType(
-            dyn_cast<DISubroutineType>(CallTy->GetDbgType()), U.getOperandNo());
-      }
-    }
-  } else if (isa<AllocaInst>(U.get()) && isa<LoadInst>(U.getUser())) {
-    Result = FindHAKCType(U.getUser());
-  } else if (auto *GEPI = dyn_cast<GetElementPtrInst>(U.getUser())) {
-    auto BaseType = FindType(GEPI->getSourceElementType());
-    if (BaseType) {
-      Result = FindPointerType(BaseType);
-    }
-  }
-
-  return Result;
-}
-
-hakc::HAKCTypeP
-hakc::HAKCTypeIdentifier::FindPointerType(const HAKCTypeP &BaseType) {
-  for (auto &It : types) {
-    auto *DebugType = It.first;
-    if (DebugType->getTag() == dwarf::DW_TAG_pointer_type) {
-      if (dyn_cast<DIDerivedType>(DebugType)->getBaseType() ==
-          BaseType->GetDbgType()) {
-        return It.second;
-      }
-    }
-  }
-
-  return nullptr;
-}
-
-hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
-  HAKCTypeP FoundType = nullptr;
-  Type *BaseType = nullptr;
-  CommonHAKCAnalysis::getWriter(
-      AnalysisHelper.GetSystemInfo().OutputDebugInfo())
-      << "Attempting to find HAKCTypeInfo for " << *V << "\n";
-
-  if (isa<LoadInst>(V) || isa<StoreInst>(V)) {
-    BaseType = getLoadStoreType(V);
-  } else if (isa<GetElementPtrInst>(V)) {
-    BaseType = dyn_cast<GetElementPtrInst>(V)->getSourceElementType();
-  } else if (auto *Arg = dyn_cast<Argument>(V)) {
-    FoundType = GetArgumentHAKCType(Arg);
-  } else if (auto *AllocaI = dyn_cast<AllocaInst>(V)) {
-    BaseType = AllocaI->getAllocatedType();
-  }
-  // maybe remove below
-  else if (auto *GlobalVar = dyn_cast<GlobalVariable>(V)) {
-    BaseType = GlobalVar->getValueType(); // or getType()?
-  } else if (auto *Func = dyn_cast<Function>(V)) {
-    BaseType = Func->getReturnType();
-  } else if (auto *CallI = dyn_cast<CallInst>(V)) {
-    BaseType = CallI->getType();
-  }
-  // maybe remove above
-
-  if (BaseType) {
-    CommonHAKCAnalysis::getWriter(
-        AnalysisHelper.GetSystemInfo().OutputDebugInfo())
-        << "Using BaseType " << *BaseType << "\n";
-    if (!isa<PointerType>(BaseType)) {
-      FoundType = FindType(BaseType);
-    } else {
-      for (auto &U : V->uses()) {
-        CommonHAKCAnalysis::getWriter(
-            AnalysisHelper.GetSystemInfo().OutputDebugInfo())
-            << "Finding Type of " << U << "\n";
-        auto BaseHAKCType = FindHAKCTypeForUse(U);
-        if (BaseHAKCType) {
-          CommonHAKCAnalysis::getWriter(
-              AnalysisHelper.GetSystemInfo().OutputDebugInfo())
-              << "Found " << *BaseHAKCType << " for " << U << "\n";
-          FoundType = BaseHAKCType;
-          break;
+        CommonHAKCAnalysis::getLogger(Verbose)
+                << "Finding HAKCTypeInfo for " << *type << "\n";
+        if (auto *Derived = dyn_cast<DIDerivedType>(type)) {
+            CommonHAKCAnalysis::getLogger(Verbose) << " with base type ";
+            if (Derived->getBaseType()) {
+                CommonHAKCAnalysis::getLogger(Verbose) << Derived->getBaseType();
+            } else { CommonHAKCAnalysis::getLogger(Verbose) << "void"; }
+            CommonHAKCAnalysis::getLogger(Verbose) << "\n";
         }
-      }
+        auto it = TypesWithDebugInfo.find(type);
+        if (it == TypesWithDebugInfo.end()) { return nullptr; }
+        return it->second;
     }
-  }
 
-  if (FoundType && FoundType->IsPointerType() &&
-      FoundType->GetPointeeType() == nullptr) {
-    auto PointeeType = FindPointeeType(*FoundType);
-    if (PointeeType) {
-      FoundType->SetPointeeType(PointeeType);
-    }
-  }
-
-  if (FoundType) {
-    CommonHAKCAnalysis::getWriter(
-        AnalysisHelper.GetSystemInfo().OutputDebugInfo())
-        << "Found HAKCTypeInfo\n"
-        << *FoundType << "\nfor " << V << "\n";
-  } else {
-    CommonHAKCAnalysis::getWriter(
-        AnalysisHelper.GetSystemInfo().OutputDebugInfo())
-        << "Cound not find HAKCTypeInfo for " << V << "\n";
-  }
-
-  return FoundType;
-}
-
-std::shared_ptr<hakc::HAKCTypeInfo>
-hakc::HAKCTypeIdentifier::FindCalledFunctionType(FunctionType *FunctionTy) {
-  if (!FunctionTy) {
-    CommonHAKCAnalysis::getWriter(true) << "Trying to find null FunctionTy\n";
-    throw std::exception();
-  }
-
-  auto FoundType = FindType(FunctionTy);
-  if (!FoundType) {
-    for (auto &it : IndirectCallsTypes) {
-      if (it.second->GetPointeeType()->GetLLVMType() == FunctionTy) {
-        FoundType = it.second;
-        break;
-      }
-    }
-  }
-  return FoundType;
-}
-
-std::shared_ptr<hakc::HAKCFunctionInfo>
-hakc::HAKCTypeIdentifier::FindFunction(const Function *F, bool SearchUnmapped) {
-  for (auto &it : functions) {
-    if (it.second->GetFunction() == F) {
-      return it.second;
-    }
-  }
-  if (SearchUnmapped) {
-    for (auto UnmappedFunction : UnmappedFunctions) {
-      if (UnmappedFunction->GetFunction() == F) {
-        return UnmappedFunction;
-      }
-    }
-  }
-  return nullptr;
-}
-
-std::shared_ptr<hakc::HAKCGlobalInfo>
-hakc::HAKCTypeIdentifier::FindGlobal(const GlobalVariable *GV,
-                                     bool SearchUnmapped) {
-  for (auto &it : globals) {
-    if (it.second->GetGlobalVariable() == GV) {
-      return it.second;
-    }
-  }
-  if (SearchUnmapped) {
-    for (auto UnmappedGlobal : UnmappedGlobals) {
-      if (UnmappedGlobal->GetGlobalVariable() == GV) {
-        return UnmappedGlobal;
-      }
-    }
-  }
-  return nullptr;
-}
-
-std::shared_ptr<hakc::HAKCSymbolInfo>
-hakc::HAKCTypeIdentifier::FindSymbol(Value *V, bool SearchUnmapped) {
-  if (auto *GV = dyn_cast<GlobalVariable>(V)) {
-    return FindGlobal(GV, SearchUnmapped);
-  }
-  if (auto *F = dyn_cast<Function>(V)) {
-    return FindFunction(F, SearchUnmapped);
-  }
-  return nullptr;
-}
-
-hakc::HAKCSymbolP hakc::HAKCTypeIdentifier::FindYamlSymbol(
-    const hakc::HAKCYamlSymbol &YamlSymbol) {
-  for (auto &it : globals) {
-    if (YamlSymbol == *it.second) {
-      return it.second;
-    }
-  }
-  for (auto &Unmapped : UnmappedGlobals) {
-    if (YamlSymbol == *Unmapped) {
-      return Unmapped;
-    }
-  }
-  for (auto &it : functions) {
-    if (YamlSymbol == *it.second) {
-      return it.second;
-    }
-  }
-  for (auto &Unmapped : UnmappedFunctions) {
-    if (YamlSymbol == *Unmapped) {
-      return Unmapped;
-    }
-  }
-  return nullptr;
-}
-
-void hakc::HAKCTypeIdentifier::FindTypesInFunctions() {
-  for (auto &it : functions) {
-    auto *F = it.second->GetFunction();
-    auto debug = AnalysisHelper.GetSystemInfo().OutputDebugInfo(F);
-
-    CommonHAKCAnalysis::getWriter(debug)
-        << "Finding types in Function " << F->getName() << "\n";
-    for (auto InstIt = inst_begin(F); InstIt != inst_end(F); ++InstIt) {
-      auto *I = &(*InstIt);
-      if (auto *DbgIntrinsic = dyn_cast<DbgVariableIntrinsic>(I)) {
-        auto *V = DbgIntrinsic->getVariableLocationOp(0);
-        if (isa<UndefValue>(V)) {
-          CommonHAKCAnalysis::getWriter(debug)
-              << "Skipping undef Value in Instruction " << *I << "\n";
-          continue;
+    bool hakc::HAKCTypeIdentifier::IsStructTypeThatStartsWithPointerLikeType(
+        const HAKCTypeInfo &HAKCTy) {
+        if (HAKCTy.GetDbgType()) {
+            auto *StrippedTy = HAKCTypeInfo::StripTypeModifiers(HAKCTy.GetDbgType());
+            if (auto *CompositeTy = dyn_cast<DICompositeType>(StrippedTy)) {
+                if (CompositeTy->getTag() == dwarf::DW_TAG_union_type) {
+                    for (auto *Element: CompositeTy->getElements()) {
+                        if (IsPointerLikeType(
+                            dyn_cast<DIDerivedType>(Element)->getBaseType())) { return true; }
+                    }
+                    return false;
+                }
+                auto *FirstMemberTy = GetFirstStructMemberType(CompositeTy);
+                return IsPointerLikeType(FirstMemberTy);
+            }
+        } else {
+            if (isa_and_nonnull<StructType>(HAKCTy.GetLLVMType())) {
+                auto *StructTy = dyn_cast<StructType>(HAKCTy.GetLLVMType());
+                return StructTy->getElementType(0)->isPointerTy();
+            }
         }
-        auto *DebugV = DbgIntrinsic->getVariable();
-        CommonHAKCAnalysis::getWriter(debug)
-            << "Found " << *V << " to " << *DebugV
-            << " mapping from Instruction " << *I << "\n";
-        auto HAKCType = FindType(DebugV->getType());
-        if (!HAKCType) {
-          CommonHAKCAnalysis::getWriter(true)
-              << "Could not find HAKCType for DIType " << *DebugV->getType()
-              << "\n";
-          throw std::exception();
+
+        return false;
+    }
+
+    bool hakc::HAKCTypeIdentifier::IsPointerLikeType(const DIType *DIType) {
+        std::set<unsigned> PointerLike_Tags = {
+            dwarf::DW_TAG_pointer_type,
+            dwarf::DW_TAG_array_type
+        };
+        auto *StrippedTy = HAKCTypeInfo::StripTypeModifiers(DIType);
+        if (!StrippedTy) { return false; }
+        CommonHAKCAnalysis::getLogger(Verbose)
+                << "Checking if " << *StrippedTy << " is Pointer Like\n";
+
+        if (PointerLike_Tags.contains(StrippedTy->getTag())) { return true; }
+
+        if (auto *BasicTy = dyn_cast<DIBasicType>(StrippedTy)) {
+            std::set<unsigned> PointerLike_Encodings = {
+                dwarf::DW_ATE_unsigned,
+                dwarf::DW_ATE_address
+            };
+            return PointerLike_Encodings.contains(BasicTy->getEncoding()) &&
+                   BasicTy->getSizeInBits() == 64;
+        } else if (auto *CompositeTy = dyn_cast<DICompositeType>(StrippedTy)) {
+            if (CompositeTy->getTag() == dwarf::DW_TAG_union_type) {
+                for (auto *UnionMember: CompositeTy->getElements()) {
+                    auto *MemberTy = dyn_cast<DIDerivedType>(UnionMember);
+                    if (IsPointerLikeType(MemberTy->getBaseType())) { return true; }
+                }
+            } else {
+                auto *FirstMemberTy = GetFirstStructMemberType(CompositeTy);
+                return IsPointerLikeType(FirstMemberTy);
+            }
         }
-        auto *LLVMTy = V->getType();
-        if (auto *Alloca = dyn_cast<AllocaInst>(V)) {
-          LLVMTy = Alloca->getAllocatedType();
+
+        return false;
+    }
+
+    const DIType *hakc::HAKCTypeIdentifier::GetFirstStructMemberType(
+        const DICompositeType *DICompositeTy) {
+        auto *StrippedTy = dyn_cast<DICompositeType>(
+            HAKCTypeInfo::StripTypeModifiers(DICompositeTy));
+        if (!StrippedTy || (StrippedTy->getTag() != dwarf::DW_TAG_structure_type &&
+                            StrippedTy->getTag() != dwarf::DW_TAG_union_type)) {
+            return nullptr;
+        }
+        const auto MemberTypes = StrippedTy->getElements();
+        if (MemberTypes.empty()) { return nullptr; }
+        auto *FirstMemberType = HAKCTypeInfo::StripTypeModifiers(
+            dyn_cast<DIDerivedType>(MemberTypes[0])->getBaseType());
+        return FirstMemberType;
+    }
+
+    void hakc::HAKCTypeIdentifier::AddTypeMapping(
+        const DIType *type, const std::shared_ptr<HAKCTypeInfo> &HAKCType) {
+        CommonHAKCAnalysis::getLogger(Verbose)
+                << "Adding mapping " << *type << " -> " << HAKCType->GetName() << "\n";
+        HAKCType->SetDbgType(type);
+        auto DbgTypeName = GetTypeName(type);
+        HAKCType->SetDbgTypeName(DbgTypeName);
+        TypesWithDebugInfo[type] = HAKCType;
+    }
+
+    std::string hakc::HAKCTypeIdentifier::GetDbgName(const HAKCTypeInfo &HAKCTy) {
+        std::string Name = "";
+        if (HAKCTy.GetDbgType()) { Name = GetTypeName(HAKCTy.GetDbgType()); } else if
+        (HAKCTy.GetLLVMType()) { Name = GetTypeName(HAKCTy.GetLLVMType()); }
+        return Name;
+    }
+
+    std::string hakc::HAKCTypeIdentifier::GetTypeName(Type *Ty) {
+        std::string Name;
+        raw_string_ostream NameStream(Name);
+        Ty->print(NameStream);
+        return Name;
+    }
+
+    std::string hakc::HAKCTypeIdentifier::GetTypeName(const DIType *type) {
+        std::string Name;
+        llvm::raw_string_ostream out(Name);
+
+        if (auto *SubroutineTy = dyn_cast<DISubroutineType>(type)) {
+            for (unsigned i = 0; i < SubroutineTy->getTypeArray()->getNumOperands();
+                 i++) {
+                auto *CurrTy = SubroutineTy->getTypeArray()[i];
+                if (!CurrTy) {
+                    if (i == 0) { out << "void"; } else if (
+                        i == SubroutineTy->getTypeArray()->getNumOperands() - 1) {
+                        out << "...";
+                    } else {
+                        CommonHAKCAnalysis::getLogger(Fatal)
+                                << "Null operand at " << i << " for " << *type << "\n"
+                                << "Current type: " << Name << "\n";
+                        throw std::exception();
+                    }
+                } else { out << GetTypeName(CurrTy); }
+
+                if (i == 0) { out << " ("; } else if (
+                    i < SubroutineTy->getTypeArray()->getNumOperands() - 1) { out << ", "; }
+            }
+            out << ")";
+        } else if (auto *DerivedTy = dyn_cast<DIDerivedType>(type)) {
+            if (DerivedTy->getTag() == dwarf::DW_TAG_pointer_type) {
+                if (!DerivedTy->getBaseType()) { out << "void"; } else {
+                    out << GetTypeName(DerivedTy->getBaseType());
+                }
+                out << "*";
+            } else if (DerivedTy->getTag() == dwarf::DW_TAG_typedef) {
+                if (!DerivedTy->getBaseType())
+                    out << "void";
+                else
+                    out << GetTypeName(DerivedTy->getBaseType());
+            } else if (DerivedTy->getTag() == dwarf::DW_TAG_volatile_type) {
+                out << "volatile ";
+                if (!DerivedTy->getBaseType()) { out << "void"; } else {
+                    out << GetTypeName(DerivedTy->getBaseType());
+                }
+            } else if (DerivedTy->getTag() == dwarf::DW_TAG_const_type) {
+                out << "const ";
+                if (!DerivedTy->getBaseType()) { out << "void"; } else {
+                    out << GetTypeName(DerivedTy->getBaseType());
+                }
+            } else if (DerivedTy->getTag() == dwarf::DW_TAG_restrict_type) {
+                out << "restrict ";
+                if (!DerivedTy->getBaseType()) { out << "void"; } else {
+                    out << GetTypeName(DerivedTy->getBaseType());
+                }
+            } else {
+                CommonHAKCAnalysis::getLogger(Fatal) << "Unhandled DIDerivedType tag\n"
+                        << DerivedTy << "\n";
+                throw std::exception();
+            }
+        } else if (auto *CompositeTy = dyn_cast<DICompositeType>(type)) {
+            if (CompositeTy->getTag() == dwarf::DW_TAG_array_type) {
+                out << GetTypeName(CompositeTy->getBaseType()) << "[]";
+            } else if (CompositeTy->getTag() == dwarf::DW_TAG_structure_type) {
+                out << "struct ";
+                if (CompositeTy->getName().empty()) {
+                    out << "anon." << CompositeTy->getLine();
+                } else { out << CompositeTy->getName(); }
+            } else if (CompositeTy->getTag() == dwarf::DW_TAG_union_type) {
+                out << "union ";
+                if (CompositeTy->getName().
+                    empty()) { out << "anon." << CompositeTy->getLine(); } else {
+                    out << CompositeTy->getName();
+                }
+            } else if (CompositeTy->getTag() == dwarf::DW_TAG_enumeration_type) {
+                out << "enum " << CompositeTy->getName();
+            } else {
+                CommonHAKCAnalysis::getLogger(Fatal) << "Unhandled DICompositeType tag\n"
+                        << CompositeTy << "\n";
+                throw std::exception();
+            }
+        } else if (auto *BaseTy = dyn_cast<DIBasicType>(type)) {
+            if (BaseTy->getEncoding() ==
+                dwarf::DW_ATE_boolean) { out << "bool"; } else {
+                out << BaseTy->getName();
+            }
+        } else {
+            CommonHAKCAnalysis::getLogger(Fatal) << "Unhandled DIType\n"
+                    << type << "\n";
+            throw std::exception();
+        }
+
+        return Name;
+    }
+
+    Type *HAKCTypeIdentifier::FindNamedType(StringRef TypeName) const {
+        const auto UnionName = "union." + TypeName;
+        const auto StructName = "struct." + TypeName;
+        for (auto *StructTy: IdentifiedStructTypes) {
+            auto LLVMName = StructTy->getName();
+            if (LLVMName.ends_with(UnionName.str()) ||
+                LLVMName.ends_with(StructName.str())) { return StructTy; }
+        }
+        return nullptr;
+    }
+
+    Type *
+    HAKCTypeIdentifier::FindAnonymousType(const DICompositeType *CompositeTy) {
+        auto Cached = AnonymousTypes.find(CompositeTy);
+        if (Cached != AnonymousTypes.end()) { return Cached->second; }
+
+        SmallVector<StructType *> FoundTypes;
+        for (auto *StructTy: IdentifiedStructTypes) {
+            if (StructTy->getName().contains(".anon")) {
+                bool TypesMatch = true;
+                unsigned i;
+                for (i = 0; i < CompositeTy->getElements().size(); i++) {
+                    auto *ElementTy = dyn_cast<DIType>(CompositeTy->getElements()[i]);
+                    if (!ElementTy || !StructTy->indexValid(i)) {
+                        TypesMatch = false;
+                        break;
+                    }
+                    auto *ElementLLVMTy = GetLLVMType(ElementTy);
+                    if (!ElementLLVMTy || ElementLLVMTy != StructTy->getTypeAtIndex(i)) {
+                        TypesMatch = false;
+                        break;
+                    }
+                }
+                if (TypesMatch && !StructTy->indexValid(i + 1)) {
+                    FoundTypes.push_back(StructTy);
+                }
+            }
+        }
+
+        CommonHAKCAnalysis::getLogger(Verbose)
+                << "Found " << FoundTypes.size() << " Types for " << CompositeTy << ":\n";
+        for (auto *Ty: FoundTypes) {
+            CommonHAKCAnalysis::getLogger(Verbose) << Ty << "\n";
+        }
+        Type *FoundType = nullptr;
+        if (!FoundTypes.empty()) { FoundType = FoundTypes.front(); }
+
+        AnonymousTypes[CompositeTy] = FoundType;
+        return FoundType;
+    }
+
+    Type *HAKCTypeIdentifier::GetLLVMType(const DIType *Ty) {
+        CommonHAKCAnalysis::getLogger(Verbose)
+                << "Finding LLVM Type for " << Ty << "\n";
+        auto &Ctx = GetModule().getContext();
+        if (!Ty) { return Type::getVoidTy(Ctx); } else if (
+            Ty->getTag() ==
+            dwarf::DW_TAG_pointer_type) { return PointerType::get(Ctx, 0); } else if (
+            auto *BasicTy = dyn_cast<DIBasicType>(Ty)) {
+            if (BasicTy->getEncoding() == dwarf::DW_ATE_boolean) {
+                return IntegerType::get(Ctx, 1);
+            }
+            return IntegerType::get(Ctx, BasicTy->getSizeInBits());
+        } else if (auto *DerivedTy = dyn_cast<DIDerivedType>(Ty)) {
+            if (Ty->getTag() == dwarf::DW_TAG_typedef && !Ty->getName().empty()) {
+                auto *LLVMTy = FindNamedType(Ty->getName());
+                if (LLVMTy) { return LLVMTy; }
+            }
+            if (DerivedTy->getBaseType())
+                return GetLLVMType(DerivedTy->getBaseType());
+        } else if (Ty->getTag() == dwarf::DW_TAG_structure_type) {
+            if (!Ty->getName().empty()) { return FindNamedType(Ty->getName()); } else {
+                return FindAnonymousType(dyn_cast<DICompositeType>(Ty));
+            }
+        } else if (Ty->getTag() == dwarf::DW_TAG_enumeration_type) {
+            auto *BaseTy = dyn_cast<DICompositeType>(Ty)->getBaseType();
+            if (!BaseTy) { return IntegerType::get(Ctx, 32); }
+            return GetLLVMType(BaseTy);
+        }
+        return nullptr;
+    }
+
+    FunctionType *
+    HAKCTypeIdentifier::GetLLVMFunctionTy(const DISubroutineType *FunctionTy) {
+        auto &Ctx = GetModule().getContext();
+        auto *ReturnTy = Type::getVoidTy(Ctx);
+        auto TyArray = FunctionTy->getTypeArray();
+        if (TyArray[0]) {
+            ReturnTy = GetLLVMType(TyArray[0]);
+            if (!ReturnTy) {
+                CommonHAKCAnalysis::getLogger(Debug)
+                        << "Could not find Return Type " << TyArray[0] << "\n";
+                return nullptr;
+            }
+        }
+        if (!FunctionType::isValidReturnType(ReturnTy)) {
+            CommonHAKCAnalysis::getLogger(Debug)
+                    << "Type " << ReturnTy << " is not a valid return type\n";
+            return nullptr;
+        }
+        SmallVector<Type *> ArgTys;
+
+        bool IsVarArg = false;
+        for (unsigned i = 1; i < TyArray.size(); i++) {
+            if (TyArray[i] == nullptr) {
+                IsVarArg = true;
+                break;
+            }
+            auto *Ty = GetLLVMType(TyArray[i]);
+            if (!Ty) {
+                CommonHAKCAnalysis::getLogger(Debug)
+                        << "Could not find LLVM Type for " << TyArray[i] << "\n";
+                return nullptr;
+            }
+            if (!FunctionType::isValidArgumentType(Ty)) {
+                CommonHAKCAnalysis::getLogger(Debug)
+                        << "Type " << Ty << " for DIType " << TyArray[i]
+                        << " is not a valid argument type\n";
+                return nullptr;
+            }
+            ArgTys.push_back(Ty);
+        }
+
+        auto *LLVMTy = FunctionType::get(ReturnTy, ArgTys, IsVarArg);
+        CommonHAKCAnalysis::getLogger(Verbose)
+                << "Found LLVM Type " << LLVMTy << " for " << FunctionTy << "\n";
+
+        return LLVMTy;
+    }
+
+    std::shared_ptr<HAKCTypeInfo>
+    HAKCTypeIdentifier::HandleType(const DIType *type) {
+        auto debug = false;
+        if (!type) {
+            CommonHAKCAnalysis::getLogger(Fatal) << "Trying to find null type\n";
+            throw std::exception();
+        }
+        CommonHAKCAnalysis::getLogger(Verbose)
+                << "Analyzing DIType " << *type << "\n";
+        auto TypeP = FindType(type);
+        if (TypeP) {
+            CommonHAKCAnalysis::getLogger(Verbose)
+                    << "Already created " << *type << "\n";
+            return TypeP;
+        }
+        auto *StrippedTy = HAKCTypeInfo::StripTypeModifiers(type);
+        if (isa<DICompositeType>(StrippedTy) || isa<DISubroutineType>(StrippedTy) ||
+            isa<DIBasicType>(StrippedTy)) {
+            CommonHAKCAnalysis::getLogger(Debug) << "Creating HAKCTypeInfo for\n"
+                    << type << "\n";
+            auto TypeName = GetTypeName(type);
+            TypeP = std::make_shared<HAKCTypeInfo>(AnalysisHelper, TypeName, debug);
+            if (auto *BasicType = dyn_cast<DIBasicType>(type)) {
+                auto BitSize = BasicType->getSizeInBits();
+                if (BasicType->getEncoding() == dwarf::DW_ATE_boolean) { BitSize = 1; }
+                auto *IntTy = IntegerType::get(GetModule().getContext(), BitSize);
+                TypeP->SetLLVMType(IntTy);
+            } else if (auto *CompositeTy = dyn_cast<DICompositeType>(type)) {
+                Type *LLVMTy = nullptr;
+                if (CompositeTy->getTag() == dwarf::DW_TAG_structure_type ||
+                    CompositeTy->getTag() == dwarf::DW_TAG_union_type) {
+                    std::string SearchName = ".";
+                    SearchName += CompositeTy->getName();
+                    for (auto *StructTy: IdentifiedStructTypes) {
+                        if (StructTy->getName().ends_with(SearchName)) {
+                            LLVMTy = StructTy;
+                            break;
+                        }
+                    }
+                } else if (CompositeTy->getTag() == dwarf::DW_TAG_array_type) {
+                    if (CompositeTy->getBaseType()) {
+                        auto ArrayMemberTy = HandleType(CompositeTy->getBaseType());
+                        if (ArrayMemberTy && ArrayMemberTy->GetLLVMType()) {
+                            auto SizeInBits = ArrayMemberTy->GetSizeInBits();
+                            if (SizeInBits > 0 && CompositeTy->getSizeInBits()) {
+                                auto ArraySize = CompositeTy->getSizeInBits() / SizeInBits;
+                                LLVMTy = ArrayType::get(ArrayMemberTy->GetLLVMType(), ArraySize);
+                                TypeP->SetPointeeType(ArrayMemberTy);
+                            }
+                        }
+                    }
+                }
+
+                if (LLVMTy) {
+                    CommonHAKCAnalysis::getLogger(Verbose)
+                            << "Setting " << *TypeP << " LLVM Type to be " << *LLVMTy << "\n";
+                    TypeP->SetLLVMType(LLVMTy);
+                }
+            } else if (auto *SubRoutineTy = dyn_cast<DISubroutineType>(StrippedTy)) {
+                for (auto *FuncTy: SubRoutineTy->getTypeArray()) {
+                    if (FuncTy) { HandleType(FuncTy); }
+                }
+                auto *LLVMTy = GetLLVMFunctionTy(SubRoutineTy);
+                if (LLVMTy) { TypeP->SetLLVMType(LLVMTy); }
+            }
+            AddTypeMapping(type, TypeP);
+        } else if (auto *DerivedTy = dyn_cast<DIDerivedType>(StrippedTy)) {
+            if (DerivedTy->getTag() == dwarf::DW_TAG_member) {
+                if (DerivedTy->getBaseType()) { HandleType(DerivedTy->getBaseType()); }
+            } else {
+                std::set<unsigned> TagsToConsider = {
+                    dwarf::DW_TAG_pointer_type, dwarf::DW_TAG_array_type,
+                    dwarf::DW_TAG_const_type, dwarf::DW_TAG_typedef,
+                    dwarf::DW_TAG_volatile_type, dwarf::DW_TAG_restrict_type,
+                };
+                if (TagsToConsider.contains(DerivedTy->getTag())) {
+                    CommonHAKCAnalysis::getLogger(Verbose) << "Creating HAKCTypeInfo for\n"
+                            << type << "\n";
+                    auto TypeName = GetTypeName(type);
+                    TypeP = std::make_shared<HAKCTypeInfo>(AnalysisHelper, TypeName, debug);
+                    auto *LLVMTy = GetLLVMType(DerivedTy);
+                    if (LLVMTy) {
+                        CommonHAKCAnalysis::getLogger(Verbose)
+                                << "Found LLVM Type " << *LLVMTy << "\n";
+                        TypeP->SetLLVMType(LLVMTy);
+                    } else {
+                        if (debug) {
+                            CommonHAKCAnalysis::getLogger(Error)
+                                    << "Could not find LLVM Type for " << type << "\n";
+                            for (auto *STy: IdentifiedStructTypes) {
+                                CommonHAKCAnalysis::getLogger(Verbose) << STy << "\n";
+                            }
+                        }
+                    }
+                    AddTypeMapping(type, TypeP);
+                    if (DerivedTy->getBaseType()) { HandleType(DerivedTy->getBaseType()); }
+                } else {
+                    CommonHAKCAnalysis::getLogger(Error)
+                            << "Not handling DITYpe " << type << "\n";
+                }
+            }
+        }
+        return TypeP;
+    }
+
+    GlobalVariable *
+    HAKCTypeIdentifier::FindGlobal(const DIGlobalVariable *DIGV) const {
+        for (auto &GV: GetModule().global_objects()) {
+            SmallVector<MDNode *, 8> DebugMetadata;
+            GV.getMetadata(LLVMContext::MD_dbg, DebugMetadata);
+            for (auto *DbgInfo: DebugMetadata) {
+                if (auto *GVExpression = dyn_cast<DIGlobalVariableExpression>(DbgInfo)) {
+                    if (GVExpression->getVariable() == DIGV) {
+                        return dyn_cast<GlobalVariable>(&GV);
+                    }
+                }
+            }
+        }
+
+        return nullptr;
+    }
+
+    std::shared_ptr<HAKCGlobalInfo>
+    HAKCTypeIdentifier::HandleGlobal(const DIGlobalVariable *DIGV) {
+        auto SuppressOutput =
+                !AnalysisHelper.GetSystemInfo().OutputDebugInfo(DIGV->getName());
+        CommonHAKCAnalysis::getLogger(Verbose, SuppressOutput)
+                << "Analyzing Global " << *DIGV << "\n";
+
+        auto *GV = FindGlobal(DIGV);
+        if (!GV) {
+            CommonHAKCAnalysis::getLogger(Verbose, SuppressOutput)
+                    << "\nCould not find Global " << DIGV->getName() << "\n";
+            return nullptr;
+        }
+        auto DIGVTy = FindType(DIGV->getType());
+        if (!DIGVTy) {
+            DIGVTy = HandleType(DIGV->getType());
+            if (!DIGVTy) {
+                CommonHAKCAnalysis::getLogger(Fatal, SuppressOutput)
+                        << "Unable to handle DIType " << *DIGV->getType() << " for Global "
+                        << *DIGV << "\n";
+                throw std::exception();
+            }
+        }
+        if (!DIGVTy->GetLLVMType()) { DIGVTy->SetLLVMType(GV->getValueType()); }
+
+        /* In LLVM, Globals are always pointers */
+        auto HAKCTy = FindPointerType(*DIGVTy);
+        if (!HAKCTy) {
+            HAKCTy = AddMissingPointerType(DIGVTy);
+            CommonHAKCAnalysis::getLogger(Verbose, SuppressOutput)
+                    << "Added missing pointer type " << *HAKCTy << " for Global " << *GV
+                    << "\n";
+        }
+
+        auto GVP = std::make_shared<HAKCGlobalInfo>(AnalysisHelper, GV->getName(),
+                                                    SuppressOutput);
+        GVP->SetType(HAKCTy);
+        GVP->SetGlobalVariable(GV);
+        if (DIGV->isDefinition()) {
+            GVP->SetDefiningLocation(DIGV->getFile(), DIGV->getLine());
+        }
+        if (DIGV->isLocalToUnit()) {
+            const auto *Scope = DIGV->getScope();
+            if (!Scope) { Scope = DefinitionLocationScope; }
+            GVP->SetLocalScope(Scope);
+        }
+        AddGlobalMapping(DIGV, GVP);
+
+        return GVP;
+    }
+
+    void HAKCTypeIdentifier::AddGlobalMapping(
+        const DIGlobalVariable *DIGV,
+        const std::shared_ptr<HAKCGlobalInfo> &HAKCSymbol) {
+        CommonHAKCAnalysis::getLogger(
+                    Debug, !AnalysisHelper.GetSystemInfo().OutputDebugInfo(
+                        DIGV->getName()))
+                << "Adding mapping " << *DIGV << " -> " << HAKCSymbol->GetName() << "\n";
+
+        globals[DIGV] = HAKCSymbol;
+    }
+
+    std::shared_ptr<HAKCFunctionInfo>
+    HAKCTypeIdentifier::HandleFunction(const DISubprogram *SubProg) {
+        auto SuppressOutput =
+                !AnalysisHelper.GetSystemInfo().OutputDebugInfo(SubProg->getName());
+
+        CommonHAKCAnalysis::getLogger(Verbose, SuppressOutput)
+                << "Handling DISubprogram " << *SubProg << "\n";
+
+        auto *F = GetModule().getFunction(SubProg->getName());
+        if (!F) {
+            for (auto &FM: GetModule().functions()) {
+                if (FM.getSubprogram() == SubProg) {
+                    F = &FM;
+                    break;
+                }
+            }
+        }
+
+        if (!F) {
+            CommonHAKCAnalysis::getLogger(Debug)
+                    << "\nCould not find Function " << SubProg->getName() << "\n";
+            return nullptr;
+        }
+
+        if (F->getSubprogram() != SubProg) {
+            CommonHAKCAnalysis::getLogger(Verbose, SuppressOutput)
+                    << *F << " SubProgram does (not?) equal " << *SubProg << "\n";
+        } else {
+            CommonHAKCAnalysis::getLogger(Verbose, SuppressOutput)
+                    << F->getSubprogram() << " == " << SubProg << "\n";
+        }
+
+        if (CommonHAKCAnalysis::IsOutsideTransferFunc(F) || F->isIntrinsic()) {
+            CommonHAKCAnalysis::getLogger(Verbose, SuppressOutput)
+                    << SubProg->getName() << " is a HAKC Transfer function\n";
+            return nullptr;
+        }
+        auto DIGVTy = FindType(SubProg->getType());
+        if (!DIGVTy) {
+            CommonHAKCAnalysis::getLogger(Fatal, SuppressOutput)
+                    << GetModule() << "Could not find HAKCType of " << F->getName()
+                    << " with DIType " << *SubProg->getType() << "\n";
+            throw std::exception();
+        }
+
+        if (!DIGVTy->GetLLVMType()) { DIGVTy->SetLLVMType(F->getFunctionType()); }
+        auto FP = std::make_shared<HAKCFunctionInfo>(
+            AnalysisHelper, SubProg->getName(), !SuppressOutput);
+        FP->SetType(DIGVTy);
+        FP->SetFunction(F);
+        if (SubProg->isDefinition()) {
+            FP->SetDefiningLocation(SubProg->getFile(), SubProg->getLine());
+        }
+        if (SubProg->isLocalToUnit()) { FP->SetLocalScope(SubProg->getScope()); }
+        AddFunctionMapping(SubProg, FP);
+
+        return FP;
+    }
+
+    void HAKCTypeIdentifier::AddFunctionMapping(
+        const DISubprogram *SubProg,
+        const std::shared_ptr<HAKCFunctionInfo> &HAKCFunction) {
+        CommonHAKCAnalysis::getLogger(
+                    Debug,
+                    !AnalysisHelper.GetSystemInfo().OutputDebugInfo(SubProg->getName()))
+                << "Adding mapping " << *SubProg << " -> " << *HAKCFunction << "\n";
+
+        functions[SubProg] = HAKCFunction;
+    }
+
+    void HAKCTypeIdentifier::FindAllGlobalsUsed(
+        Value *V, std::set<GlobalObject *> &GlobalSet) {
+        if (auto *ConstStruct = dyn_cast<ConstantStruct>(V)) {
+            for (auto &Member: ConstStruct->operands()) {
+                auto *MemberDef = AnalysisHelper.getDef(Member.get(), false);
+                if (auto *GlobalObj = dyn_cast<
+                    GlobalObject>(MemberDef)) { GlobalSet.insert(GlobalObj); } else {
+                    FindAllGlobalsUsed(MemberDef, GlobalSet);
+                }
+            }
+        } else if (auto *GlobalObj = dyn_cast<GlobalObject>(V)) {
+            GlobalSet.insert(GlobalObj);
+        } else if (auto *ConstArray = dyn_cast<ConstantArray>(V)) {
+            for (auto &Member: ConstArray->operands()) {
+                auto *MemberDef = AnalysisHelper.getDef(Member.get(), false);
+                if (auto *GlobalMember = dyn_cast<GlobalObject>(MemberDef)) {
+                    GlobalSet.insert(GlobalMember);
+                } else { FindAllGlobalsUsed(MemberDef, GlobalSet); }
+            }
+        } else if (auto *I = dyn_cast<Instruction>(V)) {
+            for (auto &Op: I->operands()) {
+                auto *MemberDef = AnalysisHelper.getDef(Op.get(), false);
+                if (auto *GlobalMember = dyn_cast<GlobalObject>(MemberDef)) {
+                    GlobalSet.insert(GlobalMember);
+                }
+            }
+        }
+    }
+
+    std::shared_ptr<HAKCFunctionInfo>
+    HAKCTypeIdentifier::AddNoDebugFunction(Function *F) {
+        auto SuppressOutput = !AnalysisHelper.GetSystemInfo().OutputDebugInfo(F);
+
+        for (const auto &UnmappedFunc: UnmappedFunctions) {
+            if (UnmappedFunc->GetFunction() == F) { return UnmappedFunc; }
+        }
+        CommonHAKCAnalysis::getLogger(Verbose, SuppressOutput)
+                << "Adding unmapped Function " << F->getName() << "\n";
+        auto FuncInfo = std::make_shared<HAKCFunctionInfo>(
+            AnalysisHelper, F->getName(), !SuppressOutput);
+        FuncInfo->SetFunction(F);
+        if (IsLocalGlobal(F)) { FuncInfo->SetLocalScope(DefinitionLocationScope); }
+        auto HAKCType = FindCalledFunctionType(F->getFunctionType());
+        if (!HAKCType) { HAKCType = CreateNoDebugType(F->getFunctionType()); }
+
+        CommonHAKCAnalysis::getLogger(Verbose, SuppressOutput)
+                << "HAKCType exists for " << F->getName() << "\n";
+
+        if (!HAKCType->GetLLVMType()) { HAKCType->SetLLVMType(F->getFunctionType()); }
+        FuncInfo->SetType(HAKCType);
+        UnmappedFunctions.insert(FuncInfo);
+        return FuncInfo;
+    }
+
+    std::shared_ptr<HAKCSymbolInfo>
+    HAKCTypeIdentifier::AddNoDebugGlobal(GlobalObject *GlobalObj) {
+        auto SuppressOutput =
+                !AnalysisHelper.GetSystemInfo().OutputDebugInfo(GlobalObj);
+        if (auto *F = dyn_cast<
+            Function>(GlobalObj)) { return AddNoDebugFunction(F); } else if (auto *GV =
+                dyn_cast<GlobalVariable>(GlobalObj)) {
+            for (auto UnmappedGlobal: UnmappedGlobals) {
+                if (UnmappedGlobal->GetGlobalVariable() == GV) { return UnmappedGlobal; }
+            }
+            CommonHAKCAnalysis::getLogger(Verbose, SuppressOutput)
+                    << "Adding unmapped Global Variable " << GV->getName() << "\n";
+            auto GlobalInfo = std::make_shared<HAKCGlobalInfo>(
+                AnalysisHelper, GlobalObj->getName(), !SuppressOutput);
+            auto BaseType = FindType(GlobalObj->getValueType());
+            if (!BaseType) { BaseType = CreateNoDebugType(GlobalObj->getValueType()); }
+            if (!BaseType->GetLLVMType()) { BaseType->SetLLVMType(GV->getValueType()); }
+            auto HAKCType = FindPointerType(*BaseType);
+            if (!HAKCType) { HAKCType = AddMissingPointerType(BaseType); }
+
+            GlobalInfo->SetGlobalVariable(GV);
+            GlobalInfo->SetType(HAKCType);
+            if (IsLocalGlobal(GV)) {
+                GlobalInfo->SetLocalScope(DefinitionLocationScope);
+            }
+            UnmappedGlobals.insert(GlobalInfo);
+            return GlobalInfo;
+        } else {
+            CommonHAKCAnalysis::getLogger(Fatal, SuppressOutput)
+                    << "Unsupported GlobalObj: " << *GlobalObj << "\n";
+            throw std::exception();
+        }
+    }
+
+    bool HAKCTypeIdentifier::IsLocalGlobal(GlobalObject *GO) const {
+        std::set<GlobalValue::LinkageTypes> LocalLinkageTypes = {
+            GlobalObject::InternalLinkage, GlobalObject::PrivateLinkage
+        };
+        return LocalLinkageTypes.contains(GO->getLinkage());
+    }
+
+    void HAKCTypeIdentifier::AddUsedGlobals(
+        const std::set<GlobalObject *> &GlobalObjects,
+        const std::shared_ptr<HAKCSymbolInfo> &UserSymbol) {
+        for (auto *UsedGlobal: GlobalObjects) {
+            auto Symbol = FindSymbol(UsedGlobal);
+            if (!Symbol) {
+                CommonHAKCAnalysis::getLogger(Verbose)
+                        << "\nGlobal " << UsedGlobal->getName() << " is used in "
+                        << UserSymbol->GetGlobalObj()->getName()
+                        << " but the Symbol could not be found\n";
+                Symbol = AddNoDebugGlobal(UsedGlobal);
+            }
+            CommonHAKCAnalysis::getLogger(Verbose)
+                    << "Found Symbol " << Symbol->GetName() << "\n";
+            if (Symbol) { UserSymbol->AddSymbolUse(Symbol); }
+        }
+    }
+
+    void HAKCTypeIdentifier::FindUsesInGlobals() {
+        for (auto &it: globals) {
+            auto *GV = it.second->GetGlobalVariable();
+
+            if (GV->hasInitializer()) {
+                CommonHAKCAnalysis::getLogger(
+                            Debug, !AnalysisHelper.GetSystemInfo().OutputDebugInfo(GV))
+                        << "Searching for globals in " << *GV << "\n";
+
+                std::set<GlobalObject *> GlobalsUsed;
+                FindAllGlobalsUsed(GV->getInitializer(), GlobalsUsed);
+                AddUsedGlobals(GlobalsUsed, it.second);
+            }
+        }
+    }
+
+    void HAKCTypeIdentifier::CreateIndirectCallSourceLink(
+        Value *V, std::vector<std::shared_ptr<HAKCIndirectCallSourceLink> > &Path) {
+        if (auto *Arg = dyn_cast<Argument>(V)) {
+            auto HAKCType = FindType(Arg->getType());
+            if (!HAKCType) {
+                CommonHAKCAnalysis::getLogger(
+                            Debug,
+                            !AnalysisHelper.GetSystemInfo().OutputDebugInfo(Arg->getParent()))
+                        << "Could not find HAKCType for Argument " << Arg->getArgNo()
+                        << " of Function " << Arg->getParent()->getName() << "\n";
+
+                return;
+            }
+            if (!HAKCType->GetLLVMType()) { HAKCType->SetLLVMType(Arg->getType()); }
+            auto Link = std::make_shared<HAKCIndirectCallSourceLink>(
+                Arg, HAKCType,
+                AnalysisHelper.GetSystemInfo().OutputDebugInfo(Arg->getParent()));
+            Path.push_back(Link);
+        } else if (auto *GV = dyn_cast<GlobalVariable>(V)) {
+            auto HAKCSymbol = FindGlobal(GV, true);
+            if (!HAKCSymbol) {
+                CommonHAKCAnalysis::getLogger(
+                            Debug, AnalysisHelper.GetSystemInfo().OutputDebugInfo(GV))
+                        << "Could not find HAKC Symbol for " << *GV << "\n";
+
+                return;
+            }
+            auto Link = std::make_shared<HAKCIndirectCallSourceLink>(
+                HAKCSymbol, AnalysisHelper.GetSystemInfo().OutputDebugInfo(GV));
+            Path.push_back(Link);
+        } else if (auto *Load = dyn_cast<LoadInst>(V)) {
+            auto *Pointer = Load->getPointerOperand();
+            auto SuppressOutput =
+                    AnalysisHelper.GetSystemInfo().OutputDebugInfo(Load->getFunction());
+            if (auto *GEP = dyn_cast<GEPOperator>(Pointer)) {
+                auto *TyToCheck = GEP->getSourceElementType();
+                auto HAKCType = FindType(TyToCheck);
+                if (HAKCType && GEP->hasAllConstantIndices()) {
+                    APInt Offset(GetModule().getDataLayout().getIndexTypeSizeInBits(GEP->getType()), 0);
+                    GEP->stripAndAccumulateInBoundsConstantOffsets(
+                        GetModule().getDataLayout(), Offset);
+                    CommonHAKCAnalysis::getLogger(Verbose)
+                            << "Offset in bits for " << *GEP << ": " << Offset.getZExtValue()
+                            << "\n";
+                    if (!HAKCType->GetLLVMType()) { HAKCType->SetLLVMType(TyToCheck); }
+                    auto Link = std::make_shared<HAKCIndirectCallSourceLink>(
+                        HAKCType, Offset.getSExtValue(), !SuppressOutput);
+                    Path.push_back(Link);
+                    CreateIndirectCallSourceLink(GEP->getPointerOperand(), Path);
+                }
+                if (!GEP->hasAllConstantIndices()) {
+                    CommonHAKCAnalysis::getLogger(Verbose)
+                            << "GEP does not have all constant indices: " << *GEP << "\n";
+                } else {
+                    CommonHAKCAnalysis::getLogger(Verbose)
+                            << "Could not find Load Pointer HAKC Type for " << *TyToCheck
+                            << "\n";
+                }
+            } else if (auto *GVal = dyn_cast<GlobalValue>(Pointer)) {
+                auto HAKCSymbol = FindSymbol(GVal, true);
+                if (!HAKCSymbol) {
+                    CommonHAKCAnalysis::getLogger(Verbose)
+                            << "Unable to find Global " << GVal->getName() << "\n";
+                    return;
+                }
+                auto Link = std::make_shared<HAKCIndirectCallSourceLink>(HAKCSymbol,
+                                                                         !SuppressOutput);
+                Path.push_back(Link);
+            } else {
+                CommonHAKCAnalysis::getLogger(Verbose)
+                        << "Unhandled Load Pointer Operand type: " << *Pointer << "\n";
+                auto *LoadTy = Load->getPointerOperand()->getType();
+                auto HAKCType = FindType(LoadTy);
+                if (HAKCType) {
+                    auto Link = std::make_shared<HAKCIndirectCallSourceLink>(
+                        HAKCType, 0, !SuppressOutput);
+                    Path.push_back(Link);
+                }
+            }
+        } else if (auto *IntToPtr = dyn_cast<IntToPtrInst>(V)) {
+            CommonHAKCAnalysis::getLogger(
+                        Debug, !AnalysisHelper.GetSystemInfo().OutputDebugInfo(
+                            IntToPtr->getFunction()))
+                    << "Adding IntToPtr Link\n";
+
+            CreateIndirectCallSourceLink(IntToPtr->getOperand(0), Path);
         } else if (auto *CallI = dyn_cast<CallInst>(V)) {
-          if (CallI->isInlineAsm()) {
-            /* Inline assembly causes too much type confusion, so skip these
-             * mappings */
-            CommonHAKCAnalysis::getWriter(debug)
-                << "Skipping inline assembly\n";
-            continue;
-          }
+            CommonHAKCAnalysis::getLogger(
+                        Debug,
+                        !AnalysisHelper.GetSystemInfo().OutputDebugInfo(
+                            CallI->getFunction()))
+                    << "Adding Call Link\n";
+
+            CreateIndirectCallSourceLink(CallI->getCalledOperand(), Path);
+        } else {
+            CommonHAKCAnalysis::getLogger(Debug)
+                    << "Unhandled Link type: " << V << "\n";
         }
-        HAKCType->SetLLVMType(LLVMTy);
-      } else if (auto *CallI = dyn_cast<CallInst>(I)) {
-        if (CallI->isIndirectCall()) {
-          HandleIndirectCall(CallI);
+    }
+
+    void HAKCTypeIdentifier::FindIndirectCallSource(
+        CallInst *CallI,
+        std::vector<std::shared_ptr<HAKCIndirectCallSourceLink> > &Path) {
+        if (!CallI->isIndirectCall()) {
+            CommonHAKCAnalysis::getLogger(Error)
+                    << *CallI << " is not an indirect call\n";
+            throw std::exception();
         }
-      }
+
+        CreateIndirectCallSourceLink(CallI->getCalledOperand(), Path);
+
+        CommonHAKCAnalysis::getLogger(
+                    Debug,
+                    !AnalysisHelper.GetSystemInfo().OutputDebugInfo(CallI->getFunction()))
+                << "Found " << Path.size() << " path links for "
+                << *CallI->getCalledOperand() << "\n";
     }
-  }
-}
 
-std::shared_ptr<hakc::HAKCTypeInfo>
-hakc::HAKCTypeIdentifier::CreateNoDebugType(Type *Ty) const {
-  std::string Name;
-  llvm::raw_string_ostream sstream(Name);
-  if (auto *StructTy = dyn_cast<StructType>(Ty)) {
-    if (StructTy->hasName()) {
-      sstream << StructTy->getName();
-    } else {
-      sstream << *Ty;
+    FunctionType *
+    HAKCTypeIdentifier::GetIndirectCallFunctionType(const CallInst *CallI) {
+        if (!CallI->isIndirectCall()) {
+            CommonHAKCAnalysis::getLogger(Fatal)
+                    << "Trying to get type from a Call that is not an indirect call\n";
+            throw std::exception();
+        }
+        return CallI->getFunctionType();
     }
-  } else {
-    sstream << *Ty;
-  }
 
-  auto HAKCType = std::make_shared<HAKCTypeInfo>(
-      AnalysisHelper, Name, AnalysisHelper.GetSystemInfo().OutputDebugInfo());
-  HAKCType->SetLLVMType(Ty);
-  return HAKCType;
-}
+    void HAKCTypeIdentifier::FindUsesInFunctions() {
+        for (auto &it: functions) {
+            auto *F = it.second->GetFunction();
+            auto SuppressOutput = !AnalysisHelper.GetSystemInfo().OutputDebugInfo(F);
+            CommonHAKCAnalysis::getLogger(Verbose, SuppressOutput)
+                    << "Searching for globals in Function " << F->getName() << "\n";
 
-hakc::HAKCTypeP hakc::HAKCTypeIdentifier::HandleIndirectCall(CallInst *CallI) {
-  if (IndirectCallsTypes.contains(CallI)) {
-    return IndirectCallsTypes[CallI];
-  }
+            std::set<GlobalObject *> GlobalsUsed;
+            for (auto InstIt = inst_begin(F); InstIt != inst_end(F); ++InstIt) {
+                auto *I = &(*InstIt);
+                if (I->isDebugOrPseudoInst() || isa<IntrinsicInst>(I) ||
+                    isa<BranchInst>(I)) { continue; }
+                FindAllGlobalsUsed(I, GlobalsUsed);
+            }
+            AddUsedGlobals(GlobalsUsed, it.second);
 
-  auto *FunctionTy = GetIndirectCallFunctionType(CallI);
-  auto HAKCType = FindCalledFunctionType(FunctionTy);
-  if (!HAKCType) {
-    HAKCType = CreateNoDebugType(FunctionTy);
-  }
-  auto PointerType =
-      CreateNoDebugType(PointerType::get(GetModule().getContext(), 0));
-  PointerType->SetPointeeType(HAKCType);
-
-  IndirectCallsTypes[CallI] = PointerType;
-  return HAKCType;
-}
-
-hakc::HAKCTypeIdentifier::HAKCTypeIdentifier(CommonHAKCAnalysis &AnalysisHelper)
-    : AnalysisHelper(AnalysisHelper), DbgInfoFinder(), types(), globals(),
-      functions(), IndirectCallsTypes(), CurrentAnonID(0) {}
-
-Module &hakc::HAKCTypeIdentifier::GetModule() const {
-  return AnalysisHelper.GetModule();
-}
-
-void hakc::HAKCTypeIdentifier::ProcessDebugInfo() {
-  DbgInfoFinder.processModule(GetModule());
-  auto Debug = AnalysisHelper.GetSystemInfo().OutputDebugInfo();
-
-  CommonHAKCAnalysis::getWriter(Debug) << GetModule() << "\n";
-
-  CommonHAKCAnalysis::getWriter(Debug) << "!!!! Starting Type Handling !!!!\n";
-  for (auto *DITy : DbgInfoFinder.types()) {
-    auto TypeP = HandleType(DITy);
-  }
-  CommonHAKCAnalysis::getWriter(Debug) << "!!!! Finished Type Handling !!!!\n";
-
-  CommonHAKCAnalysis::getWriter(Debug)
-      << "!!!! Starting Global Handling !!!!\n";
-  for (auto *DIGlobal : DbgInfoFinder.global_variables()) {
-    auto GlobalP = HandleGlobal(DIGlobal->getVariable());
-  }
-  CommonHAKCAnalysis::getWriter(Debug)
-      << "!!!! Finished Global Handling !!!!\n";
-
-  CommonHAKCAnalysis::getWriter(Debug)
-      << "!!!! Starting Function Handling !!!!\n";
-  for (auto *DISubProg : DbgInfoFinder.subprograms()) {
-    auto SubProgP = HandleFunction(DISubProg);
-  }
-  CommonHAKCAnalysis::getWriter(Debug)
-      << "!!!! Finished Function Handling !!!!\n";
-
-  FindTypesInFunctions();
-  FindUsesInGlobals();
-  FindUsesInFunctions();
-
-  for (auto &it : types) {
-    auto HAKCType = it.second;
-    if (HAKCType->IsPointerType()) {
-      auto PointeeType = FindPointeeType((*HAKCType));
-      if (PointeeType) {
-        HAKCType->SetPointeeType(PointeeType);
-      }
+            for (auto InstIt = inst_begin(F); InstIt != inst_end(F); ++InstIt) {
+                auto *I = &(*InstIt);
+                if (I->isDebugOrPseudoInst() || isa<IntrinsicInst>(I) ||
+                    isa<BranchInst>(I)) { continue; }
+                if (auto *Call = dyn_cast<CallInst>(I)) {
+                    if (Call->getCalledFunction()) {
+                        auto FoundFunction = FindFunction(Call->getCalledFunction(), true);
+                        if (!FoundFunction) {
+                            CommonHAKCAnalysis::getLogger(Verbose, SuppressOutput)
+                                    << "Could not find HAKC Symbol for Function "
+                                    << Call->getCalledFunction()->getName() << "\n";
+                            FoundFunction = AddNoDebugFunction(Call->getCalledFunction());
+                        }
+                        it.second->AddDirectCall(FoundFunction);
+                    } else if (Call->isIndirectCall()) {
+                        auto *FunctionTy = GetIndirectCallFunctionType(Call);
+                        CommonHAKCAnalysis::getLogger(Verbose, SuppressOutput)
+                                << "Source of indirect call operand in Function " << F->getName()
+                                << ": " << AnalysisHelper.getDef(Call->getCalledOperand(), true)
+                                << "\n";
+                        auto HAKCType = FindCalledFunctionType(FunctionTy);
+                        if (!HAKCType) {
+                            CommonHAKCAnalysis::getLogger(Error, SuppressOutput)
+                                    << "Could not find called HAKCType for " << *Call
+                                    << " with Searched Type " << *FunctionTy << " in Function "
+                                    << F->getName() << "\n";
+                            HAKCType = FindType(Call->getCalledOperand()->getType());
+                            if (HAKCType) {
+                                CommonHAKCAnalysis::getLogger(Fatal, SuppressOutput)
+                                        << "But the Pointer HAKCType exists: " << HAKCType->GetName()
+                                        << "\n";
+                            }
+                            throw std::exception();
+                        }
+                        std::vector<std::shared_ptr<HAKCIndirectCallSourceLink> > SourcePath;
+                        if (!HAKCType->GetLLVMType()) { HAKCType->SetLLVMType(FunctionTy); }
+                        FindIndirectCallSource(Call, SourcePath);
+                        auto Source = std::make_shared<HAKCIndirectCallSource>(
+                            SourcePath, HAKCType, !SuppressOutput);
+                        it.second->AddIndirectCall(Source);
+                    }
+                }
+            }
+        }
     }
-  }
-}
 
-void hakc::HAKCTypeIdentifier::OutputYAML(raw_ostream &out) const {
-  SmallString<256> RealPath;
-  CommonHAKCAnalysis::GetModuleFullPath(GetModule(), RealPath);
+    void hakc::HAKCTypeIdentifier::FindAllTypes(
+        Type *Ty, SmallVectorImpl<HAKCTypeP> &Results) const {
+        if (isa<PointerType>(Ty)) { return; }
 
-  out << "---\n";
-  out << "CU: ";
-  out << RealPath;
-  out << "\n";
+        for (auto &it: TypesWithDebugInfo) {
+            if (it.second->GetLLVMType() == Ty) { Results.push_back(it.second); }
+        }
 
-  auto GlobalCount = globals.size() + UnmappedGlobals.size();
-  if (GlobalCount > 0) {
-    out << "globals:\n";
-    std::vector<std::shared_ptr<HAKCGlobalInfo>> SortedGlobals;
-    SortedGlobals.reserve(GlobalCount);
-    for (auto &it : globals) {
-      SortedGlobals.push_back(it.second);
+        for (auto HAKCTy: TypesMissingDebugInfo) {
+            if (HAKCTy->GetLLVMType() == Ty) { Results.push_back(HAKCTy); }
+        }
     }
-    for (const auto &Unmapped : UnmappedGlobals) {
-      SortedGlobals.push_back(Unmapped);
-    }
-    llvm::sort(SortedGlobals.begin(), SortedGlobals.end(),
-               [](const std::shared_ptr<HAKCGlobalInfo> &LHS,
-                  const std::shared_ptr<HAKCGlobalInfo> &RHS) {
-                 return LHS->GetName() < RHS->GetName();
-               });
-    for (auto &it : SortedGlobals) {
-      out.indent(HAKCInfo::IndentSpaces())
-          << "- " << it->GetYaml(HAKCInfo::IndentSpaces()) << "\n";
-    }
-  }
 
-  auto FunctionCount = functions.size() + UnmappedFunctions.size();
-  if (FunctionCount > 0) {
-    out << "functions:\n";
-    std::vector<std::shared_ptr<HAKCFunctionInfo>> SortedFunctions;
-    SortedFunctions.reserve(FunctionCount);
-    for (auto &it : functions) {
-      SortedFunctions.push_back(it.second);
-    }
-    for (const auto &Unmapped : UnmappedFunctions) {
-      SortedFunctions.push_back(Unmapped);
-    }
-    llvm::sort(SortedFunctions.begin(), SortedFunctions.end(),
-               [](const std::shared_ptr<HAKCFunctionInfo> &LHS,
-                  const std::shared_ptr<HAKCFunctionInfo> &RHS) {
-                 return LHS->GetName() < RHS->GetName();
-               });
-    for (auto &it : SortedFunctions) {
-      out.indent(HAKCInfo::IndentSpaces())
-          << "- " << it->GetYaml(HAKCInfo::IndentSpaces()) << "\n";
-    }
-  }
-}
+    std::shared_ptr<HAKCTypeInfo> HAKCTypeIdentifier::FindType(Type *Ty) const {
+        // remove this functionality, because it would only work for non pointers and
+        // is logically incorrect
+        if (isa<PointerType>(Ty)) { return nullptr; }
+        CommonHAKCAnalysis::getLogger(Verbose)
+                << "Trying to find HAKCTypeInfo for " << *Ty << "\n";
 
-void hakc::HAKCTypeIdentifier::GetHAKCTypes(
-    SmallVectorImpl<HAKCTypeP> &Results) const {
-  for (auto &it : types) {
-    Results.push_back(it.second);
-  }
-}
+        for (auto &it: TypesWithDebugInfo) {
+            if (it.second->GetLLVMType()) {
+                CommonHAKCAnalysis::getLogger(Verbose)
+                        << "Comparing " << it.second->GetLLVMType() << " with " << Ty << "\n";
+            }
+            if (it.second->GetLLVMType() && it.second->GetLLVMType() == Ty) {
+                return it.second;
+            }
+        }
 
-Type *hakc::HAKCTypeIdentifier::GetTypeFromString(StringRef TypeStr) const {
-  if (TypeStr == "void") {
-    /* parseType only allows parsing void types for functions so explicitly
-     * check for that */
-    return Type::getVoidTy(GetModule().getContext());
-  }
+        return nullptr;
+    }
 
-  SMDiagnostic Err;
-  auto *ParsedType = parseType(TypeStr, Err, GetModule());
-  return ParsedType;
-}
+    HAKCTypeP HAKCTypeIdentifier::FindType(HAKCPointerBase &HAKCPointer) {
+        HAKCTypeP ReturnTy = nullptr;
+        if (HAKCPointer.GetType()) { ReturnTy = HAKCPointer.GetType(); } else {
+            ReturnTy = FindHAKCType(HAKCPointer.GetBaseDefinition());
+        }
+        if (ReturnTy) {
+            CommonHAKCAnalysis::getLogger(Verbose)
+                    << "Found ReturnTy: " << *ReturnTy << "\n";
+            if (ReturnTy->IsPointerType() && !ReturnTy->GetPointeeType()) {
+                if (auto PointeeType = FindPointeeType(ReturnTy)) {
+                    ReturnTy->SetPointeeType(PointeeType);
+                }
+            }
+            HAKCPointer.SetType(ReturnTy);
+        }
+        return ReturnTy;
+    }
+
+    HAKCTypeP HAKCTypeIdentifier::FindPointeeType(HAKCPointerBase &HAKCPointer) {
+        if (HAKCPointer.GetType() && HAKCPointer.GetType()->GetPointeeType()) {
+            return HAKCPointer.GetType()->GetPointeeType();
+        }
+
+        HAKCTypeP BaseType = HAKCPointer.GetType();
+        HAKCTypeP PointeeType = nullptr;
+        if (!BaseType) { BaseType = FindType(HAKCPointer); }
+
+        if (BaseType) {
+            PointeeType = FindPointeeType(BaseType);
+            BaseType->SetPointeeType(PointeeType);
+        }
+
+        return PointeeType;
+    }
+
+    HAKCTypeP HAKCTypeIdentifier::FindPointeeType(HAKCTypeP BaseType) {
+        if (!BaseType) { return nullptr; }
+
+        CommonHAKCAnalysis::getLogger(Verbose)
+                << "Finding Pointee Type for " << *BaseType << "\n";
+
+        if (BaseType->GetPointeeType()) { return BaseType->GetPointeeType(); }
+
+        if (BaseType->IsVoidPtrType()) { return GetVoidPointerPointeeType(); }
+
+        if (BaseType->IsIntegerType() && IsPointerLikeType(BaseType->GetDbgType())) {
+            return GetVoidPointerPointeeType();
+        }
+
+        DIType *TypeToFind = nullptr;
+
+        if (BaseType->IsPointerType()) {
+            auto *StrippedDbgTy =
+                    HAKCTypeInfo::StripTypeModifiers(BaseType->GetDbgType());
+            if (StrippedDbgTy->getTag() == dwarf::DW_TAG_pointer_type) {
+                TypeToFind = dyn_cast<DIDerivedType>(StrippedDbgTy)->getBaseType();
+            } else {
+                TypeToFind = dyn_cast<DICompositeType>(StrippedDbgTy)->getBaseType();
+            }
+
+            if (!TypeToFind) {
+                // BaseType is a pointer, but no known base type, so it is a void*
+                CommonHAKCAnalysis::getLogger(Verbose) << "Adding missing void type\n";
+                return GetVoidPointerPointeeType();
+            }
+        }
+
+        if (!TypeToFind && !BaseType->GetDbgType()) {
+            auto *LLVMTy = BaseType->GetLLVMType();
+            if (auto *ArrayTy = dyn_cast<ArrayType>(LLVMTy)) {
+                return FindType(ArrayTy->getElementType());
+            }
+        }
+
+        if (!TypeToFind) {
+            CommonHAKCAnalysis::getLogger(Verbose) << "Could not find PointeeType\n";
+            return nullptr;
+        }
+
+        for (auto &it: TypesWithDebugInfo) {
+            auto *DebugTy = it.first;
+            if (DebugTy == TypeToFind) {
+                CommonHAKCAnalysis::getLogger(Verbose)
+                        << "Found PointeeType " << *it.second << "\n";
+                return it.second;
+            }
+        }
+        CommonHAKCAnalysis::getLogger(Verbose)
+                << "PointeeType " << TypeToFind << " not found\n";
+        return nullptr;
+    }
+
+    HAKCTypeP HAKCTypeIdentifier::GetArgumentHAKCType(Argument *Arg) {
+        if (!Arg) { throw std::exception(); }
+        auto *F = Arg->getParent();
+        if (AnalysisHelper.IsOutsideTransferFunc(F)) {
+            F = AnalysisHelper.GetOriginalFunctionFromTransferFunction(F);
+        }
+
+        auto *DISubprog = F->getSubprogram();
+        HAKCTypeP Result = nullptr;
+        if (DISubprog) {
+            Result = GetArgumentHAKCType(DISubprog->getType(), Arg->getArgNo());
+        }
+
+        if (!Result) {
+            auto FuncHAKCTy =
+                    FindCalledFunctionType(Arg->getParent()->getFunctionType());
+            if (FuncHAKCTy) {
+                auto *DbgFuncTy = dyn_cast<DISubroutineType>(FuncHAKCTy->GetDbgType());
+                for (unsigned i = 1; i < DbgFuncTy->getTypeArray().size(); i++) {
+                    if (i == Arg->getArgNo() + 1) {
+                        Result = FindType(DbgFuncTy->getTypeArray()[i]);
+                        break;
+                    }
+                }
+            } else {
+                /* The called function type has not been analyzed and contains no debug
+                 * information, so this is a function that has been declared but nothing
+                 * else is known. So look at uses of F and try to find out the argument
+                 * types
+                 */
+                for (auto &U: F->uses()) {
+                    if (auto *CallI = dyn_cast<CallInst>(U.getUser())) {
+                        if (CallI->getFunction() == Arg->getParent())
+                            continue;
+                        auto *CallArg = CallI->getArgOperand(Arg->getArgNo());
+                        CommonHAKCAnalysis::getLogger(Verbose) <<
+                                "Attempting to find type of " << *CallArg << " from " << *CallI <<
+                                "\n";
+                        Result = FindHAKCType(CallArg);
+                        if (Result) {
+                            if (isa<GlobalVariable>(CallArg))
+                                Result = Result->GetPointeeType();
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        return Result;
+    }
+
+    HAKCTypeP
+    HAKCTypeIdentifier::GetArgumentHAKCType(const DISubroutineType *FunctionTy,
+                                            unsigned ArgNo) {
+        HAKCTypeP Result = nullptr;
+        // The + 1 comes from the fact that the type array stores the return type
+        // (including void, which is a null pointer) at index 0
+        auto ArgIdx = ArgNo + 1;
+        if (FunctionTy) {
+            CommonHAKCAnalysis::getLogger(Verbose)
+                    << "Getting argument " << ArgIdx << " of " << *FunctionTy
+                    << " that has " << FunctionTy->getTypeArray().size() << " arguments\n";
+            for (auto *Arg: FunctionTy->getTypeArray()) {
+                if (!Arg) {
+                    CommonHAKCAnalysis::getLogger(Verbose) << "void\n";
+                    continue;
+                }
+                CommonHAKCAnalysis::getLogger(Verbose) << *Arg << "\n";
+            }
+            DIType *ArgDIType = nullptr;
+            if (FunctionTy->getTypeArray().size() > ArgIdx) {
+                ArgDIType = FunctionTy->getTypeArray()[ArgIdx];
+            }
+
+            if (!ArgDIType) {
+                CommonHAKCAnalysis::getLogger(Verbose)
+                        << "Could not find argument " << ArgIdx << " type in " << *FunctionTy
+                        << "\n";
+                return nullptr;
+            }
+            Result = FindType(ArgDIType);
+        }
+        return Result;
+    }
+
+    HAKCTypeP HAKCTypeIdentifier::FindHAKCTypeForUse(Use &U) {
+        CommonHAKCAnalysis::getLogger(Verbose)
+                << "Attempting to find HAKCTypeInfo for Use " << U << "\n";
+        HAKCTypeP Result = nullptr;
+        if (auto *CallI = dyn_cast<CallInst>(U.getUser())) {
+            if (auto CallTy = FindCalledFunctionType(CallI->getFunctionType())) {
+                if (U.getOperandNo() == CallI->getCalledOperandUse().getOperandNo()) {
+                    auto FuncTy =
+                            FindType(dyn_cast<DISubroutineType>(CallTy->GetDbgType()));
+                    Result = FindPointerType(*FuncTy);
+                } else {
+                    Result = GetArgumentHAKCType(
+                        dyn_cast<DISubroutineType>(CallTy->GetDbgType()), U.getOperandNo());
+                }
+            }
+        } else if (isa<LoadInst>(U.getUser())) {
+            Result = FindHAKCType(U.getUser());
+            if (Result) {
+                if (isa<AllocaInst>(U.get())) {
+                    if (!Result->IsPointerToPointer()) {
+                        auto PointerType = FindPointerType(*Result);
+                        if (!PointerType) { Result = AddMissingPointerType(Result); }
+                    }
+                } else { Result = FindPointerType(*Result); }
+            }
+        } else if (auto *GEPI = dyn_cast<GetElementPtrInst>(U.getUser())) {
+            if (U.getOperandNo() == GetElementPtrInst::getPointerOperandIndex()) {
+                auto BaseType = FindType(GEPI->getSourceElementType());
+                if (BaseType) {
+                    CommonHAKCAnalysis::getLogger(Verbose)
+                            << "Found BaseType " << *BaseType << " for "
+                            << *GEPI->getSourceElementType() << "\n";
+                    Result = FindPointerType(*BaseType);
+                }
+            } else { Result = FindType(U->getType()); }
+        } else if (auto *StoreI = dyn_cast<StoreInst>(U.getUser())) {
+            Result = FindHAKCType(
+                StoreI->getOperand((U.getOperandNo() + 1) % StoreI->getNumOperands()));
+            if (Result) {
+                if (U.getOperandNo() == StoreInst::getPointerOperandIndex()) {
+                    if (isa<AllocaInst>(U.get())) {
+                        if (!Result->IsPointerToPointer()) {
+                            auto PointerType = FindPointerType(*Result);
+                            if (!PointerType) { Result = AddMissingPointerType(Result); }
+                        }
+                    } else { Result = FindPointerType(*Result); }
+                } else { Result = FindPointeeType(Result); }
+                CommonHAKCAnalysis::getLogger(Verbose)
+                        << "Found " << *Result << " for " << U.get() << "\n";
+            }
+        }
+
+        return Result;
+    }
+
+    HAKCTypeP HAKCTypeIdentifier::AddMissingPointerType(const HAKCTypeP &BaseType) {
+        if (BaseType->GetDbgTypeName().empty()) {
+            auto Name = GetDbgName(*BaseType);
+            BaseType->SetDbgTypeName(Name);
+        }
+        std::string AllocaName = BaseType->GetDbgTypeName().str();
+        AllocaName += "*";
+        for (auto MissingTy: TypesMissingDebugInfo) {
+            if (MissingTy->GetDbgTypeName() == AllocaName) { return MissingTy; }
+        }
+
+        auto HAKCType =
+                std::make_shared<HAKCTypeInfo>(AnalysisHelper, AllocaName, Debug);
+        HAKCType->SetPointeeType(BaseType);
+        HAKCType->SetDbgTypeName(AllocaName);
+        HAKCType->SetLLVMType(
+            PointerType::get(GetModule().getContext(),
+                             HAKCType->GetLLVMType()
+                                 ? HAKCType->GetLLVMType()->getPointerAddressSpace()
+                                 : 0));
+        TypesMissingDebugInfo.insert(HAKCType);
+
+        return HAKCType;
+    }
+
+    HAKCTypeP HAKCTypeIdentifier::FindPointerType(const HAKCTypeInfo &BaseType) {
+        std::set<dwarf::Tag> TagsToRecurseInto = {
+            dwarf::DW_TAG_typedef,
+            dwarf::DW_TAG_const_type
+        };
+        CommonHAKCAnalysis::getLogger(Verbose)
+                << "Trying to find a pointer type to " << BaseType << "\n";
+
+        for (auto &It: TypesWithDebugInfo) {
+            auto *DebugType = It.first;
+            if (DebugType->getTag() == dwarf::DW_TAG_pointer_type) {
+                auto *DbgBaseTy = dyn_cast<DIDerivedType>(DebugType)->getBaseType();
+                while (true) {
+                    if (DbgBaseTy && DbgBaseTy == BaseType.GetDbgType()) {
+                        CommonHAKCAnalysis::getLogger(Verbose)
+                                << "DbgBaseTy " << *DbgBaseTy << " equals "
+                                << BaseType.GetDbgType() << "\n";
+                        return It.second;
+                    }
+                    if (DbgBaseTy && TagsToRecurseInto.contains(DbgBaseTy->getTag())) {
+                        DbgBaseTy = dyn_cast<DIDerivedType>(DbgBaseTy)->getBaseType();
+                    } else { break; }
+                }
+            }
+        }
+
+        for (auto &AllocaType: TypesMissingDebugInfo) {
+            if (!AllocaType->GetPointeeType()) { continue; }
+            if (AllocaType->GetPointeeType()->GetDbgType() == BaseType.GetDbgType()) {
+                return AllocaType;
+            }
+
+            if (AllocaType->GetPointeeType()->GetLLVMType() &&
+                !AllocaType->GetPointeeType()->GetLLVMType()->isPointerTy() &&
+                AllocaType->GetPointeeType()->GetLLVMType() == BaseType.GetLLVMType()) {
+                return AllocaType;
+            }
+        }
+
+        return nullptr;
+    }
+
+    HAKCTypeP HAKCTypeIdentifier::FindTypeFromDebug(const DbgVariableRecord &DVR,
+                                                    Value *V) {
+        if (DVR.hasArgList()) { return nullptr; }
+        const auto *DITy = DVR.getVariable()->getType();
+
+        DebugVariable DebugVar(&DVR);
+        auto FragInfo = DebugVar.getFragment();
+        CommonHAKCAnalysis::getLogger(Verbose)
+                << "Finding type for " << DVR << " with Variable " << *DVR.getVariable()
+                << " and DITy " << *DITy;
+        if (auto *I = dyn_cast<Instruction>(V)) {
+            if (I->getDebugLoc() && I->getDebugLoc().get()) {
+                CommonHAKCAnalysis::getLogger(Debug) << " at " << I->getDebugLoc().get();
+            }
+        }
+        CommonHAKCAnalysis::getLogger(Verbose) << "\n";
+        if (DITy->getTag() == dwarf::DW_TAG_structure_type) {
+            const auto *CompositeTy = dyn_cast<DICompositeType>(DITy);
+            if (FragInfo) {
+                auto CurrentOffset = FragInfo->startInBits();
+
+            restart_analysis:
+                bool restart = false;
+                DIDerivedType *PreviousTy = nullptr;
+                if (CompositeTy->getTag() == dwarf::DW_TAG_union_type &&
+                    CurrentOffset < CompositeTy->getSizeInBits()) {
+                    /* We are examining a union, and the object could be type in the union
+                     * that matches the bit offset. We can't know for sure at this point so
+                     * move on */
+                    return nullptr;
+                }
+
+                for (auto *Member: CompositeTy->getElements()) {
+                    auto *CompositeMember = dyn_cast<DIDerivedType>(Member);
+                    if (!CompositeMember) { continue; }
+                    CommonHAKCAnalysis::getLogger(Verbose)
+                            << "Examining member " << *CompositeMember << " at offset "
+                            << CompositeMember->getOffsetInBits() << "\n";
+                    if (CompositeMember->getOffsetInBits() == CurrentOffset) {
+                        CommonHAKCAnalysis::getLogger(Verbose)
+                                << "Found Member " << *CompositeMember << " at offset "
+                                << FragInfo->startInBits() << " with BaseType ";
+                        if (!CompositeMember->getBaseType()) {
+                            CommonHAKCAnalysis::getLogger(Verbose) << "void*\n";
+                            return GetVoidPointerType();
+                        }
+                        DITy = CompositeMember->getBaseType();
+                        CommonHAKCAnalysis::getLogger(Verbose) << *DITy << "\n";
+                        break;
+                    } else if (CompositeMember->getOffsetInBits() > CurrentOffset) {
+                        CurrentOffset -= PreviousTy->getOffsetInBits();
+                        auto *StrippedTy =
+                                HAKCTypeInfo::StripTypeModifiers(PreviousTy->getBaseType());
+
+                        restart = isa_and_nonnull<DICompositeType>(StrippedTy);
+                        if (restart) {
+                            CompositeTy = dyn_cast<DICompositeType>(StrippedTy);
+                            CommonHAKCAnalysis::getLogger(Verbose)
+                                    << "Restarting analysis with new type " << *CompositeTy
+                                    << " at offset " << CurrentOffset << "\n";
+                        }
+                        break;
+                    } else { PreviousTy = CompositeMember; }
+                }
+
+                if (restart) { goto restart_analysis; }
+            }
+        }
+
+        if (V->getType()->isPointerTy() && !IsPointerLikeType(DITy)) {
+            return nullptr;
+        }
+        auto FoundType = FindType(DITy);
+        if (FoundType) {
+            if (isa<AllocaInst>(V) || isa<GEPOperator>(V)) {
+                auto PointerType = FindPointerType(*FoundType);
+                if (!PointerType) { FoundType = AddMissingPointerType(FoundType); } else {
+                    FoundType = PointerType;
+                }
+            }
+        }
+        return FoundType;
+    }
+
+    HAKCTypeP HAKCTypeIdentifier::CheckCallUses(Value *V) {
+        HAKCTypeP FoundType = nullptr;
+        for (auto &U: V->uses()) {
+            if (auto *Call = dyn_cast<CallInst>(U.getUser())) {
+                CommonHAKCAnalysis::getLogger(Verbose)
+                        << "Examining Call Site " << *Call << "\n";
+                if (U.getOperandNo() == Call->getCalledOperandUse().getOperandNo()) {
+                    if (auto PointeeTy = FindType(Call->getFunctionType())) {
+                        FoundType = FindPointerType(*PointeeTy);
+                        if (!FoundType) { FoundType = AddMissingPointerType(PointeeTy); }
+                        if (FoundType) { goto exit; }
+                    }
+                } else {
+                    auto FuncTy = FindCalledFunctionType(Call->getFunctionType());
+                    if (FuncTy && FuncTy->GetDbgType()) {
+                        auto *SubroutineTy = dyn_cast<DISubroutineType>(FuncTy->GetDbgType());
+                        FoundType = GetArgumentHAKCType(SubroutineTy, U.getOperandNo());
+                        if (FoundType) { goto exit; }
+                    }
+                }
+            }
+        }
+
+    exit:
+        return FoundType;
+    }
+
+    DIDerivedType *
+    hakc::HAKCTypeIdentifier::FindUnionMember(const DICompositeType *UnionDef,
+                                              unsigned MemberOffset) const {
+        for (auto *UnionMember: UnionDef->getElements()) {
+            const auto *MemberTy = HAKCTypeInfo::StripTypeModifiers(
+                dyn_cast<DIDerivedType>(UnionMember)->getBaseType());
+            if (isa_and_nonnull<DICompositeType>(MemberTy)) {
+                auto *MemberStruct = dyn_cast<DICompositeType>(MemberTy);
+                for (auto *Element: MemberStruct->getElements()) {
+                    if (Element->getTag() == dwarf::DW_TAG_member) {
+                        auto *Member = dyn_cast<DIDerivedType>(Element);
+                        if (Member->getOffsetInBits() / BITS_PER_BYTE == MemberOffset) {
+                            return Member;
+                        }
+                    }
+                }
+            }
+        }
+        return nullptr;
+    }
+
+    hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
+        // TODO: handle ptrtoint, phi ptr
+        HAKCTypeP FoundType = nullptr;
+        SmallVector<DbgVariableIntrinsic *> DbgUsers;
+        SmallVector<DbgVariableRecord *> DVRUsers;
+
+        CommonHAKCAnalysis::getLogger(Verbose)
+                << "Attempting to find HAKCTypeInfo for " << *V << "\n";
+
+        if (const auto *GlobalVar = dyn_cast<GlobalVariable>(V)) {
+            auto HAKCGlob = FindGlobal(GlobalVar, true);
+            if (HAKCGlob && HAKCGlob->GetType()) { FoundType = HAKCGlob->GetType(); }
+        } else if (const auto *Func = dyn_cast<Function>(V)) {
+            auto HAKCFunc = FindFunction(Func, true);
+            if (HAKCFunc && HAKCFunc->GetType()) {
+                auto FuncTy = HAKCFunc->GetType();
+                FoundType = FindPointerType(*FuncTy);
+                if (!FoundType) { FoundType = AddMissingPointerType(FuncTy); }
+            }
+        } else if (isa<Instruction>(V) || isa<Argument>(V)) {
+            findDbgUsers(DbgUsers, V, &DVRUsers);
+            for (const auto *DVI: DbgUsers) {
+                CommonHAKCAnalysis::getLogger(Verbose)
+                        << "Examining Debug Intrinsic " << *DVI << "\n";
+                if (isa<DbgDeclareInst>(DVI) ||
+                    (isa<DbgValueInst>(DVI) && !isa<DbgAssignIntrinsic>(DVI))) {
+                    FoundType = FindTypeFromDebug(DVI, V);
+                    if (FoundType) { goto exit; }
+                }
+            }
+            for (auto *DVR: DVRUsers) {
+                CommonHAKCAnalysis::getLogger(Verbose)
+                        << "Examining Debug Record " << *DVR << "\n";
+                FoundType = FindTypeFromDebug(*DVR, V);
+
+                if (FoundType) { goto exit; }
+            }
+        }
+
+        if (auto *LoadI = dyn_cast<LoadInst>(V)) {
+            FoundType = CheckCallUses(LoadI);
+            if (FoundType) { goto exit; }
+            if (!getLoadStoreType(LoadI)->isPointerTy()) {
+                SmallVector<HAKCTypeP> Types;
+                auto *LoadTy = getLoadStoreType(LoadI);
+                FindAllTypes(LoadTy, Types);
+                auto UsedAsPointer = AnalysisHelper.ValueIsUsedAsPointer(LoadI);
+                for (auto HAKCTy: Types) {
+                    CommonHAKCAnalysis::getLogger(Verbose)
+                            << "Testing Load Type " << *HAKCTy << "\n";
+                    if (HAKCTy->GetDbgType()) {
+                        CommonHAKCAnalysis::getLogger(Verbose)
+                                << " with DIType " << *HAKCTy->GetDbgType() << "\n";
+                    }
+                    if (LoadTy->isIntegerTy()) {
+                        if (UsedAsPointer && IsPointerLikeType(HAKCTy->GetDbgType())) {
+                            FoundType = HAKCTy;
+                        } else { FoundType = HAKCTy; }
+                    } else { FoundType = HAKCTy; }
+                }
+                if (FoundType) { goto exit; }
+            }
+            if (auto *PHI = dyn_cast<PHINode>(LoadI->getPointerOperand())) {
+                for (auto &IncomingV: PHI->incoming_values()) {
+                    auto *Def = AnalysisHelper.getDef(IncomingV.get(), false);
+                    if (Def != LoadI) {
+                        if (auto PointeeType = FindHAKCType(Def)) {
+                            FoundType = FindPointeeType(PointeeType);
+                            if (FoundType) { goto exit; }
+                        }
+                    }
+                }
+                if (V->getType()->isPointerTy()) { FoundType = GetVoidPointerType(); }
+            } else {
+                if (auto PointeeType = FindHAKCType(LoadI->getPointerOperand())) {
+                    if (V->getType()->isPointerTy()) {
+                        if (PointeeType->IsVoidPtrType()) { FoundType = PointeeType; } else if
+                        (PointeeType->
+                            IsIntegerType()) { FoundType = GetVoidPointerType(); } else {
+                            FoundType = FindPointeeType(PointeeType);
+                        }
+                    } else { FoundType = FindPointeeType(PointeeType); }
+                    if (FoundType) { goto exit; }
+                }
+            }
+        }
+
+        // We have no debug information for V here, so try our best to deduce
+        if (isa<GetElementPtrInst>(V) || isa<GEPOperator>(V)) {
+            Type *SourceType, *DestTy;
+            Value *SourceValue;
+            APInt ByteOffset(GetModule().getDataLayout().getIndexSizeInBits(
+                                 V->getType()->getPointerAddressSpace()),
+                             0);
+            bool FoundOffset = false;
+            if (isa<GetElementPtrInst>(V)) {
+                auto *GEPI = dyn_cast<GetElementPtrInst>(V);
+                SourceType = GEPI->getSourceElementType();
+                DestTy = GEPI->getResultElementType();
+                SourceValue = GEPI->getPointerOperand();
+                FoundOffset = GEPI->accumulateConstantOffset(GetModule().getDataLayout(),
+                                                             ByteOffset);
+            } else {
+                auto *GEPO = dyn_cast<GEPOperator>(V);
+                SourceType = GEPO->getSourceElementType();
+                SourceValue = GEPO->getPointerOperand();
+                DestTy = GEPO->getResultElementType();
+                FoundOffset = GEPO->accumulateConstantOffset(GetModule().getDataLayout(),
+                                                             ByteOffset);
+            }
+            if (FoundOffset) {
+                auto SourceHAKCTy = FindHAKCType(SourceValue);
+                if (SourceHAKCTy && isa<AllocaInst>(SourceValue)) {
+                    SourceHAKCTy = SourceHAKCTy->GetPointeeType();
+                }
+                if (SourceHAKCTy && SourceHAKCTy->GetPointeeType()) {
+                    auto *StrippedDbgTy = HAKCTypeInfo::StripTypeModifiers(
+                        SourceHAKCTy->GetPointeeType()->GetDbgType());
+                    if (isa_and_nonnull<DICompositeType>(StrippedDbgTy)) {
+                        auto *DICompositeTy = dyn_cast<DICompositeType>(StrippedDbgTy);
+                        DIDerivedType *PreviousType = nullptr;
+                        for (auto *Element: DICompositeTy->getElements()) {
+                            if (Element->getTag() == dwarf::DW_TAG_member) {
+                                auto *Member = dyn_cast<DIDerivedType>(Element);
+                                auto MemberOffsetInBytes =
+                                        Member->getOffsetInBits() / BITS_PER_BYTE;
+                                if (MemberOffsetInBytes == ByteOffset.getZExtValue()) {
+                                    // FoundType = FindType(Member->getBaseType());
+                                    auto PointeeType = FindType(Member->getBaseType());
+                                    FoundType = FindPointerType(*PointeeType);
+                                    if (!FoundType) {
+                                        FoundType = AddMissingPointerType(PointeeType);
+                                    }
+                                    goto exit;
+                                }
+                                if (MemberOffsetInBytes < ByteOffset.getZExtValue()) {
+                                    PreviousType = Member;
+                                }
+                            }
+                        }
+                        if (!FoundType && PreviousType) {
+                            auto *MemberTy =
+                                    HAKCTypeInfo::StripTypeModifiers(PreviousType->getBaseType());
+                            if (isa_and_nonnull<DICompositeType>(MemberTy)) {
+                                auto *Submember = dyn_cast<DICompositeType>(MemberTy);
+                                auto RemainingOffset =
+                                        ByteOffset.getZExtValue() -
+                                        PreviousType->getOffsetInBits() / BITS_PER_BYTE;
+                                if (Submember->getTag() == dwarf::DW_TAG_union_type) {
+                                    PreviousType = FindUnionMember(Submember, RemainingOffset);
+                                    if (!PreviousType) {
+                                        FoundType = GetVoidPointerType();
+                                        goto exit;
+                                    }
+                                } else {
+                                    for (auto *Element: Submember->getElements()) {
+                                        if (Element->getTag() == dwarf::DW_TAG_member) {
+                                            auto *Member = dyn_cast<DIDerivedType>(Element);
+                                            auto MemberOffset =
+                                                    Member->getOffsetInBits() / BITS_PER_BYTE;
+                                            if (MemberOffset == RemainingOffset) {
+                                                PreviousType = Member;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            auto PointeeType = FindType(PreviousType->getBaseType());
+                            FoundType = FindPointerType(*PointeeType);
+                            if (!FoundType) { FoundType = AddMissingPointerType(PointeeType); }
+                        }
+                    }
+                }
+            } else if (DestTy->isPointerTy() || DestTy->isArrayTy()) {
+                CommonHAKCAnalysis::getLogger(Debug)
+                        << "Could not determine type for GEP " << *V << "\n";
+                FoundType = GetVoidPointerType();
+                goto exit;
+            }
+
+            if (FoundType) { goto exit; }
+
+            if (FoundType) { goto exit; }
+
+            HAKCTypeP ElementType = FindType(SourceType);
+            if (!ElementType) { ElementType = GetVoidPointerPointeeType(); }
+            FoundType = FindPointerType(*ElementType);
+            if (!FoundType) { FoundType = AddMissingPointerType(ElementType); }
+        } else if (auto *PHI = dyn_cast<PHINode>(V)) {
+            for (auto &IncomingV: PHI->incoming_values()) {
+                auto *Def = AnalysisHelper.getDef(IncomingV, false);
+
+                if (isa<PHINode>(Def) || isa<ConstantPointerNull>(Def)) { continue; }
+
+                FoundType = FindHAKCType(IncomingV);
+                if (FoundType) { goto exit; }
+            }
+        }
+
+        if (auto *Arg = dyn_cast<Argument>(V)) {
+            FoundType = GetArgumentHAKCType(Arg);
+        } else if (auto *Func = dyn_cast<Function>(V)) {
+            HAKCTypeP FuncTy = nullptr;
+            if (Func->getSubprogram()) {
+                FuncTy = FindType(Func->getSubprogram()->getType());
+            } else { FuncTy = FindCalledFunctionType(Func->getFunctionType()); }
+            FoundType = FindPointerType(*FuncTy);
+            if (!FoundType) { FoundType = AddMissingPointerType(FuncTy); }
+        } else if (auto *CallI = dyn_cast<CallInst>(V)) {
+            if (CallI->getCalledFunction() &&
+                CallI->getCalledFunction()->getSubprogram()) {
+                const auto *SubprogramTy =
+                        CallI->getCalledFunction()->getSubprogram()->getType();
+                const auto *ReturnTy = SubprogramTy->getTypeArray()[0];
+                FoundType = FindType(ReturnTy);
+            } else {
+                auto *FuncTy = CallI->getFunctionType();
+                auto HAKCFuncTy = FindCalledFunctionType(FuncTy);
+                if (HAKCFuncTy &&
+                    isa_and_nonnull<DISubroutineType>(HAKCFuncTy->GetDbgType())) {
+                    auto *DebugFuncTy =
+                            dyn_cast<DISubroutineType>(HAKCFuncTy->GetDbgType());
+                    FoundType = FindType(DebugFuncTy->getTypeArray()[0]);
+                } else {
+                    for (auto &U: CallI->uses()) {
+                        FoundType = FindHAKCTypeForUse(U);
+                        if (FoundType) { goto exit; }
+                    }
+                }
+            }
+        } else if (auto *ZExtI = dyn_cast<
+            ZExtInst>(V)) { FoundType = FindType(ZExtI->getType()); } else if (isa<
+            AllocaInst>(V)) { FoundType = CheckCallUses(V); } else if (isa<
+            IntToPtrInst>(V)) { FoundType = GetVoidPointerType(); } else if (auto *
+                FreezeI = dyn_cast<
+                    FreezeInst>(V)) {
+            FoundType = FindHAKCType(FreezeI->getOperand(0));
+        } else if (auto *CastExpr = dyn_cast<ConstantExpr>(V)) {
+            if (CastExpr->isCast()) {
+                FoundType = FindHAKCType(CastExpr->getOperand(0));
+            } else { FoundType = GetVoidPointerType(); }
+        } else if (auto *SelectI = dyn_cast<SelectInst>(V)) {
+            FoundType = FindHAKCType(SelectI->getTrueValue());
+            if (!FoundType) { FoundType = FindHAKCType(SelectI->getFalseValue()); }
+        }
+
+    exit:
+        if (FoundType && FoundType->GetPointeeType() == nullptr) {
+            if (FoundType->IsPointerType()) {
+                if (auto PointeeType = FindPointeeType(FoundType)) {
+                    FoundType->SetPointeeType(PointeeType);
+                }
+            } else if (IsStructTypeThatStartsWithPointerLikeType(*FoundType)) {
+                if (FoundType->GetDbgType()) {
+                    auto *FirstMemberType = GetFirstStructMemberType(
+                        dyn_cast<DICompositeType>(FoundType->GetDbgType()));
+                    auto PointeeType = FindType(FirstMemberType);
+                    FoundType->SetPointeeType(PointeeType);
+                } else { FoundType->SetPointeeType(GetVoidPointerType()); }
+            }
+        }
+        if (FoundType && V->getType()->isPointerTy() && FoundType->GetDbgType() &&
+            !IsPointerLikeType(FoundType->GetDbgType())) {
+            FoundType = FindPointerType(*FoundType);
+        }
+
+        if (FoundType) {
+            CommonHAKCAnalysis::getLogger(Verbose)
+                    << "Found HAKCTypeInfo\n"
+                    << *FoundType << "\nfor " << V << "\n";
+        } else {
+            CommonHAKCAnalysis::getLogger(Debug)
+                    << "Cound not find HAKCTypeInfo for " << V << "\n";
+            if (auto *I = dyn_cast<Instruction>(V)) {
+                auto DebugLoc = I->getDebugLoc();
+                if (DebugLoc && DebugLoc.get()) {
+                    CommonHAKCAnalysis::getLogger(Debug)
+                            << " with a DebugLoc " << *DebugLoc.get() << "\n";
+                }
+            }
+        }
+
+        return FoundType;
+    }
+
+    void HAKCTypeIdentifier::ModifyTypeUse(
+        Function *F, const std::shared_ptr<HAKCTypeInfo> &HAKCTy, TypePerms perm) {
+        if (!F) {
+            CommonHAKCAnalysis::getLogger(Fatal) << "Function is NULL!\n";
+            throw std::exception();
+        }
+        auto subprog = F->getSubprogram();
+        if (!subprog) {
+            CommonHAKCAnalysis::getLogger(Fatal)
+                    << "Subprog is null for " << *F << "\n";
+            throw std::exception();
+        }
+        if (!functions.contains(subprog)) {
+            CommonHAKCAnalysis::getLogger(Fatal)
+                    << "functions does not contain " << *F << "\n";
+            throw std::exception();
+        }
+        auto FunctionP = functions[subprog];
+
+        if (!HAKCTy) {
+            CommonHAKCAnalysis::getLogger(Fatal)
+                    << "Trying to set permission of NULL HAKCTy\n";
+            throw std::exception();
+        }
+        FunctionP->ModifyTypeUse(HAKCTy, perm);
+    }
+
+    std::shared_ptr<HAKCTypeInfo>
+    HAKCTypeIdentifier::FindCalledFunctionType(FunctionType *FunctionTy) const {
+        if (!FunctionTy) {
+            CommonHAKCAnalysis::getLogger(Fatal) << "Trying to find null FunctionTy\n";
+            throw std::exception();
+        }
+
+        auto FoundType = FindType(FunctionTy);
+        if (!FoundType) {
+            for (auto &it: IndirectCallsTypes) {
+                if (it.second->GetPointeeType()->GetLLVMType() == FunctionTy) {
+                    FoundType = it.second;
+                    break;
+                }
+            }
+        }
+        return FoundType;
+    }
+
+    std::shared_ptr<HAKCFunctionInfo>
+    HAKCTypeIdentifier::FindFunction(const Function *F, bool SearchUnmapped) {
+        for (auto &it: functions) {
+            if (it.second->GetFunction() == F) { return it.second; }
+        }
+        if (SearchUnmapped) {
+            for (auto UnmappedFunction: UnmappedFunctions) {
+                if (UnmappedFunction->GetFunction() == F) { return UnmappedFunction; }
+            }
+        }
+        return nullptr;
+    }
+
+    std::shared_ptr<HAKCGlobalInfo>
+    HAKCTypeIdentifier::FindGlobal(const GlobalVariable *GV,
+                                   bool SearchUnmapped) const {
+        for (auto &it: globals) {
+            if (it.second->GetGlobalVariable() == GV) { return it.second; }
+        }
+        if (SearchUnmapped) {
+            for (auto UnmappedGlobal: UnmappedGlobals) {
+                if (UnmappedGlobal->GetGlobalVariable() == GV) { return UnmappedGlobal; }
+            }
+        }
+        return nullptr;
+    }
+
+    std::shared_ptr<HAKCSymbolInfo>
+    HAKCTypeIdentifier::FindSymbol(Value *V, bool SearchSymbolsMissingDebug) {
+        if (auto *GV = dyn_cast<GlobalVariable>(V)) {
+            return FindGlobal(GV, SearchSymbolsMissingDebug);
+        }
+        if (const auto *F = dyn_cast<Function>(V)) {
+            return FindFunction(F, SearchSymbolsMissingDebug);
+        }
+        return nullptr;
+    }
+
+    void HAKCTypeIdentifier::FindTypesInFunctions() {
+        for (auto &it: functions) {
+            auto *F = it.second->GetFunction();
+            auto SuppressOutput = !AnalysisHelper.GetSystemInfo().OutputDebugInfo(F);
+
+            CommonHAKCAnalysis::getLogger(Debug, SuppressOutput)
+                    << "Finding types in Function " << F->getName() << "\n";
+
+            for (auto InstIt = inst_begin(F); InstIt != inst_end(F); ++InstIt) {
+                auto *I = &(*InstIt);
+                if (auto *DbgIntrinsic = dyn_cast<DbgVariableIntrinsic>(I)) {
+                    auto *V = DbgIntrinsic->getVariableLocationOp(0);
+                    if (isa<UndefValue>(V)) {
+                        CommonHAKCAnalysis::getLogger(Debug, SuppressOutput)
+                                << "Skipping undef Value in Instruction " << *I << "\n";
+                        continue;
+                    }
+                    auto *DebugV = DbgIntrinsic->getVariable();
+                    CommonHAKCAnalysis::getLogger(Debug, SuppressOutput)
+                            << "Found " << *V << " to " << *DebugV
+                            << " mapping from Instruction " << *I << "\n";
+                    const auto HAKCType = FindType(DebugV->getType());
+                    if (!HAKCType) {
+                        CommonHAKCAnalysis::getLogger(Fatal)
+                                << "Could not find HAKCType for DIType " << *DebugV->getType()
+                                << "\n";
+                        throw std::exception();
+                    }
+                    auto *LLVMTy = V->getType();
+                    if (auto *Alloca = dyn_cast<AllocaInst>(V)) {
+                        LLVMTy = Alloca->getAllocatedType();
+                    } else if (auto *CallI = dyn_cast<CallInst>(V)) {
+                        if (CallI->isInlineAsm()) {
+                            /* Inline assembly causes too much type confusion, so skip these
+                             * mappings */
+                            CommonHAKCAnalysis::getLogger(Debug, SuppressOutput)
+                                    << "Skipping inline assembly\n";
+                            continue;
+                        }
+                    }
+                    HAKCType->SetLLVMType(LLVMTy);
+                } else if (auto *CallI = dyn_cast<CallInst>(I)) {
+                    if (CallI->isIndirectCall()) { HandleIndirectCall(CallI); }
+                }
+            }
+        }
+    }
+
+    std::shared_ptr<hakc::HAKCTypeInfo>
+    hakc::HAKCTypeIdentifier::CreateNoDebugType(Type *Ty) {
+        std::string Name;
+        llvm::raw_string_ostream sstream(Name);
+        if (auto *StructTy = dyn_cast<StructType>(Ty)) {
+            if (StructTy->hasName()) { sstream << StructTy->getName(); } else {
+                sstream << *Ty;
+            }
+        } else { sstream << *Ty; }
+
+        auto HAKCType = std::make_shared<HAKCTypeInfo>(AnalysisHelper, Name, Debug);
+        HAKCType->SetLLVMType(Ty);
+        HAKCTypeP PointeeTy = nullptr;
+        if (auto *ArrayTy = dyn_cast<ArrayType>(Ty)) {
+            PointeeTy = FindType(ArrayTy->getElementType());
+            if (!PointeeTy) {
+                PointeeTy = CreateNoDebugType(ArrayTy->getElementType());
+            }
+        } else if (isa<PointerType>(Ty)) {
+            /* We can't know what this points to, so have it point to one byte */
+            PointeeTy = GetVoidPointerPointeeType();
+        }
+        HAKCType->SetPointeeType(PointeeTy);
+        return HAKCType;
+    }
+
+    HAKCTypeP HAKCTypeIdentifier::HandleIndirectCall(CallInst *CallI) {
+        if (IndirectCallsTypes.contains(CallI)) { return IndirectCallsTypes[CallI]; }
+
+        auto *FunctionTy = GetIndirectCallFunctionType(CallI);
+        auto HAKCType = FindCalledFunctionType(FunctionTy);
+        if (!HAKCType) { HAKCType = CreateNoDebugType(FunctionTy); }
+        auto PointerType =
+                CreateNoDebugType(PointerType::get(GetModule().getContext(), 0));
+        PointerType->SetPointeeType(HAKCType);
+
+        IndirectCallsTypes[CallI] = PointerType;
+        return HAKCType;
+    }
+
+    HAKCTypeIdentifier::HAKCTypeIdentifier(CommonHAKCAnalysis &AnalysisHelper)
+        : AnalysisHelper(AnalysisHelper), DbgInfoFinder(), TypesWithDebugInfo(),
+          globals(), functions(), TypesMissingDebugInfo(), IndirectCallsTypes(),
+          AnonymousTypes(), DefinitionLocationScope(nullptr),
+          IdentifiedStructTypes(
+              AnalysisHelper.GetModule().getIdentifiedStructTypes()) {
+    }
+
+    Module &HAKCTypeIdentifier::GetModule() const {
+        return AnalysisHelper.GetModule();
+    }
+
+    void HAKCTypeIdentifier::ProcessDebugInfo() {
+        // this is where the dag analysis actually happens!
+        DbgInfoFinder.processModule(GetModule());
+        // segfault on line below?
+        CommonHAKCAnalysis::getLogger(Verbose) << GetModule() << "\n";
+
+        StringRef ModulePath = GetModule().getSourceFileName();
+        for (auto *Scope: DbgInfoFinder.scopes()) {
+            if (auto *File = dyn_cast<DIFile>(Scope)) {
+                auto Filename = File->getFilename();
+                if (ModulePath.contains(Filename)) {
+                    DefinitionLocationScope = Scope;
+                    break;
+                }
+            }
+        }
+
+        if (!DefinitionLocationScope) {
+            CommonHAKCAnalysis::getLogger(Verbose)
+                    << "Could not find Compilation Unit Scope\n";
+        } else {
+            CommonHAKCAnalysis::getLogger(Verbose)
+                    << "Found Compilation Unit Scope " << DefinitionLocationScope << "\n";
+        }
+
+        CommonHAKCAnalysis::getLogger(Debug) << "!!!! Starting Type Handling !!!!\n";
+        unsigned TypesProcessed = 0;
+        for (auto *DITy: DbgInfoFinder.types()) {
+            CommonHAKCAnalysis::getLogger(Verbose)
+                    << "Processing Type " << ++TypesProcessed << " of "
+                    << DbgInfoFinder.type_count() << "\n";
+            auto TypeP = HandleType(DITy);
+        }
+        CommonHAKCAnalysis::getLogger(Debug) << "!!!! Finished Type Handling !!!!\n";
+
+        CommonHAKCAnalysis::getLogger(Debug)
+                << "!!!! Starting Global Handling !!!!\n";
+        for (auto *DIGlobal: DbgInfoFinder.global_variables()) {
+            auto GlobalP = HandleGlobal(DIGlobal->getVariable());
+        }
+        CommonHAKCAnalysis::getLogger(Debug)
+                << "!!!! Finished Global Handling !!!!\n";
+
+        CommonHAKCAnalysis::getLogger(Debug)
+                << "!!!! Starting Function Handling !!!!\n";
+        for (auto *DISubProg: DbgInfoFinder.subprograms()) {
+            auto SubProgP = HandleFunction(DISubProg);
+        }
+        CommonHAKCAnalysis::getLogger(Debug)
+                << "!!!! Finished Function Handling !!!!\n";
+
+        FindTypesInFunctions();
+        FindUsesInGlobals();
+        FindUsesInFunctions();
+
+        for (auto &it: TypesWithDebugInfo) {
+            auto HAKCType = it.second;
+            HAKCTypeP PointeeType = nullptr;
+            CommonHAKCAnalysis::getLogger(Verbose)
+                    << "Determining Pointee Type of " << *HAKCType << "\n";
+
+            if (HAKCType->IsPointerType()) { PointeeType = FindPointeeType(HAKCType); }
+            if (IsStructTypeThatStartsWithPointerLikeType(*HAKCType)) {
+                CommonHAKCAnalysis::getLogger(Verbose)
+                        << HAKCType->GetDbgType()
+                        << " is a struct type that starts with a pointer like type\n";
+                auto *FirstMemberType =
+                        GetFirstStructMemberType(dyn_cast<DICompositeType>(
+                            HAKCTypeInfo::StripTypeModifiers(HAKCType->GetDbgType())));
+                PointeeType = FindType(FirstMemberType);
+            }
+
+            if (PointeeType) {
+                CommonHAKCAnalysis::getLogger(Verbose)
+                        << "Setting Pointee Type of " << *HAKCType << " to\n"
+                        << *PointeeType << "\n";
+                HAKCType->SetPointeeType(PointeeType);
+            }
+        }
+    }
+
+    // need getters for globals and functions to move yaml output writing to
+    // module analysis!
+    std::map<const DIGlobalVariable *, HAKCGlobalP>
+    HAKCTypeIdentifier::GetGlobals() { return globals; }
+
+    std::set<HAKCGlobalP> HAKCTypeIdentifier::GetUnmappedGlobals() {
+        return UnmappedGlobals;
+    }
+
+    std::map<const DISubprogram *, HAKCFunctionP>
+    HAKCTypeIdentifier::GetFunctions() { return functions; }
+
+    std::set<HAKCFunctionP> HAKCTypeIdentifier::GetUnmappedFunctions() {
+        return UnmappedFunctions;
+    }
+
+    DebugInfoFinder HAKCTypeIdentifier::GetDbgInfoFinder() { return DbgInfoFinder; }
+
+    void HAKCTypeIdentifier::GetHAKCTypes(
+        SmallVectorImpl<HAKCTypeP> &Results) const {
+        for (auto &it: TypesWithDebugInfo) { Results.push_back(it.second); }
+    }
+
+    Type *HAKCTypeIdentifier::GetTypeFromString(StringRef TypeStr) const {
+        if (TypeStr.empty()) { return nullptr; }
+
+        if (TypeStr == "void") {
+            /* parseType only allows parsing void types for functions so explicitly
+             * check for that */
+            return Type::getVoidTy(GetModule().getContext());
+        }
+
+        SMDiagnostic Err;
+        auto *ParsedType = parseType(TypeStr, Err, GetModule());
+        return ParsedType;
+    }
+
+    void HAKCTypeIdentifier::AddIgnoredType(StringRef TypeName) const {
+        for (auto &it: TypesWithDebugInfo) {
+            auto TyName = GetTypeName(it.first);
+            if (TyName == TypeName) {
+                it.second->SetIsIgnoredType(true);
+                break;
+            }
+        }
+    }
+
+    HAKCTypeP HAKCTypeIdentifier::GetVoidPointerPointeeType() {
+        auto Result =
+                FindType(IntegerType::get(GetModule().getContext(), BITS_PER_BYTE));
+        if (!Result) {
+            Result =
+                    std::make_shared<HAKCTypeInfo>(AnalysisHelper, "unsigned char", false);
+            Result->SetDbgTypeName("unsigned char");
+            Result->SetLLVMType(
+                IntegerType::get(GetModule().getContext(), BITS_PER_BYTE));
+            TypesMissingDebugInfo.insert(Result);
+        }
+        return Result;
+    }
+
+    HAKCTypeP HAKCTypeIdentifier::GetVoidPointerType() {
+        auto VoidPointerTy = FindPointerType(*GetVoidPointerPointeeType());
+        if (!VoidPointerTy) {
+            VoidPointerTy = AddMissingPointerType(GetVoidPointerPointeeType());
+        }
+        return VoidPointerTy;
+    }
+} // namespace llvm::hakc

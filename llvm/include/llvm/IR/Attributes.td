@@ -181,6 +181,12 @@ def NoMerge : EnumAttr<"nomerge", [FnAttr]>;
 /// Pointer is known to be not null.
 def NonNull : EnumAttr<"nonnull", [ParamAttr, RetAttr]>;
 
+// Pointer is a user space pointer used in kernel space
+def KernelUserPtr : EnumAttr<"kernel_user_ptr", [FnAttr, ParamAttr, RetAttr]>;
+
+// Pointer is a per-cpu pointer
+def PerCPUPtr : EnumAttr<"per_cpu_ptr", [FnAttr, ParamAttr, RetAttr]>;
+
 /// The function does not recurse.
 def NoRecurse : EnumAttr<"norecurse", [FnAttr]>;
 

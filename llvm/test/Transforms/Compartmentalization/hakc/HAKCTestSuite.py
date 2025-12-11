@@ -5,9 +5,20 @@ import lit
 from lit.formats.shtest import ShTest
 
 
+class HAKCTest(lit.Test.Test):
+    def __init__(self, testSuite, test_type, test_path, localConfig):
+        self.test_type = test_type
+        super().__init__(testSuite, test_path, localConfig)
+
+    def getExecPath(self):
+        exec_path = self.suite.getExecPath(self.path_in_suite)
+        execdir, execbase = os.path.split(exec_path)
+
+        return os.path.join(execdir, self.test_type, execbase)
+
+
 class HAKCTestSuite(ShTest):
-    # TODO: Add in kuzu tests
-    test_types = ['yaml']
+    test_types = ['kuzu', '']
 
     def __init__(self):
         super(HAKCTestSuite, self).__init__()
@@ -28,4 +39,4 @@ class HAKCTestSuite(ShTest):
                         if os.path.isfile(test_path) and extension in localConfig.suffixes:
                             file_path = list(path_in_suite)
                             file_path.append(filename)
-                            yield lit.Test.Test(testSuite, file_path, localConfig)
+                            yield HAKCTest(testSuite, test_type, file_path, localConfig)

@@ -1,3 +1,13 @@
+//===----------------------------------------------------------------------===//
+//
+// Part of the MIT Lincoln Laboratory HAKC Compartmentalization Project.
+//
+//===----------------------------------------------------------------------===//
+///
+/// \file
+/// This file contains; TODO
+///
+//===----------------------------------------------------------------------===//
 //
 // Created by de29664 on 3/6/25.
 //
@@ -28,7 +38,9 @@ public:
 
   HAKCPointerBase &GetManagedPointer();
 
-  HAKC_Access_Token GetAccessToken();
+  HAKC_Access_Token GetAccessToken() const;
+
+  operator bool() const;
 
 protected:
   std::map<HAKCTransferAction, Value *> ActionValues;

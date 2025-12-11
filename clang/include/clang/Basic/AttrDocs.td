@@ -8279,3 +8279,18 @@ of ``nonallocating`` by the compiler.
   }];
 }
 
+def KernelUserPtrDocs : Documentation {
+  let Category = DocCatVariable;
+  let Heading = "kernel_user_ptr";
+  let Content = [{
+  Adding to ``__user`` in the Linux kernel to signal a pointer is a userspace pointer.
+  }];
+}
+
+def PerCPUPtrDocs : Documentation {
+  let Category = DocCatVariable;
+  let Heading = "per_cpu_ptr";
+  let Content = [{
+  Adding to ``__percpu`` in the Linux kernel to signal a pointer is a percpu pointer.
+  }];
+}

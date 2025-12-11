@@ -1,0 +1,9 @@
+config.name = "@hakc_test_name@"
+config.test_source_root = "@hakc_test_path@"
+config.test_exec_root = "@hakc_test_path@"
+
+config.substitutions.append(
+    ("%HAKC_RUN_ENFORCEMENT_PASS",
+     "clang -O0 -g -S -emit-llvm -mllvm --enable-hakc -mllvm --hakc-config=@hakc_config_path@ -mllvm --pass-mode=enforcement -mllvm -use-simulated-client -o %t %s"))
+config.suffixes = [".c", ".cpp"]
+config.substitutions.append(("%HAKC_EVALUATE", "cat %t | FileCheck %s || exit 1"))

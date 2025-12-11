@@ -16,7 +16,7 @@ hakc::HAKCSymbolInfo::HAKCSymbolInfo(CommonHAKCAnalysis &Analysis,
                                      StringRef Name, bool DebugActive)
     : HAKCInfo(Analysis, Name, DebugActive), Type(nullptr), UsedSymbols(),
       GlobalObj(nullptr), DbgType(nullptr), DefiningLocation(nullptr),
-      DefiningLine(0), LocalScope(nullptr), LocalScopeStr() {}
+      DefiningLine(0), LocalScope(nullptr) {}
 
 void hakc::HAKCSymbolInfo::SetType(std::shared_ptr<HAKCTypeInfo> HAKCType) {
   Type = std::move(HAKCType);
@@ -32,17 +32,20 @@ void hakc::HAKCSymbolInfo::AddSymbolUse(
 }
 
 void hakc::HAKCSymbolInfo::GetTransformedPathName(
-    const DIFile *File, SmallVectorImpl<char> &Result) const {
+    const DIFile *File, SmallVectorImpl<char> &Result) {
   sys::path::append(Result, File->getDirectory(), File->getFilename());
 }
 
-StringRef hakc::HAKCSymbolInfo::GetLocalScopePath() const {
-  return LocalScopeStr;
+void hakc::HAKCSymbolInfo::GetLocalScopePath(
+    SmallVectorImpl<char> &Result) const {
+  if (LocalScope) {
+    GetTransformedPathName(LocalScope->getFile(), Result);
+  }
 }
 
 std::string hakc::HAKCSymbolInfo::GetYamlHeader(unsigned int Indents) const {
   if (!this->Type) {
-    CommonHAKCAnalysis::getWriter(true)
+    CommonHAKCAnalysis::getLogger(Fatal)
         << "Symbol " << GetName() << " has no HAKCType!\n";
     throw std::exception();
   }
@@ -51,32 +54,24 @@ std::string hakc::HAKCSymbolInfo::GetYamlHeader(unsigned int Indents) const {
   llvm::raw_string_ostream sstream(Yaml);
 
   sstream << "\n";
-  if (DefiningLocation) {
-    SmallString<256> PathName;
-    GetTransformedPathName(DefiningLocation, PathName);
-
-    sstream.indent(Indents + EntrySpaces())
-        << "DefiningFile: \"" << PathName << "\"\n";
-    sstream.indent(Indents + EntrySpaces())
-        << "DefiningLine: " << DefiningLine << "\n";
-  }
-  sstream.indent(Indents + EntrySpaces()) << "IsDefinition: ";
-  bool IsDefinition;
-
-  if (auto *Global = dyn_cast<GlobalVariable>(GlobalObj)) {
-    IsDefinition = Global->hasInitializer();
-  } else if (auto *F = dyn_cast<Function>(GlobalObj)) {
-    IsDefinition = !F->isDeclaration();
-  } else {
-    CommonHAKCAnalysis::getWriter(true) << "Unexpected GlobalObj\n";
-    throw std::exception();
-  }
-  if (IsDefinition) {
-    sstream << "true";
-  } else {
-    sstream << "false";
-  }
-  sstream << "\n";
+  // Note: IsDefinition can be inferred by whether there is a HAKCCompilationUnit which points to the source file and line
+  // sstream.indent(Indents + EntrySpaces()) << "IsDefinition: ";
+  // bool IsDefinition;
+  //
+  // if (auto *Global = dyn_cast<GlobalVariable>(GlobalObj)) {
+  //   IsDefinition = Global->hasInitializer();
+  // } else if (auto *F = dyn_cast<Function>(GlobalObj)) {
+  //   IsDefinition = !F->isDeclaration();
+  // } else {
+  //   CommonHAKCAnalysis::getLogger(Error) << "Unexpected GlobalObj\n";
+  //   throw std::exception();
+  // }
+  // if (IsDefinition) {
+  //   sstream << "true";
+  // } else {
+  //   sstream << "false";
+  // }
+  // sstream << "\n";
 
   sstream.indent(Indents + EntrySpaces()) << "Scope:\n";
   sstream.indent(Indents + EntrySpaces() + HAKCInfo::IndentSpaces())
@@ -87,7 +82,8 @@ std::string hakc::HAKCSymbolInfo::GetYamlHeader(unsigned int Indents) const {
     sstream << "\"local\"\n";
     sstream.indent(Indents + EntrySpaces() + HAKCInfo::IndentSpaces())
         << "LocalScopeName: ";
-    auto PathName = GetLocalScopePath();
+    SmallString<256> PathName;
+    GetLocalScopePath(PathName);
     sstream << "\"" << PathName << "\"";
   } else {
     sstream << "\"global\"";
@@ -122,7 +118,7 @@ std::string hakc::HAKCSymbolInfo::GetYaml(unsigned Indents) const {
 
 void hakc::HAKCSymbolInfo::SetGlobalObj(GlobalObject *Global) {
   if (!Global) {
-    CommonHAKCAnalysis::getWriter(true)
+    CommonHAKCAnalysis::getLogger(Fatal)
         << "Trying to set null GlobalVariable\n";
     throw std::exception();
   }
@@ -144,21 +140,12 @@ void hakc::HAKCSymbolInfo::SetLocalScope(const DIScope *Scope) {
     return;
   }
 
-  const DIFile *ScopeFile;
-  if (auto *SubProg = dyn_cast<DISubprogram>(LocalScope)) {
-    ScopeFile = SubProg->getFile();
-  } else if (auto *File = dyn_cast<DIFile>(LocalScope)) {
-    ScopeFile = File;
-  } else if (auto *CompileUnit = dyn_cast<DICompileUnit>(LocalScope)) {
-    ScopeFile = CompileUnit->getFile();
-  } else {
-    CommonHAKCAnalysis::getWriter(true)
+  if (!(isa<DISubprogram>(LocalScope) || isa<DIFile>(LocalScope) ||
+        isa<DICompileUnit>(LocalScope))) {
+    CommonHAKCAnalysis::getLogger(Fatal)
         << "Unexpected LocalScope: " << *LocalScope << "\n";
     throw std::exception();
   }
-
-  LocalScopeStr.clear();
-  GetTransformedPathName(ScopeFile, LocalScopeStr);
 }
 
 bool hakc::HAKCSymbolInfo::Matches(
@@ -167,7 +154,9 @@ bool hakc::HAKCSymbolInfo::Matches(
       (LocalScope ? hakc_local_scope : hakc_global_scope);
   bool ScopesMatch = SymbolInfoScope == YamlSymbol.Scope.Scope;
   if (ScopesMatch && SymbolInfoScope == hakc_local_scope) {
-    ScopesMatch = (YamlSymbol.Scope.LocalScope == GetLocalScopePath());
+    SmallString<256> PathName;
+    GetLocalScopePath(PathName);
+    ScopesMatch = (YamlSymbol.Scope.LocalScope == PathName);
   }
   return ScopesMatch && YamlSymbol.Name == Name && YamlSymbol.Type == *Type;
 }

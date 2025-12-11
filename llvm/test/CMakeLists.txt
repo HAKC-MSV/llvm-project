@@ -230,59 +230,91 @@ if (LLVM_INCLUDE_SPIRV_TOOLS_TESTS)
 endif ()
 
 if (LLVM_ENABLE_HAKC)
-    option(HAKC_SOCKET_ROOT "Directory to use for test socket paths" ${CMAKE_BINARY_DIR}/hakc-sockets)
-    string(LENGTH "${HAKC_SOCKET_ROOT}/hakc_test0.db.sock" socket_path_length)
-    if (socket_path_length GREATER_EQUAL 107)
-        message(WARNING "HAKC_SOCKET_ROOT ${HAKC_SOCKET_ROOT} is too long")
-    endif ()
+    MESSAGE("-- Configuring HAKC tests: ")
 
-    set(HAKC_TEST_ROOT_DIR test/Transforms/Compartmentalization/hakc)
-    file(GLOB HAKC_TESTS ${LLVM_MAIN_SRC_DIR}/${HAKC_TEST_ROOT_DIR}/tests/* LIST_DIRECTORIES TRUE)
+    set(HAKC_TEST_ROOT_DIR ${LLVM_MAIN_SRC_DIR}/test/Transforms/Compartmentalization/hakc)
+    set(HAKC_TEST_CASE $ENV{HAKC_TEST_CASE})
+    set(hakc_test_core_count 1) # run all tests in single threaded mode
 
-    set(HAKC_CONFIG_DIR ${LLVM_MAIN_SRC_DIR}/${HAKC_TEST_ROOT_DIR}/configs)
+    # HAKC Constants
+    set(hakc_configs_path ${CMAKE_SOURCE_DIR}/llvm-project/llvm/utils/hakc/configs/)
 
-    list(APPEND HAKC_TEST_INPUTS ${HAKC_CONFIG_DIR}/hakc_policy_config.yml.in
-            ${HAKC_CONFIG_DIR}/hakc_comp_config.yml.in
-            ${HAKC_CONFIG_DIR}/lit.local.cfg.in
+    # top level HAKC settings
+    set(hakc_server_log_level ERROR)
+    # Note: test timeouts should be much shorter than in the linux kernel
+    set(hakc_max_connection_retries 2)
+
+    set(hakc_config_in ${hakc_configs_path}/hakc-config.yaml.in)
+    set(hakc_server_config_in ${hakc_configs_path}/hakc-server-config.yaml.in)
+    set(hakc_client_config_in ${hakc_configs_path}/hakc-client-config.yaml.in)
+    set(hakc_lit_config_in ${HAKC_TEST_ROOT_DIR}/configs/hakc-lit.local.cfg.in)
+
+    # adjustments in tests currently unsupported
+    set(hakc_adjustments_path_out "")
+
+    set(hakc_server_process ${LLVM_MAIN_SRC_DIR}/utils/hakc/hakc-server-process)
+
+    list(APPEND HAKC_TEST_INPUTS
+            ${hakc_config_in}
+            ${hakc_server_config_in}
+            ${hakc_client_config_in}
+            ${hakc_lit_config_in}
     )
 
-    function(create_hakc_config_file in_path out_path)
-        list(APPEND HAKC_TEST_GENERATED_FILES ${out_path})
-        list(APPEND HAKC_TEST_INPUTS ${in_path})
+    file(GLOB_RECURSE HAKC_TESTS ${HAKC_TEST_ROOT_DIR}/tests/*.c
+            ${HAKC_TEST_ROOT_DIR}/tests/*.cpp
+            ${HAKC_TEST_ROOT_DIR}/tests/*.py
+            LIST_DIRECTORIES TRUE)
+
+    foreach (hakc_test ${HAKC_TESTS})
+        get_filename_component(hakc_test_path ${hakc_test} DIRECTORY)
+        get_filename_component(hakc_test_name ${hakc_test} NAME)
+
+        # get the test build directory
+        string(REPLACE "${HAKC_TEST_ROOT_DIR}/tests/" "" test_prefix "${hakc_test_path}")
+        MESSAGE("   -- ${test_prefix}")
+        set(test_build_path ${CMAKE_BINARY_DIR}/llvm-project/llvm/test/Transforms/Compartmentalization/hakc/tests/${test_prefix})
+
+        # configure python unittests to use with check-hakc
+        if (hakc_test_path MATCHES ".*python.*")
+            set(hakc_python_test_process ${LLVM_MAIN_SRC_DIR}/utils/hakc/hakc-test-process)
+            set(hakc_lit_config_path ${test_build_path}/lit.local.cfg)
+            configure_file(${HAKC_TEST_ROOT_DIR}/configs/hakc-unittests-lit.local.cfg.in
+                    ${hakc_lit_config_path})
+            list(APPEND HAKC_TEST_INPUTS ${HAKC_TEST_ROOT_DIR}/configs/hakc-unittests-lit.local.cfg.in)
+            list(APPEND HAKC_TEST_GENERATED_FILES ${hakc_lit_config_path})
+        else ()
+            #   Note: python/ contains a single test case which merely calls the python unittests and doesn't need additional configuration
+            set(hakc_build_dir ${test_build_path})
+            set(hakc_config_path ${hakc_build_dir}/hakc-config.yaml)
+            set(hakc_server_config_path ${hakc_build_dir}/hakc-server-config.yaml)
+            set(hakc_client_config_path ${hakc_build_dir}/hakc-client-config.yaml)
+            set(hakc_log_dir ${hakc_build_dir})
+            set(hakc_lit_config_path ${hakc_build_dir}/lit.local.cfg)
+            set(hakc_server_core_count ${hakc_test_core_count})
+            set(hakc_analysis_core_count ${hakc_test_core_count})
+
+            configure_file(${hakc_config_in}
+                    ${hakc_config_path})
+            configure_file(${hakc_server_config_in}
+                    ${hakc_server_config_path})
+            configure_file(${hakc_client_config_in}
+                    ${hakc_client_config_path})
+            configure_file(${hakc_lit_config_in}
+                    ${hakc_lit_config_path})
+
+            list(APPEND HAKC_TEST_INPUTS ${hakc_config_in})
+            list(APPEND HAKC_TEST_INPUTS ${hakc_server_config_in})
+            list(APPEND HAKC_TEST_INPUTS ${hakc_client_config_in})
+            list(APPEND HAKC_TEST_INPUTS ${hakc_lit_config_in})
+            list(APPEND HAKC_TEST_GENERATED_FILES ${hakc_config_path})
+            list(APPEND HAKC_TEST_GENERATED_FILES ${hakc_server_config_path})
+            list(APPEND HAKC_TEST_GENERATED_FILES ${hakc_client_config_path})
+            list(APPEND HAKC_TEST_GENERATED_FILES ${hakc_lit_config_path})
+        endif ()
+
         set(HAKC_TEST_GENERATED_FILES "${HAKC_TEST_GENERATED_FILES}" PARENT_SCOPE)
         set(HAKC_TEST_INPUTS "${HAKC_TEST_INPUTS}" PARENT_SCOPE)
-
-        configure_file(${in_path} ${out_path})
-    endfunction()
-
-    function(create_hakc_test_configs TestPath db_type backing_store socket_path)
-        get_filename_component(TestName ${TestPath} NAME)
-        get_filename_component(DirName ${TestPath} DIRECTORY)
-        set(HAKC_BACKING_TYPE ${db_type})
-        set(HAKC_BACKING_STORE ${backing_store})
-        set(HAKC_BUILD_DIR ${CMAKE_BINARY_DIR}/llvm-project/llvm/${HAKC_TEST_ROOT_DIR}/tests/${TestName}/${db_type})
-        set(HAKC_POLICY_CONFIG ${HAKC_BUILD_DIR}/hakc_policy_config.yml)
-        set(HAKC_PASS_CONFIG ${HAKC_BUILD_DIR}/hakc_config.yml)
-        set(HAKC_DAG_ANALYSIS_PATH ${HAKC_BUILD_DIR}/dag-analysis)
-        set(HAKC_PYTHON_POLICY_PROCESS ${LLVM_MAIN_SRC_DIR}/utils/hakc/hakc-policy-process)
-        set(HAKC_SOCKET_PATH ${socket_path}.${db_type})
-
-        create_hakc_config_file(${HAKC_CONFIG_DIR}/hakc_policy_config.yml.in ${HAKC_POLICY_CONFIG})
-        create_hakc_config_file(${HAKC_CONFIG_DIR}/hakc_comp_config.yml.in ${HAKC_PASS_CONFIG})
-        create_hakc_config_file(${HAKC_CONFIG_DIR}/lit.local.cfg.in ${HAKC_BUILD_DIR}/lit.local.cfg)
-
-        set(HAKC_TEST_GENERATED_FILES "${HAKC_TEST_GENERATED_FILES}" PARENT_SCOPE)
-        set(HAKC_TEST_INPUTS "${HAKC_TEST_INPUTS}" PARENT_SCOPE)
-    endfunction()
-
-    foreach (HAKC_TEST_DIR ${HAKC_TESTS})
-        get_filename_component(TestName ${HAKC_TEST_DIR} NAME)
-        set(HAKC_DB_IN ${LLVM_MAIN_SRC_DIR}/${HAKC_TEST_ROOT_DIR}/tests/${TestName}/db.yml.in)
-        set(HAKC_DB_OUT ${CMAKE_BINARY_DIR}/llvm-project/llvm/${HAKC_TEST_ROOT_DIR}/tests/${TestName}/db.yml)
-        set(HAKC_SOCKET_PATH ${HAKC_SOCKET_ROOT}/${TestName}.db.sock)
-        create_hakc_config_file(${HAKC_DB_IN} ${HAKC_DB_OUT})
-        create_hakc_test_configs(${HAKC_TEST_DIR} kuzu ${CMAKE_BINARY_DIR}/hakc-db/${TestName} ${HAKC_SOCKET_PATH})
-        create_hakc_test_configs(${HAKC_TEST_DIR} yaml ${HAKC_DB_OUT} ${HAKC_SOCKET_PATH})
     endforeach ()
 
     list(REMOVE_DUPLICATES HAKC_TEST_INPUTS)
@@ -296,10 +328,12 @@ if (LLVM_ENABLE_HAKC)
     get_llvm_lit_path(LIT_BASE_DIR LIT_FILE_NAME)
 
     add_custom_target(check-hakc
-            COMMAND "${Python3_EXECUTABLE}" ${LIT_BASE_DIR}/${LIT_FILE_NAME} ${LLVM_MAIN_SRC_DIR}/${HAKC_TEST_ROOT_DIR}
+            DEPENDS ${HAKC_TESTS}
+            COMMAND "${Python3_EXECUTABLE}" ${LIT_BASE_DIR}/${LIT_FILE_NAME} -a ${HAKC_TEST_ROOT_DIR}
+            COMMENT "Running check-hakc"
     )
-
-    add_dependencies(check-hakc hakc_test_configs_gen)
+    # TODO: update this so that the tests depend on hakc being built
+    add_dependencies(check-hakc hakc_test_configs_gen clang)
 
     list(APPEND LLVM_TEST_DEPENDS hakc_test_configs_gen clang)
 endif ()

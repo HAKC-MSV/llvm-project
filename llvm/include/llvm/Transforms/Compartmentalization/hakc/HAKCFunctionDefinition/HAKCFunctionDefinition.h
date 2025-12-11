@@ -1,3 +1,13 @@
+//===----------------------------------------------------------------------===//
+//
+// Part of the MIT Lincoln Laboratory HAKC Compartmentalization Project.
+//
+//===----------------------------------------------------------------------===//
+///
+/// \file
+/// This file tracks the information associated with a specific function definition.
+///
+//===----------------------------------------------------------------------===//
 //
 // Created by de29664 on 6/23/23.
 //
@@ -21,7 +31,8 @@ namespace llvm::hakc {
         IsCode,
         AccessToken,
         ValidTargets,
-        ValidTargetSize
+        ValidTargetSize,
+        Epoch
     };
 
     const std::map<HAKCFunctionArgumentUse, const char *> HAKCArgumentArgumentUseStringMap();
@@ -50,10 +61,15 @@ namespace llvm::hakc {
 
         ConstantInt *GetDivisionIdIdx() const;
 
+        int GetEpochIdx() const;
+
+        bool HasEpochIdx() const;
+
         iterator_range<SmallVector<HAKCFunctionArgumentDefinition>::iterator> Args();
 
     protected:
         Function *F;
+        int EpochIdx;
         SmallVector<HAKCFunctionArgumentDefinition> ArgList;
 
         bool GetArgIdxByUse(HAKCFunctionArgumentUse Use, unsigned *Idx) const;

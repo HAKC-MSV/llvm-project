@@ -13,7 +13,7 @@ void HAKCGlobalInfo::SetGlobalVariable(GlobalVariable *GV) {
   HAKCSymbolInfo::SetGlobalObj(GV);
 }
 
-GlobalVariable *HAKCGlobalInfo::GetGlobalVariable() {
+GlobalVariable *HAKCGlobalInfo::GetGlobalVariable() const {
   return dyn_cast<GlobalVariable>(GetGlobalObj());
 }
 

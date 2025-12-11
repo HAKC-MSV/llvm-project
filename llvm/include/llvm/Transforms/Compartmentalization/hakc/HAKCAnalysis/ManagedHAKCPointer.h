@@ -1,3 +1,15 @@
+//===----------------------------------------------------------------------===//
+//
+// Part of the MIT Lincoln Laboratory HAKC Compartmentalization Project.
+//
+//===----------------------------------------------------------------------===//
+///
+/// \file
+/// This file contains the subclass class that tracks pointers that are created
+/// during compartmentalization, e.g., a pointer that needs to be authenticated
+/// before allowing data to cross compartment boundaries
+///
+//===----------------------------------------------------------------------===//
 //
 // Created by de29664 on 9/18/23.
 //
@@ -149,7 +161,6 @@ protected:
    */
   Value *ProtectedPointer;
 
-  bool DebugActive;
   HAKCPointerManager &Manager;
 
   bool BaseIsAuthenticated;
@@ -189,7 +200,7 @@ protected:
 
   bool ComputeBasePointerAuthenticated();
 
-  void GetAllUses(SmallVectorImpl<ManagedHAKCPointerUseP> &Result) const;
+
 
   void SetProtectedPointer(Value *NewProtectedPointer);
 
@@ -216,6 +227,8 @@ public:
   ManagedHAKCPointer(Value *Pointer, HAKCPointerManager &Manager, unsigned ID);
 
   ~ManagedHAKCPointer() = default;
+
+  void GetAllUses(SmallVectorImpl<ManagedHAKCPointerUseP> &Result) const;
 
   Value *GetProtectedPointer() const;
 
@@ -254,6 +267,8 @@ public:
   void UpdateUserCounts();
 
   void SetAuthenticatedPointer(Value *NewAuthenticatedPointer) override;
+
+  bool IsDataPointer() const;
 
 private:
   void InitBaseDefinitionInfo();

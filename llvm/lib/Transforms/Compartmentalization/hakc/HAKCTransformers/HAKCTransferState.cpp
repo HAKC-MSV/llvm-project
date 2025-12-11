@@ -42,6 +42,13 @@ hakc::HAKCPointerBase &hakc::HAKCTransferState::GetManagedPointer() {
   return HAKCPointer;
 }
 
-hakc::HAKC_Access_Token hakc::HAKCTransferState::GetAccessToken(){
+hakc::HAKC_Access_Token hakc::HAKCTransferState::GetAccessToken() const {
   return TargetDivision.GetAccessToken();
+}
+
+hakc::HAKCTransferState::operator bool() const {
+  if (HAKCPointer.GetType() && HAKCPointer.GetType()->IsIgnoredType()) {
+    return false;
+  }
+  return true;
 }

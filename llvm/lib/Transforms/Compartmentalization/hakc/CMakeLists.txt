@@ -7,8 +7,10 @@ add_llvm_component_library(LLVMHAKC
         HAKCAnalysis/ManagedHAKCPointer.cpp
 
         HAKCCompartmentalizationPolicy/HAKCCompartment.cpp
-        HAKCCompartmentalizationPolicy/HAKCCompartmentalizationPolicy.cpp
         HAKCCompartmentalizationPolicy/HAKCCompartmentDivision.cpp
+
+        HAKCDatabase/HAKCDatabase.cpp
+        HAKCDatabase/HAKCServerClient.cpp
 
         HAKCFunctionDefinition/HAKCCustomTransfer.cpp
         HAKCFunctionDefinition/HAKCFunctionDefinition.cpp
@@ -16,6 +18,7 @@ add_llvm_component_library(LLVMHAKC
         HAKCSystem/HAKCAllocationSize.cpp
         HAKCSystem/HAKCSystemInformation.cpp
         HAKCSystem/HAKCWriter.cpp
+        HAKCSystem/HAKCLogger.cpp
 
         HAKCTransformers/HAKCPostTargetAction.cpp
         HAKCTransformers/HAKCPreTransferAction.cpp
