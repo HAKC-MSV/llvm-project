@@ -40,10 +40,22 @@ def output_profile_stats(profile, logger_to_use: HAKCLogger):
     logger_to_use.info(s.getvalue())
 
 
-def add_argument_to_command_list(cmd: list[str], argument: str):
-    if argument not in shlex.join(cmd):
-        for tok in shlex.split(argument):
-            cmd.insert(len(cmd) - 1, tok)
+def add_argument_to_command_list(cmd: list[str], arg_name: str, arg_value: Optional[str] = None,
+                                 add_mllvm: bool = True):
+    full_argument = f'{arg_name}={arg_value}' if arg_value is not None else f'{arg_name}'
+    bash_argument = shlex.quote(full_argument)
+    bash_arg_name = shlex.quote(arg_name)
+
+    found = False
+    for i in range(len(cmd)):
+        cmd_token = shlex.quote(cmd[i])
+        if bash_arg_name in cmd_token:
+            cmd[i] = bash_argument
+            found = True
+    if not found:
+        if add_mllvm:
+            cmd.insert(len(cmd) - 1, '-mllvm')
+        cmd.insert(len(cmd) - 1, bash_argument)
 
 
 def run_compilation_target(database_entry: dict, logger_to_use: HAKCLogger, socket_path: str, config_path: str,
@@ -54,16 +66,30 @@ def run_compilation_target(database_entry: dict, logger_to_use: HAKCLogger, sock
     if 'arguments' in database_entry:
         cmd = database_entry['arguments']
 
-    add_argument_to_command_list(cmd, f'-mllvm --enable-hakc')
+    output_file_name = None
 
-    add_argument_to_command_list(cmd, f"-mllvm --hakc-config={config_path}")
+    if 'output' in database_entry:
+        output_file_name = database_entry['output']
+    else:
+        for i in range(len(cmd)):
+            if cmd[i] == '-o':
+                output_file_name = cmd[i + 1]
+                break
 
-    add_argument_to_command_list(cmd, f'-mllvm --hakc-server-path={socket_path}')
+    skip_compile_task = output_file_name is None or not output_file_name.endswith('.o')
+    if skip_compile_task:
+        return
 
-    add_argument_to_command_list(cmd, f'-mllvm --pass-mode={pass_mode}')
+    add_argument_to_command_list(cmd, f'--enable-hakc')
+
+    add_argument_to_command_list(cmd, '--hakc-config', config_path)
+
+    add_argument_to_command_list(cmd, f'--hakc-server-path', socket_path)
+
+    add_argument_to_command_list(cmd, f'--pass-mode', pass_mode)
 
     if output_ir:
-        add_argument_to_command_list(cmd, '-S -emit-llvm')
+        add_argument_to_command_list(cmd, '-S -emit-llvm', add_mllvm=False)
         for i in range(len(cmd)):
             if cmd[i] == '-o':
                 base, _ = os.path.splitext(cmd[i + 1])
@@ -113,6 +139,7 @@ def do_compilation_tasks(task_id: int, config: HAKCConfig, logger_to_use: HAKCLo
         return None
 
     logger_to_use.debug(f'Compiling {len(files_to_analyze)} files')
+
     for database_entry in compilation_database:
         compilation_file = database_entry['file']
         if compilation_file in files_to_analyze:
@@ -296,6 +323,7 @@ def main():
                         required=True, type=HAKCBuildMode.from_str)
     parser.add_argument('--batch-size', help='Number of tasks to submit to processes', type=int, dest='batch_size',
                         default=100)
+
     args = parser.parse_args()
 
     # setting up root logger, which all other loggers should inherit its properties (unless we overwrite them later)
