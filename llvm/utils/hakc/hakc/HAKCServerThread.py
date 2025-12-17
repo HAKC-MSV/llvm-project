@@ -1,6 +1,5 @@
 import json
 import logging
-import signal
 import socketserver
 import struct
 import threading
@@ -14,21 +13,28 @@ from .HAKCLogger import HAKCLogger
 
 logging.setLoggerClass(HAKCLogger)
 
-logger: HAKCLogger = cast(HAKCLogger, logging.getLogger('hakc.server'))
-
 
 # noinspection PyTypeChecker
 class HAKCServerThread(socketserver.StreamRequestHandler):
     size_fmt = "@L"
 
+    def __init__(self, request, client_address, server):
+        self.logger = None
+        self.yaml_loader = yaml.CLoader
+        self.size_in_bytes = struct.calcsize(HAKCServerThread.size_fmt)
+        self.file_handler = None
+        self.config: HAKCConfig = None
+        self.endpoints = dict()
+        self.enforcement_source = None
+        super().__init__(request, client_address, server)
+
     def init(self):
         # Note: handler() can be called before the actual __init__() function is called, so make a custom blocking init() for use in handler()
         # Initialize thread specific data
-        self.logger = cast(HAKCLogger, logging.getLogger(str(threading.get_ident())))
+        self.logger = cast(HAKCLogger,
+                           logging.getLogger(f'hakc-server-{self.hakc_server.id}-thread-{threading.get_ident()}'))
         # Maybe use CLoader because it's faster (but may have some compatability issues)
-        self.yaml_loader = yaml.CLoader
         self.file_handler = None
-        self.size_in_bytes = struct.calcsize(HAKCServerThread.size_fmt)
         self.config: HAKCConfig = None
         self.endpoints = dict()
         self.enforcement_source = None
@@ -71,14 +77,7 @@ class HAKCServerThread(socketserver.StreamRequestHandler):
         bytes_written = self.write_raw_bytes(struct.pack(
             HAKCServerThread.size_fmt, len(encoded_data)))
         bytes_written += self.write_raw_bytes(encoded_data)
-        self.reset_alarm()
         return bytes_written
-
-    def reset_alarm(self):
-        # cancel existing alarm
-        signal.alarm(0)
-        if self.hakc_server.config.timeout > 0:
-            signal.alarm(self.hakc_server.config.timeout)
 
     # noinspection PyTypeChecker
     def handle_endpoint(self, hakc_request: HAKCDataRequest) -> HAKCResponse:
@@ -98,7 +97,7 @@ class HAKCServerThread(socketserver.StreamRequestHandler):
 
     def handle(self):
         # self.init()
-        logger.debug(f'Handling request')
+        self.logger.debug(f'Handling request')
         hakc_request = None
         response = None
         try:

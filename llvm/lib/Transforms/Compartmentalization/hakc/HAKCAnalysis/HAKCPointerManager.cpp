@@ -11,7 +11,7 @@
 
 namespace llvm::hakc {
 HAKCPointerManager::HAKCPointerManager(HAKCFunctionAnalysis &Analysis,
-                                       HAKCServerClient &Client,
+                                       HAKCServerClientBase &Client,
                                        bool DebugActive)
   : ManagedPointersList(), AuthenticatedValues(), ProtectedValues(), Clones(),
     HAKCAnalysis(Analysis), Client(Client), DataAuthenticationsAdded(0),
@@ -984,7 +984,7 @@ Value *HAKCPointerManager::CreateAuthenticationAtLocation(
   }
 }
 
-HAKCServerClient &HAKCPointerManager::GetClient() const { return Client; }
+HAKCServerClientBase &HAKCPointerManager::GetClient() const { return Client; }
 
 bool HAKCPointerManager::DebugIsActive() const { return DebugActive; }
 } // namespace llvm::hakc

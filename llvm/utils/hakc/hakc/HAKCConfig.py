@@ -11,16 +11,20 @@ from .HAKCObjects import add_yaml_constructors
 logging.setLoggerClass(HAKCLogger)
 logger: HAKCLogger = cast(HAKCLogger, logging.getLogger('hakc.config'))
 
+
 class TimeoutException(Exception):
     pass
 
+
 class TerminateConnectionException(Exception):
     pass
+
 
 class HAKCBackingType(Enum):
     NULL = "null"
     YAML = "yaml"
     KUZU = "kuzu"
+
 
 def parse_backing_type(backing_type: str) -> HAKCBackingType:
     for ty in HAKCBackingType:
@@ -28,15 +32,34 @@ def parse_backing_type(backing_type: str) -> HAKCBackingType:
             return ty
     raise RuntimeError(f'Invalid backing type {backing_type}')
 
+
 class HAKCBuildMode(Enum):
     ANALYSIS = "analysis"
     ENFORCEMENT = "enforcement"
+    IR_ANALYSIS = "ir-analysis"
+    IR_ENFORCEMENT = "ir-enforcement"
 
-def parse_build_mode(build_mode: str) -> HAKCBuildMode:
-    for mode in HAKCBuildMode:
-        if mode.value.upper() == build_mode.upper():
-            return mode
-    raise RuntimeError(f'Invalid build mode {build_mode}')
+    @staticmethod
+    def from_str(s: str) -> 'HAKCBuildMode':
+        compare_value = s.lower()
+        for e in HAKCBuildMode:
+            if compare_value == e.value.lower():
+                return e
+
+        raise ValueError(f'Invalid string {s}')
+
+    @property
+    def is_analysis_mode(self) -> bool:
+        return self in [HAKCBuildMode.ANALYSIS, HAKCBuildMode.IR_ANALYSIS]
+
+    @property
+    def is_enforcement_mode(self) -> bool:
+        return self in [HAKCBuildMode.ENFORCEMENT, HAKCBuildMode.IR_ENFORCEMENT]
+
+    @property
+    def output_ir(self) -> bool:
+        return self in [HAKCBuildMode.IR_ANALYSIS, HAKCBuildMode.IR_ENFORCEMENT]
+
 
 class HAKCDataRequest:
     def __init__(self, Endpoint: str, **kwargs):
@@ -47,7 +70,8 @@ class HAKCDataRequest:
         # Note: be careful here because if there is an error or exception the thread will crash without any debug information
         if self.endpoint == 'terminate-connection':
             return 'Request to terminate-connection'
-        elif self.endpoint in ['get-compartment-by-id','get-division-by-id','get-division-from-symbol','get-valid-targets-from-compartment-id']:
+        elif self.endpoint in ['get-compartment-by-id', 'get-division-by-id', 'get-division-from-symbol',
+                               'get-valid-targets-from-compartment-id']:
             return f'Request query {self.endpoint} {self.parameters}'
         elif self.endpoint == 'add-symbols':
             out = f"Request to {self.endpoint} "
@@ -59,27 +83,31 @@ class HAKCDataRequest:
     def __repr__(self):
         return self.__str__()
 
+
 class HAKCBackingConfig:
     def __init__(self, **backing_config):
         self.type = parse_backing_type(get_arg_or_error('type', **backing_config))
         self.path = get_arg_or_error('path', **backing_config)
         if self.type == HAKCBackingType.NULL and len(self.path) != 0:
             raise RuntimeError(f"Backing Store Type is set to NULL, but path ({self.path}) is not empty!")
+
     def __str__(self):
         return f"""BackingConfig:
                         type:                   {self.type}
                         path:                   {self.path}"""
+
 
 class HAKCEndpoints:
     def __init__(self, **endpoints):
         self.get_compartment_endpoint = endpoints.get('get-compartment-by-id-endpoint', "get-compartment-by-id")
         self.get_division_endpoint = endpoints.get('get-division-by-id-endpoint', "get-division-by-id")
         self.get_division_from_symbol_endpoint = endpoints.get('get-division-from-symbol-endpoint',
-                                                            "get-division-from-symbol")
+                                                               "get-division-from-symbol")
         self.get_valid_targets_from_compartment_id_endpoint = endpoints.get(
             'get-valid-targets-from-compartment-id-endpoint', "get-valid-targets-from-compartment-id")
         self.add_symbols_endpoint = endpoints.get('add-symbols-endpoint', "add-symbols")
         self.terminate_connection_endpoint = endpoints.get('terminate-connection-endpoint', "terminate-connection")
+
 
 class HAKCServerConfig:
     def __init__(self, **hakc_server_config):
@@ -91,6 +119,9 @@ class HAKCServerConfig:
         self.log_mode = hakc_server_config.get('log-mode', 'w')
         self.profile = hakc_server_config.get('profile', False)
         self.backing_config = HAKCBackingConfig(**get_arg_or_error('BackingConfig', **hakc_server_config))
+        self.compilation_database = hakc_server_config.get('compilation-database-path', None)
+        if self.compilation_database and len(self.compilation_database) == 0:
+            self.compilation_database = None
 
     def __str__(self):
         return f"""ServerConfig: 
@@ -98,17 +129,15 @@ class HAKCServerConfig:
                     analysis_core_count:    {self.analysis_core_count}
                     timeout:                {self.timeout}
                     log_level:              {self.log_level}
+                    compilation_database:   {self.compilation_database}
                     {self.backing_config}"""
+
 
 class HAKCConfig:
     def __init__(self, **hakc_config):
         add_yaml_constructors()
         self.server_config = HAKCServerConfig(**read_sub_config(get_arg_or_error('server-config-path', **hakc_config)))
-        # ignore pass_config_path
-        # self.build_path = Path(get_arg_or_error('build-path', **hakc_config))
         self.socket_dir = Path(get_arg_or_error('socket-dir', **hakc_config))
-        self.socket_path = ''
-        self.build_mode = parse_build_mode(get_arg_or_error('build-mode', **hakc_config))
         self.temporal_analysis_enabled = hakc_config.get('temporal-analysis-enabled', False)
         self.server_core_count = hakc_config.get('server-core-count', 64)
         self.default_compartment_id = hakc_config.get('default-compartment-id', 0)
@@ -118,15 +147,19 @@ class HAKCConfig:
         self.log_dir = hakc_config.get('log-dir', '')
         self.endpoints = HAKCEndpoints(**hakc_config)
         self.timeout = self.server_config.timeout
-        self.log_level = self.server_config.log_level
+        self.root_config_path = Path(hakc_config['root-file-path']) if 'root-file-path' in hakc_config else None
+
+    @property
+    def log_level(self):
+        return self.server_config.log_level
 
     def __str__(self):
         return f"""
         Config:
             {self.server_config}
-            build-mode:                         {self.build_mode}
             temporal-analysis-enabled:          {self.temporal_analysis_enabled}
             server-core-count:                  {self.server_core_count}"""
+
 
 def kwargs_get(cls, name: str, default: any = None, **kwargs):
     # Function to retrieve and validate function parameter
@@ -142,11 +175,13 @@ def kwargs_get(cls, name: str, default: any = None, **kwargs):
     except Exception:
         raise Exception(f"Failed to get parameter {name} of type {cls} from {kwargs}")
 
+
 def get_arg_or_error(key, **kwargs):
     val = kwargs.get(key, None)
     if val is None:
         raise RuntimeError(f"{key} is missing from args {kwargs}")
     return val
+
 
 def read_sub_config(path, Loader: Type[yaml.Loader | yaml.SafeLoader] = yaml.Loader):
     if len(path) == 0:

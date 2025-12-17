@@ -1,8 +1,3 @@
-// RUN: %HAKC_PYTHON_VENV
-// RUN: %HAKC_START_ANALYSIS_SERVER
-// RUN: %HAKC_RUN_ANALYSIS_PASS
-// sleep for n seconds to let server finish constructing dag
-// RUN: sleep 15
 // RUN: %HAKC_RUN_ENFORCEMENT_PASS
 // RUN: %HAKC_EVALUATE
 
@@ -20,8 +15,8 @@ int bar(struct data_struct __percpu *);
 int foo(struct data_struct __percpu *a) {
   if (a) {
 // CHECK-LABEL: if.then
-// CHECK: call ptr @check_hakc_data_access(ptr %1, i64 1, i64 65536)
-// CHECK: call ptr @check_hakc_data_access(ptr %7, i64 1, i64 65536)
+// CHECK: call ptr @check_hakc_data_access(ptr %1, i64 1, i64 65549)
+// CHECK: call ptr @check_hakc_data_access(ptr %7, i64 1, i64 65549)
     (a->a)++;
 // Kernel user pointers are not checked
 // CHECK-NOT: call ptr @check_hakc_data_access

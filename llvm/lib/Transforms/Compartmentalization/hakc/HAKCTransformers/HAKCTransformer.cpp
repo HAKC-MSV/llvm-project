@@ -17,7 +17,7 @@
 namespace llvm::hakc {
 
 HAKCTransformer::HAKCTransformer(HAKCModuleAnalysis &ModuleAnalysis,
-                                 HAKCServerClient &Client)
+                                 HAKCServerClientBase &Client)
   : ModuleAnalysis(ModuleAnalysis), Client(Client),
     HAKCIRBuilder(ModuleAnalysis.GetModule().getContext()),
     VariadicTransferFunctions() { InitAnalysis(); }
