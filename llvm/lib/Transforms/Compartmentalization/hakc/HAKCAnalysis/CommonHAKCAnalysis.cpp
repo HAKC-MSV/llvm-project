@@ -10,8 +10,7 @@
 #include <llvm/IR/Verifier.h>
 
 namespace llvm::hakc {
-    std::error_code EC;
-    std::shared_ptr<HAKCLogger> HAKCLog = std::make_shared<HAKCLogger>(
+    static std::shared_ptr<HAKCLogger> HAKCLog = std::make_shared<HAKCLogger>(
         Verbose); // setting configured log level for errs(), which by default is
     // the highest mode
 
@@ -20,7 +19,8 @@ namespace llvm::hakc {
     }
 
     hakc_access_token_t CommonHAKCAnalysis::GetDefaultDivisionAccessToken(hakc_compartment_id_t CompartmentID,
-                                                                          hakc_compartment_division_t DivisionID) {
+                                                                          hakc_compartment_division_t DivisionID)
+    const {
         return CompartmentID << SystemInfo.GetDivisionIDBitCount() | DivisionID;
     }
 
@@ -28,7 +28,7 @@ namespace llvm::hakc {
         Function *F, iterator_range<HAKCFunctionList::iterator> Range) {
         if (!F) { return false; }
 
-        auto Search = [F](llvm::hakc::function_def_t &Func) {
+        auto Search = [F](const llvm::hakc::function_def_t &Func) {
             return F == Func->GetFunction();
         };
         return llvm::any_of(Range, Search);
@@ -38,7 +38,7 @@ namespace llvm::hakc {
         Function *F, iterator_range<FunctionList::iterator> Range) {
         if (!F) { return false; }
 
-        auto Search = [F](Function *Func) { return F == Func; };
+        auto Search = [F](const Function *Func) { return F == Func; };
         return llvm::any_of(Range, Search);
     }
 
@@ -46,7 +46,7 @@ namespace llvm::hakc {
         Function *F, iterator_range<HAKCTransferList::iterator> Range) {
         if (!F) { return false; }
 
-        auto Search = [F](function_def_t &Func) { return F == Func->GetFunction(); };
+        auto Search = [F](const function_def_t &Func) { return F == Func->GetFunction(); };
         return llvm::any_of(Range, Search);
     }
 
@@ -121,7 +121,7 @@ namespace llvm::hakc {
     }
 
     std::string CommonHAKCAnalysis::createLogPath(StringRef BuildPath,
-                                                  HAKCPassModeEnum BuildMode) {
+                                                  HAKCPassModeEnum BuildMode) const {
         SmallString<256> Path;
         SmallString<256> ModulePath;
         GetModuleFullPath(M, ModulePath);
@@ -172,7 +172,7 @@ namespace llvm::hakc {
         return *HAKCLog;
     }
 
-    bool CommonHAKCAnalysis::IsPointerLikeType(Type *Ty) {
+    bool CommonHAKCAnalysis::IsPointerLikeType(const Type *Ty) {
         return Ty->isPointerTy() || Ty->isIntegerTy(64);
     }
 
@@ -193,11 +193,10 @@ namespace llvm::hakc {
     }
 
     bool CommonHAKCAnalysis::IsCallInIntrinsicSet(
-        CallBase *Call, std::set<Intrinsic::ID> &IntrinsicsSet) const {
+        CallBase *Call, const std::set<Intrinsic::ID> &IntrinsicsSet) {
         bool result = false;
         if (auto *intrinsic = dyn_cast<IntrinsicInst>(Call)) {
-            result = (IntrinsicsSet.find(intrinsic->getIntrinsicID()) !=
-                      IntrinsicsSet.end());
+            result = IntrinsicsSet.contains(intrinsic->getIntrinsicID());
             getLogger(Verbose) << "Intrinsic (" << intrinsic->getIntrinsicID()
                     << ") from " << Call->getFunction()->getName() << " "
                     << intrinsic;
@@ -223,7 +222,7 @@ namespace llvm::hakc {
         return Result;
     }
 
-    function_def_t CommonHAKCAnalysis::GetHAKCTransferDefinition(Function *F) {
+    function_def_t CommonHAKCAnalysis::GetHAKCTransferDefinition(const Function *F) {
         SmallVector<function_def_t> HAKCFunctions;
         for (const auto &HAKCFunction: SystemInfo.CompartmentTransferFunctions()) {
             HAKCFunctions.push_back(HAKCFunction);
@@ -243,9 +242,11 @@ namespace llvm::hakc {
      * @brief Computes the definition chain from an arbitrary value to its source
      * definition
      * @param v
+     * @param FollowLoad
+     * @param Results
      * @return The chain of definitions starting from v to the source definition
      */
-    void CommonHAKCAnalysis::findDefChain(Value *v, bool followLoad,
+    void CommonHAKCAnalysis::findDefChain(Value *v, bool FollowLoad,
                                           SmallVectorImpl<Value *> &Results) {
         if (v == nullptr) {
             getLogger(Fatal) << "v is null\n";
@@ -310,7 +311,7 @@ namespace llvm::hakc {
                 working_list.push_back(PtrToIntI->getPointerOperand());
             } else if (auto *PtrToIntOp = dyn_cast<PtrToIntOperator>(curr)) {
                 working_list.push_back(PtrToIntOp->getPointerOperand());
-            } else if (followLoad && isa<LoadInst>(curr)) {
+            } else if (FollowLoad && isa<LoadInst>(curr)) {
                 auto *load = dyn_cast<LoadInst>(curr);
                 working_list.push_back(load->getPointerOperand());
             } else if (auto *bitcast = dyn_cast<IntToPtrInst>(curr)) {
@@ -319,7 +320,7 @@ namespace llvm::hakc {
                 working_list.push_back(sext->getOperand(0));
             } else if (auto *binOp = dyn_cast<BinaryOperator>(curr)) {
                 auto PointerBinOps = GetPointerManipulatingBinaryOps();
-                if (PointerBinOps.find(binOp->getOpcode()) == PointerBinOps.end()) {
+                if (!PointerBinOps.contains(binOp->getOpcode())) {
                     getLogger(Verbose)
                             << "BinaryOperator " << binOp
                             << " is not a pointer manipulating binary operation\n";
@@ -363,11 +364,12 @@ namespace llvm::hakc {
     /**
      * @brief Returns the source definition of a Value
      * @param V
+     * @param FollowLoad
      * @return
      */
-    Value *CommonHAKCAnalysis::getDef(Value *V, bool followLoad) {
+    Value *CommonHAKCAnalysis::getDef(Value *V, bool FollowLoad) {
         SmallVector<Value *> Chain;
-        findDefChain(V, followLoad, Chain);
+        findDefChain(V, FollowLoad, Chain);
         if (Chain.empty()) {
             getLogger(Fatal) << "Def Chain for " << V << " is empty!\n";
             throw std::exception();
@@ -381,7 +383,7 @@ namespace llvm::hakc {
      * @param call
      * @return
      */
-    bool CommonHAKCAnalysis::IsSafeTransitionCall(CallBase *call) {
+    bool CommonHAKCAnalysis::IsSafeTransitionCall(const CallBase *call) {
         if (call->getCalledFunction()) {
             return IsSafeTransitionFunction(call->getCalledFunction());
         }
@@ -437,9 +439,8 @@ namespace llvm::hakc {
              */
             result = arg->hasAttribute(Kind);
         } else if (auto *I = dyn_cast<Instruction>(V)) {
-            auto *metadata = I->getMetadata(LLVMContext::MD_annotation);
-            if (metadata) {
-                for (auto &operand: metadata->operands()) {
+            if (auto *Metadata = I->getMetadata(LLVMContext::MD_annotation)) {
+                for (auto &operand: Metadata->operands()) {
                     if (auto *mdstring = dyn_cast<MDString>(operand.get())) {
                         auto MDStr = mdstring->getString();
                         if (MDStr == attrName) {
@@ -464,7 +465,7 @@ namespace llvm::hakc {
     bool CommonHAKCAnalysis::IsIgnoredGlobal(Value *V) {
         bool Result = false;
         if (auto *GV = dyn_cast<GlobalVariable>(V)) {
-            auto Search = [GV](GlobalVariable *G) { return GV == G; };
+            auto Search = [GV](const GlobalVariable *G) { return GV == G; };
             return llvm::any_of(SystemInfo.IgnoredGlobals(), Search);
         }
 
@@ -479,7 +480,7 @@ namespace llvm::hakc {
         return valueHasAttribute(V, Attribute::KernelUserPtr);
     }
 
-    bool CommonHAKCAnalysis::FunctionIsStatic(Function *F) {
+    bool CommonHAKCAnalysis::FunctionIsStatic(const Function *F) {
         return Function::isLocalLinkage(F->getLinkage()) || F->isDeclaration();
     }
 
@@ -505,7 +506,7 @@ namespace llvm::hakc {
         return false;
     }
 
-    bool CommonHAKCAnalysis::IsOutsideTransferFunc(Function *F) {
+    bool CommonHAKCAnalysis::IsOutsideTransferFunc(const Function *F) {
         return F->getName().starts_with(OUTSIDE_TRANSFER_PREFIX) ||
                F->getName().starts_with(VARIADIC_TRANSFER_PREFIX);
     }
@@ -525,7 +526,7 @@ namespace llvm::hakc {
         return F;
     }
 
-    bool CommonHAKCAnalysis::IsCapabilityReassignmentFunc(Function *F) {
+    bool CommonHAKCAnalysis::IsCapabilityReassignmentFunc(const Function *F) {
         return F->getName().starts_with(CAPABILITY_REASSIGNMENT_PREFIX);
     }
 
@@ -573,19 +574,19 @@ namespace llvm::hakc {
         return name;
     }
 
-    std::string CommonHAKCAnalysis::getVariadicTransferName(Function *F) {
+    std::string CommonHAKCAnalysis::getVariadicTransferName(const Function *F) {
         std::string VariadicTransferName = VARIADIC_TRANSFER_PREFIX.str();
         VariadicTransferName += F->getName();
         return VariadicTransferName;
     }
 
-    std::string CommonHAKCAnalysis::getOriginalTransformedName(Function *F) {
+    std::string CommonHAKCAnalysis::getOriginalTransformedName(const Function *F) {
         std::string TransformedName = ORIGINAL_FUNCTION_PREFIX.str();
         TransformedName += F->getName();
         return TransformedName;
     }
 
-    bool CommonHAKCAnalysis::FunctionIsModParamGetCtx(Function *F) {
+    bool CommonHAKCAnalysis::FunctionIsModParamGetCtx(const Function *F) {
         return F->getName().starts_with(MODPARAM_GETCTX_PREFIX);
     }
 
@@ -600,7 +601,7 @@ namespace llvm::hakc {
                 !F->hasFnAttribute(Attribute::InlineHint));
     }
 
-    bool CommonHAKCAnalysis::FunctionIsComplexVariadic(Function *F) {
+    bool CommonHAKCAnalysis::FunctionIsComplexVariadic(const Function *F) {
         return F->isVarArg();
     }
 
@@ -627,14 +628,14 @@ namespace llvm::hakc {
     void CommonHAKCAnalysis::SortGlobalList(
         std::vector<GlobalVariable *> &GlobalList) {
         llvm::sort(GlobalList.begin(), GlobalList.end(),
-                   [](GlobalVariable *LHS, GlobalVariable *RHS) {
+                   [](const GlobalVariable *LHS, const GlobalVariable *RHS) {
                        return LHS->getName().str() < RHS->getName().str();
                    });
     }
 
     void CommonHAKCAnalysis::SortFunctionList(FunctionList &FuncList) {
         llvm::sort(FuncList.begin(), FuncList.end(),
-                   [](Function *LHS, Function *RHS) {
+                   [](const Function *LHS, const Function *RHS) {
                        return LHS->getName().str() < RHS->getName().str();
                    });
     }
@@ -643,8 +644,7 @@ namespace llvm::hakc {
         const ManagedHAKCPointer &ManagedPointer) {
         auto HAKCType = ManagedPointer.GetType();
         if (HAKCType && HAKCType->IsPointerType() && HAKCType->GetPointeeType()) {
-            return HAKCType->GetPointeeType()->GetLLVMType() &&
-                   isa<FunctionType>(HAKCType->GetPointeeType()->GetLLVMType());
+            return isa_and_nonnull<FunctionType>(HAKCType->GetPointeeType()->GetLLVMType());
         }
         return false;
     }
@@ -664,7 +664,7 @@ namespace llvm::hakc {
         return IsFunctionInFunctionList(F, AllocationFunctions);
     }
 
-    HAKCCustomAllocation CommonHAKCAnalysis::GetAllocationDefinition(Function *F) {
+    HAKCCustomAllocation CommonHAKCAnalysis::GetAllocationDefinition(const Function *F) {
         for (auto Allocation: SystemInfo.AllocationFunctions()) {
             if (Allocation->GetAllocationFunction() == F) { return Allocation; }
         }
@@ -687,7 +687,7 @@ namespace llvm::hakc {
         return false;
     }
 
-    StringRef CommonHAKCAnalysis::GetFunctionName(Function *F) {
+    StringRef CommonHAKCAnalysis::GetFunctionName(const Function *F) {
         /* The compiler will sometimes rename functions when directed to, especially
          * for kernel modules, in order to facilitate general functionality.  However,
          * the debug symbols maintain the original name, so use that name if it is
@@ -699,12 +699,12 @@ namespace llvm::hakc {
         return F->getName();
     }
 
-    bool CommonHAKCAnalysis::IsStringType(Type *Ty) {
+    bool CommonHAKCAnalysis::IsStringType(const Type *Ty) {
         return Ty->isArrayTy() && Ty->getArrayElementType()->isIntegerTy(8);
     }
 
     Instruction *CommonHAKCAnalysis::GetTargetTypeCast(Instruction *I,
-                                                       Type *TargetType) {
+                                                       const Type *TargetType) {
         if (I->getType() == TargetType) { return I; }
 
         for (auto *U: I->users()) {
@@ -716,13 +716,12 @@ namespace llvm::hakc {
         return nullptr;
     }
 
-    void CommonHAKCAnalysis::GetModuleFullPath(Module &M,
+    void CommonHAKCAnalysis::GetModuleFullPath(const Module &M,
                                                SmallVectorImpl<char> &Result) {
         const auto &SourceFileName = M.getSourceFileName();
-        auto err = sys::fs::real_path(SourceFileName, Result, true);
-        if (err) {
+        if (auto Err = sys::fs::real_path(SourceFileName, Result, true)) {
             getLogger(Fatal) << "Could not get real path to " << M.getSourceFileName()
-                    << "\n";
+                    << ": " << Err.message() << "\n";
             throw std::exception();
         }
     }

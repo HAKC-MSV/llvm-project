@@ -42,9 +42,9 @@ namespace llvm::hakc {
         {"run-config-and-exit", RunConfigAndExit}
     };
 
-class CommonHAKCAnalysis final {
-protected:
-  Module &M;
+    class CommonHAKCAnalysis {
+    protected:
+        Module &M;
 
         ModuleAnalysisManager &MAM;
 
@@ -59,9 +59,8 @@ protected:
 
         void InitConfig(StringRef ConfigPath, StringRef ServerSocketPath, HAKCPassModeEnum PassMode);
 
-public:
-
-  ~CommonHAKCAnalysis() = default;
+    public:
+        virtual ~CommonHAKCAnalysis() = default;
 
         explicit CommonHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM,
                                     StringRef ConfigPath, StringRef ServerSocketPath, HAKCPassModeEnum PassMode);
@@ -83,19 +82,19 @@ public:
 
         bool IsNoTransferFunction(Function *F);
 
-  static bool FunctionIsStatic(const Function *F);
+        static bool FunctionIsStatic(const Function *F);
 
         static bool FunctionHasPointerArg(Function *F);
 
-  static bool IsOutsideTransferFunc(const Function *F);
+        static bool IsOutsideTransferFunc(const Function *F);
 
-  static bool IsCapabilityReassignmentFunc(const Function *F);
+        static bool IsCapabilityReassignmentFunc(const Function *F);
 
-  static bool IsPointerLikeType(const Type *Ty);
+        static bool IsPointerLikeType(const Type *Ty);
 
         std::string GetOutsideTransferName(Function *F);
 
-  static bool FunctionIsModParamGetCtx(const Function *F);
+        static bool FunctionIsModParamGetCtx(const Function *F);
 
         static HAKCPassModeEnum ParsePassMode(StringRef mode);
 
@@ -105,9 +104,9 @@ public:
 
         bool IsSafeTransitionFunction(Function *F);
 
-  static std::string getVariadicTransferName(const Function *F);
+        static std::string getVariadicTransferName(const Function *F);
 
-  static std::string getOriginalTransformedName(const Function *F);
+        static std::string getOriginalTransformedName(const Function *F);
 
         bool IsHAKCTransferFunction(Function *F);
 
@@ -122,10 +121,10 @@ public:
         bool functionIsTransferCandidate(Function *F,
                                          HAKCServerClientBase &Client);
 
-  HAKCLogger &getHAKCLoggerObject() const;
+        HAKCLogger &getHAKCLoggerObject() const;
 
-  static HAKCLogger &getLogger(HAKCLogLevel log_level,
-                               bool suppress_output = false);
+        static HAKCLogger &getLogger(HAKCLogLevel log_level,
+                                     bool suppress_output = false);
 
         FunctionType *GetDataAuthenticationFunctionType(unsigned AddrSpace = 0);
 
@@ -133,9 +132,9 @@ public:
 
         FunctionType *GetTransferFunctionType(unsigned AddrSpace = 0);
 
-  static bool FunctionIsComplexVariadic(const Function *F);
+        static bool FunctionIsComplexVariadic(const Function *F);
 
-  static StringRef GetFunctionName(const Function *F);
+        static StringRef GetFunctionName(const Function *F);
 
         static bool isRegisterRead(Value *v);
 
@@ -145,7 +144,7 @@ public:
         FunctionsAreInSameCompartment(Function *F, Function *G,
                                       HAKCServerClientBase &Client);
 
-  bool IsSafeTransitionCall(const CallBase *call);
+        bool IsSafeTransitionCall(const CallBase *call);
 
         bool IsAllocation(Value *V);
 
@@ -153,18 +152,18 @@ public:
         IsCompartmentalizedFunction(Function *F,
                                     HAKCServerClientBase &Client);
 
-  static bool IsStringType(const Type *Ty);
+        static bool IsStringType(const Type *Ty);
 
-  static Instruction *GetTargetTypeCast(Instruction *I, const Type *TargetType);
+        static Instruction *GetTargetTypeCast(Instruction *I, const Type *TargetType);
 
-  static std::set<Intrinsic::ID> GetBitshiftIntrinsics();
+        static std::set<Intrinsic::ID> GetBitshiftIntrinsics();
 
-  static std::set<Instruction::BinaryOps> GetPointerManipulatingBinaryOps();
+        static std::set<Instruction::BinaryOps> GetPointerManipulatingBinaryOps();
 
-  static bool IsCallInIntrinsicSet(CallBase *Call,
-                       const std::set<Intrinsic::ID> &IntrinsicsSet);
+        static bool IsCallInIntrinsicSet(CallBase *Call,
+                                         const std::set<Intrinsic::ID> &IntrinsicsSet);
 
-  static void GetModuleFullPath(const Module &M, SmallVectorImpl<char> &Result);
+        static void GetModuleFullPath(const Module &M, SmallVectorImpl<char> &Result);
 
         static bool IsMultiSSAUser(Value *V);
 
@@ -182,9 +181,9 @@ public:
 
         bool ValueIsUsedAsPointer(Value *V);
 
-  function_def_t GetHAKCTransferDefinition(const Function *F);
+        function_def_t GetHAKCTransferDefinition(const Function *F);
 
-  HAKCCustomAllocation GetAllocationDefinition(const Function *F);
+        HAKCCustomAllocation GetAllocationDefinition(const Function *F);
 
         bool FunctionIsAnalysisCandidate(Function *F);
 
@@ -203,10 +202,10 @@ public:
 
         static Function *GetOriginalFunctionFromTransferFunction(Function *F);
 
-  std::string createLogPath(StringRef BuildPath, HAKCBuildModeTypeEnum BuildMode) const;
+        std::string createLogPath(StringRef BuildPath, HAKCPassModeEnum PassMode) const;
 
         hakc_access_token_t GetDefaultDivisionAccessToken(hakc_compartment_id_t CompartmentID,
-                                                          hakc_compartment_division_t DivisionID);
+                                                          hakc_compartment_division_t DivisionID) const;
 
     private:
         static bool valueHasAttribute(Value *v, Attribute::AttrKind Kind);
