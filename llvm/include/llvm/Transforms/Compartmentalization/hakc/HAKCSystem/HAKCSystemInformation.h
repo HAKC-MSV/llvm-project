@@ -162,8 +162,6 @@ namespace llvm::hakc {
 
         void GetAllDefinedHAKCFunctions(SmallVectorImpl<function_def_t> &Results);
 
-        bool ShouldSkipCurrentFile();
-
         CommonHAKCAnalysis &CommonAnalysis;
         FunctionList NoTransferFunctionList;
         FunctionList SafeTransitionFunctionList;
@@ -209,7 +207,6 @@ namespace llvm::hakc {
         unsigned MaxConnectionRetries;
         unsigned ServerCoreCount;
         unsigned DivisionIDBitCount;
-        bool skip_current_file = false;
     };
 } // namespace llvm::hakc
 

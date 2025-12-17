@@ -111,13 +111,13 @@ namespace llvm::hakc {
         InitConfig(ConfigPath, ServerSocketPath, PassMode);
     }
 
-    HAKCPassModeEnum CommonHAKCAnalysis::ParsePassMode(StringRef mode) {
-        auto it = PassModeToString.find(mode);
-        if (it != PassModeToString.end()) {
-            return it->second;
+    HAKCPassModeEnum CommonHAKCAnalysis::ParsePassMode(StringRef Mode) {
+        auto It = PassModeToString.find(Mode);
+        if (It != PassModeToString.end()) {
+            return It->second;
         }
 
-        throw std::invalid_argument("Invalid pass mode: " + mode.str());
+        throw std::invalid_argument("Invalid pass mode: " + Mode.str());
     }
 
     std::string CommonHAKCAnalysis::createLogPath(StringRef BuildPath,

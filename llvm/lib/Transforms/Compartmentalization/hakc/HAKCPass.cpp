@@ -101,7 +101,7 @@ namespace llvm {
                 throw std::exception();
             }
 
-            auto PassMode = CommonHAKCAnalysis::ParsePassMode(PassModeArg.getValue());
+            const auto PassMode = CommonHAKCAnalysis::ParsePassMode(PassModeArg.getValue());
             CommonHAKCAnalysis HAKCAnalysis(M, MAM, HAKCConfigPath.getValue(),
                                             HAKCServerPath.getValue(), PassMode);
             switch (PassMode) {

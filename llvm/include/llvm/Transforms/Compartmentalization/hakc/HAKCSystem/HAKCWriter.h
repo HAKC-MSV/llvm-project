@@ -137,7 +137,7 @@ public:
 
   HAKCWriter &operator<<(const HAKCTypeInfo &TypeInfo);
 
-  HAKCWriter &operator<<(HAKCAllocationTypeEnum AllocationType);
+  HAKCWriter &operator<<(const enum HAKCAllocationTypeEnum AllocationType);
 
   HAKCWriter &operator<<(const ManagedHAKCPointerUse &HAKCPointerUse);
 
@@ -155,7 +155,7 @@ public:
 
   HAKCWriter &operator<<(const HAKCFunctionArgumentDefinition &Arg);
 
-  HAKCWriter &operator<<(HAKCFunctionArgumentUse ArgUse);
+  HAKCWriter &operator<<(const enum HAKCFunctionArgumentUse ArgUse);
 
   HAKCWriter &operator<<(const HAKCTransferAction &TransferAction);
 
