@@ -1,0 +1,58 @@
+#!/usr/bin/env python3
+import argparse
+import logging
+import signal
+import sys
+import unittest
+from typing import cast
+from unittest import TestLoader
+
+import yaml
+
+import hakc.tests.HAKCSpatialTests as HAKCSpatialTests
+import hakc.tests.HAKCTemporalTests as HAKCTemporalTests
+import hakc.tests.HAKCDatabaseTests as HAKCDatabaseTests
+from hakc.HAKCConfig import HAKCConfig
+from hakc.HAKCLogger import HAKCLogger
+from hakc.HAKCUtils import signal_handler
+
+logging.setLoggerClass(HAKCLogger)
+
+logger = cast(HAKCLogger, logging.getLogger('hakc.test-database-process'))
+
+class HAKCTestLoader(TestLoader):
+    def __init__(self, **kwargs):
+        super().__init__()
+        self.extra_args = kwargs
+
+    """A custom TestLoader that passes extra arguments to test case constructors."""
+    def loadTestsFromTestCase(self, testCaseClass):
+        # This method is called for each TestCase class found.
+        return self.suiteClass([testCaseClass(name, **self.extra_args) for name in self.getTestCaseNames(testCaseClass)])
+
+
+class HAKCTestProgram(unittest.TestProgram):
+    def parseArgs(self, argv):
+        parser = argparse.ArgumentParser(description='HAKC Test Process')
+        parser.add_argument('--config', help='Path to server config file', required=True)
+        args = parser.parse_args()
+        with open(args.config, 'r') as f:
+            self.config = HAKCConfig(**yaml.safe_load(f))
+        super().parseArgs([])
+
+
+if __name__ == "__main__":
+    signal.signal(signal.SIGINT, signal_handler)
+
+    program = HAKCTestProgram(module=None, argv=sys.argv, exit=False)
+
+    # Create the test loader with the parsed arguments
+    loader = HAKCTestLoader(config=program.config)
+
+    # Run the tests with the custom loader
+    test_classes = [HAKCDatabaseTests.HAKCDatabaseTests]
+    test_suites = [loader.loadTestsFromTestCase(test_class) for test_class in test_classes]
+
+    runner = unittest.TextTestRunner(verbosity=0)
+    [runner.run(test_suite) for test_suite in test_suites]
+
