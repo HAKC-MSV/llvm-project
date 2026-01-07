@@ -32,9 +32,11 @@ public:
   void addStream(StringRef log_path, HAKCLogLevel log_level);
   HAKCLogLevel GetLogLevel() const;
   void SetLogLevel(HAKCLogLevel log_level);
-  void SetConsoleConfiguredLogLevels(HAKCLogLevel log_level) const;
+  void SetConsoleConfiguredLogLevel(HAKCLogLevel log_level) const;
   void SetFileConfiguredLogLevel(HAKCLogLevel log_level) const;
   bool IsDisabled() const;
+  void Disable();
+  void Enable();
   iterator_range<SmallVector<std::shared_ptr<HAKCWriter>>::iterator> Streams();
 };
 
@@ -44,20 +46,22 @@ template <
                      !std::is_same_v<T, std::string> &&
                      !std::is_same_v<T, const std::string>> * = nullptr>
 HAKCLogger &operator<<(HAKCLogger &Logger, T &T_) {
-  for (std::shared_ptr<HAKCWriter> &stream : Logger.Streams()) {
-    if (!Logger.IsDisabled() && !stream->IsDisabled() &&
-        Logger.GetLogLevel() >= stream->GetConfiguredLogLevel()) {
-      *stream << T_;
+  if (!Logger.IsDisabled()) {
+    for (std::shared_ptr<HAKCWriter> &stream : Logger.Streams()) {
+      if (!stream->IsDisabled() && Logger.GetLogLevel() >= stream->GetConfiguredLogLevel()) {
+        *stream << T_;
+      }
     }
   }
   return Logger;
 }
 
 template <typename T> HAKCLogger &operator<<(HAKCLogger &Logger, T *T_) {
-  for (std::shared_ptr<HAKCWriter> &stream : Logger.Streams()) {
-    if (!Logger.IsDisabled() && !stream->IsDisabled() &&
-        Logger.GetLogLevel() >= stream->GetConfiguredLogLevel()) {
-      *stream << T_;
+  if (!Logger.IsDisabled()) {
+    for (std::shared_ptr<HAKCWriter> &stream : Logger.Streams()) {
+      if (!stream->IsDisabled() && Logger.GetLogLevel() >= stream->GetConfiguredLogLevel()) {
+        *stream << T_;
+      }
     }
   }
   return Logger;
@@ -69,10 +73,11 @@ template <
                      std::is_same_v<T, std::string> ||
                      std::is_same_v<T, const std::string>> * = nullptr>
 HAKCLogger &operator<<(HAKCLogger &Logger, T T_) {
-  for (std::shared_ptr<HAKCWriter> &stream : Logger.Streams()) {
-    if (!Logger.IsDisabled() && !stream->IsDisabled() &&
-        Logger.GetLogLevel() >= stream->GetConfiguredLogLevel()) {
-      *stream << T_;
+  if (!Logger.IsDisabled()) {
+    for (std::shared_ptr<HAKCWriter> &stream : Logger.Streams()) {
+      if (!stream->IsDisabled() && Logger.GetLogLevel() >= stream->GetConfiguredLogLevel()) {
+        *stream << T_;
+      }
     }
   }
   return Logger;

@@ -8,8 +8,7 @@
 namespace llvm::hakc {
 HAKCFunctionInfo::HAKCFunctionInfo(CommonHAKCAnalysis &Analysis, StringRef Name,
                                    bool DebugActive)
-    : HAKCSymbolInfo(Analysis, Name, DebugActive), TypesUsed(), DirectCalls(),
-      IndirectCalls() {}
+    : HAKCSymbolInfo(Analysis, Name, DebugActive) {}
 
 void HAKCFunctionInfo::SetFunction(Function *F) { SetGlobalObj(F); }
 

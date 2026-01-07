@@ -39,10 +39,13 @@ namespace llvm::hakc {
  */
 class HAKCTransformer {
 public:
-  HAKCTransformer(HAKCModuleAnalysis &ModuleAnalysis,
-                  HAKCServerClientBase &Client);
+  HAKCTransformer(HAKCModuleAnalysis &ModuleAnalysis, HAKCServerClientBase &Client);
 
   virtual ~HAKCTransformer() = default;
+
+  void runAnalysis() const;
+
+  void runEnforcement();
 
   /**
    * Create a pointer suitable for dereferencing
@@ -99,7 +102,6 @@ public:
    * @param HAKCPointer
    * @param I
    * @param Target
-   * @param IsPerCPU
    * @param IsData
    * @param Size
    * @return
@@ -182,7 +184,7 @@ public:
   /**
    * Creates metadata associated with a Compartment for proper loading by the
    * kernel
-   * @param CompartmentID
+   * @param Compartment
    * @return
    */
   virtual GlobalVariable *
@@ -191,11 +193,9 @@ public:
   virtual Function *PopulateGlobalTransfer(Function *GlobalTransfer,
                                            GlobalVariable *GlobalVar);
 
-  void performTransformations();
-
   void AddCompartmentMetadata();
 
-  bool TransferFunctionShouldBeCreated(Function *F);
+  static bool TransferFunctionShouldBeCreated(Function *F);
 
   StructType *GetKernelParamType() const;
 
@@ -203,7 +203,7 @@ public:
 
   Function *GetFunctionByName(StringRef Name, FunctionType *FuncTy) const;
 
-  HAKCTransformer &GetTransformer();
+  HAKCModuleAnalysis& GetModuleAnalysis() const;
 
   bool FunctionIsInAnalysisSet(Function *F) const;
 
@@ -213,6 +213,10 @@ protected:
   IRBuilder<> HAKCIRBuilder;
 
   std::map<Function *, Function *> VariadicTransferFunctions;
+
+  static HAKCLogger &getLogger(HAKCLogLevel log_level);
+
+  static HAKCLogger &GetLogger(HAKCLogLevel log_level, bool suppress_output);
 
   void InitAnalysis();
 
@@ -224,9 +228,7 @@ protected:
 
   std::string getGlobalHAKCSectionName(GlobalVariable *GV) const;
 
-  Function *CreateInitTransfer(GlobalVariable *GlobalVar);
-
-  void RegisterUsedCompartment(HAKCCompartment &compartment);
+  void RegisterUsedCompartment(const HAKCCompartment &compartment) const;
 
   bool TransferIsNeeded(GlobalVariable *GlobalVar);
 

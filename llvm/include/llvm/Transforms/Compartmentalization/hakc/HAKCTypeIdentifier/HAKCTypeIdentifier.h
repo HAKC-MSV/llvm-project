@@ -44,14 +44,14 @@ class HAKCTypeIdentifier {
 public:
   explicit HAKCTypeIdentifier(CommonHAKCAnalysis &Analysis);
 
-  void OutputYAML(raw_ostream &out) const;
-
   /// Find the HAKCSymbol associated with V if it exists
   /// @param V
   /// @param SearchSymbolsMissingDebug
   /// @return The HAKCSymbol associated with V or nullptr if it could not
   /// found
   HAKCSymbolP FindSymbol(Value *V, bool SearchSymbolsMissingDebug = false);
+
+  HAKCSymbolP FindYamlSymbol(const HAKCYamlSymbol &YamlSymbol);
 
   /// Attempts to find the HAKCType associated with the HAKCPointer if
   /// it has not been found already.  Sets both the pointee type of the
@@ -94,11 +94,13 @@ public:
 
   HAKCTypeP FindType(Type *Ty) const;
 
+  HAKCTypeP FindType(StringRef TypeName);
+
   void FindAllTypes(Type *Ty, SmallVectorImpl<HAKCTypeP> &Results) const;
 
   HAKCTypeP FindPointeeType(HAKCPointerBase &HAKCPointer);
 
-  HAKCTypeP FindPointeeType(HAKCTypeP BaseType);
+  HAKCTypeP FindPointeeType(HAKCTypeP &BaseType);
 
   HAKCTypeP FindPointerType(const HAKCTypeInfo &BaseType);
 
@@ -110,7 +112,7 @@ public:
 
   static std::string GetTypeName(const DIType *type);
 
-  static std::string GetTypeName(Type *Ty);
+  static std::string GetTypeName(const Type *Ty);
 
   static std::string GetDbgName(const HAKCTypeInfo &HAKCTy);
 
@@ -145,9 +147,9 @@ public:
 
   static FunctionType *GetIndirectCallFunctionType(const CallInst *CallI);
 
-  bool IsStructTypeThatStartsWithPointerLikeType(const HAKCTypeInfo &HAKCTy);
+  static bool IsStructTypeThatStartsWithPointerLikeType(const HAKCTypeInfo &HAKCTy);
 
-  bool IsPointerLikeType(const DIType *DIType);
+  static bool IsPointerLikeType(const DIType *DIType);
 
   static const DIType *
   GetFirstStructMemberType(const DICompositeType *DICompositeTy);
@@ -188,8 +190,8 @@ public:
 
   HAKCTypeP CheckCallUses(Value *V);
 
-  DIDerivedType *FindUnionMember(const DICompositeType *UnionDef,
-                                 unsigned MemberOffset) const;
+  static DIDerivedType *FindUnionMember(const DICompositeType *UnionDef,
+                                 unsigned MemberOffset);
 
   bool IsLocalGlobal(GlobalObject *GO) const;
 

@@ -17,7 +17,6 @@
 #define HAKC_HAKCALLOCATIONSIZE_H
 
 #include "llvm/IR/Constants.h"
-#include "llvm/Support/FileSystem.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/yaml/HAKCYaml.h"
 #include <memory>
 
@@ -29,7 +28,7 @@ public:
   virtual ~HAKCAllocationSize() = default;
 
   static std::shared_ptr<HAKCAllocationSize>
-  FromYaml(const HAKCYAMLAllocationType &YamlLine, Module &M);
+  FromYaml(const HAKCYAMLAllocationType &YamlLine, const Module &M);
 
   virtual ConstantInt *GetSize(CallInst *val) = 0;
 

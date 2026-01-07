@@ -27,25 +27,6 @@ using namespace llvm::hakc;
 
 namespace llvm {
     namespace hakc {
-        bool skip_current_file(CommonHAKCAnalysis &HAKCAnalysis) {
-            StringRef CurrentSourceName(HAKCAnalysis.GetModule().getSourceFileName());
-            for (auto &path: HAKCAnalysis.GetSystemInfo().HAKCSourcePaths()) {
-                if (CurrentSourceName.contains(path)) {
-                    CommonHAKCAnalysis::getLogger(Warning)
-                            << "Skipping hakc source " << CurrentSourceName << "\n";
-                    return true;
-                }
-            }
-
-            for (auto &path: HAKCAnalysis.GetSystemInfo().SeparateNamespacePaths()) {
-                if (CurrentSourceName.contains(path)) {
-                    CommonHAKCAnalysis::getLogger(Warning)
-                            << "Skipping separate namespace source " << CurrentSourceName << "\n";
-                    return true;
-                }
-            }
-            return false;
-        }
 
         bool ShouldSendSymbolsToServer(HAKCTypeIdentifier &TypeIdentifier) {
             auto FunctionCount = TypeIdentifier.GetFunctions().size() +
@@ -55,45 +36,34 @@ namespace llvm {
             return FunctionCount + GlobalCount > 0;
         }
 
-        std::unique_ptr<HAKCServerClientBase> ConstructClient(HAKCModuleAnalysis &ModuleAnalysis) {
-            std::unique_ptr<HAKCServerClientBase> Client;
-            if (UseSimulatedClient) {
-                Client = std::make_unique<FakeServerClient>(ModuleAnalysis);
-            } else {
-                Client = std::make_unique<HAKCServerClient>(ModuleAnalysis);
-            }
-            return Client;
-        }
+static bool runEnforcement(CommonHAKCAnalysis &HAKCAnalysis) {
+  if (HAKCAnalysis.GetSystemInfo().GetSkipCurrentFile()) {
+    return false;
+  }
+  CommonHAKCAnalysis::getLogger(Info) << "Running Enforcement Pass Mode!\n";
+  HAKCModuleAnalysis ModuleAnalysis(HAKCAnalysis);
+  ModuleAnalysis.runEnforcement(UseSimulatedClient);
+  return true;
+}
 
-        static bool runEnforcement(CommonHAKCAnalysis &HAKCAnalysis) {
-            if (skip_current_file(HAKCAnalysis)) { return false; }
-            CommonHAKCAnalysis::getLogger(Info) << "Running Enforcement Pass Mode!\n";
-            HAKCModuleAnalysis ModuleAnalysis(HAKCAnalysis);
+static void runAnalysis(CommonHAKCAnalysis &HAKCAnalysis) {
+  if (HAKCAnalysis.GetSystemInfo().GetSkipCurrentFile()) {
+    return;
+  }
+  CommonHAKCAnalysis::getLogger(Info) << "Running Analysis Pass Mode!\n";
+  HAKCModuleAnalysis ModuleAnalysis(HAKCAnalysis);
 
-            auto Client = ConstructClient(ModuleAnalysis);
-            HAKCTransformer Transformer(ModuleAnalysis, *Client);
-
-            Transformer.performTransformations();
-
-            return true;
-        }
-
-        static bool runAnalysis(CommonHAKCAnalysis &HAKCAnalysis) {
-            if (skip_current_file(HAKCAnalysis)) { return false; }
-            CommonHAKCAnalysis::getLogger(Info) << "Running Analysis Pass Mode!\n";
-            HAKCModuleAnalysis ModuleAnalysis(HAKCAnalysis);
-
-            if (ShouldSendSymbolsToServer(ModuleAnalysis.GetTypeIdentifier())) {
-                // Only ever connect to server if symbols need to be sent
-                auto Client = ConstructClient(ModuleAnalysis);
-                Client->CloseConnection();
-            } else {
-                CommonHAKCAnalysis::getLogger(Info)
-                        << "Skipping file " << HAKCAnalysis.GetModule().getSourceFileName()
-                        << "with 0 symbols\n";
-            }
-            return false;
-        }
+  if (ShouldSendSymbolsToServer(ModuleAnalysis.GetTypeIdentifier())) {
+    // Only ever connect to server if symbols need to be sent
+    auto Client = ModuleAnalysis.ConstructClient(UseSimulatedClient);
+    // Symbols gathered are sent on connection termination
+    Client->CloseConnection();
+  } else {
+    CommonHAKCAnalysis::getLogger(Debug)
+        << "Skipping file " << HAKCAnalysis.GetModule().getSourceFileName()
+        << "with 0 symbols\n";
+  }
+}
 
         static bool RunHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM) {
             if (HAKCConfigPath.getValue().empty()) {
@@ -106,9 +76,11 @@ namespace llvm {
                                             HAKCServerPath.getValue(), PassMode);
             switch (PassMode) {
                 case Analysis:
-                    return runAnalysis(HAKCAnalysis);
+                    runAnalysis(HAKCAnalysis);
+                    return false;
                 case Enforcement:
-                    return runEnforcement(HAKCAnalysis);
+                    runEnforcement(HAKCAnalysis);
+                    return true;
                 case RunConfigAndExit:
                     return false;
                 default:

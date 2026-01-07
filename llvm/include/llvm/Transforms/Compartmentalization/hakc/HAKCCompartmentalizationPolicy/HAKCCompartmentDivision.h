@@ -44,8 +44,8 @@ public:
 
 protected:
   HAKCCompartment ParentCompartment;
-  HAKC_Access_Token AccessToken;
-  HAKC_Division_ID DivisionID;
+  HAKC_Access_Token AccessToken = nullptr;
+  HAKC_Division_ID DivisionID = nullptr;
 };
 } // namespace llvm::hakc
 

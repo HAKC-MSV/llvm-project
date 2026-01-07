@@ -70,7 +70,7 @@ protected:
 class HAKCIndirectCallSource : public HAKCInfo {
 public:
   HAKCIndirectCallSource(
-      std::vector<std::shared_ptr<HAKCIndirectCallSourceLink>> SourcePath,
+      const std::vector<std::shared_ptr<HAKCIndirectCallSourceLink>> &SourcePath,
       const std::shared_ptr<HAKCTypeInfo> &HAKCType, bool debug);
 
   ~HAKCIndirectCallSource() override = default;

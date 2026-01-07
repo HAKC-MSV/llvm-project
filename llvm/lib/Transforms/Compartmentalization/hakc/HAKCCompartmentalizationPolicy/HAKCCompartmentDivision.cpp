@@ -19,8 +19,7 @@ namespace llvm::hakc {
                                                                                  DivisionID)) {
     }
 
-    HAKCCompartmentDivision::HAKCCompartmentDivision()
-        : ParentCompartment(), AccessToken(nullptr), DivisionID(nullptr) {
+    HAKCCompartmentDivision::HAKCCompartmentDivision() {
     }
 
 

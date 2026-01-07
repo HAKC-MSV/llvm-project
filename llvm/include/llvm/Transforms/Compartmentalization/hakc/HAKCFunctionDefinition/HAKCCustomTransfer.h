@@ -53,7 +53,7 @@ protected:
   virtual Instruction *
   CreateTransfer(IRBuilder<> &HAKCIRBuilder,
                  HAKCCompartmentDivision &CompartmentDivision, Value *Pointer,
-                 Value *Size, bool IsData);
+                 Value *ObjectSize, bool IsData);
 };
 
 typedef std::shared_ptr<HAKCCustomTransfer> custom_transfer_def_t;

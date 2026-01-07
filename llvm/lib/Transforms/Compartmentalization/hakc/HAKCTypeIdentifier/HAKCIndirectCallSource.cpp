@@ -5,9 +5,9 @@
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTypeIdentifier/HAKCIndirectCallSource.h"
 
 namespace llvm::hakc {
-    HAKCIndirectCallSource::HAKCIndirectCallSource(std::vector<std::shared_ptr<HAKCIndirectCallSourceLink> > SourcePath,
-                                                   const std::shared_ptr<HAKCTypeInfo> &HAKCType,
-                                                   bool debug) : HAKCInfo(HAKCType->GetCommonHAKCAnalysis(),
+    HAKCIndirectCallSource::HAKCIndirectCallSource(
+    const std::vector<std::shared_ptr<HAKCIndirectCallSourceLink> > &SourcePath,
+                                                   const std::shared_ptr<HAKCTypeInfo> &HAKCType, const bool debug) : HAKCInfo(HAKCType->GetCommonHAKCAnalysis(),
                                                                           HAKCType->GetName(), debug),
                                                                  HAKCType(HAKCType), SourcePath(SourcePath) {
     }

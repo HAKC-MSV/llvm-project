@@ -5,8 +5,8 @@
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCTransferAction.h"
 
 hakc::HAKCTransferAction::HAKCTransferAction(
-    HAKCFunctionDefinition &HAKCActionFunction, StringRef Label,
-    SmallVector<HAKCActionArgument> Arguments)
+    HAKCFunctionDefinition &HAKCActionFunction, const StringRef Label,
+    const SmallVector<HAKCActionArgument> &Arguments)
     : Label(Label), HAKCActionFunction(HAKCActionFunction),
       Arguments(Arguments) {}
 

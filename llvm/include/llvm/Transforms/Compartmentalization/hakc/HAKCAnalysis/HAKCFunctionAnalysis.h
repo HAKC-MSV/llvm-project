@@ -23,7 +23,6 @@
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCTransformer.h"
 
 namespace llvm::hakc {
-
 class HAKCModuleAnalysis;
 class HAKCModuleTransform;
 
@@ -51,12 +50,47 @@ class HAKCPointerManager;
  * then authenticate pointers which the caller has already authenticated.  This
  * might be redundant, and a source of overhead.
  */
+
 class HAKCFunctionAnalysis {
+
+public:
+  virtual ~HAKCFunctionAnalysis() = default;
+
+  HAKCFunctionAnalysis(Function *F, HAKCModuleAnalysis& ModuleAnalysis);
+
+  virtual void setup();
+
+  HAKCTypeIdentifier& GetTypeIdentifier() const;
+
+  HAKCLogger &getLogger(HAKCLogLevel log_level) const {return CommonHAKCAnalysis::getLogger(log_level, !DebugActive);}
+
+  HAKCLogger &GetLogger(HAKCLogLevel log_level, bool suppress_output) const {return CommonHAKCAnalysis::getLogger(log_level, suppress_output);}
+
+  void TypeUseAnalysis();
+
+  void TypeUseHandleCall(const ManagedHAKCPointerUseP &CallUse) const;
+
+  void TypeUseHandleLoad(const ManagedHAKCPointerUseP &LoadUse) const;
+
+  void TypeUseHandleStore(const ManagedHAKCPointerUseP &StoreUse) const;
+
+  bool modifiedFunction() const;
+
+  Value *getDef(Value *, bool) const;
+
+  Function &GetFunction() const {return *CurrentFunction;}
+
+  static Instruction *GetFinalAllocaDef(AllocaInst *Alloca);
+
+  HAKCModuleAnalysis &GetModuleAnalysis() const;
+
+  void AddPermissionUse(const ManagedHAKCPointer &ManagedPointer, TypePerms perm) const;
+
+  bool IsIntrinsicToSkip(CallBase *Call) const;
 protected:
   HAKCModuleAnalysis &ModuleAnalysis;
-  HAKCTransformer &Transformer;
-  HAKCServerClientBase &Client;
-  HAKCPointerManager PointerManager;
+  HAKCPointerManager _PointerManager;
+  HAKCPointerManager &PointerManager = _PointerManager;
   bool DebugActive;
 
   /**
@@ -64,19 +98,11 @@ protected:
    */
   std::map<GlobalValue *, std::set<Instruction *>> GlobalArgumentUses;
 
-  /**
-   * @brief Used for ideal placement of authentication checks and cloned
-   * instructions
-   */
-  DominatorTree DTree;
-
-  std::set<CallInst *> NonKernelDirectFunctionCallSet;
+  std::set<CallInst *> DirectFunctionCallSet;
 
   std::set<CallInst *> HAKCFunctionCalls;
 
   Function *CurrentFunction;
-
-  bool SetupHasRun;
 
   /* All functions used in comparisons and function call arguments should be
    * transfer functions, so replace direct uses with transfer functions */
@@ -84,35 +110,16 @@ protected:
 
   unsigned CompartmentTransferCount;
 
-  Instruction *addCompartmentTransferCall(Value *operand,
-                                          const DebugLoc &debugLoc,
-                                          Instruction *I, ConstantInt *Size);
-
-  bool userInFunction(Value *user) const;
-
-  BasicBlock *findDominatorUseBlock(Value *ptr,
-                                    std::set<Instruction *> &users) const;
-
-  void createAllAuthenticatedPointers();
-
-  void createMissingTransfers();
-
-  void transformPointerDereferences();
-
   bool argNeedsAuthentication(Use &arg);
 
   bool phiNodeUsesValue(PHINode *phiNode, Value *target,
                         std::set<PHINode *> &visited);
 
-  void HandleInstruction(Instruction *I);
+  virtual void HandleInstruction(Instruction *I);
 
   Instruction *getUserInst(User *user);
 
-  bool isPHIofGlobalsOnly(Value *ptr, std::set<PHINode *> &nodes);
-
   void handleLoad(LoadInst *load);
-
-  void handleComparison(CmpInst *compare);
 
   void handleCall(CallInst *call);
 
@@ -122,107 +129,155 @@ protected:
 
   bool globalShouldBeTransferred(Use &globalValueArg) const;
 
-  void relocateFunctionSection();
-
-  virtual std::string getHAKCFunctionSectionName();
-
-  void CheckForValidCompartmentTransitionAndUpdateIntraCompartmentCalls();
-
-  HAKCTransformer &getTransformer() const;
-
   bool AddManagedPointer(Use &PointerUse);
 
-  void ReplaceInstructionOperand(Instruction *I, unsigned ArgNo,
-                                 Value *OldValue, Value *NewValue);
+};
 
-  void ReplaceDirectFunctionUsesWithTransfers();
+class HAKCFunctionEnforcement : public HAKCFunctionAnalysis {
+  public:
 
-  void CheckCompareOperandForDirectFunctionUse(CmpInst *CmpI, unsigned OpNo);
+  explicit HAKCFunctionEnforcement(Function *F, HAKCModuleAnalysis& ModuleAnalysis, HAKCTransformer &Transformer, HAKCServerClientBase &Client);
 
-  void MaybeAddCompareToDirectUsers(CmpInst *CmpI);
+  ~HAKCFunctionEnforcement() override = default;
+
+  void setup() override;
+
+  void HandleInstruction(Instruction *I) override;
+
+  void handleComparison(CmpInst *compare);
 
   void UpdateHAKCFunctionParameters() const;
 
-  void AddInstrumentation(bool RelocateSection);
+  void UpdateHAKCFunctionParameters(CallInst *CallI, const HAKCCompartment &TargetCompartment, const function_def_t &HAKCTransferFunction) const;
 
-  void CheckAndReplaceArgument(Value *V, Instruction *I, unsigned ArgNo);
+  void CheckCompareOperandForDirectFunctionUse(CmpInst *CmpI, unsigned OpNo);
 
-  bool IsCallInIntrinsicSet(CallBase *Call, ArrayRef<Intrinsic::ID> IDs) const;
+  void CheckForValidCompartmentTransitionAndUpdateIntraCompartmentCalls();
 
-  void UpdateHAKCFunctionParameters(
-      CallInst *CallI, const HAKCCompartment &TargetCompartment,
-      const hakc::function_def_t &HAKCTransferFunction) const;
+  void MaybeAddCompareToDirectUsers(CmpInst *CmpI);
 
-public:
-  virtual ~HAKCFunctionAnalysis() = default;
+  Instruction *FindUseInsertionPoint(Value *V, const std::set<Instruction *> &Users) const;
 
-  HAKCFunctionAnalysis(Function *F, HAKCModuleAnalysis &ModuleAnalysis, HAKCTransformer &Transformer,
-                       HAKCServerClientBase &Client);
+  std::string getHAKCFunctionSectionName() const;
 
-  HAKCTypeIdentifier& GetTypeIdentifier() const;
+  Instruction *addCompartmentTransferCall(Value *Operand, const DebugLoc &DebugLoc, Instruction *I, ConstantInt *Size);
 
-  HAKCLogger &getLogger(HAKCLogLevel log_level) const;
+  void ReplaceDirectFunctionUsesWithTransfers();
 
-  void TemporalAnalysis();
+  void transformPointerDereferences();
 
-  void TemporalAnalysisHandleCall(ManagedHAKCPointerUseP Use);
+  void createMissingTransfers();
 
-  void TemporalAnalysisHandleLoad(ManagedHAKCPointerUseP Use);
+  void AddInstrumentation();
 
-  void TemporalAnalysisHandleStore(ManagedHAKCPointerUseP Use);
+  void relocateFunctionSection() const;
 
-  bool modifiedFunction() const;
+  void createAllAuthenticatedPointers();
 
-  void InstrumentCode();
-
-  void setup();
-
-  Value *getDef(Value *, bool) const;
-
-  Instruction *FindUseInsertionPoint(Value *v,
-                                     std::set<Instruction *> &users) const;
-
-  Value *AddDataAuthCheckAtLocation(Value *signed_ptr, Instruction *location);
-
-  Value *AddCodeAuthCheckAtLocation(Value *SignedPtr, Instruction *Location);
-
-  Value *AddSafePointerCreationAtLocation(Value *SignedPtr,
-                                          Instruction *Location);
-
-  bool isCompartmentalizedFunction() const;
-
-  Function &GetFunction() const;
+  HAKCTransformer &GetTransformer() const;
 
   Instruction *CreateMissingTransfer(Instruction *PointerNeedingTransfer);
 
-  virtual Instruction *SignGlobalPointerWithColor(GlobalValue *GlobalVar);
+  Instruction *SignGlobalPointerWithColor(GlobalValue *GlobalVar);
 
-  Instruction *GetFinalAllocaDef(AllocaInst *Alloca);
+  void ReplaceInstructionOperand(Instruction *I, unsigned ArgNo, Value *OldValue, Value *NewValue);
 
-  bool IsPHIOfGlobalsOnly(Value *V);
+  void CheckAndReplaceArgument(Value *V, Instruction *I, const unsigned int ArgNo);
 
-  HAKCModuleAnalysis &GetModuleAnalysis() const;
+protected:
+  HAKCTransformer &Transformer;
+  HAKCServerClientBase &Client;
+  /**
+   * @brief Used for ideal placement of authentication checks and cloned
+   * instructions
+   */
+  DominatorTree DTree;
 
-  bool IsIntrinsicNeedingAuthentication(CallBase *Call) const;
+  bool IsUncompartmentalizedSymbol();
 
-  bool IsIntrinsicNeedingCloning(CallBase *Call) const;
+  bool IsUncompartmentalizedSymbol() const;
 
-  void AddPermissionUse(const ManagedHAKCPointer &ManagedPointer, TypePerms perm) const;
+  bool IsUncompartmentalizedSymbol(GlobalValue *GV);
 
-  bool IsIntrinsicToSkip(CallBase *Call) const;
-  // TicTac code
-  void AssignFunctionEpochs();
+  bool IsUncompartmentalizedSymbol(GlobalValue *GV) const;
 
-  tictac_epoch_id_t GetEpoch(Value *V);
-  // std::map<Type*, std::shared_ptr<TICTACEpoch>> function_epochs;
-  Value *AddEpochDataAuthCheckAtLocation(Value *signed_ptr, Instruction *location);
-  Value *AddEpochCodeAuthCheckAtLocation(Value *SignedPtr, Instruction *Location);
+  bool isCompartmentalizedFunction();
 
-  HAKCWriter &getWriter();
+  bool isCompartmentalizedFunction() const;
 
-  HAKCWriter &getWriter(HAKCLogLevel log_level);
+  void CreateBaseAuthenticatedPointer(const ManagedHAKCPointerP & ManagedPtr);
+
+  void CreatePointerUseClones(const ManagedHAKCPointerP & ManagedPtr);
+
+  void TransformPointers();
+
+  void TransformUses(const ManagedHAKCPointerP &Use);
+
+  void MaybeCreateProtectedPointer(const ManagedHAKCPointerP & ManagedPtr);
+
+  void MaybeCreateBaseCopyPointer(const ManagedHAKCPointerP & ManagedPtr);
+
+  void UpdateUserCounts(const ManagedHAKCPointerP &ManagedPtr);
+
+  // void SetAuthenticatedPointer(Value *NewAuthenticatedPointer);
+
+  /**
+  * Return the Authenticated version of HAKCUse
+  * @param use
+  * @return
+  */
+  Value *CreateAuthenticatedValue(const ManagedHAKCPointerP &ManagedPtr, ManagedHAKCPointerUse &use);
+  Value *CreateAuthenticatedValueHelper(ManagedHAKCPointerUse &use);
+
+  /**
+  * Return the Signed version of HAKCUse
+  * @param use
+  * @return
+  */
+  Value *CreateProtectedValue(const ManagedHAKCPointerP &ManagedPtr, ManagedHAKCPointerUse &use);
+  Value *CreateProtectedValueHelper(ManagedHAKCPointerUse &HAKCUse);
+
+  void TransformUseSet(const ManagedHAKCPointerP &ManagedPtr, SmallVectorImpl<ManagedHAKCPointerUseP> &UseSet);
+
+  void TransformClones(const ManagedHAKCPointerP &ManagedPtr);
+
+  void CreatePointerReplacements(const ManagedHAKCPointerP & ManagedPtr);
+
+  void SetUseOperand(const ManagedHAKCPointerP &ManagedPtr,
+                  User *U, Value *Replacement,
+                    const ManagedHAKCPointerUse &PointerUse,
+                    bool IsAuthenticatedUse);
+
+  void SetPointerSetsToBeEqual(const ManagedHAKCPointerP & ManagedPtr);
+
+  Value *AddDataAuthCheckAtLocation(Value *SignedPtr, Instruction *location);
+
+  Value *AddCodeAuthCheckAtLocation(Value *SignedPtr, Instruction *Location);
+
+  Value *AddSafePointerCreationAtLocation(Value *SignedPtr, Instruction *Location);
+
+  BasicBlock *findDominatorUseBlock(Value *Ptr, const std::set<Instruction *> &Users) const;
+
+  bool userInFunction(Value *User) const;
+
+  void CreateAuthenticatedPointersAndAllClones();
+
+  void CreateAllTransfers();
+
+  Value *CreateSafePointerAtLocation(Value *Pointer, Instruction *InsertLocation);
+
+  Value *CreateAuthenticationAtLocation(Value *Pointer, Instruction *InsertLocation);
+
+  bool FunctionsAreInSameCompartment(Function *F, Function *G) const;
+
+  Instruction *CloneInstruction(Instruction *I);
+
+  bool BaseDefinitionShouldBeTransferred(const ManagedHAKCPointerP &ManagedPtr) const;
+
+  void WriteBuggyFunctionToFile();
 
 };
+
 } // namespace llvm::hakc
 
 #endif // HAKC_HAKCFUNCTIONANALYSIS_H

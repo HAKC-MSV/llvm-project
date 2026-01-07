@@ -7,17 +7,16 @@
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartment.h"
 
 namespace llvm::hakc {
-HAKCCompartment::HAKCCompartment(hakc_compartment_id_t Compartment,
-                                 hakc_access_token_t EntryToken,
-                                 class LLVMContext &Context)
+HAKCCompartment::HAKCCompartment(const hakc_compartment_id_t Compartment,
+                                 const hakc_access_token_t EntryToken,
+                                 LLVMContext &Context)
     : Compartment(ConstantInt::get(
           IntegerType::get(Context, COMPARTMENT_ID_BIT_LENGTH), Compartment)),
       EntryToken(ConstantInt::get(HAKCCompartment::GetEntryTokenType(Context),
                                   EntryToken)),
       Targets() {}
 
-HAKCCompartment::HAKCCompartment()
-    : Compartment(nullptr), EntryToken(nullptr), Targets() {}
+HAKCCompartment::HAKCCompartment() {}
 
 HAKC_Compartment_ID HAKCCompartment::GetCompartmentID() const {
   return Compartment;
@@ -28,7 +27,7 @@ HAKCCompartment::GetValidTargets() const {
   return make_range(Targets.begin(), Targets.end());
 }
 
-void HAKCCompartment::AddTarget(HAKC_Compartment_ID CompartmentID) {
+void HAKCCompartment::AddTarget(const HAKC_Compartment_ID CompartmentID) {
   Targets.insert(CompartmentID);
 }
     unsigned HAKCCompartment::GetValidTargetsSize() const {
@@ -43,8 +42,8 @@ hakc_compartment_id_t HAKCCompartment::GetCompartmentIDValue() const {
 
 HAKC_Access_Token HAKCCompartment::GetEntryToken() const { return EntryToken; }
 
-HAKC_Compartment_ID HAKCCompartment::CreateID(hakc_compartment_id_t ID,
-                                              Module &M) {
+HAKC_Compartment_ID HAKCCompartment::CreateID(const hakc_compartment_id_t ID,
+                                              const Module &M) {
   return ConstantInt::get(
       IntegerType::get(M.getContext(), CompartmentIDBitCount), ID);
 }

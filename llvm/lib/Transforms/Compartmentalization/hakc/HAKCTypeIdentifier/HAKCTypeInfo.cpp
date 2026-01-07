@@ -10,11 +10,9 @@
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/CommonHAKCAnalysis.h"
 
 namespace llvm::hakc {
-HAKCTypeInfo::HAKCTypeInfo(CommonHAKCAnalysis &Analysis, StringRef Name,
+HAKCTypeInfo::HAKCTypeInfo(CommonHAKCAnalysis &Analysis, const StringRef Name,
                            bool DebugActive)
-    : HAKCInfo(Analysis, Name, DebugActive), Members(), SizeInBits(0),
-      DbgType(nullptr), LLVMType(nullptr), DbgTypeName(), PointeeType(nullptr),
-      IsIgnored(false) {}
+    : HAKCInfo(Analysis, Name, DebugActive) {}
 
 unsigned HAKCTypeInfo::GetSizeInBits() const {
   unsigned SizeInBits = 0;

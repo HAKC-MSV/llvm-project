@@ -17,12 +17,17 @@
 #ifndef HAKC_MANAGEDHAKCPOINTER_H
 #define HAKC_MANAGEDHAKCPOINTER_H
 
+
 #include "llvm/IR/Value.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTypeIdentifier/HAKCTypeInfo.h"
 
 using namespace llvm;
 
 namespace llvm::hakc {
+
+class HAKCFunctionEnforcement;
+
+
 class HAKCPointerBase {
 protected:
   /**
@@ -155,96 +160,15 @@ class HAKCPointerManager;
  * can be different if BaseDefinition is from an external function call.
  */
 class ManagedHAKCPointer : public HAKCPointerBase {
-protected:
-  /**
-   * A pointer belonging to the current function compartment
-   */
-  Value *ProtectedPointer;
-
-  HAKCPointerManager &Manager;
-
-  bool BaseIsAuthenticated;
-
-  bool ManuallyTransferred;
-
-  bool PurposefullyIgnored;
-
-  bool AuthenticatedIsCopyOfBase;
-
-  /**
-   * Pointer uses and their replacements
-   */
-  SmallVector<ManagedHAKCPointerUseP> AuthenticatedUses;
-  SmallVector<ManagedHAKCPointerUseP> ProtectedUses;
-  SmallVector<ManagedHAKCPointerUseP> CloneUses;
-
-  /**
-   * Return the Authenticated version of HAKCUse
-   * @param HAKCUse
-   * @return
-   */
-  Value *CreateAuthenticatedValue(ManagedHAKCPointerUse &HAKCUse);
-
-  /**
-   * Return the Signed version of HAKCUse
-   * @param HAKCUse
-   * @return
-   */
-  Value *CreateProtectedValue(ManagedHAKCPointerUse &HAKCUse);
-
-  void TransformUseSet(SmallVectorImpl<ManagedHAKCPointerUseP> &UseSet);
-
-  void TransformClones();
-
-  void CreatePointerReplacements();
-
-  bool ComputeBasePointerAuthenticated();
-
-
-
-  void SetProtectedPointer(Value *NewProtectedPointer);
-
-  void SetUseOperand(User *U, Value *Replacement,
-                     const ManagedHAKCPointerUse &PointerUse,
-                     bool IsAuthenticatedUse);
-
-  bool AllIncomingValuesAreAuthenticated();
-
-  bool AllIncomingValuesWillBeAuthenticated() const;
-
-  void GetAllIncomingValues(SmallVectorImpl<Value *> &Result) const;
-
-  bool PointerSetsShouldBeEqual() const;
-
-  void SetPointerSetsToBeEqual();
-
-  bool UseIsManagedAndHasUsers(const ManagedHAKCPointerUse &PointerUse,
-                               bool CountAuthenticatedUsers);
-
-  bool ValueIsManagedAndHasUsers(Value *V, bool CountAuthenticatedUsers);
 
 public:
   ManagedHAKCPointer(Value *Pointer, HAKCPointerManager &Manager, unsigned ID);
 
-  ~ManagedHAKCPointer() = default;
+  ~ManagedHAKCPointer() override = default;
 
-  void GetAllUses(SmallVectorImpl<ManagedHAKCPointerUseP> &Result) const;
+  void GetAllUses(SmallVectorImpl<ManagedHAKCPointerUseP> &Results) const;
 
   Value *GetProtectedPointer() const;
-
-  void CreateBaseAuthenticatedPointer();
-
-  void CreatePointerUseClones();
-
-  bool BaseDefinitionShouldBeTransferred();
-
-  void TransformUses();
-
-  void MaybeCreateProtectedPointer();
-
-  void MaybeCreateBaseCopyPointer();
-
-  void RegisterManualHAKCTransfer(CallBase *CallI);
 
   unsigned GetAuthenticatedUserCount() const;
 
@@ -256,26 +180,87 @@ public:
 
   bool DetermineIfBasePointerIsAuthenticated();
 
-  void AddAuthenticatedUse(ManagedHAKCPointerUseP &UPtr);
-
-  void AddProtectedUse(ManagedHAKCPointerUseP &UPtr);
-
-  void AddCloneUse(ManagedHAKCPointerUseP &UPtr);
-
   bool PointerSetsCanBeEqual() const;
-
-  void UpdateUserCounts();
 
   void SetAuthenticatedPointer(Value *NewAuthenticatedPointer) override;
 
   bool IsDataPointer() const;
 
+  bool ComputeBasePointerAuthenticated() const;
+
+  bool AllIncomingValuesAreAuthenticated() const;
+
+  bool AllIncomingValuesWillBeAuthenticated() const;
+
+  void GetAllIncomingValues(SmallVectorImpl<Value *> &Result) const;
+
+  bool PointerSetsShouldBeEqual() const;
+
+  bool UseIsManagedAndHasUsers(const ManagedHAKCPointerUse &PointerUse, bool CountAuthenticatedUsers) const;
+
+  bool ValueIsManagedAndHasUsers(Value *V, bool CountAuthenticatedUsers) const;
+
+  void CheckPointerReplacement(Value *Old, Value *New, StringRef TypeName) const;
+
+  void AddAuthenticatedUse(const ManagedHAKCPointerUseP &UPtr);
+
+  void AddCloneUse(const ManagedHAKCPointerUseP &UPtr);
+
+  void RegisterManualHAKCTransfer(CallBase *CallI);
+
+  void SetProtectedPointer(Value *NewProtectedPointer);
+
+  void SetAuthenticatedIsCopyOfBase(bool val){AuthenticatedIsCopyOfBase=val;}
+
+  // bool GetBaseIsAuthenticated() const {return BaseIsAuthenticated;}
+
+  bool GetManuallyTransferred() const {return ManuallyTransferred;}
+
+  bool GetPurposefullyIgnored() const {return PurposefullyIgnored;}
+
+  // bool GetAuthenticatedIsCopyOfBase() const {return AuthenticatedIsCopyOfBase;}
+  //
+  SmallVector<ManagedHAKCPointerUseP>& GetAuthenticatedUses() {return AuthenticatedUses;}
+
+  SmallVector<ManagedHAKCPointerUseP>& GetProtectedUses() {return ProtectedUses;}
+
+  SmallVector<ManagedHAKCPointerUseP>& GetCloneUses() {return CloneUses;}
+
+  void setPurposefullyIgnored(bool val) {PurposefullyIgnored=val;}
+
+  void AddProtectedUse(const ManagedHAKCPointerUseP &UPtr);
+
+
+protected:
+  /**
+   * A pointer belonging to the current function compartment
+   */
+  Value *ProtectedPointer = nullptr;
+
+  HAKCPointerManager &Manager;
+
+  bool BaseIsAuthenticated = false;
+
+  bool ManuallyTransferred = false;
+
+  bool PurposefullyIgnored = false;
+
+  bool AuthenticatedIsCopyOfBase = false;
+
+  /**
+   * Pointer uses and their replacements
+   */
+  SmallVector<ManagedHAKCPointerUseP> AuthenticatedUses;
+  SmallVector<ManagedHAKCPointerUseP> ProtectedUses;
+  SmallVector<ManagedHAKCPointerUseP> CloneUses;
+
+
 private:
   void InitBaseDefinitionInfo();
 
-  void CheckPointerReplacement(Value *Old, Value *New,
-                               StringRef TypeName) const;
 };
+
+
 } // namespace llvm::hakc
 
 #endif // HAKC_MANAGEDHAKCPOINTER_H

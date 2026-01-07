@@ -10,9 +10,8 @@
 #include <llvm/IR/Verifier.h>
 
 namespace llvm::hakc {
-    static std::shared_ptr<HAKCLogger> HAKCLog = std::make_shared<HAKCLogger>(
-        Verbose); // setting configured log level for errs(), which by default is
-    // the highest mode
+    std::error_code EC;
+    auto HAKCLog = std::make_shared<HAKCLogger>(Verbose); // setting configured log level for errs(), which by default is the highest mode
 
     bool CommonHAKCAnalysis::IsNoTransferFunction(Function *F) {
         return IsFunctionInFunctionList(F, SystemInfo.NoTransferFunctions());
@@ -28,7 +27,7 @@ namespace llvm::hakc {
         Function *F, iterator_range<HAKCFunctionList::iterator> Range) {
         if (!F) { return false; }
 
-        auto Search = [F](const llvm::hakc::function_def_t &Func) {
+        auto Search = [F](function_def_t &Func) {
             return F == Func->GetFunction();
         };
         return llvm::any_of(Range, Search);
@@ -38,7 +37,7 @@ namespace llvm::hakc {
         Function *F, iterator_range<FunctionList::iterator> Range) {
         if (!F) { return false; }
 
-        auto Search = [F](const Function *Func) { return F == Func; };
+        auto Search = [F](Function *Func) { return F == Func; };
         return llvm::any_of(Range, Search);
     }
 
@@ -46,7 +45,7 @@ namespace llvm::hakc {
         Function *F, iterator_range<HAKCTransferList::iterator> Range) {
         if (!F) { return false; }
 
-        auto Search = [F](const function_def_t &Func) { return F == Func->GetFunction(); };
+        auto Search = [F](function_def_t &Func) { return F == Func->GetFunction(); };
         return llvm::any_of(Range, Search);
     }
 
@@ -73,10 +72,13 @@ namespace llvm::hakc {
             getLogger(Fatal) << ConfigPath << " is not a regular file\n";
             throw std::exception();
         }
+        if (ServerSocketPath.empty() && PassMode != RunConfigAndExit) {
+          getLogger(Fatal) << "ServerSocketPath is empty!\n";
+          throw std::exception();
+        }
 
         HAKCYAMLConfig SystemConfig;
-        ErrorOr<std::unique_ptr<MemoryBuffer> > mb =
-                MemoryBuffer::getFile(ConfigPath);
+        ErrorOr<std::unique_ptr<MemoryBuffer>> mb = MemoryBuffer::getFile(ConfigPath);
         yaml::Input yin(mb.get()->getMemBufferRef().getBuffer());
 
         // yaml parsed here
@@ -86,29 +88,24 @@ namespace llvm::hakc {
             getLogger(Fatal) << "Error parsing config file " << ConfigPath << "\n";
             throw std::exception();
         }
-        // Creating fd log as soon as possible
-        HAKCLog->SetConsoleConfiguredLogLevels(
-            SystemConfig.ClientConfig.ConsoleLogLevel);
-        // setting the errs() stream to
-        // the configured log level
-        HAKCLog->addStream(
-            createLogPath(SystemConfig.LogDir, PassMode),
-            SystemConfig.ClientConfig
-            .FileLogLevel); // setting the fd_ostream to configured log level
-
         // A bunch of work is done creating SystemInfo, so we want the log to be
         // created before this
         SystemInfo << SystemConfig;
-        if (!ServerSocketPath.empty()) { SystemInfo.SetSocketPath(ServerSocketPath); }
+        SystemInfo.SetSocketPath(ServerSocketPath);
+
+        // create fd log
+        getHAKCLoggerObject().addStream(
+        createLogPath(SystemConfig.LogDir, PassMode),
+          SystemConfig.ClientConfig
+          .FileLogLevel); // setting the fd_ostream to configured log level
     }
 
     CommonHAKCAnalysis::CommonHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM,
                                            StringRef ConfigPath,
                                            StringRef ServerSocketPath,
                                            HAKCPassModeEnum PassMode)
-        : M(M), MAM(MAM), SystemInfo(*this) {
-        _HAKCLog = HAKCLog;
-        InitConfig(ConfigPath, ServerSocketPath, PassMode);
+        : M(M), MAM(MAM), SystemInfo(*this), _HAKCLog(*HAKCLog) {
+      InitConfig(ConfigPath, ServerSocketPath, PassMode);
     }
 
     HAKCPassModeEnum CommonHAKCAnalysis::ParsePassMode(StringRef Mode) {
@@ -163,13 +160,17 @@ namespace llvm::hakc {
             F, SystemInfo.CompartmentalizationSupportFunctions());
     }
 
-    HAKCLogger &CommonHAKCAnalysis::getLogger(HAKCLogLevel log_level, bool suppress_output) {
-        // must provide a log_level to print
-        if (suppress_output) {
-            // errs() << "SUPPRESSING OUTPUT!\n";
-            HAKCLog->SetLogLevel(Disabled);
-        } else { HAKCLog->SetLogLevel(log_level); }
-        return *HAKCLog;
+    HAKCLogger &CommonHAKCAnalysis::getLogger(const HAKCLogLevel log_level,
+                                              const bool suppress_output) {
+      // must provide a log_level to print
+      if (suppress_output) {
+        // errs() << "SUPPRESSING OUTPUT!\n";
+        HAKCLog->Disable();
+      } else {
+        HAKCLog->Enable();
+        HAKCLog->SetLogLevel(log_level);
+      }
+      return *HAKCLog;
     }
 
     bool CommonHAKCAnalysis::IsPointerLikeType(const Type *Ty) {
@@ -301,11 +302,9 @@ namespace llvm::hakc {
                         working_list.push_back(call->getArgOperand(0));
                     }
                 }
-            } else if (auto *GEPOp = dyn_cast<
-                GEPOperator>(curr)) {
+            } else if (auto *GEPOp = dyn_cast<GEPOperator>(curr)) {
                 working_list.push_back(GEPOp->getPointerOperand());
-            } else if (auto *BitcastOp = dyn_cast<
-                BitCastOperator>(curr)) {
+            } else if (auto *BitcastOp = dyn_cast<BitCastOperator>(curr)) {
                 working_list.push_back(BitcastOp->getOperand(0));
             } else if (auto *PtrToIntI = dyn_cast<PtrToIntInst>(curr)) {
                 working_list.push_back(PtrToIntI->getPointerOperand());
@@ -319,8 +318,7 @@ namespace llvm::hakc {
             } else if (auto *sext = dyn_cast<SExtInst>(curr)) {
                 working_list.push_back(sext->getOperand(0));
             } else if (auto *binOp = dyn_cast<BinaryOperator>(curr)) {
-                auto PointerBinOps = GetPointerManipulatingBinaryOps();
-                if (!PointerBinOps.contains(binOp->getOpcode())) {
+              if (!GetPointerManipulatingBinaryOps().contains(binOp->getOpcode())) {
                     getLogger(Verbose)
                             << "BinaryOperator " << binOp
                             << " is not a pointer manipulating binary operation\n";
@@ -343,13 +341,9 @@ namespace llvm::hakc {
                 } else if (!isa<Constant>(LHSDef) && !isa<Constant>(RHSDef)) {
                     getLogger(Verbose) << "Neither LHS nor RHS of " << binOp
                             << " are constants\n";
-                    /* We stop here */
-                    goto add_to_chain;
                 } else if (isa<Constant>(LHSDef) && isa<Constant>(RHSDef)) {
                     getLogger(Verbose) << "Both LHS and RHS of " << binOp
                             << " are constants\n";
-                    /* We stop here */
-                    goto add_to_chain;
                 }
             }
         add_to_chain:
@@ -439,8 +433,9 @@ namespace llvm::hakc {
              */
             result = arg->hasAttribute(Kind);
         } else if (auto *I = dyn_cast<Instruction>(V)) {
-            if (auto *Metadata = I->getMetadata(LLVMContext::MD_annotation)) {
-                for (auto &operand: Metadata->operands()) {
+            auto *metadata = I->getMetadata(LLVMContext::MD_annotation);
+            if (metadata) {
+                for (auto &operand: metadata->operands()) {
                     if (auto *mdstring = dyn_cast<MDString>(operand.get())) {
                         auto MDStr = mdstring->getString();
                         if (MDStr == attrName) {
@@ -463,13 +458,12 @@ namespace llvm::hakc {
     }
 
     bool CommonHAKCAnalysis::IsIgnoredGlobal(Value *V) {
-        bool Result = false;
-        if (auto *GV = dyn_cast<GlobalVariable>(V)) {
-            auto Search = [GV](const GlobalVariable *G) { return GV == G; };
-            return llvm::any_of(SystemInfo.IgnoredGlobals(), Search);
-        }
+      if (auto *GV = dyn_cast<GlobalVariable>(V)) {
+        auto Search = [GV](const GlobalVariable *G) { return GV == G; };
+        return any_of(SystemInfo.IgnoredGlobals(), Search);
+      }
 
-        return Result;
+      return false;
     }
 
     bool CommonHAKCAnalysis::IsPerCPUPointer(Value *V) {
@@ -500,7 +494,8 @@ namespace llvm::hakc {
         Value *V, HAKCServerClientBase &Client) {
         if (auto *F = dyn_cast<Function>(V)) {
             return functionIsTransferCandidate(F, Client);
-        } else if (auto *BCO = dyn_cast<BitCastOperator>(V)) {
+        }
+        if (auto *BCO = dyn_cast<BitCastOperator>(V)) {
             return ValueShouldBeReplacedWithTransfer(BCO->getOperand(0), Client);
         }
         return false;
@@ -513,15 +508,12 @@ namespace llvm::hakc {
 
     Function *
     CommonHAKCAnalysis::GetOriginalFunctionFromTransferFunction(Function *F) {
-        if (IsOutsideTransferFunc(F)) {
-            StringRef TransferPrefix;
-            if (F->getName().starts_with(OUTSIDE_TRANSFER_PREFIX)) {
-                TransferPrefix = OUTSIDE_TRANSFER_PREFIX;
-            } else { TransferPrefix = VARIADIC_TRANSFER_PREFIX; }
-            auto transferTargetName = F->getName().substr(TransferPrefix.size());
-            auto *TransferTarget = F->getParent()->getFunction(transferTargetName);
-            return TransferTarget;
-        }
+      if (IsOutsideTransferFunc(F)) {
+        StringRef TransferPrefix = F->getName().starts_with(OUTSIDE_TRANSFER_PREFIX) ? OUTSIDE_TRANSFER_PREFIX : VARIADIC_TRANSFER_PREFIX;
+        const auto transferTargetName = F->getName().substr(TransferPrefix.size());
+        auto *TransferTarget = F->getParent()->getFunction(transferTargetName);
+        return TransferTarget;
+      }
 
         return F;
     }
@@ -543,13 +535,11 @@ namespace llvm::hakc {
         }
     }
 
-    FunctionType *
-    CommonHAKCAnalysis::GetDataAuthenticationFunctionType(unsigned AddrSpace) {
+    FunctionType *CommonHAKCAnalysis::GetDataAuthenticationFunctionType() {
         return GetSystemInfo().DataValidation()->GetFunction()->getFunctionType();
     }
 
-    FunctionType *
-    CommonHAKCAnalysis::GetTransferFunctionType(unsigned int AddrSpace) {
+    FunctionType *CommonHAKCAnalysis::GetTransferFunctionType() {
         return GetSystemInfo()
                 .CompartmentTransfer(false)
                 ->GetFunction()
@@ -568,22 +558,18 @@ namespace llvm::hakc {
 
     std::string CommonHAKCAnalysis::GetOutsideTransferName(Function *F) {
         if (F->getName().starts_with(OUTSIDE_TRANSFER_PREFIX) ||
-            IsNoTransferFunction(F)) { return F->getName().str(); }
-        std::string name = OUTSIDE_TRANSFER_PREFIX.str();
-        name += F->getName().str();
-        return name;
+            IsNoTransferFunction(F)) {
+          return F->getName().str();
+        }
+        return OUTSIDE_TRANSFER_PREFIX.str() + F->getName().str();
     }
 
     std::string CommonHAKCAnalysis::getVariadicTransferName(const Function *F) {
-        std::string VariadicTransferName = VARIADIC_TRANSFER_PREFIX.str();
-        VariadicTransferName += F->getName();
-        return VariadicTransferName;
+      return VARIADIC_TRANSFER_PREFIX.str() + F->getName().str();
     }
 
     std::string CommonHAKCAnalysis::getOriginalTransformedName(const Function *F) {
-        std::string TransformedName = ORIGINAL_FUNCTION_PREFIX.str();
-        TransformedName += F->getName();
-        return TransformedName;
+      return ORIGINAL_FUNCTION_PREFIX.str() + F->getName().str();
     }
 
     bool CommonHAKCAnalysis::FunctionIsModParamGetCtx(const Function *F) {
@@ -672,11 +658,8 @@ namespace llvm::hakc {
         return nullptr;
     }
 
-    bool CommonHAKCAnalysis::FunctionsAreInSameCompartment(
-        Function *F, Function *G, HAKCServerClientBase &Client) {
-        auto FCompartment = Client.GetDivision(F).GetHAKCCompartment();
-        auto GCompartment = Client.GetDivision(G).GetHAKCCompartment();
-        return FCompartment == GCompartment;
+    bool CommonHAKCAnalysis::FunctionsAreInSameCompartment(Function *F, Function *G, HAKCServerClientBase &Client) {
+      return Client.GetDivision(F).GetHAKCCompartment() == Client.GetDivision(G).GetHAKCCompartment();
     }
 
     bool CommonHAKCAnalysis::IsAllocation(Value *V) {
@@ -747,8 +730,7 @@ namespace llvm::hakc {
                         unsigned OpNum = (U.getOperandNo() + 1) % 2;
                         auto *OtherOp = U.getUser()->getOperand(OpNum);
 
-                        getLogger(
-                                    Debug, !GetSystemInfo().OutputDebugInfo(BinOp->getFunction()))
+                        getLogger(Debug, !GetSystemInfo().OutputDebugInfo(BinOp->getFunction()))
                                 << "Checking operator " << OpNum << " of "
                                 << *BinOp << ": " << *OtherOp << "\n";
 
@@ -768,5 +750,8 @@ namespace llvm::hakc {
         }
 
         return CallIsUsedAsPointer;
+    }
+    HAKCLogger &CommonHAKCAnalysis::getHAKCLoggerObject() const {
+      return _HAKCLog;
     }
 } // namespace llvm::hakc

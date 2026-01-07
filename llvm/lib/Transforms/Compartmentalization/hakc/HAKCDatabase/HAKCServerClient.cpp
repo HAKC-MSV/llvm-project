@@ -220,24 +220,23 @@ namespace llvm::hakc {
                     << "Could not find HAKCSymbol for " << GV << "\n";
             return GetDefaultDivision();
         }
-        auto CachedDivision = FindCachedSymbolDivision(HAKCSymbol);
-        if (CachedDivision) {
+        if (auto CachedDivision = FindCachedSymbolDivision(HAKCSymbol)) {
             return *CachedDivision;
         }
 
         std::string ObjectYaml;
         raw_string_ostream os(ObjectYaml);
-        os << *HAKCSymbol;
+      os << *HAKCSymbol;
         json::Object Parameters({{"object", ObjectYaml}});
-        HAKCResult result =
-                Execute(SystemInformation.GetSymbolDivisionEndpoint(), Parameters);
-        if (!result.success) {
-            CommonHAKCAnalysis::getLogger(Fatal)
-                    << "Failed request to "
-                    << SystemInformation.GetSymbolDivisionEndpoint() << " on GV " << *GV
-                    << " with error " << result.error << "\n";
-            throw std::exception();
-        }
+      HAKCResult result =
+          Execute(SystemInformation.GetSymbolDivisionEndpoint(), Parameters);
+      if (!result.success) {
+        CommonHAKCAnalysis::getLogger(Fatal)
+            << "Failed request to "
+            << SystemInformation.GetSymbolDivisionEndpoint() << " on GV " << *GV
+            << " with error " << result.error << "\n";
+        throw std::exception();
+      }
 
         std::shared_ptr<HAKCDivisionCompartmentPayload> division_compartment_payload =
                 std::dynamic_pointer_cast<HAKCDivisionCompartmentPayload>(

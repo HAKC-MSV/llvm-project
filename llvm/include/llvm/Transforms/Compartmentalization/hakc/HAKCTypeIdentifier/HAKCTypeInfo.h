@@ -88,12 +88,12 @@ public:
 
 protected:
   std::map<unsigned, std::set<std::shared_ptr<HAKCTypeInfo>>> Members;
-  unsigned SizeInBits;
-  const DIType *DbgType;
-  Type *LLVMType;
+  unsigned SizeInBits = 0;
+  const DIType *DbgType = nullptr;
+  Type *LLVMType = nullptr;
   std::string DbgTypeName;
-  HAKCTypeP PointeeType;
-  bool IsIgnored;
+  HAKCTypeP PointeeType = nullptr;
+  bool IsIgnored = false;
 
   static bool IsPointerToPointer(const DIType *DiType);
 

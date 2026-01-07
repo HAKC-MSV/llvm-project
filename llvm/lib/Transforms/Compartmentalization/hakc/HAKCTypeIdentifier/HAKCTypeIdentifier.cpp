@@ -19,24 +19,23 @@
 #include "llvm/Analysis/CallGraph.h"
 
 namespace llvm::hakc {
-    std::shared_ptr<HAKCTypeInfo> HAKCTypeIdentifier::FindType(const DIType *type) {
-        if (!type) {
-            CommonHAKCAnalysis::getLogger(Fatal) << "Trying to find null type\n";
-            throw std::exception();
-        }
-        CommonHAKCAnalysis::getLogger(Verbose)
-                << "Finding HAKCTypeInfo for " << *type << "\n";
-        if (auto *Derived = dyn_cast<DIDerivedType>(type)) {
-            CommonHAKCAnalysis::getLogger(Verbose) << " with base type ";
-            if (Derived->getBaseType()) {
-                CommonHAKCAnalysis::getLogger(Verbose) << Derived->getBaseType();
-            } else { CommonHAKCAnalysis::getLogger(Verbose) << "void"; }
-            CommonHAKCAnalysis::getLogger(Verbose) << "\n";
-        }
-        auto it = TypesWithDebugInfo.find(type);
-        if (it == TypesWithDebugInfo.end()) { return nullptr; }
-        return it->second;
-    }
+std::shared_ptr<HAKCTypeInfo> HAKCTypeIdentifier::FindType(const DIType *type) {
+  if (!type) {
+    CommonHAKCAnalysis::getLogger(Fatal) << "Trying to find null type\n";
+    throw std::exception();
+  }
+  CommonHAKCAnalysis::getLogger(Verbose)
+      << "Finding HAKCTypeInfo for " << *type << "\n";
+  if (auto *Derived = dyn_cast<DIDerivedType>(type)) {
+    CommonHAKCAnalysis::getLogger(Verbose) << " with base type ";
+    if (Derived->getBaseType()) {
+      CommonHAKCAnalysis::getLogger(Verbose) << Derived->getBaseType();
+    } else { CommonHAKCAnalysis::getLogger(Verbose) << "void"; }
+    CommonHAKCAnalysis::getLogger(Verbose) << "\n";
+  }
+  if (!TypesWithDebugInfo.contains(type)) { return nullptr; }
+  return TypesWithDebugInfo.find(type)->second;
+}
 
     bool hakc::HAKCTypeIdentifier::IsStructTypeThatStartsWithPointerLikeType(
         const HAKCTypeInfo &HAKCTy) {
@@ -75,24 +74,25 @@ namespace llvm::hakc {
 
         if (PointerLike_Tags.contains(StrippedTy->getTag())) { return true; }
 
-        if (auto *BasicTy = dyn_cast<DIBasicType>(StrippedTy)) {
-            std::set<unsigned> PointerLike_Encodings = {
-                dwarf::DW_ATE_unsigned,
-                dwarf::DW_ATE_address
-            };
-            return PointerLike_Encodings.contains(BasicTy->getEncoding()) &&
-                   BasicTy->getSizeInBits() == 64;
-        } else if (auto *CompositeTy = dyn_cast<DICompositeType>(StrippedTy)) {
-            if (CompositeTy->getTag() == dwarf::DW_TAG_union_type) {
-                for (auto *UnionMember: CompositeTy->getElements()) {
-                    auto *MemberTy = dyn_cast<DIDerivedType>(UnionMember);
-                    if (IsPointerLikeType(MemberTy->getBaseType())) { return true; }
-                }
-            } else {
-                auto *FirstMemberTy = GetFirstStructMemberType(CompositeTy);
-                return IsPointerLikeType(FirstMemberTy);
-            }
+  if (auto *BasicTy = dyn_cast<DIBasicType>(StrippedTy)) {
+    const std::set<unsigned> PointerLike_Encodings = {dwarf::DW_ATE_unsigned,
+                                                dwarf::DW_ATE_address};
+    return PointerLike_Encodings.contains(BasicTy->getEncoding()) &&
+           BasicTy->getSizeInBits() == 64;
+  }
+  if (auto *CompositeTy = dyn_cast<DICompositeType>(StrippedTy)) {
+    if (CompositeTy->getTag() == dwarf::DW_TAG_union_type) {
+      for (auto *UnionMember : CompositeTy->getElements()) {
+        if (const auto *MemberTy = dyn_cast<DIDerivedType>(UnionMember);
+            IsPointerLikeType(MemberTy->getBaseType())) {
+          return true;
         }
+      }
+    } else {
+      auto *FirstMemberTy = GetFirstStructMemberType(CompositeTy);
+      return IsPointerLikeType(FirstMemberTy);
+    }
+  }
 
         return false;
     }
@@ -129,12 +129,12 @@ namespace llvm::hakc {
         return Name;
     }
 
-    std::string hakc::HAKCTypeIdentifier::GetTypeName(Type *Ty) {
-        std::string Name;
-        raw_string_ostream NameStream(Name);
-        Ty->print(NameStream);
-        return Name;
-    }
+std::string HAKCTypeIdentifier::GetTypeName(const Type *Ty) {
+  std::string Name;
+  raw_string_ostream NameStream(Name);
+  Ty->print(NameStream);
+  return Name;
+}
 
     std::string hakc::HAKCTypeIdentifier::GetTypeName(const DIType *type) {
         std::string Name;
@@ -997,7 +997,7 @@ namespace llvm::hakc {
         return PointeeType;
     }
 
-    HAKCTypeP HAKCTypeIdentifier::FindPointeeType(HAKCTypeP BaseType) {
+    HAKCTypeP HAKCTypeIdentifier::FindPointeeType(HAKCTypeP &BaseType) {
         if (!BaseType) { return nullptr; }
 
         CommonHAKCAnalysis::getLogger(Verbose)
@@ -1373,8 +1373,7 @@ namespace llvm::hakc {
     }
 
     DIDerivedType *
-    hakc::HAKCTypeIdentifier::FindUnionMember(const DICompositeType *UnionDef,
-                                              unsigned MemberOffset) const {
+    HAKCTypeIdentifier::FindUnionMember(const DICompositeType *UnionDef, unsigned MemberOffset) {
         for (auto *UnionMember: UnionDef->getElements()) {
             const auto *MemberTy = HAKCTypeInfo::StripTypeModifiers(
                 dyn_cast<DIDerivedType>(UnionMember)->getBaseType());

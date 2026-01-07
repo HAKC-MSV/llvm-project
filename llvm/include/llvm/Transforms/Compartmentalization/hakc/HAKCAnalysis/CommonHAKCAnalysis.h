@@ -52,7 +52,7 @@ namespace llvm::hakc {
 
         HAKCSystemInformation SystemInfo;
 
-        std::shared_ptr<HAKCLogger> _HAKCLog;
+        HAKCLogger &_HAKCLog;
 
         static bool IsFunctionInHAKCTransferFunctionList(
             Function *F, iterator_range<HAKCTransferList::iterator> Range);
@@ -98,9 +98,7 @@ namespace llvm::hakc {
 
         static HAKCPassModeEnum ParsePassMode(StringRef mode);
 
-        bool
-        ValueShouldBeReplacedWithTransfer(Value *V,
-                                          HAKCServerClientBase &Client);
+        bool ValueShouldBeReplacedWithTransfer(Value *V, HAKCServerClientBase &Client);
 
         bool IsSafeTransitionFunction(Function *F);
 
@@ -118,19 +116,17 @@ namespace llvm::hakc {
 
         bool IsAllocationFunction(Function *F);
 
-        bool functionIsTransferCandidate(Function *F,
-                                         HAKCServerClientBase &Client);
+        bool functionIsTransferCandidate(Function *F, HAKCServerClientBase &Client);
 
         HAKCLogger &getHAKCLoggerObject() const;
 
-        static HAKCLogger &getLogger(HAKCLogLevel log_level,
-                                     bool suppress_output = false);
+        static HAKCLogger &getLogger(HAKCLogLevel log_level, bool suppress_output = false);
 
-        FunctionType *GetDataAuthenticationFunctionType(unsigned AddrSpace = 0);
+        FunctionType *GetDataAuthenticationFunctionType();
 
         FunctionType *GetCodeAuthenticationFunctionType(unsigned AddrSpace = 0);
 
-        FunctionType *GetTransferFunctionType(unsigned AddrSpace = 0);
+        FunctionType *GetTransferFunctionType();
 
         static bool FunctionIsComplexVariadic(const Function *F);
 
@@ -190,8 +186,6 @@ namespace llvm::hakc {
         static bool
         IsFunctionInFunctionList(Function *F,
                                  iterator_range<FunctionList::iterator> Range);
-
-        static bool functionIsEpochTransferCandidate(Function *F);
 
         static bool
         IsFunctionInFunctionList(Function *F,
