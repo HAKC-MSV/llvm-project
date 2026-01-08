@@ -14,8 +14,8 @@
 // call it module transformation
 namespace llvm::hakc {
 HAKCModuleAnalysis::HAKCModuleAnalysis(CommonHAKCAnalysis &CommonAnalysis)
-  : UsedCompartments(), CommonAnalysis(CommonAnalysis), AnalysisFunctions(),
-    TypeIdentifier(CommonAnalysis.GetSystemInfo().GetTypeIdentifier()) {}
+    : UsedCompartments(), CommonAnalysis(CommonAnalysis), AnalysisFunctions(),
+      TypeIdentifier(CommonAnalysis.GetSystemInfo().GetTypeIdentifier()) {}
 
 Module &HAKCModuleAnalysis::GetModule() const {
   return CommonAnalysis.GetSystemInfo().GetModule();
@@ -31,7 +31,9 @@ bool HAKCModuleAnalysis::FunctionNeedsAnalysis(Function *F) const {
                        !CommonHAKCAnalysis::IsOutsideTransferFunc(F) &&
                        !CommonAnalysis.IsHAKCFunction(F);
   bool SuppressOutput = !CommonAnalysis.GetSystemInfo().OutputDebugInfo(F);
-  if (!needsAnalysis) { goto out; }
+  if (!needsAnalysis) {
+    goto out;
+  }
   for (auto *user : F->users()) {
     if (!isa<CallInst>(user)) {
       /* Function is passed into a global variable */
@@ -81,29 +83,41 @@ bool HAKCModuleAnalysis::FunctionDefinedInAssembly(Function *F) {
 
 bool _useEscapes(Use &U, std::set<Value *> &expected) {
   /* If F is used in a global variable */
-  if (auto *gv = dyn_cast<
-    GlobalVariable>(U.getUser())) {
+  if (auto *gv = dyn_cast<GlobalVariable>(U.getUser())) {
     return gv->getSection() != ".discard.addressable";
-  } else if (isa<ConstantStruct>(U.getUser()) || isa<
-               SelectInst>(U.getUser())) { return true; } else if (auto *call =
-      dyn_cast<CallInst>(U.getUser())) {
+  } else if (isa<ConstantStruct>(U.getUser()) || isa<SelectInst>(U.getUser())) {
+    return true;
+  } else if (auto *call = dyn_cast<CallInst>(U.getUser())) {
     for (auto &arg : call->args()) {
-      if (arg.get() == U.get()) { return true; }
+      if (arg.get() == U.get()) {
+        return true;
+      }
     }
   } else if (auto *bc = dyn_cast<BitCastOperator>(U.getUser())) {
     for (Use &u : bc->uses()) {
-      if (expected.find(u.get()) != expected.end()) { continue; }
+      if (expected.find(u.get()) != expected.end()) {
+        continue;
+      }
       expected.insert(u.get());
-      if (_useEscapes(u, expected)) { return true; }
+      if (_useEscapes(u, expected)) {
+        return true;
+      }
     }
-  } else if (isa<ICmpInst>(U.getUser())) { return false; } else if (auto *store
-      = dyn_cast<StoreInst>(U.getUser())) {
-    if (store->getValueOperand() == U.get()) { return true; }
+  } else if (isa<ICmpInst>(U.getUser())) {
+    return false;
+  } else if (auto *store = dyn_cast<StoreInst>(U.getUser())) {
+    if (store->getValueOperand() == U.get()) {
+      return true;
+    }
   } else if (auto *phi = dyn_cast<PHINode>(U.getUser())) {
     for (Use &u : phi->uses()) {
-      if (expected.find(u.get()) != expected.end()) { continue; }
+      if (expected.find(u.get()) != expected.end()) {
+        continue;
+      }
       expected.insert(u.get());
-      if (_useEscapes(u, expected)) { return true; }
+      if (_useEscapes(u, expected)) {
+        return true;
+      }
     }
   }
 
@@ -118,18 +132,24 @@ bool HAKCModuleAnalysis::useEscapes(Use &U) {
       << "Use " << U.get() << " in " << U.getUser();
   if (escapes) {
     CommonHAKCAnalysis::getLogger(Verbose) << " escapes\n";
-  } else { CommonHAKCAnalysis::getLogger(Verbose) << " does not escape\n"; }
+  } else {
+    CommonHAKCAnalysis::getLogger(Verbose) << " does not escape\n";
+  }
 
   return escapes;
 }
 
 bool HAKCModuleAnalysis::functionEscapes(Function *F) {
-  if (F->isIntrinsic()) { return false; }
+  if (F->isIntrinsic()) {
+    return false;
+  }
   for (auto &U : F->uses()) {
-    if (useEscapes(U)) { return true; }
+    if (useEscapes(U)) {
+      return true;
+    }
 
     CommonHAKCAnalysis::getLogger(
-            Debug, !CommonAnalysis.GetSystemInfo().OutputDebugInfo(F))
+        Debug, !CommonAnalysis.GetSystemInfo().OutputDebugInfo(F))
         << "Use " << U.getUser() << " does not escape\n";
   }
   Function *transfer =
@@ -161,7 +181,9 @@ HAKCModuleAnalysis::ExtractGlobalFromKernelParam(GlobalVariable *GV) {
 
   auto *KernelParamType = GetKernelParamType();
   // type not found, just do nothing
-  if (!KernelParamType) { return nullptr; }
+  if (!KernelParamType) {
+    return nullptr;
+  }
 
   // trying to find globals of type GetKernelParamType()
   if (auto *StructTy = dyn_cast<StructType>(GV->getValueType())) {
@@ -208,20 +230,28 @@ HAKCModuleAnalysis::ExtractGlobalFromKernelParam(GlobalVariable *GV) {
           // now we have kp->arg
         }
         // the thing in the union isn't a BitCastOperator, that's bad
-        else { return nullptr; }
+        else {
+          return nullptr;
+        }
       }
       // we couldn't get the union out of the union struct, that's bad
-      else { return nullptr; }
+      else {
+        return nullptr;
+      }
     }
     // we couldn't get the union struct at all out of the param struct, that's
     // bad
-    else { return nullptr; }
+    else {
+      return nullptr;
+    }
   }
   // we couldn't even get the kernel param struct as a struct, that's bad
-  else { return nullptr; }
+  else {
+    return nullptr;
+  }
   CommonHAKCAnalysis::getLogger(
-          Debug, !CommonAnalysis.GetSystemInfo().OutputDebugInfo(GV)) <<
-      "processing kernel param\n"
+      Debug, !CommonAnalysis.GetSystemInfo().OutputDebugInfo(GV))
+      << "processing kernel param\n"
       << *kernparam << "\n";
 
   return kernparam;
@@ -243,7 +273,7 @@ void HAKCModuleAnalysis::OutputYAML(raw_ostream &out) const {
                      TypeIdentifier.GetUnmappedGlobals().size();
   if (GlobalCount > 0) {
     out << "globals:\n";
-    std::vector<std::shared_ptr<HAKCGlobalInfo> > SortedGlobals;
+    std::vector<std::shared_ptr<HAKCGlobalInfo>> SortedGlobals;
     SortedGlobals.reserve(GlobalCount);
     for (auto &it : TypeIdentifier.GetGlobals()) {
       SortedGlobals.push_back(it.second);
@@ -266,7 +296,7 @@ void HAKCModuleAnalysis::OutputYAML(raw_ostream &out) const {
                        TypeIdentifier.GetUnmappedFunctions().size();
   if (FunctionCount > 0) {
     out << "functions:\n";
-    std::vector<std::shared_ptr<HAKCFunctionInfo> > SortedFunctions;
+    std::vector<std::shared_ptr<HAKCFunctionInfo>> SortedFunctions;
     SortedFunctions.reserve(FunctionCount);
     for (auto &it : TypeIdentifier.GetFunctions()) {
       SortedFunctions.push_back(it.second);

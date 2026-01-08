@@ -255,7 +255,8 @@ std::string HAKCTypeInfo::GetYamlHeader(unsigned int Indents) const {
 
   return Yaml;
 }
-std::string HAKCTypeInfo::GetYamlHeader(unsigned int Indents, unsigned RWX) const {
+std::string HAKCTypeInfo::GetYamlHeader(unsigned int Indents,
+                                        unsigned RWX) const {
   // function to generate HAKCTypePerm yaml
   std::string Yaml;
   llvm::raw_string_ostream sstream(Yaml);
@@ -264,7 +265,8 @@ std::string HAKCTypeInfo::GetYamlHeader(unsigned int Indents, unsigned RWX) cons
   sstream.indent(Indents + EntrySpaces()) << "RWX: " << RWX << "\n";
   sstream.indent(Indents + EntrySpaces()) << "Type:\n";
 
-  sstream.indent(Indents + EntrySpaces() + 4) << HAKCInfo::GetYamlHeader(Indents + 4);
+  sstream.indent(Indents + EntrySpaces() + 4)
+      << HAKCInfo::GetYamlHeader(Indents + 4);
 
   sstream << "\n";
   sstream.indent(Indents + EntrySpaces() + 4) << "DebugType: \"";

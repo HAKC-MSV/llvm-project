@@ -30,7 +30,8 @@ void HAKCFunctionInfo::AddTypeUse(const std::shared_ptr<HAKCTypeInfo> &Ty) {
   }
   if (!TypesUsed.contains(Ty)) {
     TypesUsed[Ty] = 0b0;
-    CommonHAKCAnalysis::getLogger(Debug, !DebugActive) << "Adding type use " << *Ty << "\n";
+    CommonHAKCAnalysis::getLogger(Debug, !DebugActive)
+        << "Adding type use " << *Ty << "\n";
   }
 }
 
@@ -48,7 +49,8 @@ unsigned HAKCFunctionInfo::GetTypeUse(const std::shared_ptr<HAKCTypeInfo> &Ty) {
   return TypesUsed[Ty];
 }
 
-void HAKCFunctionInfo::ModifyTypeUse(const std::shared_ptr<HAKCTypeInfo> &Ty, TypePerms perm){
+void HAKCFunctionInfo::ModifyTypeUse(const std::shared_ptr<HAKCTypeInfo> &Ty,
+                                     TypePerms perm) {
   if (!Ty) {
     CommonHAKCAnalysis::getLogger(Fatal)
         << "Trying to modify type use of type null\n";
@@ -59,13 +61,17 @@ void HAKCFunctionInfo::ModifyTypeUse(const std::shared_ptr<HAKCTypeInfo> &Ty, Ty
     AddTypeUse(Ty);
   }
   if (TypesUsed[Ty] == (TypesUsed[Ty] | perm)) {
-    // if nothing changes, don't print the debug text (overwhelming amount of debugging)
+    // if nothing changes, don't print the debug text (overwhelming amount of
+    // debugging)
     return;
   }
   // Note: Only to be used internally, and only to add uses, not remove them
-  CommonHAKCAnalysis::getLogger(Debug, !DebugActive) << "Modifying TypeUse with mask " << static_cast<unsigned>(perm) << " perm from " << TypesUsed[Ty] << " -> ";
+  CommonHAKCAnalysis::getLogger(Debug, !DebugActive)
+      << "Modifying TypeUse with mask " << static_cast<unsigned>(perm)
+      << " perm from " << TypesUsed[Ty] << " -> ";
   TypesUsed[Ty] |= perm;
-  CommonHAKCAnalysis::getLogger(Debug, !DebugActive) << TypesUsed[Ty] << " for type " << *Ty << "\n";
+  CommonHAKCAnalysis::getLogger(Debug, !DebugActive)
+      << TypesUsed[Ty] << " for type " << *Ty << "\n";
 }
 
 StringRef HAKCFunctionInfo::GetYamlIdentifier() const {
@@ -139,7 +145,9 @@ std::string HAKCFunctionInfo::GetYaml(unsigned Indents) const {
     Count = 0;
     for (auto &it : TypesUsed) {
       sstream.indent(Indents + HAKCInfo::IndentSpaces())
-          << "- " << it.first->GetYamlHeader(Indents + HAKCInfo::IndentSpaces(), it.second);
+          << "- "
+          << it.first->GetYamlHeader(Indents + HAKCInfo::IndentSpaces(),
+                                     it.second);
       if (++Count != TypesUsed.size()) {
         sstream << "\n";
       }

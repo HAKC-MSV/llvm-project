@@ -9,7 +9,8 @@
 hakc::HAKCCustomTransfer::HAKCCustomTransfer(
     Function *CustomFunction, const HAKCTypeP &TargetType,
     SmallVectorImpl<HAKCFunctionArgumentDefinition> &Args)
-  : HAKCFunctionDefinition(CustomFunction, Args), TypeToTransfer(TargetType) {}
+    : HAKCFunctionDefinition(CustomFunction, Args), TypeToTransfer(TargetType) {
+}
 
 hakc::HAKCTypeP hakc::HAKCCustomTransfer::GetTargetType() const {
   return TypeToTransfer;
@@ -36,8 +37,8 @@ Instruction *hakc::HAKCCustomTransfer::CreateTransfer(
     CallArgs.push_back(it->second);
   }
 
-  CommonHAKCAnalysis::getLogger(Debug) << "Creating call to " << GetFunction()
-      << " with args:\n";
+  CommonHAKCAnalysis::getLogger(Debug)
+      << "Creating call to " << GetFunction() << " with args:\n";
   for (auto &Arg : CallArgs) {
     CommonHAKCAnalysis::getLogger(Debug) << Arg << "\n";
   }
@@ -58,8 +59,8 @@ Instruction *hakc::HAKCCustomTransfer::CreateTransfer(
 
 Instruction *hakc::HAKCCustomTransfer::CreateTransferWithCasts(
     IRBuilder<> &HAKCIRBuilder, HAKCCompartmentDivision &CompartmentDivision,
-    HAKCPointerBase &HAKCPointer, Value *Size, HAKCTypeP srcTy,
-    HAKCTypeP dstTy, bool IsData) {
+    HAKCPointerBase &HAKCPointer, Value *Size, HAKCTypeP srcTy, HAKCTypeP dstTy,
+    bool IsData) {
   auto *BitcastArgForTransferCall = HAKCIRBuilder.CreateBitCast(
       HAKCPointer.GetBaseDefinition(), dstTy->GetLLVMType());
   auto *TransferCall = CreateTransfer(HAKCIRBuilder, CompartmentDivision,

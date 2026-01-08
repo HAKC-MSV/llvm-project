@@ -54,7 +54,8 @@ std::string hakc::HAKCSymbolInfo::GetYamlHeader(unsigned int Indents) const {
   llvm::raw_string_ostream sstream(Yaml);
 
   sstream << "\n";
-  // Note: IsDefinition can be inferred by whether there is a HAKCCompilationUnit which points to the source file and line
+  // Note: IsDefinition can be inferred by whether there is a
+  // HAKCCompilationUnit which points to the source file and line
   // sstream.indent(Indents + EntrySpaces()) << "IsDefinition: ";
   // bool IsDefinition;
   //

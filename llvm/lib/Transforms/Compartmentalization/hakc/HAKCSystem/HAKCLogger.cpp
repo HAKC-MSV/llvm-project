@@ -17,8 +17,7 @@ hakc::HAKCLogger::HAKCLogger(HAKCLogLevel log_level)
 
 hakc::HAKCLogger::~HAKCLogger() { HAKCStreams.clear(); }
 
-void hakc::HAKCLogger::addStream(StringRef log_path,
-                                 HAKCLogLevel log_level) {
+void hakc::HAKCLogger::addStream(StringRef log_path, HAKCLogLevel log_level) {
   if (log_level == Disabled || log_path.empty()) {
     disabled = true;
   } else {
