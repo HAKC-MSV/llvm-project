@@ -456,11 +456,6 @@ BasicBlock *HAKCFunctionEnforcement::findDominatorUseBlock(Value *Ptr, const std
                 }
             }
             if (call->getCalledFunction()) {
-                // TODO: look here and maybe add uncompartmentalization check
-              // if (!CommonHAKCAnalysis::IsUncompartmentalizedSymbol(
-              // call->getCalledFunction(), Client)) {
-              //   NonKernelDirectFunctionCallSet.insert(call);
-              // }
                 DirectFunctionCallSet.insert(call);
             }
         }
@@ -663,7 +658,7 @@ BasicBlock *HAKCFunctionEnforcement::findDominatorUseBlock(Value *Ptr, const std
         // need to check that call is actually compartmentalized here since that check was removed from handle call function in analysis
         if (!CommonHAKCAnalysis::IsUncompartmentalizedSymbol(call->getCalledFunction(), Client)) {
           getLogger(Verbose) << "Call " << *call->getCalledFunction() << "is not compartmentalized, skipping\n";
-          return;
+          continue;
         }
         auto TargetCompartment =Client.GetDivision(call->getCalledFunction()).GetHAKCCompartment();
         if (CurrentDivision.GetHAKCCompartment().GetCompartmentID() == TargetCompartment.GetCompartmentID()) {
@@ -676,22 +671,22 @@ BasicBlock *HAKCFunctionEnforcement::findDominatorUseBlock(Value *Ptr, const std
         const auto TransformedFunction = ModuleAnalysis.GetFunctionByName(TransformedName, call->getCalledFunction()->getFunctionType());
         call->setCalledFunction(TransformedFunction);
         } else {
+
           // Fixing https://github.mit.edu/inherently-secure/ARM-MTE/issues/40
           bool ValidTransition = false;
 
           for (const auto *Target : CurrentDivision.GetHAKCCompartment().GetValidTargets()) {
           GetLogger(Verbose, !DebugActive)
-              << "Testing Target Compartment "
-              << static_cast<unsigned int>(Target->getSExtValue()) << " == "
-              << static_cast<unsigned int>(
-                TargetCompartment.GetCompartmentID()->getSExtValue())
+              << "Testing Target Compartment " << Target->getZExtValue()
+              << " == " << TargetCompartment.GetCompartmentID()->getZExtValue()
               << " -> "
               << (Target->getSExtValue() ==
                   TargetCompartment.GetCompartmentID()->getSExtValue())
               << "\n";
             // comparing i32 1 and i64 1 returns false (LLVM constant ints), so cast
             // to int64_t
-            if (Target->getSExtValue() == TargetCompartment.GetCompartmentID()->getSExtValue()) {
+        if (Target->getZExtValue() ==
+            TargetCompartment.GetCompartmentID()->getZExtValue()) {
               ValidTransition = true;
               break;
           }
