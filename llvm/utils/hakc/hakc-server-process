@@ -13,7 +13,7 @@ import subprocess
 import sys
 import threading
 import time
-from typing import cast, Optional
+from typing import cast, Optional, Tuple
 
 import yaml
 
@@ -109,8 +109,8 @@ def safe_serve_forever(server, logger_to_use):
         logger_to_use.error(f'Server ended: {e}')
 
 
-def start_hakc_server(server_id: int, server_mode: HAKCBuildMode, config: HAKCConfig, logger_to_use: HAKCLogger) -> (
-        HAKCServer, threading.Thread):
+def start_hakc_server(server_id: int, server_mode: HAKCBuildMode, config: HAKCConfig, logger_to_use: HAKCLogger) -> \
+        Tuple[HAKCServer, threading.Thread]:
     logger_to_use.debug(f'Starting server in {server_mode.value} mode')
     server = HAKCServer(server_id=server_id, server_mode=server_mode, config=config, logger_to_use=logger_to_use)
     server_thread = threading.Thread(target=safe_serve_forever, args=(server, logger_to_use))
@@ -245,7 +245,7 @@ def create_enforcement_obj_files(compilation_database: dict, batch_size: int, co
 def perform_analysis_with_compilation_database(config: HAKCConfig, compilation_database: dict, batch_size: int,
                                                server_main_logger: HAKCLogger, server_mode: HAKCBuildMode) -> Optional[
     HAKCCompartmentalization]:
-    assert (server_mode.is_analysis_mode)
+    assert server_mode.is_analysis_mode
     db_dir = config.server_config.backing_config.path if config.server_config.backing_config.type == HAKCBackingType.KUZU else ''
     compartmentalization = HAKCCompartmentalization(db_dir=db_dir)
 

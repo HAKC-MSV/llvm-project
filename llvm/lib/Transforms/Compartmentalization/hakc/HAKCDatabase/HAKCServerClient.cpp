@@ -373,12 +373,20 @@ HAKCServerClient::CreateCompartment(hakc_compartment_id_t CompartmentID,
   return HAKCServerClientBase::CreateCompartment(CompartmentID, EntryToken);
 }
 
-FakeServerClient::FakeServerClient(HAKCModuleAnalysis &ModuleAnalysis)
+FakeServerClient::FakeServerClient(HAKCModuleAnalysis &ModuleAnalysis,
+                                   bool NecOnly)
     : HAKCServerClientBase(ModuleAnalysis),
       CurrentComaprtmentID(ModuleAnalysis.GetCommonAnalysis()
                                .GetSystemInfo()
                                .GetDefaultCompartmentID() +
-                           1) {}
+                           1),
+      NecOnly(NecOnly) {
+  if (NecOnly) {
+    CurrentComaprtmentID = ModuleAnalysis.GetCommonAnalysis()
+                               .GetSystemInfo()
+                               .GetDefaultCompartmentID();
+  }
+}
 
 void FakeServerClient::add_symbols(
     ArrayRef<std::shared_ptr<HAKCFunctionInfo>> FIs,
@@ -397,7 +405,16 @@ HAKCCompartmentDivision &FakeServerClient::GetDivision(GlobalValue *GV) {
   if (SymbolDivisionMap.contains(GV)) {
     return *SymbolDivisionMap[GV];
   }
-  auto CompartmentID = CurrentComaprtmentID++;
+  if (!SymbolDivisionMap.empty() && NecOnly) {
+    auto Division = SymbolDivisionMap.begin()->second;
+    SymbolDivisionMap[GV] = Division;
+    return *Division;
+  }
+
+  auto CompartmentID = CurrentComaprtmentID;
+  if (!NecOnly) {
+    CurrentComaprtmentID++;
+  }
   auto DivisionID =
       ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().GetDefaultDivisionID();
   auto Division = CreateDivision(

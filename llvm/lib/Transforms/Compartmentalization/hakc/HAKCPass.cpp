@@ -24,6 +24,9 @@ static cl::opt<std::string>
 static cl::opt<bool> UseSimulatedClient("use-simulated-client",
                                         cl::desc("Use simulated server"),
                                         cl::init(false));
+static cl::opt<bool> NecOnly("use-nec-only",
+                             cl::desc("Use NEC for simulated server"),
+                             cl::init(false));
 
 using namespace llvm::hakc;
 
@@ -61,7 +64,7 @@ std::unique_ptr<HAKCServerClientBase>
 ConstructClient(HAKCModuleAnalysis &ModuleAnalysis) {
   std::unique_ptr<HAKCServerClientBase> Client;
   if (UseSimulatedClient) {
-    Client = std::make_unique<FakeServerClient>(ModuleAnalysis);
+    Client = std::make_unique<FakeServerClient>(ModuleAnalysis, NecOnly);
   } else {
     Client = std::make_unique<HAKCServerClient>(ModuleAnalysis);
   }
