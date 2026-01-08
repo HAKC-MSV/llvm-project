@@ -5,7 +5,7 @@ from typing import cast
 from ..HAKCCompartmentalization import HAKCCompartmentalization
 from ..HAKCLogger import HAKCLogger
 from ..HAKCObjects import HAKCDefinitionLocation, HAKCFunction, HAKCType, HAKCScope, HAKCGlobalVariable, \
-    HAKCAdjustments, HAKCCompartmentAdjustment, HAKCDivision, HAKCCompartment, HAKCSymbol
+    HAKCAdjustments
 
 logging.setLoggerClass(HAKCLogger)
 
@@ -76,7 +76,8 @@ class HAKCDatabaseTests(unittest.TestCase):
         # initially there should be N divisions for N symbols
         self.assertEqual(len(compartmentalization.conn.get_all_divisions()), 40)
 
-        compartmentalization.perform_adjustments(HAKCAdjustments(**{'no-enforcement-compartment': True, 'adjustments': []}))
+        compartmentalization.perform_adjustments(
+            HAKCAdjustments(**{'no-enforcement-compartment': True, 'adjustments': []}))
 
         # after placing everything in the NEC there should only be 1
         self.assertEqual(len(compartmentalization.conn.get_all_divisions()), 1)
@@ -84,7 +85,8 @@ class HAKCDatabaseTests(unittest.TestCase):
         self.assertEqual(len(compartmentalization.get_symbols()), len(compartmentalization.conn.get_symbols()))
         self.assertEqual(len(compartmentalization.get_types()), len(compartmentalization.conn.get_types()))
         self.assertEqual(len(compartmentalization.get_scopes()), len(compartmentalization.conn.get_scopes()))
-        self.assertEqual(len(compartmentalization.get_definition_locations()), len(compartmentalization.conn.get_definition_locations()))
+        self.assertEqual(len(compartmentalization.get_definition_locations()),
+                         len(compartmentalization.conn.get_definition_locations()))
 
 
 if __name__ == '__main__':

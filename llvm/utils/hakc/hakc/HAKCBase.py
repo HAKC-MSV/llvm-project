@@ -9,6 +9,7 @@ import yaml
 hakc_loader = yaml.CLoader
 hakc_dumper = yaml.Dumper
 
+
 class QuotedString(str):
     pass
 
@@ -38,7 +39,7 @@ class HAKCHashValue:
 
     @classmethod
     def from_int(cls, hash_value: int):
-        assert(isinstance(hash_value, int))
+        assert (isinstance(hash_value, int))
         result = cls([])
         result.final_hash = hash_value
         return result
@@ -50,7 +51,7 @@ class HAKCHashValue:
                 h.update(HAKCHashValue.get_bytes(value))
             # Note: [:7] is the first 8 bytes
             self.final_hash = int.from_bytes(h.digest()[:7], byteorder=HAKCHashValue.ByteOrder, signed=False)
-            assert(isinstance(self.final_hash, int))
+            assert (isinstance(self.final_hash, int))
 
     @staticmethod
     def get_bytes(value) -> bytes:
@@ -128,7 +129,6 @@ class HAKCPrintableObj:
     def __hash__(self):
         return int(self.get_computed_hash())
 
-
     def get_hash_inputs(self) -> list[object]:
         raise NotImplementedError
 
@@ -195,7 +195,7 @@ class HAKCDBNode(HAKCPrintableObj):
         return int(self.get_computed_hash())
 
     def set_computed_hash(self, computed_hash):
-        assert(isinstance(computed_hash, HAKCHashValue))
+        assert (isinstance(computed_hash, HAKCHashValue))
         self.computed_hash = computed_hash
         self.set_hash = True
 
@@ -261,6 +261,7 @@ class HAKCPayload(HAKCPrintableObj):
 
     def __str__(self):
         return f"HAKCPayload: {self.payload}"
+
     @classmethod
     def to_yaml(cls, dumper: hakc_dumper, data):
         return dumper.represent_dict(data.to_yaml_dict())
@@ -272,6 +273,7 @@ class HAKCPayload(HAKCPrintableObj):
         if key not in self.payload:
             self.payload[key] = val
 
+
 class HAKCResult(HAKCPayload):
     def __init__(self, success: bool = True, error: str = '', data: HAKCPayload = None, **kwargs):
         HAKCPayload.__init__(self, payload={'Success': success, 'Error': error, 'Data': data})
@@ -279,21 +281,25 @@ class HAKCResult(HAKCPayload):
     def __str__(self):
         return f"{'Successful' if self.payload['Success'] else 'Failed'} HAKCResponse with {self.payload}"
 
+
 class HAKCResultSuccess(HAKCResult):
     def __init__(self, data: HAKCPayload = None):
         # HAKCResult.__init__(self, payload={'Success': True, 'Error': '', 'Data': data})
         HAKCResult.__init__(self, success=True, error='', data=data)
+
 
 class HAKCResultFail(HAKCResult):
     def __init__(self, error: str):
         # HAKCResult.__init__(self, payload={'Success': False, 'Error': error, 'Data': {}})
         HAKCResult.__init__(self, success=False, error=error, data=None)
 
+
 class HAKCResponse(HAKCPayload):
     # response type -> endpoint
     # status -> (success, error, payload)
     def __init__(self, result: HAKCResult, response_endpoint: str, **kwargs):
         HAKCPayload.__init__(self, payload={'Result': result, 'ResponseEndpoint': response_endpoint}, **kwargs)
+
 
 class HashedHAKCDBNode(HAKCDBNode):
     def __init__(self, **kwargs):

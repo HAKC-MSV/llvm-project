@@ -4,12 +4,10 @@ import unittest
 from typing import cast
 
 from .HAKCTestUtils import get_random_function, get_random_global_variable, get_random_string
-from ..HAKCCompartmentalization import HAKCCompartmentalization
+from ..HAKCConfig import HAKCConfig, HAKCBackingType
 from ..HAKCDatabase import HAKCDatabase
 from ..HAKCLogger import HAKCLogger, setup_logging
-from ..HAKCObjects import HAKCDefinitionLocation, HAKCType, HAKCAdjustments, HAKCDivision, HAKCScope, HAKCSymbol, HAKCCompartment
 from ..HAKCUtils import delete_database, copy_database
-from ..HAKCConfig import HAKCConfig, HAKCBackingType
 
 logging.setLoggerClass(HAKCLogger)
 
@@ -17,18 +15,18 @@ logger: HAKCLogger = cast(HAKCLogger, logging.getLogger('hakc.spatial-tests'))
 
 
 class HAKCDatabaseTests(unittest.TestCase):
-    def __init__(self, methodName='runTest', config: HAKCConfig=None):
+    def __init__(self, methodName='runTest', config: HAKCConfig = None):
         super().__init__(methodName)
         self.config: HAKCConfig = config
         root_logger = logging.getLogger()
         setup_logging(root_logger, log_level=config.log_level.INFO)
         logger.debug(f"Loaded {self.config}")
 
-
     def test_linux_database(self):
         print()
         if self.config.server_config.backing_config.type != HAKCBackingType.KUZU:
-            logger.info(f"!!!    Spatial test_linux_database: Unsupported backing type {self.config.server_config.backing_config.type}     !!!")
+            logger.info(
+                f"!!!    Spatial test_linux_database: Unsupported backing type {self.config.server_config.backing_config.type}     !!!")
             return
 
         logger.info("!!!    Starting Spatial test_linux_database    !!!")

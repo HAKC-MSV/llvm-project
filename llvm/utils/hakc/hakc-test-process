@@ -12,7 +12,6 @@ logging.setLoggerClass(HAKCLogger)
 logger = cast(HAKCLogger, logging.getLogger('hakc.test-process'))
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser(description='HAKC Analysis Server Process')
     parser.add_argument('--log-mode', default='w', dest='log_mode')
     parser.add_argument('--log-level', required=False, dest='log_level',

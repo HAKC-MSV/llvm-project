@@ -6,7 +6,7 @@ from typing import cast
 
 from .HAKCDatabase import HAKCDatabase
 from .HAKCLogger import HAKCLogger
-from .HAKCObjects import HAKCSymbol, HAKCFunction, HAKCCompartment, HAKCDivision
+from .HAKCObjects import HAKCSymbol, HAKCFunction
 
 logging.setLoggerClass(HAKCLogger)
 
@@ -14,9 +14,11 @@ logger: HAKCLogger = cast(HAKCLogger, logging.getLogger('hakc.static-analysis'))
 
 mp_conn: HAKCDatabase | None = None
 
+
 def init_mp_database(db_dir: str):
     global mp_conn
     mp_conn = HAKCDatabase(db_dir, read_only=True)
+
 
 def compute_dag_edges_for_symbol(symbol_hashes):
     global mp_conn
@@ -30,6 +32,7 @@ def compute_dag_edges_for_symbol(symbol_hashes):
             raise RuntimeError(f'compute_dag_edges_for_symbol failed for {symbol_hash}: {str(e)}')
 
     return results
+
 
 def compute_dag_edges_for_symbol_with_conn(conn: HAKCDatabase, symbol_hash: int):
     results = list()
@@ -50,9 +53,11 @@ def compute_dag_edges_for_symbol_with_conn(conn: HAKCDatabase, symbol_hash: int)
 
     return results
 
+
 def print_edge_data(G):
     for edge in G.edges:
         print(f"Edge: {edge} -> {G.get_edge_data(edge[0], edge[1])}")
+
 
 def output_profile_stats(profile):
     s = io.StringIO()
@@ -75,10 +80,10 @@ def compute_dag_edge_weight(**kwargs) -> int:
 
     return edge_weight
 
+
 def batched(iterable, n):
     if n < 1:
         raise ValueError('n must be at least one')
     iterator = iter(iterable)
     while batch := tuple(itertools.islice(iterator, n)):
         yield batch
-

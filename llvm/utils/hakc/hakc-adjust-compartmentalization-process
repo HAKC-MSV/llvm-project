@@ -17,9 +17,11 @@ logging.setLoggerClass(HAKCLogger)
 
 logger = cast(HAKCLogger, logging.getLogger('hakc.adjust-compartmentalization-process'))
 
+
 def cleanup_processes():
     import subprocess
-    subprocess.run(['pkill', '-9', '-f','hakc-adjust-compartmentalization-process'])
+    subprocess.run(['pkill', '-9', '-f', 'hakc-adjust-compartmentalization-process'])
+
 
 def main():
     parser = argparse.ArgumentParser(description='HAKC Adjust Compartmentalization Process')
@@ -32,7 +34,8 @@ def main():
         config = HAKCConfig(**yaml.safe_load(f))
 
     root_logger = logging.getLogger()
-    setup_logging(root_logger, log_level=config.log_level, log_file=config.log_dir + "/hakc.adjustments.log", log_mode=config.server_config.log_mode)
+    setup_logging(root_logger, log_level=config.log_level, log_file=config.log_dir + "/hakc.adjustments.log",
+                  log_mode=config.server_config.log_mode)
     # logger.error(f"Adjustments: {config.server_config.adjustments}")
     match config.server_config.backing_config.type:
         case HAKCBackingType.KUZU:
@@ -61,7 +64,6 @@ def main():
             pass
 
 
-
 if __name__ == "__main__":
     def signal_handler(sig, frame):
         # print("\nCtrl+C detected via signal handler. Exiting.")
@@ -69,6 +71,7 @@ if __name__ == "__main__":
         print(f"Catching signal {sig} in frame {frame}")
         cleanup_processes()
         sys.exit(0)
+
 
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTSTP, signal_handler)
