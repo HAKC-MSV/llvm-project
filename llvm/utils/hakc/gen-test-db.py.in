@@ -9,7 +9,8 @@ import subprocess
 def main():
     parser = argparse.ArgumentParser(description='Generate HAKC Test Database')
     parser.add_argument("--test-name", dest='test_name', required=True, help='Name of HAKC Test')
-    parser.add_argument("--test-mode", dest='test_mode', default="RunDataAccessGraphAnalysis", help='Name of HAKC Test mode {RunDataAccessGraphAnalysis;RunPostDominatorAnalysis}')
+    parser.add_argument("--test-mode", dest='test_mode', default="RunDataAccessGraphAnalysis",
+                        help='Name of HAKC Test mode {RunDataAccessGraphAnalysis;RunPostDominatorAnalysis}')
 
     args = parser.parse_args()
 

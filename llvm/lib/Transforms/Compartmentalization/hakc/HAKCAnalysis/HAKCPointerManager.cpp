@@ -81,7 +81,8 @@ bool HAKCPointerManager::PointerIsEligibleForManagement(const Use &U) {
    * definition to check if we are managing constant strings.
    */
   auto *Pointer = U.get();
-  auto *Definition = GetDef(Pointer);
+  // auto *Definition = GetFunctionAnalysis().getDef(Pointer, false);
+  auto *Definition = ModuleAnalysis.GetCommonAnalysis().getDef(Pointer, false);
   auto *PointerTy = Pointer->getType();
 
   if (const auto *AllocaI = dyn_cast<AllocaInst>(Definition)) {
@@ -139,8 +140,10 @@ bool HAKCPointerManager::PointerIsEligibleForManagement(const Use &U) {
     }
   } else if (auto *ConstExpr = dyn_cast<ConstantExpr>(Pointer)) {
     if (ConstExpr->isCast()) {
-      auto *Operand = GetDef(ConstExpr->getOperand(0));
-      GetLogger(Verbose, !DebugActive) << *ConstExpr << " operand def is " << *Operand << "\n";
+      // auto *Operand = GetFunctionAnalysis().getDef(ConstExpr->getOperand(0), false);
+      auto *Operand = ModuleAnalysis.GetCommonAnalysis().getDef(ConstExpr->getOperand(0), false);
+      GetLogger(Verbose, !DebugActive)
+          << *ConstExpr << " operand def is " << *Operand << "\n";
       if (isa<ConstantInt>(Operand)) {
         GetLogger(Verbose, !DebugActive) << "ConstExpr is from ConstantInt\n";
         return false;
@@ -208,6 +211,11 @@ bool HAKCPointerManager::PointerIsEligibleForManagement(const Use &U) {
 
 bool HAKCPointerManager::ManageNewPointer(Use &U) {
   auto *BaseDefinition = GetDef(U.get());
+  if (!BaseDefinition) {
+    CommonHAKCAnalysis::getLogger(Fatal)
+        << "Could not find BaseDefinition for " << U << "\n";
+    throw std::exception();
+  }
   if (isa<IntToPtrInst>(U.get())) {
     const bool is_percpu_ptr = CommonHAKCAnalysis::IsPerCPUPointer(U);
 
@@ -590,12 +598,8 @@ ManagedHAKCPointerP HAKCPointerManager::GetManagedPointer(Value *V) {
 bool HAKCPointerManager::empty() const { return ManagedPointersList.empty(); }
 
 Value *HAKCPointerManager::GetDef(Value *V) const {
+  // auto *BaseDefinition = GetFunctionAnalysis().getDef(V, false);
   auto *BaseDefinition = ModuleAnalysis.GetCommonAnalysis().getDef(V, false);
-  if (!BaseDefinition) {
-    ModuleAnalysis.GetCommonAnalysis().getLogger(Fatal)
-        << "Could not find definition for " << V << "\n";
-    throw std::exception();
-  }
 
   if (isa<GlobalVariable>(BaseDefinition) && !CommonHAKCAnalysis::IsStringType(BaseDefinition->getType())) {
     Value *NewBaseDefinition = nullptr;

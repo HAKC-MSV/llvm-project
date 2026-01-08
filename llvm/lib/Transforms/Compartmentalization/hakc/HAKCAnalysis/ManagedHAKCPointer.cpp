@@ -275,7 +275,7 @@ bool ManagedHAKCPointer::ValueIsManagedAndHasUsers(
   bool Result = false;
 
   if (const auto ManagedPointer = Manager.GetManagedPointer(V)) {
-    if (*ManagedPointer != *this) {
+    if (ManagedPointer && *ManagedPointer != *this) {
       Result = CountAuthenticatedUsers
         ? ManagedPointer->GetAuthenticatedUserCount() > 0
         : ManagedPointer->GetProtectedUserCount() > 0;

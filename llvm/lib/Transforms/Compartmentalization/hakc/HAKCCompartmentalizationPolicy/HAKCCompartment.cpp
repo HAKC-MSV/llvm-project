@@ -30,9 +30,7 @@ HAKCCompartment::GetValidTargets() const {
 void HAKCCompartment::AddTarget(const HAKC_Compartment_ID CompartmentID) {
   Targets.insert(CompartmentID);
 }
-    unsigned HAKCCompartment::GetValidTargetsSize() const {
-      return Targets.size();
-    }
+unsigned HAKCCompartment::GetValidTargetsSize() const { return Targets.size(); }
 
 hakc_compartment_id_t HAKCCompartment::GetCompartmentIDValue() const {
   return Compartment->getSExtValue();

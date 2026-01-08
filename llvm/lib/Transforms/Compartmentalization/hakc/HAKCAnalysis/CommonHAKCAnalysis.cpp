@@ -72,10 +72,6 @@ namespace llvm::hakc {
             getLogger(Fatal) << ConfigPath << " is not a regular file\n";
             throw std::exception();
         }
-        if (ServerSocketPath.empty() && PassMode != RunConfigAndExit) {
-          getLogger(Fatal) << "ServerSocketPath is empty!\n";
-          throw std::exception();
-        }
 
         HAKCYAMLConfig SystemConfig;
         ErrorOr<std::unique_ptr<MemoryBuffer>> mb = MemoryBuffer::getFile(ConfigPath);

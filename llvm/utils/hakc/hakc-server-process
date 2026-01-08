@@ -216,7 +216,7 @@ def get_batched_files(compilation_database: dict, batch_size: int):
 
 def create_enforcement_obj_files(compilation_database: dict, batch_size: int, config: HAKCConfig,
                                  server_main_logger: HAKCLogger, server_mode: HAKCBuildMode):
-    assert (server_mode.is_enforcement_mode)
+    assert server_mode.is_enforcement_mode
     worker_count = max(1, config.server_config.analysis_core_count // 2)
     successful_enforcement = True
     with concurrent.futures.ProcessPoolExecutor(max_workers=worker_count) as executor:

@@ -70,6 +70,10 @@ static void runAnalysis(CommonHAKCAnalysis &HAKCAnalysis) {
                 CommonHAKCAnalysis::getLogger(Fatal) << "no hakc-config pass specified\n";
                 throw std::exception();
             }
+            if (!UseSimulatedClient && HAKCServerPath.getValue().empty()) {
+              CommonHAKCAnalysis::getLogger(Fatal) << "HAKCServerPath is empty!\n";
+              throw std::exception();
+            }
 
             const auto PassMode = CommonHAKCAnalysis::ParsePassMode(PassModeArg.getValue());
             CommonHAKCAnalysis HAKCAnalysis(M, MAM, HAKCConfigPath.getValue(),

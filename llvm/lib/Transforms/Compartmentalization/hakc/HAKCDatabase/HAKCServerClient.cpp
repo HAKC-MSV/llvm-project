@@ -11,11 +11,10 @@
 
 namespace llvm::hakc {
     HAKCServerClientBase::HAKCServerClientBase(HAKCModuleAnalysis &ModuleAnalysis) : ModuleAnalysis(ModuleAnalysis),
-        SystemInformation(ModuleAnalysis.GetCommonAnalysis().GetSystemInfo()), Compartments(), Divisions() {
+        SystemInformation(ModuleAnalysis.GetCommonAnalysis().GetSystemInfo()) {
     }
 
-    HAKCServerClientBase::~HAKCServerClientBase() {
-    }
+HAKCServerClientBase::~HAKCServerClientBase() {}
 
     HAKCCompartmentP HAKCServerClientBase::GetCompartment(hakc_compartment_id_t CompartmentID) {
         if (auto Compartment = FindCachedCompartment(CompartmentID))
@@ -151,8 +150,7 @@ namespace llvm::hakc {
 
         json::Object Parameters({{"allSymbols", AllSymbols}});
 
-        auto result =
-                Execute(SystemInformation.GetAddSymbolsEndpoint(), Parameters);
+        auto result = Execute(SystemInformation.GetAddSymbolsEndpoint(), Parameters);
         if (!result.success) {
             CommonHAKCAnalysis::getLogger(Fatal) << "Invalid Response for AllSymbols\n";
             throw std::exception();

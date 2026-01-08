@@ -6,7 +6,6 @@
 #include "llvm/Support/Timer.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/CommonHAKCAnalysis.h"
-#include <unistd.h>
 
 namespace llvm::hakc {
 
@@ -140,8 +139,7 @@ namespace llvm::hakc {
             throw std::exception();
         }
         // TODO: update if endpoints change
-        if (response_endpoint ==
-            SystemInformation.GetTerminateConnectionEndpoint()) {
+  if (response_endpoint == SystemInformation.GetTerminateConnectionEndpoint()) {
             terminate_connection = true;
             return;
         }
@@ -151,14 +149,16 @@ namespace llvm::hakc {
         } else if (response_endpoint == SystemInformation.GetDivisionEndpoint()) {
             auto *payload = GetObject(_result, "Data");
             result.data = std::make_shared<HAKCDivisionPayload>(payload);
-        } else if (response_endpoint == SystemInformation.GetSymbolDivisionEndpoint()) {
+        } else if (response_endpoint ==
+             SystemInformation.GetSymbolDivisionEndpoint()) {
             auto *payload = GetObject(_result, "Data");
             result.data = std::make_shared<HAKCDivisionCompartmentPayload>(payload);
         } else if (response_endpoint == SystemInformation.GetValidTargetsEndpoint()) {
             auto *payload = GetObject(_result, "Data");
             result.data = std::make_shared<HAKCValidTargetsPayload>(payload);
         } else if (response_endpoint == SystemInformation.GetAddSymbolsEndpoint()) {
-            // These requests don't have a 'Data' field to extract, so just pass the result
+          // These requests don't have a 'Data' field to extract, so just pass the
+          // result
             result.data = std::make_shared<HAKCPayload>(_result);
         } else {
             // unknown endpoint
@@ -170,10 +170,8 @@ namespace llvm::hakc {
 
     HAKCDatabaseResponse::HAKCDatabaseResponse(
             const HAKCSystemInformation &SystemInformation)
-            : Response(),
-              Success(false), response_endpoint(), result(HAKCResult()),
+            : Success(false), result(HAKCResult()),
               SystemInformation(SystemInformation), terminate_connection(false) {}
-
 
     void HAKCDatabaseRequest::operator>>(raw_ostream &OS) const {
         std::string RequestJSON;
@@ -249,8 +247,9 @@ namespace llvm::hakc {
         }
 
         parse_result(hakc_result);
-        CommonHAKCAnalysis::getLogger(Debug) << "Successfully read from socket, returning payload!\n";
-    }
+        CommonHAKCAnalysis::getLogger(Debug)
+          << "Successfully read from socket, returning payload!\n";
+}
 
     HAKCDatabaseConnection::HAKCDatabaseConnection(
             const HAKCSystemInformation &SystemInformation, bool debug)
@@ -287,16 +286,16 @@ namespace llvm::hakc {
         close();
         CommonHAKCAnalysis::getLogger(Debug) << "Connecting...";
 
-        auto NewConnection = raw_socket_stream::createConnectedUnix(
-                SystemInformation.GetSocketPath());
+    auto NewConnection =
+      raw_socket_stream::createConnectedUnix(SystemInformation.GetSocketPath());
         if (!NewConnection) {
             /* NB: calling consuming all the errors is required in order for the
              * Expected object to be properly destructed. llvm::toString does
              * this.
              */
             CommonHAKCAnalysis::getLogger(Verbose)
-                    << "\nError connecting to " << SystemInformation.GetSocketPath()
-                    << ": " << llvm::toString(NewConnection.takeError()) << "\n";
+                << "\nError connecting to " << SystemInformation.GetSocketPath() << ": "
+                << llvm::toString(NewConnection.takeError()) << "\n";
             throw std::exception();
         }
         CommonHAKCAnalysis::getLogger(Debug)

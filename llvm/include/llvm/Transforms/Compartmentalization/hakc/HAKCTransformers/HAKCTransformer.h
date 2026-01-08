@@ -43,7 +43,6 @@ public:
 
   virtual ~HAKCTransformer() = default;
 
-  void runAnalysis() const;
 
   void runEnforcement();
 

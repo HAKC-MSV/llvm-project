@@ -9,8 +9,6 @@ from unittest import TestLoader
 
 import yaml
 
-import hakc.tests.HAKCSpatialTests as HAKCSpatialTests
-import hakc.tests.HAKCTemporalTests as HAKCTemporalTests
 import hakc.tests.HAKCDatabaseTests as HAKCDatabaseTests
 from hakc.HAKCConfig import HAKCConfig
 from hakc.HAKCLogger import HAKCLogger
@@ -20,15 +18,18 @@ logging.setLoggerClass(HAKCLogger)
 
 logger = cast(HAKCLogger, logging.getLogger('hakc.test-database-process'))
 
+
 class HAKCTestLoader(TestLoader):
     def __init__(self, **kwargs):
         super().__init__()
         self.extra_args = kwargs
 
     """A custom TestLoader that passes extra arguments to test case constructors."""
+
     def loadTestsFromTestCase(self, testCaseClass):
         # This method is called for each TestCase class found.
-        return self.suiteClass([testCaseClass(name, **self.extra_args) for name in self.getTestCaseNames(testCaseClass)])
+        return self.suiteClass(
+            [testCaseClass(name, **self.extra_args) for name in self.getTestCaseNames(testCaseClass)])
 
 
 class HAKCTestProgram(unittest.TestProgram):
@@ -55,4 +56,3 @@ if __name__ == "__main__":
 
     runner = unittest.TextTestRunner(verbosity=0)
     [runner.run(test_suite) for test_suite in test_suites]
-
