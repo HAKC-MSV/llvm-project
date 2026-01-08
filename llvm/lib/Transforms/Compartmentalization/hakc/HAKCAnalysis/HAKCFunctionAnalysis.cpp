@@ -456,7 +456,11 @@ BasicBlock *HAKCFunctionEnforcement::findDominatorUseBlock(Value *Ptr, const std
                 }
             }
             if (call->getCalledFunction()) {
-                // add uncompartmentalization check
+                // TODO: look here and maybe add uncompartmentalization check
+              // if (!CommonHAKCAnalysis::IsUncompartmentalizedSymbol(
+              // call->getCalledFunction(), Client)) {
+              //   NonKernelDirectFunctionCallSet.insert(call);
+              // }
                 DirectFunctionCallSet.insert(call);
             }
         }
@@ -657,7 +661,7 @@ BasicBlock *HAKCFunctionEnforcement::findDominatorUseBlock(Value *Ptr, const std
       Client.GetValidTargets(CurrentDivision.GetHAKCCompartment());
       for (auto *call : DirectFunctionCallSet) {
         // need to check that call is actually compartmentalized here since that check was removed from handle call function in analysis
-        if (CommonHAKCAnalysis::IsUncompartmentalizedSymbol(call->getCalledFunction(), Client)) {
+        if (!CommonHAKCAnalysis::IsUncompartmentalizedSymbol(call->getCalledFunction(), Client)) {
           getLogger(Verbose) << "Call " << *call->getCalledFunction() << "is not compartmentalized, skipping\n";
           return;
         }
