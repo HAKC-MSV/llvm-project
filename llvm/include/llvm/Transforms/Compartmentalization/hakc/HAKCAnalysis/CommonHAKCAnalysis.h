@@ -62,6 +62,8 @@ namespace llvm::hakc {
     public:
         virtual ~CommonHAKCAnalysis() = default;
 
+        explicit CommonHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM);
+
         explicit CommonHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM,
                                     StringRef ConfigPath, StringRef ServerSocketPath, HAKCPassModeEnum PassMode);
 
@@ -170,7 +172,7 @@ namespace llvm::hakc {
         static void SortFunctionList(FunctionList &FuncList);
 
         static bool
-        IsUncompartmentalizedSymbol(GlobalValue *GV,
+        IsNECSymbol(GlobalValue *GV,
                                     HAKCServerClientBase &Client);
 
         static void VerifyFunction(Function *F);
@@ -200,6 +202,9 @@ namespace llvm::hakc {
 
         hakc_access_token_t GetDefaultDivisionAccessToken(hakc_compartment_id_t CompartmentID,
                                                           hakc_compartment_division_t DivisionID) const;
+
+        static hakc_access_token_t GetDefaultDivisionAccessToken(hakc_compartment_id_t CompartmentID,
+                                                                      hakc_compartment_division_t DivisionID, unsigned DivisionIDBitCount);
 
     private:
         static bool valueHasAttribute(Value *v, Attribute::AttrKind Kind);

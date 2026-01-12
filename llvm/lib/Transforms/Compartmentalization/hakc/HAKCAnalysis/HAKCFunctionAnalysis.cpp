@@ -477,6 +477,7 @@ BasicBlock *HAKCFunctionEnforcement::findDominatorUseBlock(Value *Ptr, const std
             for (auto Use : Uses) {
                 GetLogger(Debug, !DebugActive) << "\tAnalyzing Use" << *Use << "\n";
                 auto *I = Use->getUser();
+
                 if (dyn_cast<CallInst>(I)) {
                     TypeUseHandleCall(Use);
                 }
@@ -607,19 +608,19 @@ BasicBlock *HAKCFunctionEnforcement::findDominatorUseBlock(Value *Ptr, const std
     }
 
     bool HAKCFunctionEnforcement::IsUncompartmentalizedSymbol() {
-      return CommonHAKCAnalysis::IsUncompartmentalizedSymbol(CurrentFunction, Client);
+      return CommonHAKCAnalysis::IsNECSymbol(CurrentFunction, Client);
     }
 
     bool HAKCFunctionEnforcement::IsUncompartmentalizedSymbol() const {
-      return CommonHAKCAnalysis::IsUncompartmentalizedSymbol(CurrentFunction, Client);
+      return CommonHAKCAnalysis::IsNECSymbol(CurrentFunction, Client);
     }
 
     bool HAKCFunctionEnforcement::IsUncompartmentalizedSymbol(GlobalValue *GV) {
-      return CommonHAKCAnalysis::IsUncompartmentalizedSymbol(GV, Client);
+      return CommonHAKCAnalysis::IsNECSymbol(GV, Client);
     }
 
     bool HAKCFunctionEnforcement::IsUncompartmentalizedSymbol(GlobalValue *GV) const {
-      return CommonHAKCAnalysis::IsUncompartmentalizedSymbol(GV, Client);
+      return CommonHAKCAnalysis::IsNECSymbol(GV, Client);
     }
 
     bool HAKCFunctionEnforcement::isCompartmentalizedFunction() {
@@ -656,10 +657,10 @@ BasicBlock *HAKCFunctionEnforcement::findDominatorUseBlock(Value *Ptr, const std
       Client.GetValidTargets(CurrentDivision.GetHAKCCompartment());
       for (auto *call : DirectFunctionCallSet) {
         // need to check that call is actually compartmentalized here since that check was removed from handle call function in analysis
-        if (!CommonHAKCAnalysis::IsUncompartmentalizedSymbol(call->getCalledFunction(), Client)) {
-          getLogger(Verbose) << "Call " << *call->getCalledFunction() << "is not compartmentalized, skipping\n";
-          continue;
-        }
+        // if (CommonHAKCAnalysis::IsNECSymbol(call->getCalledFunction(), Client)) {
+        //   getLogger(Verbose) << "Call " << *call->getCalledFunction() << "is not compartmentalized, skipping\n";
+        //   continue;
+        // }
         auto TargetCompartment =Client.GetDivision(call->getCalledFunction()).GetHAKCCompartment();
         if (CurrentDivision.GetHAKCCompartment().GetCompartmentID() == TargetCompartment.GetCompartmentID()) {
         /* Aliases are being used for transfer functions, so if the
@@ -674,14 +675,14 @@ BasicBlock *HAKCFunctionEnforcement::findDominatorUseBlock(Value *Ptr, const std
 
           // Fixing https://github.mit.edu/inherently-secure/ARM-MTE/issues/40
           bool ValidTransition = false;
-
+          Client.GetValidTargets(CurrentDivision.GetHAKCCompartment());
           for (const auto *Target : CurrentDivision.GetHAKCCompartment().GetValidTargets()) {
           GetLogger(Verbose, !DebugActive)
               << "Testing Target Compartment " << Target->getZExtValue()
               << " == " << TargetCompartment.GetCompartmentID()->getZExtValue()
               << " -> "
-              << (Target->getSExtValue() ==
-                  TargetCompartment.GetCompartmentID()->getSExtValue())
+              << (Target->getZExtValue() ==
+                  TargetCompartment.GetCompartmentID()->getZExtValue())
               << "\n";
             // comparing i32 1 and i64 1 returns false (LLVM constant ints), so cast
             // to int64_t
@@ -1488,9 +1489,12 @@ BasicBlock *HAKCFunctionEnforcement::findDominatorUseBlock(Value *Ptr, const std
       if (ManagedPtr->GetAuthenticatedUserCount() > 0) {
         TransformUseSet(ManagedPtr, ManagedPtr->GetAuthenticatedUses());
       }
-      GetLogger(Verbose, !DebugActive)
-        << "Not transforming Authenticated Pointer Replacements since user count of "
-          << *ManagedPtr << " is 0\n";
+      else {
+          GetLogger(Verbose, !DebugActive)
+            << "Not transforming Authenticated Pointer Replacements since user count of "
+              << *ManagedPtr << " is 0\n";
+
+      }
       if (ManagedPtr->GetProtectedUserCount() > 0) {
         TransformUseSet(ManagedPtr, ManagedPtr->GetProtectedUses());
       } else {

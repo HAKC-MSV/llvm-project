@@ -459,6 +459,22 @@ struct yaml::MappingTraits<hakc::HAKCYAMLConfig> {
             errs() << "Error parsing config file " << YamlConfig.ClientConfigPath << "\n";
             throw std::exception();
         }
+      // if (!YamlConfig.ClientConfigPath.empty()) {
+      //   ErrorOr<std::unique_ptr<MemoryBuffer> > mb = MemoryBuffer::getFile(YamlConfig.ClientConfigPath);
+      //   Input yin(mb.get()->getMemBufferRef().getBuffer());
+      //   yin >> YamlConfig.ClientConfig;
+      //   if (yin.error()) {
+      //     errs() << "Error parsing config file!\n";
+      //     throw std::exception();
+      //   }
+      // }
+      // else {
+      //   // use default configuration
+      //   std::unique_ptr<hakc::HAKCYAMLClientConfig> ClientConfig = std::make_unique<hakc::HAKCYAMLClientConfig>();
+      //   YamlConfig.ClientConfig = *ClientConfig;
+      //
+      // }
+
         io.mapRequired("build-dir", YamlConfig.BuildDir);
         io.mapRequired("socket-dir", YamlConfig.SocketDir);
         io.mapRequired("log-dir", YamlConfig.LogDir);

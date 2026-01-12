@@ -35,6 +35,8 @@ public:
 
   static bool useEscapes(const Use &U);
 
+  HAKCModuleAnalysis();
+
   HAKCModuleAnalysis(CommonHAKCAnalysis &CommonAnalysis);
 
   StructType *GetKernelParamType() const;

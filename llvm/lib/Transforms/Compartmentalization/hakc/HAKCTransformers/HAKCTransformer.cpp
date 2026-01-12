@@ -145,7 +145,7 @@ HAKCModuleAnalysis& HAKCTransformer::GetModuleAnalysis() const {
 
     std::string
     HAKCTransformer::getGlobalHAKCSectionName(GlobalVariable *GV) const {
-        if (CommonHAKCAnalysis::IsUncompartmentalizedSymbol(GV, Client)) {
+        if (CommonHAKCAnalysis::IsNECSymbol(GV, Client)) {
             return GV->getSection().str();
         }
 
@@ -161,7 +161,7 @@ HAKCModuleAnalysis& HAKCTransformer::GetModuleAnalysis() const {
     void HAKCTransformer::AddTransferFunctions() {
         FunctionList FuncsNeedingTransfers;
         for (auto &F: getModule().functions()) {
-            if (!CommonHAKCAnalysis::IsUncompartmentalizedSymbol(&F, Client) &&
+            if (!CommonHAKCAnalysis::IsNECSymbol(&F, Client) &&
                 getCommonAnalysis().functionIsTransferCandidate(&F, Client) &&
                 !CommonHAKCAnalysis::IsOutsideTransferFunc(&F) &&
                 ModuleAnalysis.functionEscapes(&F)) {
@@ -311,7 +311,7 @@ HAKCModuleAnalysis& HAKCTransformer::GetModuleAnalysis() const {
           }
             if (auto *GlobalVal = dyn_cast<GlobalValue>(Def)) {
                 Result =
-                        !CommonHAKCAnalysis::IsUncompartmentalizedSymbol(GlobalVal, Client);
+                        !CommonHAKCAnalysis::IsNECSymbol(GlobalVal, Client);
             } else if (auto *StructMember = dyn_cast<ConstantStruct>(Def)) {
                 Result = ConstantStructTransferIsNeeded(StructMember);
             }
@@ -328,7 +328,7 @@ HAKCModuleAnalysis& HAKCTransformer::GetModuleAnalysis() const {
 
     bool HAKCTransformer::TransferIsNeeded(GlobalVariable *GlobalVar) {
         bool IsKernelSym =
-                CommonHAKCAnalysis::IsUncompartmentalizedSymbol(GlobalVar, Client);
+                CommonHAKCAnalysis::IsNECSymbol(GlobalVar, Client);
         bool Result = GlobalVar->hasInitializer() && !IsKernelSym;
         if (Result) {
             if (auto *ConstStruct =
@@ -1098,7 +1098,7 @@ Instruction *HAKCTransformer::CastCallToType(CallInst *Call, Value *ValueToTypeM
     }
 
     bool HAKCTransformer::NoKernelTransfers(Function *Target) {
-  return CommonHAKCAnalysis::IsUncompartmentalizedSymbol(Target, Client);
+  return CommonHAKCAnalysis::IsNECSymbol(Target, Client);
     }
 
     Value *HAKCTransformer::CreateActionCall(HAKCTransferAction &TransferAction,
@@ -1545,7 +1545,7 @@ HAKCTransformer::InferHAKCType(Argument &Arg, CallInst *CallSite,
     ConstantInt *HAKCTransformer::GetDefaultObjectSize() { return getInt64(1); }
 
     bool HAKCTransformer::TargetIsKernel(GlobalValue *Target) {
-        return CommonHAKCAnalysis::IsUncompartmentalizedSymbol(
+        return CommonHAKCAnalysis::IsNECSymbol(
             Target, Client);
     }
 

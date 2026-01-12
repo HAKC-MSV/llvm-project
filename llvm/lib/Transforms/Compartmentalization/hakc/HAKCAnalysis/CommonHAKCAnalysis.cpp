@@ -20,7 +20,12 @@ namespace llvm::hakc {
     hakc_access_token_t CommonHAKCAnalysis::GetDefaultDivisionAccessToken(hakc_compartment_id_t CompartmentID,
                                                                           hakc_compartment_division_t DivisionID)
     const {
-        return CompartmentID << SystemInfo.GetDivisionIDBitCount() | DivisionID;
+        return GetDefaultDivisionAccessToken(CompartmentID, DivisionID, SystemInfo.GetDivisionIDBitCount());
+    }
+
+    hakc_access_token_t CommonHAKCAnalysis::GetDefaultDivisionAccessToken(hakc_compartment_id_t CompartmentID,
+                                                                      hakc_compartment_division_t DivisionID, unsigned DivisionIDBitCount){
+      return CompartmentID << DivisionIDBitCount | DivisionID;
     }
 
     bool CommonHAKCAnalysis::IsFunctionInFunctionList(
@@ -94,6 +99,10 @@ namespace llvm::hakc {
         createLogPath(SystemConfig.LogDir, PassMode),
           SystemConfig.ClientConfig
           .FileLogLevel); // setting the fd_ostream to configured log level
+    }
+
+CommonHAKCAnalysis::CommonHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM)
+    : M(M), MAM(MAM), SystemInfo(*this), _HAKCLog(*HAKCLog) {
     }
 
     CommonHAKCAnalysis::CommonHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM,
@@ -337,9 +346,13 @@ namespace llvm::hakc {
                 } else if (!isa<Constant>(LHSDef) && !isa<Constant>(RHSDef)) {
                     getLogger(Verbose) << "Neither LHS nor RHS of " << binOp
                             << " are constants\n";
+        /* We stop here */
+        goto add_to_chain;
                 } else if (isa<Constant>(LHSDef) && isa<Constant>(RHSDef)) {
                     getLogger(Verbose) << "Both LHS and RHS of " << binOp
                             << " are constants\n";
+        /* We stop here */
+        goto add_to_chain;
                 }
             }
         add_to_chain:
@@ -429,9 +442,8 @@ namespace llvm::hakc {
              */
             result = arg->hasAttribute(Kind);
         } else if (auto *I = dyn_cast<Instruction>(V)) {
-            auto *metadata = I->getMetadata(LLVMContext::MD_annotation);
-            if (metadata) {
-                for (auto &operand: metadata->operands()) {
+    if (auto *Metadata = I->getMetadata(LLVMContext::MD_annotation)) {
+      for (auto &operand : Metadata->operands()) {
                     if (auto *mdstring = dyn_cast<MDString>(operand.get())) {
                         auto MDStr = mdstring->getString();
                         if (MDStr == attrName) {
@@ -549,7 +561,7 @@ namespace llvm::hakc {
 
     bool CommonHAKCAnalysis::IsCompartmentalizedFunction(Function *F,
                                                          HAKCServerClientBase &Client) {
-        return !IsUncompartmentalizedSymbol(F, Client) && !IsOutsideTransferFunc(F);
+        return !IsNECSymbol(F, Client) && !IsOutsideTransferFunc(F);
     }
 
     std::string CommonHAKCAnalysis::GetOutsideTransferName(Function *F) {
@@ -575,7 +587,7 @@ namespace llvm::hakc {
     bool CommonHAKCAnalysis::functionIsTransferCandidate(Function *F,
                                                          HAKCServerClientBase &Client) {
         auto Division = Client.GetDivision(F);
-        return !IsNoTransferFunction(F) && !IsUncompartmentalizedSymbol(F, Client) &&
+        return !IsNoTransferFunction(F) && !IsNECSymbol(F, Client) &&
                !F->isDeclaration() && !IsCapabilityReassignmentFunc(F) &&
                !FunctionIsComplexVariadic(F) && !FunctionIsModParamGetCtx(F) &&
                FunctionHasPointerArg(F) &&
@@ -631,7 +643,7 @@ namespace llvm::hakc {
         return false;
     }
 
-    bool CommonHAKCAnalysis::IsUncompartmentalizedSymbol(GlobalValue *GV,
+    bool CommonHAKCAnalysis::IsNECSymbol(GlobalValue *GV,
                                                          HAKCServerClientBase &Client) {
         auto Division = Client.GetDivision(GV);
         return Division.GetHAKCCompartment() ==

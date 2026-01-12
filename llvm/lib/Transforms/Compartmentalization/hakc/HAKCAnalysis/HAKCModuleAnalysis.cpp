@@ -25,6 +25,7 @@ void HAKCModuleAnalysis::runAnalysis() {
     HAKCFunctionAnalysis FunctionAnalysis(F, *this);
     // perform type use analysis after all types are known
     FunctionAnalysis.TypeUseAnalysis();
+
   }
 }
 
@@ -37,7 +38,7 @@ void HAKCModuleAnalysis::runEnforcement(bool UseSimulatedClient) {
 std::unique_ptr<HAKCServerClientBase> HAKCModuleAnalysis::ConstructClient(bool UseSimulatedClient) {
   std::unique_ptr<HAKCServerClientBase> Client;
   if (UseSimulatedClient) {
-    Client = std::make_unique<FakeServerClient>(*this);
+    Client = std::make_unique<FakeServerClient>(GetModule().getContext());
   } else {
     Client = std::make_unique<HAKCServerClient>(*this);
   }
