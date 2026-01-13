@@ -43,19 +43,20 @@ def output_profile_stats(profile, logger_to_use: HAKCLogger):
 def add_argument_to_command_list(cmd: list[str], arg_name: str, arg_value: Optional[str] = None,
                                  add_mllvm: bool = True):
     full_argument = f'{arg_name}={arg_value}' if arg_value is not None else f'{arg_name}'
-    bash_argument = shlex.quote(full_argument)
-    bash_arg_name = shlex.quote(arg_name)
 
-    found = False
-    for i in range(len(cmd)):
-        cmd_token = shlex.quote(cmd[i])
-        if bash_arg_name in cmd_token:
-            cmd[i] = bash_argument
-            found = True
-    if not found:
+    argument_already_in_cmd = arg_name in " ".join(cmd)
+
+    if argument_already_in_cmd:
+        for i in range(len(cmd)):
+            cmd_token = shlex.quote(cmd[i])
+            if arg_name in cmd_token:
+                cmd[i] = full_argument
+                break
+    else:
         if add_mllvm:
             cmd.insert(len(cmd) - 1, '-mllvm')
-        cmd.insert(len(cmd) - 1, bash_argument)
+        for arg_tok in full_argument.split(" "):
+            cmd.insert(len(cmd) - 1, arg_tok)
 
 
 def run_compilation_target(database_entry: dict, logger_to_use: HAKCLogger, socket_path: str, config_path: str,
@@ -293,6 +294,10 @@ def create_dag(config: HAKCConfig, compilation_database: dict, logger_to_use: HA
         logger_to_use.error(f'Failed to create compartmentalization. Exiting.')
         sys.exit(1)
 
+    if server_mode.output_ir:
+        logger_to_use.info(f'Stopping because mode is IR Output mode')
+        sys.exit(0)
+
     match config.server_config.backing_config.type:
         case HAKCBackingType.KUZU:
             compartmentalization.delete_db()
@@ -326,7 +331,7 @@ def main():
                         required=True, type=HAKCBuildMode.from_str)
     parser.add_argument('--batch-size', help='Number of tasks to submit to processes', type=int, dest='batch_size',
                         default=100)
-    parser.add_argument('files-to-compile', nargs='*', required=False, help='List of files to compile', dest='files')
+    parser.add_argument('files_to_compile', nargs='*', help='List of files to compile')
 
     args = parser.parse_args()
 
@@ -358,7 +363,7 @@ def main():
         profile = cProfile.Profile()
         profile.enable()
 
-    file_set = set(args.files)
+    file_set = set(args.files_to_compile)
 
     if server_mode.is_analysis_mode:
         create_dag(config, compilation_database, server_main_logger, args.batch_size, server_mode, file_set)
