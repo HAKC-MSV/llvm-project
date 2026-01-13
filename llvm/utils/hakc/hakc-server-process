@@ -204,10 +204,12 @@ def create_logger_and_compile_files(task_id: int, config: HAKCConfig, files: set
     return result
 
 
-def get_batched_files(compilation_database: dict, batch_size: int):
+def get_batched_files(compilation_database: dict, batch_size: int, file_set: set[str]):
     files = set()
     for db_entry in compilation_database:
         if os.path.exists(db_entry['file']):
+            if len(file_set) > 0 and db_entry['file'] not in file_set:
+                continue
             files.add(db_entry['file'])
 
     for batched_files in batched(files, batch_size):
@@ -215,14 +217,14 @@ def get_batched_files(compilation_database: dict, batch_size: int):
 
 
 def create_enforcement_obj_files(compilation_database: dict, batch_size: int, config: HAKCConfig,
-                                 server_main_logger: HAKCLogger, server_mode: HAKCBuildMode):
+                                 server_main_logger: HAKCLogger, server_mode: HAKCBuildMode, file_set: set[str]):
     assert server_mode.is_enforcement_mode
     worker_count = max(1, config.server_config.analysis_core_count // 2)
     successful_enforcement = True
     with concurrent.futures.ProcessPoolExecutor(max_workers=worker_count) as executor:
         futures = dict()
         task_id = 0
-        for batched_files in get_batched_files(compilation_database, batch_size):
+        for batched_files in get_batched_files(compilation_database, batch_size, file_set):
             future = executor.submit(create_logger_and_compile_files, task_id, config, set(batched_files), server_mode)
             futures[future] = task_id
             task_id += 1
@@ -243,7 +245,8 @@ def create_enforcement_obj_files(compilation_database: dict, batch_size: int, co
 
 
 def perform_analysis_with_compilation_database(config: HAKCConfig, compilation_database: dict, batch_size: int,
-                                               server_main_logger: HAKCLogger, server_mode: HAKCBuildMode) -> Optional[
+                                               server_main_logger: HAKCLogger, server_mode: HAKCBuildMode,
+                                               file_set: set[str]) -> Optional[
     HAKCCompartmentalization]:
     assert server_mode.is_analysis_mode
     db_dir = config.server_config.backing_config.path if config.server_config.backing_config.type == HAKCBackingType.KUZU else ''
@@ -255,7 +258,7 @@ def perform_analysis_with_compilation_database(config: HAKCConfig, compilation_d
     with concurrent.futures.ProcessPoolExecutor(max_workers=worker_count) as executor:
         futures = dict()
         task_id = 0
-        for batched_files in get_batched_files(compilation_database, batch_size):
+        for batched_files in get_batched_files(compilation_database, batch_size, file_set):
             future = executor.submit(create_logger_and_compile_files, task_id, config, set(batched_files), server_mode)
             futures[future] = task_id
             task_id += 1
@@ -282,10 +285,10 @@ def perform_analysis_with_compilation_database(config: HAKCConfig, compilation_d
 
 
 def create_dag(config: HAKCConfig, compilation_database: dict, logger_to_use: HAKCLogger, batch_size: int,
-               server_mode: HAKCBuildMode):
+               server_mode: HAKCBuildMode, files_to_compile: set[str]):
     start = time.time()
     compartmentalization = perform_analysis_with_compilation_database(config, compilation_database, batch_size,
-                                                                      logger_to_use, server_mode)
+                                                                      logger_to_use, server_mode, files_to_compile)
     if compartmentalization is None:
         logger_to_use.error(f'Failed to create compartmentalization. Exiting.')
         sys.exit(1)
@@ -323,6 +326,7 @@ def main():
                         required=True, type=HAKCBuildMode.from_str)
     parser.add_argument('--batch-size', help='Number of tasks to submit to processes', type=int, dest='batch_size',
                         default=100)
+    parser.add_argument('files-to-compile', nargs='*', required=False, help='List of files to compile', dest='files')
 
     args = parser.parse_args()
 
@@ -354,10 +358,13 @@ def main():
         profile = cProfile.Profile()
         profile.enable()
 
+    file_set = set(args.files)
+
     if server_mode.is_analysis_mode:
-        create_dag(config, compilation_database, server_main_logger, args.batch_size, server_mode)
+        create_dag(config, compilation_database, server_main_logger, args.batch_size, server_mode, file_set)
     elif server_mode.is_enforcement_mode:
-        create_enforcement_obj_files(compilation_database, args.batch_size, config, server_main_logger, server_mode)
+        create_enforcement_obj_files(compilation_database, args.batch_size, config, server_main_logger, server_mode,
+                                     file_set)
 
     if config.server_config.profile:
         profile.disable()
