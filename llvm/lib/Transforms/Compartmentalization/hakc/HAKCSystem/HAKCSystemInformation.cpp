@@ -372,8 +372,6 @@ function_def_t HAKCSystemInformation::CompartmentTransfer(bool PerCPU) const {
 
 bool HAKCSystemInformation::OutputDebugInfo(StringRef SymbolName) const {
   auto Search = [SymbolName](const GlobalValue *Symbol) {
-    errs() << "Checking " << Symbol->getName() << " =?= " << SymbolName << ": "
-           << (Symbol->getName() == SymbolName) << "\n";
     return Symbol->getName() == SymbolName;
   };
 
