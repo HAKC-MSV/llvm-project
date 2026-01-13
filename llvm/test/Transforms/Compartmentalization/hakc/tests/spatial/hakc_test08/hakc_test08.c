@@ -23,7 +23,7 @@ int foo(struct data_struct2 *a, int* v1, int* v2) {
         *v2++;
         struct data_struct b;
         b.a = 0;
-// CHECK: call ptr @check_hakc_code_access(ptr %8, i64 1, i64 65549, ptr @entry_tokens_1, i64 1)
+// CHECK: call ptr @check_hakc_code_access(ptr %10, i64 1, i64 65549, ptr @entry_tokens_1, i64 1)
         return a->f(&b);
     }
     return 0;

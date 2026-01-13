@@ -16,13 +16,13 @@ int foo(struct data_struct __percpu *a) {
   if (a) {
 // CHECK-LABEL: if.then
 // CHECK: call ptr @check_hakc_data_access(ptr %1, i64 1, i64 65549)
-// CHECK: call ptr @check_hakc_data_access(ptr %7, i64 1, i64 65549)
+// CHECK: call ptr @check_hakc_data_access(ptr %5, i64 1, i64 65549)
     (a->a)++;
 // Kernel user pointers are not checked
 // CHECK-NOT: call ptr @check_hakc_data_access
     int __user *p = a->p;
     (*p)++;
-// CHECK: call i32 @bar(ptr noundef %10)
+// CHECK: call i32 @bar(ptr noundef %11)
     return bar(a);
   }
   return 0;

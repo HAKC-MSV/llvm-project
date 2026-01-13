@@ -498,12 +498,23 @@ bool CommonHAKCAnalysis::IsIgnoredGlobal(Value *V) {
   return Result;
 }
 
+bool CommonHAKCAnalysis::CheckPointerForAttribute(Value *V,
+                                                  Attribute::AttrKind Attr) {
+  auto Result = valueHasAttribute(V, Attr);
+  if (!Result && isa<LoadInst>(V)) {
+    auto *LoadI = dyn_cast<LoadInst>(V);
+    auto *Def = getDef(LoadI->getPointerOperand(), false);
+    Result = CheckPointerForAttribute(Def, Attr);
+  }
+  return Result;
+}
+
 bool CommonHAKCAnalysis::IsPerCPUPointer(Value *V) {
-  return valueHasAttribute(V, Attribute::PerCPUPtr);
+  return CheckPointerForAttribute(V, Attribute::PerCPUPtr);
 }
 
 bool CommonHAKCAnalysis::IsKernelUserPointer(Value *V) {
-  return valueHasAttribute(V, Attribute::KernelUserPtr);
+  return CheckPointerForAttribute(V, Attribute::KernelUserPtr);
 }
 
 bool CommonHAKCAnalysis::FunctionIsStatic(const Function *F) {

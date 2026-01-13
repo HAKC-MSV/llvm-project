@@ -530,8 +530,8 @@ void HAKCTransformer::CreateTransferArguments(HAKCPointerBase &HAKCPointer,
                                               SmallVector<Value *> &Result) {
   Value *OperandCast;
   auto AddrSpace = GetPointerAddrSpace(HAKCPointer);
-  bool IsPerCPU =
-      CommonHAKCAnalysis::IsPerCPUPointer(HAKCPointer.GetBaseDefinition());
+  bool IsPerCPU = ModuleAnalysis.GetCommonAnalysis().IsPerCPUPointer(
+      HAKCPointer.GetBaseDefinition());
   auto Division = Client.GetDivision(Target);
 
   OperandCast = HAKCIRBuilder.CreateBitOrPointerCast(
@@ -978,8 +978,8 @@ HAKCTransformer::CreateDefaultTransfer(HAKCPointerBase &HAKCPointer,
   SmallVector<Value *> TransferOperations;
   CreateTransferArguments(HAKCPointer, Target, IsData, Size,
                           TransferOperations);
-  bool IsPerCPU =
-      CommonHAKCAnalysis::IsPerCPUPointer(HAKCPointer.GetBaseDefinition());
+  bool IsPerCPU = ModuleAnalysis.GetCommonAnalysis().IsPerCPUPointer(
+      HAKCPointer.GetBaseDefinition());
 
   auto CompartmentTransfer = getSystemInfo().CompartmentTransfer(IsPerCPU);
 
@@ -1489,7 +1489,8 @@ Function *HAKCTransformer::PopulateTransferFunction(
   Unreachable->removeFromParent();
 
   for (auto &Arg : TransferFunction->args()) {
-    if (!CommonHAKCAnalysis::argShouldTransfer(&Arg) || NoKernelXfers) {
+    if (!ModuleAnalysis.GetCommonAnalysis().argShouldTransfer(&Arg) ||
+        NoKernelXfers) {
       continue;
     }
     auto ManagedPointer = CreateNewManagedPointer(&Arg);

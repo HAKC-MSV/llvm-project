@@ -125,7 +125,10 @@ bool HAKCPointerManager::PointerIsEligibleForManagement(Use &U) {
     GetLogger(Verbose, !DebugActive)
         << *Pointer << " is a PHINode of Globals\n";
     return false;
-  } else if (CommonHAKCAnalysis::IsKernelUserPointer(Pointer)) {
+  } else if (GetFunctionAnalysis()
+                 .GetModuleAnalysis()
+                 .GetCommonAnalysis()
+                 .IsKernelUserPointer(Pointer)) {
     GetLogger(Verbose, !DebugActive)
         << *Pointer << " is a Kernel pointer from user space\n";
     return false;
@@ -147,7 +150,10 @@ bool HAKCPointerManager::PointerIsEligibleForManagement(Use &U) {
       }
     }
     return U.getOperandNo() == StoreInst::getPointerOperandIndex() &&
-           !CommonHAKCAnalysis::IsKernelUserPointer(Pointer);
+           !GetFunctionAnalysis()
+                .GetModuleAnalysis()
+                .GetCommonAnalysis()
+                .IsKernelUserPointer(Pointer);
   } else if (auto *AllocaI = dyn_cast<AllocaInst>(Pointer)) {
     for (auto &Use : AllocaI->uses()) {
       if (isa<StoreInst>(Use.getUser())) {
@@ -178,18 +184,24 @@ bool HAKCPointerManager::PointerIsEligibleForManagement(Use &U) {
         << "\n";
     return false;
   } else if (auto *GEP = dyn_cast<GEPOperator>(Pointer)) {
-      // Check if use is a load (load -> GEP -> load pattern)
+    // Check if use is a load (load -> GEP -> load pattern)
     if (!GetManagedPointer(GEP->getPointerOperand())) {
       if (isa<StoreInst>(U.getUser()) || isa<LoadInst>(U.getUser())) {
-        GetLogger(Verbose, !DebugActive) << "Pointer of " << *Pointer << " is used in a load or store and must be managed\n";
+        GetLogger(Verbose, !DebugActive)
+            << "Pointer of " << *Pointer
+            << " is used in a load or store and must be managed\n";
         return true;
       }
-      GetLogger(Verbose, !DebugActive) << "Pointer of " << *Pointer << " is not managed\n";
+      GetLogger(Verbose, !DebugActive)
+          << "Pointer of " << *Pointer << " is not managed\n";
       return false;
     }
   }
   return Pointer->getType()->isPointerTy() &&
-         !CommonHAKCAnalysis::IsKernelUserPointer(Pointer);
+         !GetFunctionAnalysis()
+              .GetModuleAnalysis()
+              .GetCommonAnalysis()
+              .IsKernelUserPointer(Pointer);
 }
 
 bool HAKCPointerManager::ManageNewPointer(Use &U) {
@@ -200,7 +212,10 @@ bool HAKCPointerManager::ManageNewPointer(Use &U) {
     throw std::exception();
   }
   if (isa<IntToPtrInst>(U.get())) {
-    bool is_percpu_ptr = CommonHAKCAnalysis::IsPerCPUPointer(U);
+    bool is_percpu_ptr = GetFunctionAnalysis()
+                             .GetModuleAnalysis()
+                             .GetCommonAnalysis()
+                             .IsPerCPUPointer(U);
 
     if (is_percpu_ptr) {
       GetLogger(Verbose, !DebugActive)
