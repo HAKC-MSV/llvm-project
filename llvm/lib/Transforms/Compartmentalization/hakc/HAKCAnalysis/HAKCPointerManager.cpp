@@ -13,8 +13,7 @@ namespace llvm::hakc {
 HAKCPointerManager::HAKCPointerManager(HAKCFunctionAnalysis &Analysis,
                                        HAKCServerClientBase &Client,
                                        bool DebugActive)
-    : ManagedPointersList(), AuthenticatedValues(), ProtectedValues(), Clones(),
-      HAKCAnalysis(Analysis), Client(Client), DataAuthenticationsAdded(0),
+    : HAKCAnalysis(Analysis), Client(Client), DataAuthenticationsAdded(0),
       CodeAuthenticationsAdded(0), SafePointersAdded(0),
       IsCompartmentalized(false), DebugActive(DebugActive), CurrentPointerID(0),
       CurrentPointerUseID(0) {}
