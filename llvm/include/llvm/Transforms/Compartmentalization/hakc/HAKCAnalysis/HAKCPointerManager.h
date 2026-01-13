@@ -141,7 +141,8 @@ protected:
   unsigned CodeAuthenticationsAdded = 0;
   unsigned SafePointersAdded = 0;
 
-  bool IsCompartmentalized = false;
+  // bool IsCompartmentalized = false;
+  bool IsCompartmentalized = true;
   bool DebugActive;
 
   void AddHAKCPointerReplacement(const ManagedHAKCPointerUseP &PtrUse,

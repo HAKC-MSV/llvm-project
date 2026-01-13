@@ -561,6 +561,7 @@ CommonHAKCAnalysis::CommonHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM)
 
     bool CommonHAKCAnalysis::IsCompartmentalizedFunction(Function *F,
                                                          HAKCServerClientBase &Client) {
+      getLogger(Debug) << "IsCompartmentalizedFunction returns " << (!IsNECSymbol(F, Client) && !IsOutsideTransferFunc(F)) << "\n";
         return !IsNECSymbol(F, Client) && !IsOutsideTransferFunc(F);
     }
 
@@ -586,7 +587,7 @@ CommonHAKCAnalysis::CommonHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM)
 
     bool CommonHAKCAnalysis::functionIsTransferCandidate(Function *F,
                                                          HAKCServerClientBase &Client) {
-        auto Division = Client.GetDivision(F);
+        // auto Division = Client.GetDivision(F);
         return !IsNoTransferFunction(F) && !IsNECSymbol(F, Client) &&
                !F->isDeclaration() && !IsCapabilityReassignmentFunc(F) &&
                !FunctionIsComplexVariadic(F) && !FunctionIsModParamGetCtx(F) &&
@@ -646,6 +647,7 @@ CommonHAKCAnalysis::CommonHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM)
     bool CommonHAKCAnalysis::IsNECSymbol(GlobalValue *GV,
                                                          HAKCServerClientBase &Client) {
         auto Division = Client.GetDivision(GV);
+      getLogger(Debug) << "Returning " << (Division.GetHAKCCompartment() == Client.GetDefaultDivision().GetHAKCCompartment()) << " for IsNECSymbol with Compartment " << Division.GetHAKCCompartment().GetCompartmentIDValue() << " and default compartment " << Client.GetDefaultDivision().GetHAKCCompartment().GetCompartmentIDValue() << "\n";
         return Division.GetHAKCCompartment() ==
                Client.GetDefaultDivision().GetHAKCCompartment();
     }

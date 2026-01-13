@@ -355,6 +355,7 @@ void ManagedHAKCPointer::SetProtectedPointer(Value *NewProtectedPointer) {
 }
 
 void ManagedHAKCPointer::AddProtectedUse(const ManagedHAKCPointerUseP &UPtr) {
+  CommonHAKCAnalysis::getLogger(Debug) << "AddProtectedUse has FunctionIsCompartmentalized: " << Manager.FunctionIsCompartmentalized() << "\n";
   if (!Manager.FunctionIsCompartmentalized()) {
     CommonHAKCAnalysis::getLogger(Verbose) << *this << " is not managing protected uses since "
         << Manager.GetFunction().getName() << " is not compartmentalized\n";

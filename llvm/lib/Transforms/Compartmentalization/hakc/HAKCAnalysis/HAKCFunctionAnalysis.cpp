@@ -21,7 +21,7 @@ HAKCFunctionAnalysis::HAKCFunctionAnalysis(Function *F, HAKCModuleAnalysis& Modu
   }
 
     void HAKCFunctionAnalysis::setup() {
-      getLogger(Debug) << "Running Function Analysis setup for " << CurrentFunction->getName() << "\n" << CurrentFunction << "\n";
+      getLogger(Debug) << "Running Function Analysis setup for " << CurrentFunction->getName() << "\n" << *CurrentFunction << "\n";
       // during analysis consider all functions to be uncompartmentalized so everything is analyzed
       for (auto it = inst_begin(CurrentFunction); it != inst_end(CurrentFunction); ++it) {
         Instruction *inst = &*it;
@@ -31,12 +31,13 @@ HAKCFunctionAnalysis::HAKCFunctionAnalysis(Function *F, HAKCModuleAnalysis& Modu
     }
 
     void HAKCFunctionEnforcement::setup() {
-      getLogger(Verbose) << "Running Function Enforcement setup for " << CurrentFunction->getName() << "\n" << CurrentFunction << "\n";
+      getLogger(Verbose) << "Running Function Enforcement setup for " << CurrentFunction->getName() << "\n";
       if (CommonHAKCAnalysis::IsOutsideTransferFunc(CurrentFunction)) {
         getLogger(Fatal) << "Exception - Function " << CurrentFunction->getName() << " is outside transfer function!\n";
         throw std::exception();
       }
       PointerManager.SetFunctionIsCompartmentalized(!IsUncompartmentalizedSymbol());
+      getLogger(Debug) << "Function now has FunctionIsCompartmentalized set to " << PointerManager.FunctionIsCompartmentalized() << "\n";
       AddInstrumentation();
       getLogger(Verbose) << "Function Enforcement setup has run for " << CurrentFunction->getName() << "\n";
     }
@@ -100,7 +101,7 @@ BasicBlock *HAKCFunctionEnforcement::findDominatorUseBlock(Value *Ptr, const std
 
     bool HAKCFunctionAnalysis::AddManagedPointer(Use &PointerUse) {
         if (!CommonHAKCAnalysis::IsPointerLikeType(PointerUse->getType())) {
-          getLogger(Fatal) << "Trying to add an invalid ManagedHAKCPointer: " << PointerUse << "\n" << CurrentFunction << "\n";
+          getLogger(Fatal) << "Trying to add an invalid ManagedHAKCPointer: " << PointerUse << "\n" << *CurrentFunction << "\n";
           throw std::exception();
         }
         auto Result = PointerManager.ManagePointer(PointerUse);
@@ -748,14 +749,14 @@ BasicBlock *HAKCFunctionEnforcement::findDominatorUseBlock(Value *Ptr, const std
      * @brief Replace signed pointer dereferences with authenticated dereferences
      */
     void HAKCFunctionEnforcement::transformPointerDereferences() {
-      GetLogger(Verbose, !DebugActive) << "Function prior to transforming pointer dereferences\n" << CurrentFunction << "\n";
+      GetLogger(Verbose, !DebugActive) << "Function prior to transforming pointer dereferences\n" << *CurrentFunction << "\n";
       TransformPointers();
     }
 
 
     void HAKCFunctionEnforcement::createMissingTransfers() {
       if (!IsUncompartmentalizedSymbol()) {
-        GetLogger(Verbose, !DebugActive) << "Function prior to making transfers:\n" << CurrentFunction << "\n";
+        GetLogger(Verbose, !DebugActive) << "Function prior to making transfers:\n" << *CurrentFunction << "\n";
         CreateAllTransfers();
       }
     }
@@ -774,7 +775,7 @@ BasicBlock *HAKCFunctionEnforcement::findDominatorUseBlock(Value *Ptr, const std
      * pointer arithmetic between authentication and dereference
      */
     void HAKCFunctionEnforcement::createAllAuthenticatedPointers() {
-      GetLogger(Verbose, !DebugActive) << "Function prior to making authenticated copies:\n" << CurrentFunction << "\n";
+      GetLogger(Verbose, !DebugActive) << "Function prior to making authenticated copies:\n" << *CurrentFunction << "\n";
       CreateAuthenticatedPointersAndAllClones();
     }
 
@@ -897,7 +898,7 @@ BasicBlock *HAKCFunctionEnforcement::findDominatorUseBlock(Value *Ptr, const std
 
       BasicBlock *DominatorBlock = findDominatorUseBlock(V, Users);
       if (!DominatorBlock) {
-        GetLogger(Fatal, !DebugActive) << "Could not find block for " << V << "\n" << CurrentFunction;
+        GetLogger(Fatal, !DebugActive) << "Could not find block for " << V << "\n" << *CurrentFunction;
         throw std::exception();
       }
       // Print out the block that we find
@@ -994,7 +995,7 @@ BasicBlock *HAKCFunctionEnforcement::findDominatorUseBlock(Value *Ptr, const std
         CheckForValidCompartmentTransitionAndUpdateIntraCompartmentCalls();
         GetLogger(Verbose, !DebugActive) << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n";
 
-        GetLogger(Verbose, !DebugActive) << CurrentFunction << "\n";
+        GetLogger(Verbose, !DebugActive) << *CurrentFunction << "\n";
         // WriteBuggyFunctionToFile();
         CommonHAKCAnalysis::VerifyFunction(CurrentFunction);
       } else {
@@ -1287,7 +1288,7 @@ BasicBlock *HAKCFunctionEnforcement::findDominatorUseBlock(Value *Ptr, const std
         GetLogger(Verbose, !DebugActive) << "No protected pointer use of " << *ManagedPtr << " transfer creation is not needed\n";
         return;
       }
-
+      // this is returning false
       const auto BaseShouldBeTransferred = BaseDefinitionShouldBeTransferred(ManagedPtr);
 
       GetLogger(Verbose, !DebugActive) << "The Base Definition of " << *ManagedPtr << " is ";
@@ -1500,7 +1501,7 @@ BasicBlock *HAKCFunctionEnforcement::findDominatorUseBlock(Value *Ptr, const std
       } else {
         GetLogger(Verbose, !DebugActive) << "Not transforming Protected Pointer Replacements since user count is 0\n";
       }
-      GetLogger(Verbose, !DebugActive) << "Function after pointer transformation:\n" << CurrentFunction << "\n";
+      GetLogger(Verbose, !DebugActive) << "Function after pointer transformation:\n" << *CurrentFunction << "\n";
     }
 
     void HAKCFunctionEnforcement::SetUseOperand(const ManagedHAKCPointerP &ManagedPtr,
@@ -1528,7 +1529,7 @@ BasicBlock *HAKCFunctionEnforcement::findDominatorUseBlock(Value *Ptr, const std
         getLogger(Fatal)
             << "Invalid PointerUse " << PointerUse << " for User " << *U << " of "
             << *ManagedPtr << " in function\n"
-            << CurrentFunction << "\n";
+            << *CurrentFunction << "\n";
         throw std::exception();
       }
 
@@ -1578,7 +1579,7 @@ BasicBlock *HAKCFunctionEnforcement::findDominatorUseBlock(Value *Ptr, const std
               if (PointerManager.GetManagedPointer(CloneUse->get()) == nullptr || ManagedPtr->UseIsManagedAndHasUsers(*CloneUse, true)) {
                 getLogger(Fatal) << "Unable to find Authenticated replacement of " << *CloneUse << "\n";
                 PointerManager.PrintAuthenticatedValues();
-                getLogger(Fatal) << "\n" << CurrentFunction << "\n";
+                getLogger(Fatal) << "\n" << *CurrentFunction << "\n";
                 throw std::exception();
               }
               GetLogger(Verbose, !DebugActive) << *CloneUse << " does not need authenticated operand replaced\n";
@@ -1586,7 +1587,7 @@ BasicBlock *HAKCFunctionEnforcement::findDominatorUseBlock(Value *Ptr, const std
             }
             if (!AuthenticatedUser) {
               getLogger(Fatal) << "AuthenticatedVersion is not a User: " << AuthenticatedVersion
-                  << "\n" << CurrentFunction << "\n";
+                  << "\n" << *CurrentFunction << "\n";
               throw std::exception();
             }
 
@@ -1613,7 +1614,7 @@ BasicBlock *HAKCFunctionEnforcement::findDominatorUseBlock(Value *Ptr, const std
           }
           if (!ProtectedUser) {
             getLogger(Fatal) << "ProtectedVersion is not a User: " << ProtectedVersion << "\n"
-                << CurrentFunction << "\n";
+                << *CurrentFunction << "\n";
             throw std::exception();
           }
 
@@ -1658,7 +1659,7 @@ BasicBlock *HAKCFunctionEnforcement::findDominatorUseBlock(Value *Ptr, const std
         }
 
         if (!Replacement) {
-          getLogger(Fatal) << "Unable to find " << ReplacementSource << " replacement of " << *SortedUse << "\n" << CurrentFunction << "\n";
+          getLogger(Fatal) << "Unable to find " << ReplacementSource << " replacement of " << *SortedUse << "\n" << *CurrentFunction << "\n";
           UseAuthenticatedValue ? PointerManager.PrintAuthenticatedValues() : PointerManager.PrintProtectedValues();
           throw std::exception();
         }
@@ -1776,6 +1777,9 @@ BasicBlock *HAKCFunctionEnforcement::findDominatorUseBlock(Value *Ptr, const std
 
 
     bool HAKCFunctionEnforcement::BaseDefinitionShouldBeTransferred(const ManagedHAKCPointerP &ManagedPtr) const {
+
+      // TODO: Look here, maybe negate isuncompartmentalizedsymbol
+      GetLogger(Verbose, !DebugActive) << "Calling BaseDefinitionShouldBeTransferred\n";
       if (!IsUncompartmentalizedSymbol() || ManagedPtr->GetManuallyTransferred() || ManagedPtr->GetPurposefullyIgnored()) {
         return false;
       }

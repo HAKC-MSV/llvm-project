@@ -159,12 +159,14 @@ HAKCModuleAnalysis& HAKCTransformer::GetModuleAnalysis() const {
     }
 
     void HAKCTransformer::AddTransferFunctions() {
+    CommonHAKCAnalysis::getLogger(Debug) << "Calling AddTransferFunctions\n";
         FunctionList FuncsNeedingTransfers;
         for (auto &F: getModule().functions()) {
+            CommonHAKCAnalysis::getLogger(Debug) << "Considering adding function " << F.getName() << " to FuncsNeedingTransfers\n";
             if (!CommonHAKCAnalysis::IsNECSymbol(&F, Client) &&
                 getCommonAnalysis().functionIsTransferCandidate(&F, Client) &&
-                !CommonHAKCAnalysis::IsOutsideTransferFunc(&F) &&
-                ModuleAnalysis.functionEscapes(&F)) {
+                !CommonHAKCAnalysis::IsOutsideTransferFunc(&F)){
+              CommonHAKCAnalysis::getLogger(Debug) << "Adding function " << F.getName() << " to FuncsNeedingTransfers\n";
                 FuncsNeedingTransfers.push_back(&F);
             }
         }
