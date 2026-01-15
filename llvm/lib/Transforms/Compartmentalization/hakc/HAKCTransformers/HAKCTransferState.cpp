@@ -7,13 +7,13 @@
 
 hakc::HAKCTransferState::HAKCTransferState(
     const HAKCCompartmentDivision &TargetDivision, HAKCPointerBase &HAKCPointer)
-    : ActionValues(), TargetDivision(TargetDivision), HAKCPointer(HAKCPointer) {
+    : TargetDivision(TargetDivision), HAKCPointer(HAKCPointer) {
 }
 
-Value *hakc::HAKCTransferState::GetLabeledValue(StringRef Label) const {
-  for (auto &it : ActionValues) {
-    if (it.first.GetLabel() == Label) {
-      return it.second;
+Value *hakc::HAKCTransferState::GetLabeledValue(const StringRef Label) const {
+  for (const auto &[key, val] : ActionValues) {
+    if (key.GetLabel() == Label) {
+      return val;
     }
   }
   return nullptr;
@@ -38,7 +38,7 @@ hakc::HAKCTransferState::GetDivision() const {
   return TargetDivision;
 }
 
-hakc::HAKCPointerBase &hakc::HAKCTransferState::GetManagedPointer() {
+hakc::HAKCPointerBase &hakc::HAKCTransferState::GetManagedPointer() const {
   return HAKCPointer;
 }
 

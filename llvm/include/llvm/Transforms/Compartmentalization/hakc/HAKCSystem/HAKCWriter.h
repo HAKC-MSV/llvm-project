@@ -48,33 +48,27 @@ protected:
 
 public:
   explicit HAKCWriter(HAKCLogLevel log_level)
-      : log_path(""), ConfiguredLogLevel(log_level) {
-    // errs() << "CREATING HAKC WRITER0\n";
-    // allow using shared ptr to errs() but force it to not try to destroy
-    // errs()
+      : log_path(""), ConfiguredLogLevel(log_level), disabled(false) {
     os = std::shared_ptr<raw_ostream>(&errs(), // non-owning raw pointer
                                       [](raw_ostream *) {
                                         // no-op deleter to prevent delete on
                                         // singleton
                                       });
-    disabled = log_level == Disabled;
   }
   explicit HAKCWriter(StringRef log_path, HAKCLogLevel log_level)
-      : log_path(log_path), ConfiguredLogLevel(log_level) {
-    // errs() << "CREATING HAKC WRITER1\n";
+      : log_path(log_path), ConfiguredLogLevel(log_level), disabled(false) {
     CreateLog();
-    disabled = log_level == Disabled;
   }
-  ~HAKCWriter() {
-    // errs() << "DESTROYING HAKC WRITER\n";
-  }
+
+  ~HAKCWriter() {}
+
+  void Disable() { disabled=true; }
+
+  void Enable() { disabled=false; }
 
   bool IsDisabled() const { return disabled; }
 
-  void SetConfiguredLogLevel(HAKCLogLevel log_level) {
-    ConfiguredLogLevel = log_level;
-    disabled = log_level == Disabled;
-  }
+  void SetConfiguredLogLevel(HAKCLogLevel log_level) { ConfiguredLogLevel = log_level; }
 
   HAKCLogLevel GetConfiguredLogLevel() const { return ConfiguredLogLevel; }
 

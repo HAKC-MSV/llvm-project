@@ -64,13 +64,13 @@ public:
   }
 
 protected:
-  std::shared_ptr<HAKCTypeInfo> Type;
+  std::shared_ptr<HAKCTypeInfo> Type = nullptr;
   std::set<std::shared_ptr<HAKCSymbolInfo>> UsedSymbols;
-  GlobalObject *GlobalObj;
-  const DIType *DbgType;
-  const DIFile *DefiningLocation;
-  unsigned DefiningLine;
-  const DIScope *LocalScope;
+  GlobalObject *GlobalObj = nullptr;
+  const DIType *DbgType = nullptr;
+  const DIFile *DefiningLocation = nullptr;
+  unsigned DefiningLine = 0;
+  const DIScope *LocalScope = nullptr;
 
   void SetGlobalObj(GlobalObject *GlobalObj);
 

@@ -129,61 +129,61 @@ HAKCDatabaseRequest::HAKCDatabaseRequest(StringRef Endpoint,
   Request = std::move(FullRequest);
 }
 
-void HAKCDatabaseResponse::parse_result(json::Object *_result) {
-  result.success = _result->getBoolean("Success").value_or(false);
-  result.error = _result->getString("Error").value_or(
-      "Unable to parse Error from HAKCResult!");
-  if (!result.success) {
-    CommonHAKCAnalysis::getLogger(Fatal)
-        << "Request failed with error " << result.error << "!\n";
-    throw std::exception();
-  }
-  // TODO: update if endpoints change
+    void HAKCDatabaseResponse::parse_result(json::Object *_result) {
+        result.success = _result->getBoolean("Success").value_or(false);
+        result.error = _result->getString("Error").value_or(
+                "Unable to parse Error from HAKCResult!");
+        if (!result.success) {
+            CommonHAKCAnalysis::getLogger(Fatal)
+                    << "Request failed with error " << result.error << "!\n";
+            throw std::exception();
+        }
+        // TODO: update if endpoints change
   if (response_endpoint == SystemInformation.GetTerminateConnectionEndpoint()) {
-    terminate_connection = true;
-    return;
-  }
-  if (response_endpoint == SystemInformation.GetCompartmentEndpoint()) {
-    auto *payload = GetObject(_result, "Data");
-    result.data = std::make_shared<HAKCCompartmentPayload>(payload);
-  } else if (response_endpoint == SystemInformation.GetDivisionEndpoint()) {
-    auto *payload = GetObject(_result, "Data");
-    result.data = std::make_shared<HAKCDivisionPayload>(payload);
-  } else if (response_endpoint ==
+            terminate_connection = true;
+            return;
+        }
+        if (response_endpoint == SystemInformation.GetCompartmentEndpoint()) {
+            auto *payload = GetObject(_result, "Data");
+            result.data = std::make_shared<HAKCCompartmentPayload>(payload);
+        } else if (response_endpoint == SystemInformation.GetDivisionEndpoint()) {
+            auto *payload = GetObject(_result, "Data");
+            result.data = std::make_shared<HAKCDivisionPayload>(payload);
+        } else if (response_endpoint ==
              SystemInformation.GetSymbolDivisionEndpoint()) {
-    auto *payload = GetObject(_result, "Data");
-    result.data = std::make_shared<HAKCDivisionCompartmentPayload>(payload);
-  } else if (response_endpoint == SystemInformation.GetValidTargetsEndpoint()) {
-    auto *payload = GetObject(_result, "Data");
-    result.data = std::make_shared<HAKCValidTargetsPayload>(payload);
-  } else if (response_endpoint == SystemInformation.GetAddSymbolsEndpoint()) {
-    // These requests don't have a 'Data' field to extract, so just pass the
-    // result
-    result.data = std::make_shared<HAKCPayload>(_result);
-  } else {
-    // unknown endpoint
-    CommonHAKCAnalysis::getLogger(Fatal)
-        << "Unknown endpoint " << response_endpoint << "\n";
-    throw std::exception();
-  }
-}
+            auto *payload = GetObject(_result, "Data");
+            result.data = std::make_shared<HAKCDivisionCompartmentPayload>(payload);
+        } else if (response_endpoint == SystemInformation.GetValidTargetsEndpoint()) {
+            auto *payload = GetObject(_result, "Data");
+            result.data = std::make_shared<HAKCValidTargetsPayload>(payload);
+        } else if (response_endpoint == SystemInformation.GetAddSymbolsEndpoint()) {
+          // These requests don't have a 'Data' field to extract, so just pass the
+          // result
+            result.data = std::make_shared<HAKCPayload>(_result);
+        } else {
+            // unknown endpoint
+            CommonHAKCAnalysis::getLogger(Fatal)
+                    << "Unknown endpoint " << response_endpoint << "\n";
+            throw std::exception();
+        }
+    }
 
-HAKCDatabaseResponse::HAKCDatabaseResponse(
-    const HAKCSystemInformation &SystemInformation)
-    : Response(), Success(false), response_endpoint(), result(HAKCResult()),
-      SystemInformation(SystemInformation), terminate_connection(false) {}
+    HAKCDatabaseResponse::HAKCDatabaseResponse(
+            const HAKCSystemInformation &SystemInformation)
+            : Success(false), result(HAKCResult()),
+              SystemInformation(SystemInformation), terminate_connection(false) {}
 
-void HAKCDatabaseRequest::operator>>(raw_ostream &OS) const {
-  std::string RequestJSON;
-  raw_string_ostream RequestStream(RequestJSON);
-  RequestStream << Request;
-  size_t RequestSize = RequestJSON.size();
-  /* The << operator for size_t does not seem to write 8 bytes, so specifically
-   * write 8 bytes */
-  OS.write((const char *)&RequestSize, sizeof(RequestSize));
-  OS << RequestJSON;
-  OS.flush();
-}
+    void HAKCDatabaseRequest::operator>>(raw_ostream &OS) const {
+        std::string RequestJSON;
+        raw_string_ostream RequestStream(RequestJSON);
+        RequestStream << Request;
+        size_t RequestSize = RequestJSON.size();
+        /* The << operator for size_t does not seem to write 8 bytes, so specifically
+         * write 8 bytes */
+        OS.write((const char *) &RequestSize, sizeof(RequestSize));
+        OS << RequestJSON;
+        OS.flush();
+    }
 
 HAKCDatabaseResponse::operator bool() const { return Success; }
 
@@ -246,9 +246,9 @@ void HAKCDatabaseResponse::operator<<(raw_socket_stream &OS) {
     throw std::exception();
   }
 
-  parse_result(hakc_result);
-  CommonHAKCAnalysis::getLogger(Debug)
-      << "Successfully read from socket, returning payload!\n";
+        parse_result(hakc_result);
+        CommonHAKCAnalysis::getLogger(Debug)
+          << "Successfully read from socket, returning payload!\n";
 }
 
 HAKCDatabaseConnection::HAKCDatabaseConnection(
@@ -286,21 +286,21 @@ void HAKCDatabaseConnection::connect() {
   close();
   CommonHAKCAnalysis::getLogger(Debug) << "Connecting...";
 
-  auto NewConnection =
+    auto NewConnection =
       raw_socket_stream::createConnectedUnix(SystemInformation.GetSocketPath());
-  if (!NewConnection) {
-    /* NB: calling consuming all the errors is required in order for the
-     * Expected object to be properly destructed. llvm::toString does
-     * this.
-     */
-    CommonHAKCAnalysis::getLogger(Verbose)
-        << "\nError connecting to " << SystemInformation.GetSocketPath() << ": "
-        << llvm::toString(NewConnection.takeError()) << "\n";
-    throw std::exception();
-  }
-  CommonHAKCAnalysis::getLogger(Debug)
-      << "Connected to " << SystemInformation.GetSocketPath() << "\n";
-  Socket = std::move(*NewConnection);
-}
+        if (!NewConnection) {
+            /* NB: calling consuming all the errors is required in order for the
+             * Expected object to be properly destructed. llvm::toString does
+             * this.
+             */
+            CommonHAKCAnalysis::getLogger(Verbose)
+                << "\nError connecting to " << SystemInformation.GetSocketPath() << ": "
+                << llvm::toString(NewConnection.takeError()) << "\n";
+            throw std::exception();
+        }
+        CommonHAKCAnalysis::getLogger(Debug)
+                << "Connected to " << SystemInformation.GetSocketPath() << "\n";
+        Socket = std::move(*NewConnection);
+    }
 
 } // namespace llvm::hakc

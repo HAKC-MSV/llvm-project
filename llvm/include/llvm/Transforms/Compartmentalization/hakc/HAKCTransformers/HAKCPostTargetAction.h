@@ -24,7 +24,7 @@ class HAKCPostTargetAction : public HAKCTransferAction {
 public:
   HAKCPostTargetAction(HAKCFunctionDefinition &HAKCActionFunction,
                        StringRef Label,
-                       SmallVector<HAKCActionArgument> Arguments);
+                       const SmallVector<HAKCActionArgument> &Arguments);
 };
 
 typedef std::shared_ptr<HAKCPostTargetAction> post_target_action_def_t;

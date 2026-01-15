@@ -26,16 +26,11 @@
 
 namespace llvm::hakc {
 
-    class HAKCModuleAnalysis;
-
-    class HAKCModuleTransform;
-
-    class HAKCSystemInformation;
-
-    class HAKCDatabaseResponse;
-
-    class HAKCDatabaseConnection;
-// class HAKCResult;
+  class HAKCModuleAnalysis;
+  class HAKCModuleTransform;
+  class HAKCSystemInformation;
+  class HAKCDatabaseResponse;
+  class HAKCDatabaseConnection;
 
     typedef std::shared_ptr<HAKCCompartment> HAKCCompartmentP;
     typedef std::shared_ptr<HAKCCompartmentDivision> HAKCDivisionP;
@@ -95,12 +90,19 @@ namespace llvm::hakc {
         unsigned EntryToken;
     };
 
-    class HAKCValidTargetsPayload : public HAKCPayload {
+
+    class HAKCBoolPayload final : public HAKCPayload {
 
     public:
-        HAKCValidTargetsPayload(json::Object *payload);
+      HAKCBoolPayload(json::Object *payload);
+      bool value;
+    };
 
-        std::vector<uint> ValidTargets;
+    class HAKCValidTargetsPayload final : public HAKCPayload {
+
+    public:
+      HAKCValidTargetsPayload(json::Object *payload);
+      std::vector<uint> ValidTargets;
     };
 
     class HAKCResult {

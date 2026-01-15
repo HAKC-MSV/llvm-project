@@ -31,14 +31,14 @@ using HAKCYAMLSequence = std::vector<Ty>;
 typedef HAKCYAMLSequence<HAKCYAMLStringType> HAKCYAMLStringSequenceType;
 
 namespace llvm::hakc {
+
     enum HAKCLogLevel {
-        Disabled = 0,
-        Verbose = 1,
-        Debug = 2,
-        Info = 3,
-        Warning = 4,
-        Error = 5,
-        Fatal = 10,
+      Verbose = 1,
+      Debug = 2,
+      Info = 3,
+      Warning = 4,
+      Error = 5,
+      Fatal = 10,
     };
 
     enum HAKCAllocationTypeEnum {
@@ -50,27 +50,24 @@ namespace llvm::hakc {
         ArgumentGEP
     };
 
-    struct HAKCYAMLSymbolDeclaration {
+      struct HAKCYAMLSymbolDeclaration {
         HAKCYAMLStringType SymbolName;
 
-        HAKCYAMLSymbolDeclaration() {
-        }
+        HAKCYAMLSymbolDeclaration() {}
     };
 
-    struct HAKCYAMLAllocationType : public HAKCYAMLSymbolDeclaration {
+    struct HAKCYAMLAllocationType : HAKCYAMLSymbolDeclaration {
         HAKCAllocationTypeEnum AllocationType;
         HAKCYAMLStringSequenceType Arguments;
 
-        HAKCYAMLAllocationType() : AllocationType(InvalidAllocationType) {
-        }
+        HAKCYAMLAllocationType() : AllocationType(InvalidAllocationType) {}
     };
 
     struct HAKCYAMLFileType {
         HAKCYAMLStringType PathRoot;
         HAKCYAMLStringSequenceType Files;
 
-        HAKCYAMLFileType() {
-        }
+        HAKCYAMLFileType() {}
 
         void AddAllFiles(SmallVectorImpl<std::string> &Results) {
             for (auto &FilePath: Files) {
@@ -89,21 +86,18 @@ namespace llvm::hakc {
         HAKCYAMLStringType TypeStr;
         HAKCFunctionArgumentUse ArgUse;
 
-        HAKCYAMLFunctionArgument() : Idx(), TypeStr(), ArgUse(Other) {
-        }
+        HAKCYAMLFunctionArgument() : Idx(), ArgUse(Other) {}
 
         Type *GetType(const HAKCTypeIdentifier &TypeIdentifier) const {
             return TypeIdentifier.GetTypeFromString(TypeStr);
         }
     };
 
-    struct HAKCYAMLFunctionDefinition : public HAKCYAMLSymbolDeclaration {
+    struct HAKCYAMLFunctionDefinition : HAKCYAMLSymbolDeclaration {
         HAKCYAMLStringType ReturnType;
         HAKCYAMLSequence<HAKCYAMLFunctionArgument> Arguments;
 
-        HAKCYAMLFunctionDefinition()
-            : HAKCYAMLSymbolDeclaration(), ReturnType(), Arguments() {
-        }
+        HAKCYAMLFunctionDefinition(){}
 
         bool IsValid() {
             bool Result = !ReturnType.empty() || !SymbolName.empty();
@@ -152,12 +146,10 @@ namespace llvm::hakc {
         }
     };
 
-    struct HAKCYAMLCustomTransferType : public HAKCYAMLFunctionDefinition {
+    struct HAKCYAMLCustomTransferType : HAKCYAMLFunctionDefinition {
         HAKCYAMLStringType TransferObjectTypeName;
 
-        HAKCYAMLCustomTransferType()
-            : HAKCYAMLFunctionDefinition(), TransferObjectTypeName() {
-        }
+        HAKCYAMLCustomTransferType() {}
     };
 
     struct HAKCYAMLActionArgument {
@@ -165,18 +157,18 @@ namespace llvm::hakc {
         unsigned Idx;
     };
 
-    struct HAKCYAMLActionType : public HAKCYAMLSymbolDeclaration {
+    struct HAKCYAMLActionType : HAKCYAMLSymbolDeclaration {
         HAKCYAMLStringType Label;
         HAKCYAMLSequence<HAKCYAMLActionArgument> Arguments;
 
-        HAKCYAMLActionType() : HAKCYAMLSymbolDeclaration(), Label(), Arguments() {
-        }
+        HAKCYAMLActionType() {}
     };
 
     struct HAKCYAMLEndpoints {
         HAKCYAMLStringType GetCompartmentEndpoint;
         HAKCYAMLStringType GetDivisionEndpoint;
         HAKCYAMLStringType GetSymbolDivisionEndpoint;
+        HAKCYAMLStringType GetSymbolTypeUseDivisionEndpoint;
         HAKCYAMLStringType GetValidTargetsEndpoint;
         HAKCYAMLStringType AddSymbolsEndpoint;
         HAKCYAMLStringType AddFunctionEndpoint;
@@ -241,6 +233,8 @@ namespace llvm::hakc {
         unsigned ServerCoreCount;
         unsigned DefaultCompartmentID;
         unsigned DefaultDivisionID;
+        unsigned DefaultEntryToken;
+        unsigned DefaultAccessToken;
         HAKCYAMLEndpoints Endpoints;
         unsigned DivisionIDBitCount;
     };
@@ -289,7 +283,6 @@ struct yaml::ScalarEnumerationTraits<hakc::HAKCAllocationTypeEnum> {
 template<>
 struct yaml::ScalarEnumerationTraits<hakc::HAKCLogLevel> {
     static void enumeration(IO &io, hakc::HAKCLogLevel &value) {
-        io.enumCase(value, "Disabled", hakc::Disabled);
         io.enumCase(value, "Verbose", hakc::Verbose);
         io.enumCase(value, "Debug", hakc::Debug);
         io.enumCase(value, "Info", hakc::Info);
@@ -308,14 +301,14 @@ struct yaml::ScalarEnumerationTraits<hakc::HAKCFunctionArgumentUse> {
     }
 };
 
-template<>
-struct yaml::MappingTraits<hakc::HAKCYAMLAllocationType> {
-    static void mapping(yaml::IO &io,
-                        hakc::HAKCYAMLAllocationType &AllocationType) {
-        YAMLFunctionDeclarationMapping(io, AllocationType);
-        io.mapRequired("type", AllocationType.AllocationType);
-        io.mapRequired("arguments", AllocationType.Arguments);
-    }
+
+template <> struct yaml::MappingTraits<hakc::HAKCYAMLAllocationType> {
+  static void mapping(yaml::IO &io,
+                      hakc::HAKCYAMLAllocationType &AllocationType) {
+    YAMLFunctionDeclarationMapping(io, AllocationType);
+    io.mapRequired("type", AllocationType.AllocationType);
+    io.mapRequired("arguments", AllocationType.Arguments);
+  }
 };
 
 template<>
@@ -389,6 +382,9 @@ struct yaml::MappingTraits<hakc::HAKCYAMLEndpoints> {
         Io.mapOptional("get-division-from-symbol-endpoint",
                        Endpoints.GetSymbolDivisionEndpoint,
                        "get-division-from-symbol");
+        Io.mapOptional("get-division-from-symbol-type-use-endpoint",
+                     Endpoints.GetSymbolTypeUseDivisionEndpoint,
+                     "get-division-from-symbol-type-use");
         Io.mapOptional("get-valid-targets-from-compartment-id-endpoint",
                        Endpoints.GetValidTargetsEndpoint,
                        "get-valid-targets-from-compartment-id");
@@ -463,12 +459,30 @@ struct yaml::MappingTraits<hakc::HAKCYAMLConfig> {
             errs() << "Error parsing config file " << YamlConfig.ClientConfigPath << "\n";
             throw std::exception();
         }
+      // if (!YamlConfig.ClientConfigPath.empty()) {
+      //   ErrorOr<std::unique_ptr<MemoryBuffer> > mb = MemoryBuffer::getFile(YamlConfig.ClientConfigPath);
+      //   Input yin(mb.get()->getMemBufferRef().getBuffer());
+      //   yin >> YamlConfig.ClientConfig;
+      //   if (yin.error()) {
+      //     errs() << "Error parsing config file!\n";
+      //     throw std::exception();
+      //   }
+      // }
+      // else {
+      //   // use default configuration
+      //   std::unique_ptr<hakc::HAKCYAMLClientConfig> ClientConfig = std::make_unique<hakc::HAKCYAMLClientConfig>();
+      //   YamlConfig.ClientConfig = *ClientConfig;
+      //
+      // }
+
         io.mapRequired("build-dir", YamlConfig.BuildDir);
         io.mapRequired("socket-dir", YamlConfig.SocketDir);
         io.mapRequired("log-dir", YamlConfig.LogDir);
         io.mapOptional("server-core-count", YamlConfig.ServerCoreCount, 64);
         io.mapOptional("default-compartment-id", YamlConfig.DefaultCompartmentID);
         io.mapOptional("default-division-id", YamlConfig.DefaultDivisionID);
+        io.mapOptional("default-entry-token", YamlConfig.DefaultEntryToken);
+        io.mapOptional("default-access-token", YamlConfig.DefaultAccessToken);
         io.mapRequired("Endpoints", YamlConfig.Endpoints);
         io.mapOptional("division-id-bit-count", YamlConfig.DivisionIDBitCount, 16);
     }

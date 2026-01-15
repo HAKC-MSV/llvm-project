@@ -73,6 +73,8 @@ namespace llvm::hakc {
 
         StringRef GetDivisionEndpoint() const;
 
+        StringRef GetSymbolTypeUseDivisionEndpoint() const;
+
         StringRef GetPlatform() const;
 
         StringRef GetRootPath() const;
@@ -144,6 +146,8 @@ namespace llvm::hakc {
 
         void operator<<(HAKCYAMLConfig &Config);
 
+      bool GetSkipCurrentFile() const;
+
         void SetSocketPath(StringRef SocketPath);
 
         unsigned GetDivisionIDBitCount() const;
@@ -161,6 +165,7 @@ namespace llvm::hakc {
             HAKCYAMLFunctionDefinition &YAMLFunctionDef) const;
 
         void GetAllDefinedHAKCFunctions(SmallVectorImpl<function_def_t> &Results);
+        bool ShouldSkipCurrentFile();
 
         CommonHAKCAnalysis &CommonAnalysis;
         FunctionList NoTransferFunctionList;
@@ -181,11 +186,11 @@ namespace llvm::hakc {
         HAKCTransferList CompartmentTransferFunctionList;
         HAKCTypeIdentifier TypeIdentifier;
         bool DebugDatabase;
-        function_def_t CodeValidationFunction;
-        function_def_t DataValidationFunction;
-        function_def_t DefaultCompartmentTransfer;
-        function_def_t PerCPUCompartmentTransfer;
-        function_def_t SignWithDivisionFunction;
+        function_def_t CodeValidationFunction = nullptr;
+        function_def_t DataValidationFunction = nullptr;
+        function_def_t DefaultCompartmentTransfer = nullptr;
+        function_def_t PerCPUCompartmentTransfer = nullptr;
+        function_def_t SignWithDivisionFunction = nullptr;
         std::string AddFunctionEndpoint;
         std::string AddGlobalVariableEndpoint;
         std::string AddSymbolsEndpoint;
@@ -200,13 +205,17 @@ namespace llvm::hakc {
         std::string SocketPath;
         std::string LogPath;
         std::string SymbolDivisionEndpoint;
+        std::string SymbolTypeUseDivisionEndpoint;
         std::string TerminateConnectionEndpoint;
         std::string ValidTargetsEndpoint;
+        unsigned DefaultAccessToken;
+        unsigned DefaultEntryToken;
         unsigned DefaultCompartmentID;
         unsigned DefaultDivisionID;
         unsigned MaxConnectionRetries;
         unsigned ServerCoreCount;
         unsigned DivisionIDBitCount;
+        bool skip_current_file = false;
     };
 } // namespace llvm::hakc
 

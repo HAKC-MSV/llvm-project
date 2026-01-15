@@ -35,7 +35,7 @@ namespace llvm::hakc {
         Epoch
     };
 
-    const std::map<HAKCFunctionArgumentUse, const char *> HAKCArgumentArgumentUseStringMap();
+    std::map<HAKCFunctionArgumentUse, const char *> HAKCArgumentArgumentUseStringMap();
 
     struct HAKCFunctionArgumentDefinition {
         HAKCFunctionArgumentDefinition(Type *ArgTy, unsigned Idx, HAKCFunctionArgumentUse Use);
@@ -61,9 +61,7 @@ namespace llvm::hakc {
 
         ConstantInt *GetDivisionIdIdx() const;
 
-        int GetEpochIdx() const;
-
-        bool HasEpochIdx() const;
+        ConstantInt *GetEpochIdx() const;
 
         iterator_range<SmallVector<HAKCFunctionArgumentDefinition>::iterator> Args();
 

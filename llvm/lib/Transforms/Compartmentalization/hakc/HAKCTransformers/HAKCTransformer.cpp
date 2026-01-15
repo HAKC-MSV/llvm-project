@@ -22,6 +22,14 @@ HAKCTransformer::HAKCTransformer(HAKCModuleAnalysis &ModuleAnalysis,
   InitAnalysis();
 }
 
+HAKCLogger &HAKCTransformer::getLogger(HAKCLogLevel log_level) {
+  return CommonHAKCAnalysis::getLogger(log_level);
+}
+
+HAKCLogger &HAKCTransformer::GetLogger(HAKCLogLevel log_level, bool suppress_output) {
+      return CommonHAKCAnalysis::getLogger(log_level, suppress_output);
+    }
+
 void HAKCTransformer::InitAnalysis() {
   for (auto &F : getModule().functions()) {
     if (ModuleAnalysis.FunctionNeedsAnalysis(&F)) {
@@ -34,11 +42,19 @@ void HAKCTransformer::InitAnalysis() {
   CommonHAKCAnalysis::SortFunctionList(ModuleAnalysis.AnalysisFunctions);
 }
 
-void HAKCTransformer::RegisterUsedCompartment(HAKCCompartment &compartment) {
-  if (compartment != Client.GetDefaultDivision().GetHAKCCompartment()) {
-    ModuleAnalysis.UsedCompartments.push_back(compartment);
+  void HAKCTransformer::runEnforcement() {
+    TransformModule();
+    getLogger(Debug)
+        << "Final Module After Transformations:\n"
+        << getModule() << "\n";
   }
-}
+
+  void HAKCTransformer::RegisterUsedCompartment(
+      const HAKCCompartment &compartment) const {
+    if (compartment != Client.GetDefaultDivision().GetHAKCCompartment()) {
+      ModuleAnalysis.UsedCompartments.push_back(compartment);
+    }
+  }
 
 /**
  * @brief Moves all global values to the specified HAKC ELF section
@@ -112,17 +128,12 @@ void HAKCTransformer::TransformModule() {
 
 void HAKCTransformer::TransformFunctions() {
   for (auto *F : ModuleAnalysis.AnalysisFunctions) {
-    HAKCFunctionAnalysis FunctionTransformation(F, ModuleAnalysis, (*this),
-                                                Client);
-    FunctionTransformation.InstrumentCode();
+    HAKCFunctionEnforcement FunctionEnforcement(F, ModuleAnalysis, (*this), Client);
   }
 }
 
-void HAKCTransformer::performTransformations() {
-  TransformModule();
-  CommonHAKCAnalysis::getLogger(Debug)
-      << "Final Module After Transformations:\n"
-      << getModule() << "\n";
+HAKCModuleAnalysis& HAKCTransformer::GetModuleAnalysis() const {
+  return ModuleAnalysis;
 }
 
 bool HAKCTransformer::TransferFunctionShouldBeCreated(Function *F) {
@@ -133,66 +144,54 @@ bool HAKCTransformer::TransferFunctionShouldBeCreated(Function *F) {
   return CommonHAKCAnalysis::FunctionHasPointerArg(F);
 }
 
-std::string
-HAKCTransformer::getGlobalHAKCSectionName(GlobalVariable *GV) const {
-  if (CommonHAKCAnalysis::IsUncompartmentalizedSymbol(GV, Client)) {
-    return GV->getSection().str();
-  }
+    std::string
+    HAKCTransformer::getGlobalHAKCSectionName(GlobalVariable *GV) const {
+        if (CommonHAKCAnalysis::IsNECSymbol(GV, Client)) {
+            return GV->getSection().str();
+        }
 
-  auto Compartment = Client.GetDivision(GV).GetHAKCCompartment();
-  std::string finalName = HAKC_SECTION_PREFIX.str();
-  finalName += std::to_string(Compartment.GetCompartmentID()->getSExtValue());
-
-  finalName += GV->getSection().str();
-  if (GV->getSection().empty()) {
-    if (GV->isConstant()) {
-      finalName += ".rodata";
-    } else {
-      finalName += ".data";
+        auto Compartment = Client.GetDivision(GV).GetHAKCCompartment();
+        std::string finalName = HAKC_SECTION_PREFIX.str();
+        finalName += std::to_string(Compartment.GetCompartmentID()->getSExtValue()) + GV->getSection().str();
+        if (GV->getSection().empty()) {
+          finalName += GV->isConstant() ? ".rodata" : ".data";
+        }
+        return finalName;
     }
-  }
-  return finalName;
-}
 
-void HAKCTransformer::AddTransferFunctions() {
-  FunctionList FuncsNeedingTransfers;
-  for (auto &F : getModule().functions()) {
-    if (!CommonHAKCAnalysis::IsUncompartmentalizedSymbol(&F, Client) &&
-        getCommonAnalysis().functionIsTransferCandidate(&F, Client) &&
-        !CommonHAKCAnalysis::IsOutsideTransferFunc(&F) &&
-        ModuleAnalysis.functionEscapes(&F)) {
-      FuncsNeedingTransfers.push_back(&F);
-    }
-  }
-  CommonHAKCAnalysis::SortFunctionList(FuncsNeedingTransfers);
-  for (auto *Funcp : FuncsNeedingTransfers) {
-    Function &F = *Funcp;
+    void HAKCTransformer::AddTransferFunctions() {
+    CommonHAKCAnalysis::getLogger(Debug) << "Calling AddTransferFunctions\n";
+        FunctionList FuncsNeedingTransfers;
+        for (auto &F: getModule().functions()) {
+            CommonHAKCAnalysis::getLogger(Debug) << "Considering adding function " << F.getName() << " to FuncsNeedingTransfers\n";
+            if (!CommonHAKCAnalysis::IsNECSymbol(&F, Client) &&
+                getCommonAnalysis().functionIsTransferCandidate(&F, Client) &&
+                !CommonHAKCAnalysis::IsOutsideTransferFunc(&F)){
+              CommonHAKCAnalysis::getLogger(Debug) << "Adding function " << F.getName() << " to FuncsNeedingTransfers\n";
+                FuncsNeedingTransfers.push_back(&F);
+            }
+        }
+        CommonHAKCAnalysis::SortFunctionList(FuncsNeedingTransfers);
+        for (auto *Funcp: FuncsNeedingTransfers) {
+            Function &F = *Funcp;
 
     Function *transferFunc = nullptr;
 
-    if (getCommonAnalysis().functionIsTransferCandidate(&F, Client)) {
-      auto Compartment = Client.GetDivision(&F).GetHAKCCompartment();
-      transferFunc = CreateTransferFunction(&F);
-      if (!transferFunc) {
-        CommonHAKCAnalysis::getLogger(Fatal)
-            << "Could not create transfer for " << F.getName() << "\n";
-        throw std::exception();
-      }
-      bool TransferAlreadyExisted =
-          (transferFunc->getInstructionCount() > 0 && !F.isDeclaration());
-      if (TransferAlreadyExisted) {
-        CommonHAKCAnalysis::getLogger(Verbose)
-            << "Retrieved transfer function " << transferFunc->getName();
-      } else {
-        CommonHAKCAnalysis::getLogger(Verbose)
-            << "Created transfer function " << transferFunc->getName();
-      }
-      CommonHAKCAnalysis::getLogger(Verbose)
-          << " in compartment "
-          << std::to_string(Compartment.GetCompartmentIDValue()) << "\n";
-      if (!TransferAlreadyExisted) {
-        CommonHAKCAnalysis::getLogger(Verbose) << *transferFunc << "\n";
-      }
+            if (getCommonAnalysis().functionIsTransferCandidate(&F, Client)) {
+                auto Compartment = Client.GetDivision(&F).GetHAKCCompartment();
+                transferFunc = CreateTransferFunction(&F);
+                if (!transferFunc) {
+                    CommonHAKCAnalysis::getLogger(Fatal)
+                            << "Could not create transfer for " << F.getName() << "\n";
+                    throw std::exception();
+                }
+      bool TransferAlreadyExisted = transferFunc->getInstructionCount() > 0 && !F.isDeclaration();
+
+      getLogger(Verbose) << (TransferAlreadyExisted ? "Retrieved transfer function " : "Created transfer function ") << transferFunc->getName();
+      getLogger(Verbose) << " in compartment " << std::to_string(Compartment.GetCompartmentIDValue()) << "\n";
+                if (!TransferAlreadyExisted) {
+                    CommonHAKCAnalysis::getLogger(Verbose) << *transferFunc << "\n";
+                }
 
       if (F.isDeclaration()) {
         CommonHAKCAnalysis::getLogger(Verbose)
@@ -219,70 +218,68 @@ void HAKCTransformer::AddTransferFunctions() {
         std::vector<std::pair<User *, unsigned>> UsesToReplace;
         auto TargetDivision = Client.GetDivision(&F);
 
-        for (auto &FUse : F.uses()) {
-          if (auto *I = dyn_cast<Instruction>(FUse.getUser())) {
-            if (CommonHAKCAnalysis::IsOutsideTransferFunc(I->getFunction())) {
-              continue;
-            }
-          }
-          if (auto *CallI = dyn_cast<CallInst>(FUse.getUser())) {
-            if (CallI->getCalledFunction() == &F) {
-              auto HeadDivision =
-                  Client.GetDivision(CallI->getParent()->getParent());
-              if (HeadDivision.GetHAKCCompartment().GetCompartmentID() !=
-                  TargetDivision.GetHAKCCompartment().GetCompartmentID()) {
-                UsesToReplace.push_back(
-                    std::make_pair(CallI, FUse.getOperandNo()));
-                continue;
-              }
-            }
-          }
-          if (ModuleAnalysis.useEscapes(FUse)) {
-            UsesToReplace.push_back(
-                std::make_pair(FUse.getUser(), FUse.getOperandNo()));
-          }
-        }
-        for (auto &U : UsesToReplace) {
-          CommonHAKCAnalysis::getLogger(Verbose)
-              << "Replacing operand " << U.second << " of " << U.first
+                    for (auto &FUse: F.uses()) {
+                        if (auto *I = dyn_cast<Instruction>(FUse.getUser())) {
+                            if (CommonHAKCAnalysis::IsOutsideTransferFunc(I->getFunction())) {
+                                continue;
+                            }
+                        }
+                        if (auto *CallI = dyn_cast<CallInst>(FUse.getUser())) {
+                            if (CallI->getCalledFunction() == &F) {
+                                auto HeadDivision =
+                                        Client.GetDivision(CallI->getParent()->getParent());
+                                if (HeadDivision.GetHAKCCompartment().GetCompartmentID() !=
+                                    TargetDivision.GetHAKCCompartment().GetCompartmentID()) {
+                                    UsesToReplace.push_back(
+                                        std::make_pair(CallI, FUse.getOperandNo()));
+                                    continue;
+                                }
+                            }
+                        }
+                        if (ModuleAnalysis.useEscapes(FUse)) {
+                            UsesToReplace.push_back(
+                                std::make_pair(FUse.getUser(), FUse.getOperandNo()));
+                        }
+                    }
+        for (auto &[key, val] : UsesToReplace) {
+          getLogger(Verbose)
+              << "Replacing operand " << val << " of " << key
               << " with " << transferFunc << "\n";
-          if (auto *Const = dyn_cast<Constant>(U.first)) {
-            std::vector<Constant *> ReplacementValues;
-            for (auto &C : Const->operands()) {
-              if (C.get() == &F) {
-                ReplacementValues.push_back(transferFunc);
-              } else {
-                ReplacementValues.push_back(dyn_cast<Constant>(C.get()));
-              }
-            }
+          if (auto *Const = dyn_cast<Constant>(key)) {
+                            std::vector<Constant *> ReplacementValues;
+                            for (auto &C: Const->operands()) {
+                                if (C.get() == &F) {
+                                    ReplacementValues.push_back(transferFunc);
+                                } else {
+                                    ReplacementValues.push_back(dyn_cast<Constant>(C.get()));
+                                }
+                            }
 
-            Constant *ReplacementInitializer;
-            if (auto *ConstArray = dyn_cast<ConstantArray>(U.first)) {
-              ReplacementInitializer =
+                            Constant *ReplacementInitializer;
+            if (const auto *ConstArray = dyn_cast<ConstantArray>(key)) {
+                                ReplacementInitializer =
                   ConstantArray::get(ConstArray->getType(), ReplacementValues);
-            } else if (auto *ConstStruct = dyn_cast<ConstantStruct>(U.first)) {
+            } else if (const auto *ConstStruct = dyn_cast<ConstantStruct>(key)) {
               ReplacementInitializer = ConstantStruct::get(
                   ConstStruct->getType(), ReplacementValues);
-            } else if (auto *ConstVector = dyn_cast<ConstantVector>(U.first)) {
-              ReplacementInitializer = ConstantVector::get(ReplacementValues);
-            } else {
-              CommonHAKCAnalysis::getLogger(Fatal)
-                  << "Unhandled ConstantAggregate: " << U.first << "\n";
-              throw std::exception();
-            }
+            } else if (dyn_cast<ConstantVector>(key)) {
+                                ReplacementInitializer = ConstantVector::get(ReplacementValues);
+                            } else {
+              getLogger(Fatal) << "Unhandled ConstantAggregate: " << key << "\n";
+                                throw std::exception();
+                            }
 
-            for (auto &InitializerUser : U.first->uses()) {
-              if (auto *GV =
-                      dyn_cast<GlobalVariable>(InitializerUser.getUser())) {
-                if (GV->hasInitializer() && GV->getInitializer() == U.first) {
-                  GV->setInitializer(ReplacementInitializer);
-                }
-              }
-            }
+            for (auto &InitializerUser : key->uses()) {
+              if (auto *GV = dyn_cast<GlobalVariable>(InitializerUser.getUser())) {
+                if (GV->hasInitializer() && GV->getInitializer() == key) {
+                                        GV->setInitializer(ReplacementInitializer);
+                                    }
+                                }
+                            }
           } else {
-            U.first->setOperand(U.second, transferFunc);
+            key->setOperand(val, transferFunc);
           }
-        }
+                    }
 
         CommonHAKCAnalysis::getLogger(Verbose) << "Done\n"
                                                << getModule() << "\n";
@@ -303,56 +300,56 @@ void HAKCTransformer::AddTransferFunctions() {
   }
 }
 
-bool HAKCTransformer::ConstantStructTransferIsNeeded(
-    ConstantStruct *ConstStruct) {
-  bool Result = false;
-  CommonHAKCAnalysis::getLogger(Verbose)
-      << "TransferIsNeeded Checking " << *ConstStruct << "\n";
-  for (auto &Member : ConstStruct->operands()) {
-    auto *Def = getCommonAnalysis().getDef(Member.get(), false);
-    CommonHAKCAnalysis::getLogger(Verbose)
-        << "Checking struct member " << *Member << " with Def " << *Def << "\n";
-    if (isa<ConstantPointerNull>(Def)) {
-      continue;
-    }
-    if (auto *GlobalVal = dyn_cast<GlobalValue>(Def)) {
-      Result =
-          !CommonHAKCAnalysis::IsUncompartmentalizedSymbol(GlobalVal, Client);
-    } else if (auto *StructMember = dyn_cast<ConstantStruct>(Def)) {
-      Result = ConstantStructTransferIsNeeded(StructMember);
-    }
+    bool HAKCTransformer::ConstantStructTransferIsNeeded(
+        ConstantStruct *ConstStruct) {
+        bool Result = false;
+        CommonHAKCAnalysis::getLogger(Verbose)
+                << "TransferIsNeeded Checking " << *ConstStruct << "\n";
+        for (auto &Member: ConstStruct->operands()) {
+            auto *Def = getCommonAnalysis().getDef(Member.get(), false);
+            CommonHAKCAnalysis::getLogger(Verbose)
+                    << "Checking struct member " << *Member << " with Def " << *Def << "\n";
+          if (isa<ConstantPointerNull>(Def)) {
+            continue;
+          }
+            if (auto *GlobalVal = dyn_cast<GlobalValue>(Def)) {
+                Result =
+                        !CommonHAKCAnalysis::IsNECSymbol(GlobalVal, Client);
+            } else if (auto *StructMember = dyn_cast<ConstantStruct>(Def)) {
+                Result = ConstantStructTransferIsNeeded(StructMember);
+            }
 
-    if (Result) {
-      break;
-    }
-  }
+          if (Result) {
+            break;
+          }
+        }
 
   CommonHAKCAnalysis::getLogger(Verbose)
       << __FUNCTION__ << " Result: " << std::to_string(Result) << "\n";
   return Result;
 }
 
-bool HAKCTransformer::TransferIsNeeded(GlobalVariable *GlobalVar) {
-  bool IsKernelSym =
-      CommonHAKCAnalysis::IsUncompartmentalizedSymbol(GlobalVar, Client);
-  bool Result = GlobalVar->hasInitializer() && !IsKernelSym;
-  if (Result) {
-    if (auto *ConstStruct =
-            dyn_cast<ConstantStruct>(GlobalVar->getInitializer())) {
-      Result = ConstantStructTransferIsNeeded(ConstStruct);
-    } else {
-      if (isa<GlobalValue>(GlobalVar->getInitializer())) {
-        Result = !IsKernelSym;
-      } else if (isa<ConstantPointerNull>(GlobalVar->getInitializer())) {
-        Result = false;
-      } else {
-        Result = CommonHAKCAnalysis::IsPointerLikeType(
-            GlobalVar->getInitializer()->getType());
-      }
+    bool HAKCTransformer::TransferIsNeeded(GlobalVariable *GlobalVar) {
+        bool IsKernelSym =
+                CommonHAKCAnalysis::IsNECSymbol(GlobalVar, Client);
+        bool Result = GlobalVar->hasInitializer() && !IsKernelSym;
+        if (Result) {
+            if (auto *ConstStruct =
+                    dyn_cast<ConstantStruct>(GlobalVar->getInitializer())) {
+                Result = ConstantStructTransferIsNeeded(ConstStruct);
+            } else {
+                if (isa<GlobalValue>(GlobalVar->getInitializer())) {
+                    Result = !IsKernelSym;
+                } else if (isa<ConstantPointerNull>(GlobalVar->getInitializer())) {
+                    Result = false;
+                } else {
+                    Result = CommonHAKCAnalysis::IsPointerLikeType(
+                        GlobalVar->getInitializer()->getType());
+                }
+            }
+        }
+        return Result;
     }
-  }
-  return Result;
-}
 
 void HAKCTransformer::AddCompartmentMetadata() {
   auto &DefaultCompartment = Client.GetDefaultDivision().GetHAKCCompartment();
@@ -421,15 +418,11 @@ void HAKCTransformer::emitModParamGetCtx(GlobalValue *kernparam) {
   CommonHAKCAnalysis::getLogger(Verbose)
       << kernparam << " " << Division << "\n";
 
-  // cast kernparam to a void*
-  Value *voidCast;
-  auto AddrSpace = HAKCTransformer::GetPointerAddrSpace(kernparam);
-
-  if (kernparam->getType()->isIntegerTy()) {
-    voidCast = builder.CreateIntToPtr(kernparam, builder.getPtrTy(AddrSpace));
-  } else {
-    voidCast = builder.CreateBitCast(kernparam, builder.getPtrTy(AddrSpace));
-  }
+        // cast kernparam to a void*
+      const auto AddrSpace = GetPointerAddrSpace(kernparam);
+      Value *voidCast = kernparam->getType()->isIntegerTy()
+        ? builder.CreateIntToPtr(kernparam, builder.getPtrTy(AddrSpace))
+        : builder.CreateBitCast(kernparam, builder.getPtrTy(AddrSpace));
 
   // if returnTypeArg == 0, next step will use access token for return value
   // else, use color for return value
@@ -437,13 +430,13 @@ void HAKCTransformer::emitModParamGetCtx(GlobalValue *kernparam) {
   Value *tokColSelect = builder.CreateSelect(
       tokEqZero, Division.GetAccessToken(), Division.GetDivisionID());
 
-  // check if the address passed in matches address of kernparam
-  Value *pointerArgEq = builder.CreateICmpEQ(pointerArg, voidCast);
-  // if it does, return the previously selected token/color
-  // it it isn't a match, return zero
-  Value *ctxSelect = builder.CreateSelect(pointerArgEq, tokColSelect, czero);
-  // function is done
-  builder.CreateRet(ctxSelect);
+        // check if the address passed in matches address of kernparam
+        Value *pointerArgEq = builder.CreateICmpEQ(pointerArg, voidCast);
+        // if it does, return the previously selected token/color
+        // if it isn't a match, return zero
+        Value *ctxSelect = builder.CreateSelect(pointerArgEq, tokColSelect, czero);
+        // function is done
+        builder.CreateRet(ctxSelect);
 
   CommonHAKCAnalysis::getLogger(Verbose) << *getctx << "\n";
 
@@ -469,24 +462,17 @@ Type *HAKCTransformer::GetEntryTokenType(unsigned AddrSpace) const {
   return HAKCCompartment::GetEntryTokenType(HAKCIRBuilder.getContext());
 }
 
-void HAKCTransformer::CreateDataAuthArguments(
-    HAKCPointerBase &HAKCPointer, Instruction *I,
-    SmallVectorImpl<Value *> &Result) {
-  Function *F = I->getFunction();
-  Value *HAKCPointerBitCast;
-  auto Division = Client.GetDivision(F);
-  auto *AccessToken = Division.GetAccessToken();
-  unsigned AddrSpace = GetPointerAddrSpace(HAKCPointer);
-  auto *DataAuthFuncTy =
-      getCommonAnalysis().GetDataAuthenticationFunctionType(AddrSpace);
+    void HAKCTransformer::CreateDataAuthArguments(
+        HAKCPointerBase &HAKCPointer, Instruction *I,
+        SmallVectorImpl<Value *> &Result) {
+        Function *F = I->getFunction();
+        auto Division = Client.GetDivision(F);
+        auto *AccessToken = Division.GetAccessToken();
+  const auto *DataAuthFuncTy = getCommonAnalysis().GetDataAuthenticationFunctionType();
 
-  if (HAKCPointer.GetBaseDefinition()->getType()->isIntegerTy()) {
-    HAKCPointerBitCast = HAKCIRBuilder.CreateIntToPtr(
-        HAKCPointer.GetBaseDefinition(), DataAuthFuncTy->getParamType(0));
-  } else {
-    HAKCPointerBitCast = HAKCIRBuilder.CreateBitCast(
-        HAKCPointer.GetBaseDefinition(), DataAuthFuncTy->getParamType(0));
-  }
+  Value *HAKCPointerBitCast = HAKCPointer.GetBaseDefinition()->getType()->isIntegerTy()
+    ? HAKCIRBuilder.CreateIntToPtr( HAKCPointer.GetBaseDefinition(), DataAuthFuncTy->getParamType(0))
+    : HAKCIRBuilder.CreateBitCast(HAKCPointer.GetBaseDefinition(), DataAuthFuncTy->getParamType(0));
 
   SmallVector<Value *> Args = {HAKCPointerBitCast,
                                Division.GetHAKCCompartment().GetCompartmentID(),
@@ -515,35 +501,33 @@ void HAKCTransformer::CreateCodeAuthArguments(
   Value *IndirectCallTarget = HAKCIRBuilder.CreateBitCast(
       HAKCPointer.GetBaseDefinition(), HAKCIRBuilder.getPtrTy(AddrSpace));
 
-  SmallVector<Value *> Args = {
-      IndirectCallTarget, Division.GetHAKCCompartment().GetCompartmentID(),
-      AccessToken, FirstExitToken,
-      HAKCIRBuilder.getInt64(
-          ExitTokens->getValueType()->getArrayNumElements())};
+        SmallVector<Value *> Args = {
+            IndirectCallTarget, Division.GetHAKCCompartment().GetCompartmentID(),
+            AccessToken, FirstExitToken,
+            HAKCIRBuilder.getInt64(
+            ExitTokens->getValueType()->getArrayNumElements())};
 
   Results.append(Args);
 }
 
-void HAKCTransformer::CreateTransferArguments(HAKCPointerBase &HAKCPointer,
-                                              GlobalValue *Target, bool IsData,
-                                              ConstantInt *Size,
-                                              SmallVector<Value *> &Result) {
-  Value *OperandCast;
-  auto AddrSpace = GetPointerAddrSpace(HAKCPointer);
-  bool IsPerCPU = ModuleAnalysis.GetCommonAnalysis().IsPerCPUPointer(
-      HAKCPointer.GetBaseDefinition());
-  auto Division = Client.GetDivision(Target);
+    void HAKCTransformer::CreateTransferArguments(HAKCPointerBase &HAKCPointer,
+                                                  GlobalValue *Target, bool IsData,
+                                                  ConstantInt *Size,
+                                                  SmallVector<Value *> &Result) {
+        auto AddrSpace = GetPointerAddrSpace(HAKCPointer);
+        bool IsPerCPU =
+                CommonHAKCAnalysis::IsPerCPUPointer(HAKCPointer.GetBaseDefinition());
+        auto Division = Client.GetDivision(Target);
 
-  OperandCast = HAKCIRBuilder.CreateBitOrPointerCast(
-      HAKCPointer.GetBaseDefinition(), HAKCIRBuilder.getPtrTy(AddrSpace));
+      Value *OperandCast = HAKCIRBuilder.CreateBitOrPointerCast(HAKCPointer.GetBaseDefinition(), HAKCIRBuilder.getPtrTy(AddrSpace));
 
-  SmallVector<Value *> FullArgSet = {
-      OperandCast, Size, Division.GetHAKCCompartment().GetCompartmentID(),
-      Division.GetDivisionID()};
-  if (!IsPerCPU) {
-    /* Function signature uses is_code which is !isData */
-    FullArgSet.push_back(IsData ? getFalse() : getTrue());
-  }
+        SmallVector<Value *> FullArgSet = {
+            OperandCast, Size, Division.GetHAKCCompartment().GetCompartmentID(),
+            Division.GetDivisionID()};
+        if (!IsPerCPU) {
+            /* Function signature uses is_code which is !isData */
+            FullArgSet.push_back(IsData ? getFalse() : getTrue());
+        }
 
   Result.append(FullArgSet);
 }
@@ -560,35 +544,34 @@ HAKCSystemInformation &HAKCTransformer::getSystemInfo() const {
   return ModuleAnalysis.GetCommonAnalysis().GetSystemInfo();
 }
 
-void HAKCTransformer::ValidateLocation(Instruction *I) {
-  if (I == nullptr) {
-    CommonHAKCAnalysis::getLogger(Fatal) << "I is null\n";
-    throw std::exception();
-  }
-  HAKCIRBuilder.SetInsertPoint(I);
-}
-
-void HAKCTransformer::ValidateHAKCPointer(const HAKCPointerBase &HAKCPointer) {
-  if (HAKCPointer.GetType() == nullptr) {
-    CommonHAKCAnalysis::getLogger(Fatal)
-        << "HAKCPointer " << HAKCPointer << " has no HAKCType\n";
-    if (auto *I = dyn_cast<Instruction>(HAKCPointer.GetBaseDefinition())) {
-      auto DebugLoc = I->getDebugLoc();
-      CommonHAKCAnalysis::getLogger(Fatal)
-          << "in Function " << I->getFunction()->getName();
-      if (DebugLoc && DebugLoc.get()) {
-        CommonHAKCAnalysis::getLogger(Fatal) << " at " << DebugLoc.get();
-      }
-      CommonHAKCAnalysis::getLogger(Fatal) << "\n";
+    void HAKCTransformer::ValidateLocation(Instruction *I) {
+  if (!I) {
+    getLogger(Fatal) << "I is null\n";
+            throw std::exception();
+        }
+        HAKCIRBuilder.SetInsertPoint(I);
     }
-    throw std::exception();
-  } else if (HAKCPointer.GetType()->GetPointeeType() == nullptr) {
-    CommonHAKCAnalysis::getLogger(Fatal)
-        << "HAKCPointer " << HAKCPointer << " Type " << *HAKCPointer.GetType()
-        << " has no PointeeType\n";
-    throw std::exception();
+
+    void HAKCTransformer::ValidateHAKCPointer(const HAKCPointerBase &HAKCPointer) {
+  if (!HAKCPointer.GetType()) {
+    getLogger(Fatal) << "HAKCPointer " << HAKCPointer << " has no HAKCType\n";
+            if (auto *I = dyn_cast<Instruction>(HAKCPointer.GetBaseDefinition())) {
+      const auto DebugLoc = I->getDebugLoc();
+      getLogger(Fatal) << "in Function " << I->getFunction()->getName();
+                if (DebugLoc && DebugLoc.get()) {
+                    CommonHAKCAnalysis::getLogger(Fatal) << " at " << DebugLoc.get();
+                }
+                CommonHAKCAnalysis::getLogger(Fatal) << "\n";
+            }
+            throw std::exception();
   }
-}
+  if (!HAKCPointer.GetType()->GetPointeeType()) {
+    getLogger(Fatal)
+                    << "HAKCPointer " << HAKCPointer << " Type " << *HAKCPointer.GetType()
+                    << " has no PointeeType\n";
+            throw std::exception();
+        }
+    }
 
 void HAKCTransformer::ValidateHAKCPointerAndLocation(
     const HAKCPointerBase &HAKCPointer, Instruction *I) {
@@ -618,29 +601,21 @@ Value *HAKCTransformer::CreateSafePointer(HAKCPointerBase &HAKCPointer,
     return HAKCPointer.GetAuthenticatedPointer();
   }
 
-  Value *voidCast;
 
-  unsigned AddrSpace = GetPointerAddrSpace(HAKCPointer);
+  const unsigned AddrSpace = GetPointerAddrSpace(HAKCPointer);
+  Value *voidCast = HAKCPointer.GetBaseDefinition()->getType()->isIntegerTy()
+    ? HAKCIRBuilder.CreateIntToPtr(HAKCPointer.GetBaseDefinition(), HAKCIRBuilder.getPtrTy(AddrSpace))
+    : HAKCIRBuilder.CreateBitCast(HAKCPointer.GetBaseDefinition(), HAKCIRBuilder.getPtrTy(AddrSpace));
 
-  if (HAKCPointer.GetBaseDefinition()->getType()->isIntegerTy()) {
-    voidCast = HAKCIRBuilder.CreateIntToPtr(HAKCPointer.GetBaseDefinition(),
-                                            HAKCIRBuilder.getPtrTy(AddrSpace));
-  } else {
-    voidCast = HAKCIRBuilder.CreateBitCast(HAKCPointer.GetBaseDefinition(),
-                                           HAKCIRBuilder.getPtrTy(AddrSpace));
-  }
-
-  Value *maxUserAddr = HAKCIRBuilder.CreateIntToPtr(
-      ConstantInt::get(HAKCIRBuilder.getInt64Ty(), 0x0000ffffffffffff),
-      voidCast->getType());
-  Value *addrCheck = HAKCIRBuilder.CreateICmpUGT(voidCast, maxUserAddr);
-  Value *ptrToInt =
-      HAKCIRBuilder.CreatePtrToInt(voidCast, HAKCIRBuilder.getInt64Ty());
-  Value *orValue = HAKCIRBuilder.CreateOr(ptrToInt, 0xFFFF000000000000);
-  Value *orCast = HAKCIRBuilder.CreateIntToPtr(
-      orValue, HAKCPointer.GetBaseDefinition()->getType());
-  auto SafePtr = HAKCIRBuilder.CreateSelect(addrCheck, orCast,
-                                            HAKCPointer.GetBaseDefinition());
+  Value *maxUserAddr = HAKCIRBuilder.CreateIntToPtr(ConstantInt::get(HAKCIRBuilder.getInt64Ty(), 0x0000ffffffffffff), voidCast->getType());
+        Value *addrCheck = HAKCIRBuilder.CreateICmpUGT(voidCast, maxUserAddr);
+        Value *ptrToInt =
+                HAKCIRBuilder.CreatePtrToInt(voidCast, HAKCIRBuilder.getInt64Ty());
+        Value *orValue = HAKCIRBuilder.CreateOr(ptrToInt, 0xFFFF000000000000);
+        Value *orCast = HAKCIRBuilder.CreateIntToPtr(
+            orValue, HAKCPointer.GetBaseDefinition()->getType());
+        auto SafePtr = HAKCIRBuilder.CreateSelect(addrCheck, orCast,
+                                                  HAKCPointer.GetBaseDefinition());
 
   if (SafePtr->getType() != HAKCPointer.GetBaseDefinition()->getType()) {
     CommonHAKCAnalysis::getLogger(Fatal)
@@ -662,30 +637,26 @@ Value *HAKCTransformer::CreateDataAuthentication(HAKCPointerBase &HAKCPointer,
     return HAKCPointer.GetAuthenticatedPointer();
   }
 
-  if (isa<PHINode>(I)) {
-    CommonHAKCAnalysis::getLogger(Fatal)
-        << "exception in CreateDataAuthentication\n";
-    CommonHAKCAnalysis::getLogger(Fatal)
-        << "Trying to insert data auth check at " << *I << " for "
-        << HAKCPointer << "\n"
-        << *I->getFunction();
-    throw std::exception();
-  }
+        if (isa<PHINode>(I)) {
+    getLogger(Fatal)
+                    << "Trying to insert data auth check at " << *I << " for "
+                    << HAKCPointer << "\n"
+                    << *I->getFunction();
+            throw std::exception();
+        }
 
-  SmallVector<Value *> Args;
-  unsigned AddrSpace = GetPointerAddrSpace(HAKCPointer);
-  auto *DataAuthFuncTy =
-      getCommonAnalysis().GetDataAuthenticationFunctionType(AddrSpace);
-  CreateDataAuthArguments(HAKCPointer, I, Args);
-  for (unsigned i = 0; i < DataAuthFuncTy->getNumParams(); i++) {
-    if (Args[i]->getType() != DataAuthFuncTy->getParamType(i)) {
-      CommonHAKCAnalysis::getLogger(Fatal)
-          << "Types do not match at index " << std::to_string(i) << "\n"
-          << *DataAuthFuncTy << "\n"
-          << *Args[i] << "\n";
-      throw std::exception();
-    }
-  }
+        SmallVector<Value *> Args;
+  auto *DataAuthFuncTy = getCommonAnalysis().GetDataAuthenticationFunctionType();
+        CreateDataAuthArguments(HAKCPointer, I, Args);
+        for (unsigned i = 0; i < DataAuthFuncTy->getNumParams(); i++) {
+            if (Args[i]->getType() != DataAuthFuncTy->getParamType(i)) {
+                CommonHAKCAnalysis::getLogger(Fatal)
+                        << "Types do not match at index " << std::to_string(i) << "\n"
+                        << *DataAuthFuncTy << "\n"
+                        << *Args[i] << "\n";
+                throw std::exception();
+            }
+        }
 
   auto *DataAuthCall = CreateCall(getSystemInfo().DataValidation(), Args);
   Value *HAKCPointerBitCast = CreateReturnCast(HAKCPointer, DataAuthCall);
@@ -694,36 +665,29 @@ Value *HAKCTransformer::CreateDataAuthentication(HAKCPointerBase &HAKCPointer,
   return HAKCPointerBitCast;
 }
 
-Value *HAKCTransformer::CreateReturnCast(HAKCPointerBase &HAKCPointer,
-                                         Value *V) {
-  if (!V) {
-    CommonHAKCAnalysis::getLogger(Fatal) << "NULL V\n";
-    throw std::exception();
-  }
-  if (HAKCPointer.GetBaseDefinition()->getType()->isIntegerTy()) {
-    return HAKCIRBuilder.CreatePtrToInt(
-        V, HAKCPointer.GetBaseDefinition()->getType());
-  } else {
-    return HAKCIRBuilder.CreateBitCast(
-        V, HAKCPointer.GetBaseDefinition()->getType());
-  }
-}
+Value *HAKCTransformer::CreateReturnCast(HAKCPointerBase &HAKCPointer, Value *V) {
+        if (!V) {
+            CommonHAKCAnalysis::getLogger(Fatal) << "NULL V\n";
+            throw std::exception();
+        }
+        if (HAKCPointer.GetBaseDefinition()->getType()->isIntegerTy()) {
+    return HAKCIRBuilder.CreatePtrToInt(V, HAKCPointer.GetBaseDefinition()->getType());
+        }
+  return HAKCIRBuilder.CreateBitCast(V, HAKCPointer.GetBaseDefinition()->getType());
 
-Value *HAKCTransformer::CreatePointerCast(HAKCPointerBase &HAKCPointer,
-                                          PointerType *PointerTy) {
-  if (!PointerTy) {
-    CommonHAKCAnalysis::getLogger(Fatal) << "NULL PointerTy\n";
-    throw std::exception();
-  }
+    }
 
-  if (HAKCPointer.GetBaseDefinition()->getType()->isIntegerTy()) {
-    return HAKCIRBuilder.CreateIntToPtr(HAKCPointer.GetBaseDefinition(),
-                                        PointerTy);
-  } else {
-    return HAKCIRBuilder.CreateBitCast(HAKCPointer.GetBaseDefinition(),
-                                       PointerTy);
-  }
-}
+Value *HAKCTransformer::CreatePointerCast(HAKCPointerBase &HAKCPointer, PointerType *PointerTy) {
+        if (!PointerTy) {
+            CommonHAKCAnalysis::getLogger(Fatal) << "NULL PointerTy\n";
+            throw std::exception();
+        }
+
+        if (HAKCPointer.GetBaseDefinition()->getType()->isIntegerTy()) {
+    return HAKCIRBuilder.CreateIntToPtr(HAKCPointer.GetBaseDefinition(),PointerTy);
+        }
+  return HAKCIRBuilder.CreateBitCast(HAKCPointer.GetBaseDefinition(), PointerTy);
+    }
 
 Value *HAKCTransformer::CreateCodeAuthentication(HAKCPointerBase &HAKCPointer,
                                                  Instruction *I) {
@@ -752,14 +716,14 @@ GlobalVariable *HAKCTransformer::GetValidTargetCompartments(
     return EntryTokenArray;
   }
 
-  SmallVector<Constant *> EntryTokenValues;
-  SmallVector<hakc_compartment_id_t> IDs;
-  IDs.push_back(CompartmentID->getZExtValue());
-  for (auto &t : Division.GetHAKCCompartment().GetValidTargets()) {
-    IDs.push_back(t->getZExtValue());
-  }
-  llvm::sort(IDs.begin(), IDs.end(),
-             [](const hakc_compartment_id_t LHS,
+        SmallVector<Constant *> EntryTokenValues;
+        SmallVector<hakc_compartment_id_t> IDs;
+        IDs.push_back(CompartmentID->getZExtValue());
+        for (auto &t: Division.GetHAKCCompartment().GetValidTargets()) {
+            IDs.push_back(t->getZExtValue());
+        }
+        llvm::sort(IDs.begin(), IDs.end(),
+                   [](const hakc_compartment_id_t LHS,
                 const hakc_compartment_id_t RHS) { return LHS < RHS; });
 
   for (auto ID : IDs) {
@@ -817,30 +781,30 @@ CallInst *HAKCTransformer::CreateCall(Function *Callee,
   CommonHAKCAnalysis::getLogger(Debug) << "\n";
   auto *Call = HAKCIRBuilder.CreateCall(Callee, Args);
 
-  /* The LLVM function checker throws an error when an inline-able function with
-   * debug info contains a function call with no debug information.  So try to
-   * set the appropriate debug info for this transfer */
-  if (!Call->getDebugLoc()) {
-    auto *I = &*HAKCIRBuilder.GetInsertPoint();
-    if (I->getDebugLoc()) {
-      Call->setDebugLoc(I->getDebugLoc());
-    } else {
-      /* Use the closest debug info to I */
-      bool PastI = false;
-      for (auto BBI = I->getParent()->begin(), BBE = I->getParent()->end();
-           BBI != BBE; ++BBI) {
-        if (BBI->getDebugLoc()) {
-          Call->setDebugLoc(BBI->getDebugLoc());
+        /* The LLVM function checker throws an error when an inline-able function with
+         * debug info contains a function call with no debug information.  So try to
+         * set the appropriate debug info for this transfer */
+        if (!Call->getDebugLoc()) {
+            auto *I = &*HAKCIRBuilder.GetInsertPoint();
+            if (I->getDebugLoc()) {
+              Call->setDebugLoc(I->getDebugLoc());
+            } else {
+                /* Use the closest debug info to I */
+                bool PastI = false;
+                for (auto BBI = I->getParent()->begin(), BBE = I->getParent()->end();
+                     BBI != BBE; ++BBI) {
+                  if (BBI->getDebugLoc()) {
+                    Call->setDebugLoc(BBI->getDebugLoc());
+                  }
+                  if (&*BBI == I) {
+                    PastI = true;
+                  }
+                  if (PastI && Call->getDebugLoc()) {
+                    break;
+                  }
+                }
+            }
         }
-        if (&*BBI == I) {
-          PastI = true;
-        }
-        if (PastI && Call->getDebugLoc()) {
-          break;
-        }
-      }
-    }
-  }
 
   return Call;
 }
@@ -850,9 +814,9 @@ CallInst *HAKCTransformer::CreateCall(const function_def_t &Callee,
   return CreateCall(Callee->GetFunction(), Args);
 }
 
-CallInst *HAKCTransformer::CreateCall(StringRef name, Type *RetTy,
-                                      ArrayRef<Value *> Args) {
-  std::vector<Type *> FunctionParamTypes;
+    CallInst *HAKCTransformer::CreateCall(StringRef name, Type *RetTy,
+                                          ArrayRef<Value *> Args) {
+        std::vector<Type *> FunctionParamTypes;
   for (auto *Arg : Args) {
     FunctionParamTypes.push_back(Arg->getType());
   }
@@ -871,27 +835,24 @@ CallInst *HAKCTransformer::CreateCall(StringRef name, Type *RetTy,
   return CreateCall(Func, Args);
 }
 
-Instruction *HAKCTransformer::CreateSizedCompartmentTransfer(
-    HAKCPointerBase &HAKCPointer, Instruction *I, GlobalValue *Target,
-    bool IsData, ConstantInt *Size) {
-  ValidateHAKCPointerAndLocation(HAKCPointer, I);
-  Instruction *Transfer;
-  if (TargetIsKernel(Target)) {
-    auto *V = CreateSafePointer(HAKCPointer, &*HAKCIRBuilder.GetInsertPoint());
-    auto *SafePtr = dyn_cast<Instruction>(V);
-    if (!SafePtr) {
-      CommonHAKCAnalysis::getLogger(Fatal)
-          << "Unexpected Safe Pointer Type: " << *V << "\n";
-      throw std::exception();
-    }
-    return SafePtr;
-  }
+    Instruction *HAKCTransformer::CreateSizedCompartmentTransfer(
+        HAKCPointerBase &HAKCPointer, Instruction *I, GlobalValue *Target,
+        bool IsData, ConstantInt *Size) {
+        ValidateHAKCPointerAndLocation(HAKCPointer, I);
+        if (TargetIsKernel(Target)) {
+            auto *V = CreateSafePointer(HAKCPointer, &*HAKCIRBuilder.GetInsertPoint());
+            auto *SafePtr = dyn_cast<Instruction>(V);
+            if (!SafePtr) {
+                CommonHAKCAnalysis::getLogger(Fatal)
+                        << "Unexpected Safe Pointer Type: " << *V << "\n";
+                throw std::exception();
+            }
+            return SafePtr;
+        }
 
-  if (HAKCPointerHasCustomTransfer(HAKCPointer)) {
-    Transfer = CreateCustomTransfer(HAKCPointer, Target, IsData, Size);
-  } else {
-    Transfer = CreateDefaultTransfer(HAKCPointer, Target, IsData, Size);
-  }
+  Instruction *Transfer = HAKCPointerHasCustomTransfer(HAKCPointer)
+    ? CreateCustomTransfer(HAKCPointer, Target, IsData, Size)
+    : CreateDefaultTransfer(HAKCPointer, Target, IsData, Size);
 
   return Transfer;
 }
@@ -947,22 +908,22 @@ bool HAKCTransformer::HAKCPointerHasCustomTransfer(
   return GetCustomTransferFunction(HAKCPointer) != nullptr;
 }
 
-custom_transfer_def_t
-HAKCTransformer::GetCustomTransferFunctionForType(HAKCTypeP HAKCTy) {
-  CommonHAKCAnalysis::getLogger(Verbose)
-      << "Attempting to find Custom Transfer Function for Type " << *HAKCTy
-      << "\n";
-  for (auto &it : ModuleAnalysis.GetCommonAnalysis()
-                      .GetSystemInfo()
-                      .HAKCCustomTransfers()) {
-    CommonHAKCAnalysis::getLogger(Verbose)
-        << "Custom Transfer Type " << *it->GetTargetType() << "\n";
-    if (HAKCTy == it->GetTargetType()) {
-      return it;
+    custom_transfer_def_t
+    HAKCTransformer::GetCustomTransferFunctionForType(HAKCTypeP HAKCTy) {
+        CommonHAKCAnalysis::getLogger(Verbose)
+                << "Attempting to find Custom Transfer Function for Type " << *HAKCTy
+                << "\n";
+        for (auto &it: ModuleAnalysis.GetCommonAnalysis()
+             .GetSystemInfo()
+             .HAKCCustomTransfers()) {
+            CommonHAKCAnalysis::getLogger(Verbose)
+                    << "Custom Transfer Type " << *it->GetTargetType() << "\n";
+      if (HAKCTy == it->GetTargetType()) {
+        return it;
+      }
+        }
+        return nullptr;
     }
-  }
-  return nullptr;
-}
 
 custom_transfer_def_t
 HAKCTransformer::GetCustomTransferFunction(HAKCPointerBase &HAKCPointer) {
@@ -971,17 +932,14 @@ HAKCTransformer::GetCustomTransferFunction(HAKCPointerBase &HAKCPointer) {
   return GetCustomTransferFunctionForType(HAKCPointer.GetType());
 }
 
-Instruction *
-HAKCTransformer::CreateDefaultTransfer(HAKCPointerBase &HAKCPointer,
-                                       GlobalValue *Target, bool IsData,
-                                       ConstantInt *Size) {
-  SmallVector<Value *> TransferOperations;
-  CreateTransferArguments(HAKCPointer, Target, IsData, Size,
-                          TransferOperations);
-  bool IsPerCPU = ModuleAnalysis.GetCommonAnalysis().IsPerCPUPointer(
-      HAKCPointer.GetBaseDefinition());
+    Instruction *
+    HAKCTransformer::CreateDefaultTransfer(HAKCPointerBase &HAKCPointer,
+                                           GlobalValue *Target, bool IsData,
+                                           ConstantInt *Size) {
+        SmallVector<Value *> TransferOperations;
+  CreateTransferArguments(HAKCPointer, Target, IsData, Size, TransferOperations);
 
-  auto CompartmentTransfer = getSystemInfo().CompartmentTransfer(IsPerCPU);
+  auto CompartmentTransfer = getSystemInfo().CompartmentTransfer(ModuleAnalysis.GetCommonAnalysis().IsPerCPUPointer(HAKCPointer.GetBaseDefinition()));
 
   return CreateCallWithResultCast(CompartmentTransfer->GetFunction(),
                                   TransferOperations,
@@ -1002,16 +960,11 @@ Instruction *HAKCTransformer::CreateCallWithResultCast(
   return CastCallToType(Call, ValueToTypeMatch);
 }
 
-Instruction *HAKCTransformer::CastCallToType(CallInst *Call,
-                                             Value *ValueToTypeMatch) {
-  Value *ResultCast;
-  if (isa<PtrToIntInst>(ValueToTypeMatch) ||
-      ValueToTypeMatch->getType()->isIntegerTy()) {
-    ResultCast =
-        HAKCIRBuilder.CreatePtrToInt(Call, ValueToTypeMatch->getType());
-  } else {
-    ResultCast = HAKCIRBuilder.CreateBitCast(Call, ValueToTypeMatch->getType());
-  }
+Instruction *HAKCTransformer::CastCallToType(CallInst *Call, Value *ValueToTypeMatch) {
+  Value *ResultCast = isa<PtrToIntInst>(ValueToTypeMatch) || ValueToTypeMatch->getType()->isIntegerTy()
+    ? HAKCIRBuilder.CreatePtrToInt(Call, ValueToTypeMatch->getType())
+    : HAKCIRBuilder.CreateBitCast(Call, ValueToTypeMatch->getType());
+
 
   auto *Result = dyn_cast<Instruction>(ResultCast);
   if (!Result) {
@@ -1147,9 +1100,9 @@ Function *HAKCTransformer::GetTransferFunction(Function *F) const {
   return TransferFunction;
 }
 
-bool HAKCTransformer::NoKernelTransfers(Function *Target) {
-  return CommonHAKCAnalysis::IsUncompartmentalizedSymbol(Target, Client);
-}
+    bool HAKCTransformer::NoKernelTransfers(Function *Target) {
+  return CommonHAKCAnalysis::IsNECSymbol(Target, Client);
+    }
 
 Value *HAKCTransformer::CreateActionCall(HAKCTransferAction &TransferAction,
                                          HAKCTransferState &TransferState) {
@@ -1238,10 +1191,8 @@ Function *HAKCTransformer::CreateTransferFunction(Function *F) {
     throw std::exception();
   }
 
-  Function *TransferFunction = CreateNonVariadicTransferFunction(F);
-
-  return TransferFunction;
-}
+  return CreateNonVariadicTransferFunction(F);
+    }
 
 Function *
 HAKCTransformer::CreateTransferToVariadic(CallInst *Call,
@@ -1258,7 +1209,7 @@ HAKCTransformer::CreateTransferToVariadic(CallInst *Call,
     throw std::exception();
   }
 
-  std::vector<Type *> ArgTypes;
+        std::vector<Type *> ArgTypes;
   for (auto &Arg : Call->args()) {
     ArgTypes.push_back(Arg->getType());
   }
@@ -1268,18 +1219,18 @@ HAKCTransformer::CreateTransferToVariadic(CallInst *Call,
   Function *TransferFunction = nullptr;
   unsigned TargetTransferCount = 0;
 
-  for (auto &it : VariadicTransferFunctions) {
-    Function *Transfer = it.first;
-    Function *TransferTarget = it.second;
-    if (TransferTarget == Target) {
-      TargetTransferCount += 1;
-    }
+        for (auto &it: VariadicTransferFunctions) {
+            Function *Transfer = it.first;
+            Function *TransferTarget = it.second;
+      if (TransferTarget == Target) {
+        TargetTransferCount += 1;
+      }
 
-    if (Transfer->getFunctionType() == TransferType &&
-        TransferTarget == Target) {
-      TransferFunction = Transfer;
-    }
-  }
+              if (Transfer->getFunctionType() == TransferType &&
+              TransferTarget == Target) {
+          TransferFunction = Transfer;
+        }
+        }
 
   if (!TransferFunction) {
     auto TransferName = CommonHAKCAnalysis::getVariadicTransferName(Target);
@@ -1330,24 +1281,23 @@ void HAKCTransformer::TransferStructMembers(ConstantStruct *ConstStruct,
       continue;
     }
 
-    if (CommonHAKCAnalysis::IsPointerLikeType(Member->getType())) {
-      Value *Transfer, *GEP, *Load;
+            if (CommonHAKCAnalysis::IsPointerLikeType(Member->getType())) {
 
-      CommonHAKCAnalysis::getLogger(Verbose)
-          << "Creating Transfer of Member "
-          << std::to_string(Member.getOperandNo()) << " " << Member.get()
-          << "\n";
-      GEP = HAKCIRBuilder.CreateStructGEP(GlobalVar->getValueType(), GlobalVar,
-                                          Member.getOperandNo());
-      Load = HAKCIRBuilder.CreateLoad(Member->getType(), GEP);
-      auto ManagedPointer = CreateNewManagedPointer(Load);
-      Transfer = CreateCompartmentTransfer(
-          *ManagedPointer, GlobalTransfer->getEntryBlock().getTerminator(),
-          Target, !isa<Function>(Member.get()));
-      HAKCIRBuilder.CreateStore(Transfer, GEP);
+                CommonHAKCAnalysis::getLogger(Verbose)
+                        << "Creating Transfer of Member "
+                        << std::to_string(Member.getOperandNo()) << " " << Member.get()
+                        << "\n";
+      Value *GEP = HAKCIRBuilder.CreateStructGEP(
+          GlobalVar->getValueType(), GlobalVar, Member.getOperandNo());
+      Value *Load = HAKCIRBuilder.CreateLoad(Member->getType(), GEP);
+                auto ManagedPointer = CreateNewManagedPointer(Load);
+      Value *Transfer = CreateCompartmentTransfer(
+                    *ManagedPointer, GlobalTransfer->getEntryBlock().getTerminator(),
+                    Target, !isa<Function>(Member.get()));
+                HAKCIRBuilder.CreateStore(Transfer, GEP);
+            }
+        }
     }
-  }
-}
 
 bool HAKCTransformer::TransferShouldBeCreated(Value *V, GlobalValue *Target) {
   bool CreateTransfer = !TargetIsKernel(Target) &&
@@ -1360,11 +1310,11 @@ bool HAKCTransformer::TransferShouldBeCreated(Value *V, GlobalValue *Target) {
   return CreateTransfer;
 }
 
-Function *HAKCTransformer::PopulateGlobalTransfer(Function *GlobalTransfer,
-                                                  GlobalVariable *GlobalVar) {
-  if (!GlobalTransfer->empty()) {
-    return GlobalTransfer;
-  }
+    Function *HAKCTransformer::PopulateGlobalTransfer(Function *GlobalTransfer,
+                                                      GlobalVariable *GlobalVar) {
+        if (!GlobalTransfer->empty()) {
+          return GlobalTransfer;
+        }
 
   CommonHAKCAnalysis::getLogger(Verbose)
       << "Initializing New Function " << GlobalTransfer->getName() << "\n";
@@ -1404,7 +1354,7 @@ Function *HAKCTransformer::PopulateGlobalTransfer(Function *GlobalTransfer,
   return GlobalTransfer;
 }
 
-void HAKCTransformer::InitNewFunction(Function *F, StringRef EntryBlockName) {
+    void HAKCTransformer::InitNewFunction(Function *F, StringRef EntryBlockName) {
   if (!F->empty()) {
     return;
   }
@@ -1440,15 +1390,15 @@ HAKCTransformer::InferHAKCType(Argument &Arg, CallInst *CallSite,
       HAKCTy = ModuleAnalysis.GetTypeIdentifier().FindHAKCType(
           LoadI->getPointerOperand());
       return HAKCTy;
-    }
+        }
   }
 
   return nullptr;
 }
 
-Function *HAKCTransformer::PopulateTransferFunction(
-    Function *Target, Function *TransferFunction, CallInst *CallSite,
-    HAKCPointerManager *PointerManager) {
+    Function *HAKCTransformer::PopulateTransferFunction(
+        Function *Target, Function *TransferFunction, CallInst *CallSite,
+        HAKCPointerManager *PointerManager) {
   if (!TransferFunction->empty()) {
     return TransferFunction;
   }
@@ -1488,19 +1438,18 @@ Function *HAKCTransformer::PopulateTransferFunction(
   }
   Unreachable->removeFromParent();
 
-  for (auto &Arg : TransferFunction->args()) {
-    if (!ModuleAnalysis.GetCommonAnalysis().argShouldTransfer(&Arg) ||
-        NoKernelXfers) {
-      continue;
-    }
-    auto ManagedPointer = CreateNewManagedPointer(&Arg);
-    if (!ManagedPointer->GetType() && CallSite && PointerManager) {
-      auto HAKCTy = InferHAKCType(Arg, CallSite, PointerManager);
+        for (auto &Arg: TransferFunction->args()) {
+            if (!CommonHAKCAnalysis::argShouldTransfer(&Arg) || NoKernelXfers) {
+                continue;
+            }
+            auto ManagedPointer = CreateNewManagedPointer(&Arg);
+            if (!ManagedPointer->GetType() && CallSite && PointerManager) {
+                auto HAKCTy = InferHAKCType(Arg, CallSite, PointerManager);
       if (HAKCTy) {
         ManagedPointer->SetType(HAKCTy);
       }
-    }
-    HAKCTransferState TransferState(TargetDivision, *ManagedPointer);
+            }
+            HAKCTransferState TransferState(TargetDivision, *ManagedPointer);
     if (!TransferState) {
       continue;
     }
@@ -1603,9 +1552,10 @@ ConstantInt *HAKCTransformer::getInt32(uint32_t Value) {
 
 ConstantInt *HAKCTransformer::GetDefaultObjectSize() { return getInt64(1); }
 
-bool HAKCTransformer::TargetIsKernel(GlobalValue *Target) {
-  return CommonHAKCAnalysis::IsUncompartmentalizedSymbol(Target, Client);
-}
+    bool HAKCTransformer::TargetIsKernel(GlobalValue *Target) {
+        return CommonHAKCAnalysis::IsNECSymbol(
+            Target, Client);
+    }
 
 unsigned HAKCTransformer::GetPointerAddrSpace(HAKCPointerBase &HAKCPointer) {
   return GetPointerAddrSpace(HAKCPointer.GetBaseDefinition());
@@ -1624,20 +1574,19 @@ HAKCTransformer::AddCompartmentMetadataEntry(HAKCCompartment &Compartment) {
   return nullptr;
 }
 
-HAKCPointerBaseP
-HAKCTransformer::CreateNewManagedPointer(Value *BaseDefinition) const {
-  CommonHAKCAnalysis::getLogger(Verbose)
-      << "Creating new managed pointer for " << *BaseDefinition << "\n";
-  auto ManagedPtr = std::make_shared<HAKCPointerBase>(BaseDefinition, 0);
-  auto HAKCTy = ModuleAnalysis.GetTypeIdentifier().FindType(*ManagedPtr);
-  if (!HAKCTy) {
-    CommonHAKCAnalysis::getLogger(Fatal)
-        << "Could not find valid HAKCTy for value: " << *BaseDefinition
-        << " with type: " << *ManagedPtr << "\n";
-    throw std::exception();
-  } else {
-    ManagedPtr->SetType(HAKCTy);
-  }
-  return ManagedPtr;
-}
+    HAKCPointerBaseP
+    HAKCTransformer::CreateNewManagedPointer(Value *BaseDefinition) const {
+        CommonHAKCAnalysis::getLogger(Verbose)
+                << "Creating new managed pointer for " << *BaseDefinition << "\n";
+        auto ManagedPtr = std::make_shared<HAKCPointerBase>(BaseDefinition, 0);
+        auto HAKCTy = ModuleAnalysis.GetTypeIdentifier().FindType(*ManagedPtr);
+        if (!HAKCTy) {
+            CommonHAKCAnalysis::getLogger(Fatal)
+                    << "Could not find valid HAKCTy for value: " << *BaseDefinition <<
+                    " with type: " << *ManagedPtr << "\n";
+            throw std::exception();
+        }
+        ManagedPtr->SetType(HAKCTy);
+        return ManagedPtr;
+    }
 } // namespace llvm::hakc

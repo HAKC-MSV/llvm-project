@@ -36,7 +36,7 @@ public:
 
   const HAKCCompartmentDivision &GetDivision() const;
 
-  HAKCPointerBase &GetManagedPointer();
+  HAKCPointerBase &GetManagedPointer() const;
 
   HAKC_Access_Token GetAccessToken() const;
 

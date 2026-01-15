@@ -13,10 +13,9 @@
 #include <utility>
 
 hakc::HAKCSymbolInfo::HAKCSymbolInfo(CommonHAKCAnalysis &Analysis,
-                                     StringRef Name, bool DebugActive)
-    : HAKCInfo(Analysis, Name, DebugActive), Type(nullptr), UsedSymbols(),
-      GlobalObj(nullptr), DbgType(nullptr), DefiningLocation(nullptr),
-      DefiningLine(0), LocalScope(nullptr) {}
+                                     StringRef Name,
+                                     bool DebugActive)
+    : HAKCInfo(Analysis, Name, DebugActive) {}
 
 void hakc::HAKCSymbolInfo::SetType(std::shared_ptr<HAKCTypeInfo> HAKCType) {
   Type = std::move(HAKCType);
@@ -150,14 +149,14 @@ void hakc::HAKCSymbolInfo::SetLocalScope(const DIScope *Scope) {
 }
 
 bool hakc::HAKCSymbolInfo::Matches(
-    const hakc::HAKCYamlSymbol &YamlSymbol) const {
-  hakc_scope_t SymbolInfoScope =
+    const HAKCYamlSymbol &YamlSymbol) const {
+  const hakc_scope_t SymbolInfoScope =
       (LocalScope ? hakc_local_scope : hakc_global_scope);
   bool ScopesMatch = SymbolInfoScope == YamlSymbol.Scope.Scope;
   if (ScopesMatch && SymbolInfoScope == hakc_local_scope) {
     SmallString<256> PathName;
     GetLocalScopePath(PathName);
-    ScopesMatch = (YamlSymbol.Scope.LocalScope == PathName);
+    ScopesMatch = YamlSymbol.Scope.LocalScope == PathName;
   }
   return ScopesMatch && YamlSymbol.Name == Name && YamlSymbol.Type == *Type;
 }

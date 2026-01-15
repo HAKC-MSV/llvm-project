@@ -23,6 +23,7 @@ def cleanup_processes():
     subprocess.run(['pkill', '-9', '-f', 'hakc-adjust-compartmentalization-process'])
 
 
+
 def main():
     parser = argparse.ArgumentParser(description='HAKC Adjust Compartmentalization Process')
     parser.add_argument('--config', help='Path to server config file', required=True)

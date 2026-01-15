@@ -43,7 +43,7 @@ namespace llvm::hakc {
 
         hakc_compartment_id_t GetCompartmentIDValue() const;
 
-        static HAKC_Compartment_ID CreateID(hakc_compartment_id_t ID, Module &M);
+      static HAKC_Compartment_ID CreateID(hakc_compartment_id_t ID, const Module &M);
 
         static IntegerType *GetEntryTokenType(LLVMContext &Ctx);
 
@@ -59,11 +59,11 @@ namespace llvm::hakc {
 
         static constexpr unsigned CompartmentIDBitCount = 32;
 
-    protected:
-        HAKC_Compartment_ID Compartment;
-        HAKC_Access_Token EntryToken;
+      protected:
+        HAKC_Compartment_ID Compartment = nullptr;
+        HAKC_Access_Token EntryToken = nullptr;
         CompartmentIDSet Targets;
-    };
+      };
 } // namespace llvm::hakc
 
 #endif // HAKC_HAKCCOMPARTMENT_H

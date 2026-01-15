@@ -34,7 +34,7 @@ public:
 
   virtual std::string GetYamlHeader(unsigned Indents) const;
 
-  virtual StringRef GetName() const;
+  virtual StringRef GetName() const __attribute__((noinline));
 
   raw_ostream &operator>>(raw_ostream &os) const;
 

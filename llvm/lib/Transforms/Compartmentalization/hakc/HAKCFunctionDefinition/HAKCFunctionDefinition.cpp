@@ -18,7 +18,7 @@ HAKCFunctionArgumentDefinition::HAKCFunctionArgumentDefinition(
 
 HAKCFunctionDefinition::HAKCFunctionDefinition(
     Function *F, SmallVectorImpl<HAKCFunctionArgumentDefinition> &Args)
-    : F(F), ArgList(Args.begin(), Args.end()) {
+    : F(F), EpochIdx(0), ArgList(Args.begin(), Args.end()) {
   if (!F) {
     CommonHAKCAnalysis::getLogger(Fatal) << "F is null\n";
     throw std::exception();
@@ -46,8 +46,14 @@ ConstantInt *HAKCFunctionDefinition::GetDivisionIdIdx() const {
   return GetArgLLVMByUse(Div);
 }
 
+ConstantInt *HAKCFunctionDefinition::GetEpochIdx() const {
+  // TODO: implement
+  return GetArgLLVMByUse(Div);
+}
+
 ConstantInt *
-HAKCFunctionDefinition::GetArgLLVMByUse(HAKCFunctionArgumentUse Use) const {
+HAKCFunctionDefinition::GetArgLLVMByUse(
+    const HAKCFunctionArgumentUse Use) const {
   unsigned Idx;
   if (GetArgIdxByUse(Use, &Idx)) {
     return ConstantInt::get(IntegerType::get(F->getContext(), 32), Idx);
@@ -55,7 +61,7 @@ HAKCFunctionDefinition::GetArgLLVMByUse(HAKCFunctionArgumentUse Use) const {
   return nullptr;
 }
 
-bool HAKCFunctionDefinition::GetArgIdxByUse(HAKCFunctionArgumentUse Use,
+bool HAKCFunctionDefinition::GetArgIdxByUse(const HAKCFunctionArgumentUse Use,
                                             unsigned *Idx) const {
   for (auto &Arg : ArgList) {
     if (Arg.ArgUse == Use) {
@@ -71,7 +77,7 @@ HAKCFunctionDefinition::Args() {
   return make_range(ArgList.begin(), ArgList.end());
 }
 
-const std::map<HAKCFunctionArgumentUse, const char *>
+std::map<HAKCFunctionArgumentUse, const char *>
 HAKCArgumentArgumentUseStringMap() {
   return {{hakc::Size, "size"},
           {hakc::SignedPtr, "signed-ptr"},

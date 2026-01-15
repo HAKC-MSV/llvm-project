@@ -9,7 +9,7 @@
 namespace llvm::hakc {
 
 HAKCSimpleArgumentSize::HAKCSimpleArgumentSize(Function *AllocationFunction,
-                                               StringRef ArgNoString)
+                                               const StringRef ArgNoString)
     : HAKCAllocationSize(AllocationFunction), ArgNo(0) {
   if (ArgNoString.empty()) {
     CommonHAKCAnalysis::getLogger(Fatal)
@@ -27,10 +27,9 @@ ConstantInt *HAKCSimpleArgumentSize::GetSize(CallInst *Val) {
   return CI;
 }
 
-// e.g., - { name: neigh_parms_alloc, type: SimpleStaticSize, arguments: [ 144 ]
-// }
+// e.g., - { name: neigh_parms_alloc, type: SimpleStaticSize, arguments: [ 144 ] }
 HAKCSimpleStaticSize::HAKCSimpleStaticSize(Function *AllocationFunction,
-                                           StringRef StaticSizeString)
+                                           const StringRef StaticSizeString)
     : HAKCAllocationSize(AllocationFunction), StaticSize(0) {
   if (StaticSizeString.empty()) {
     CommonHAKCAnalysis::getLogger(Fatal)
@@ -48,8 +47,8 @@ ConstantInt *HAKCSimpleStaticSize::GetSize(CallInst *Val) {
 // e.g., - { name: nlmsg_new, type: StaticPlusArgument, arguments: [ 64,0 ] }
 // i.e., variable size struct = fixed size + argument size
 HAKCStaticPlusArgument::HAKCStaticPlusArgument(Function *AllocationFunction,
-                                               StringRef StaticSizeString,
-                                               StringRef ArgNoString)
+                                               const StringRef StaticSizeString,
+                                               const StringRef ArgNoString)
     : HAKCAllocationSize(AllocationFunction), StaticSize(0) {
   if (StaticSizeString.empty() || ArgNoString.empty()) {
     CommonHAKCAnalysis::getLogger(Fatal)
@@ -61,20 +60,16 @@ HAKCStaticPlusArgument::HAKCStaticPlusArgument(Function *AllocationFunction,
   ArgNoString.getAsInteger(10, ArgNo);
 }
 ConstantInt *HAKCStaticPlusArgument::GetSize(CallInst *Val) {
-  IRBuilder<> irBuilder(Val);
-  Value *ArgSizeVal = Val->getArgOperand(ArgNo);
-  ArgSizeVal =
-      irBuilder.CreateZExtOrBitCast(ArgSizeVal, irBuilder.getInt64Ty());
-  Value *StaticSizeVal = irBuilder.getInt64(StaticSize);
-  ConstantInt *CI =
-      irBuilder.getInt64(dyn_cast<ConstantInt>(ArgSizeVal)->getZExtValue() +
-                         dyn_cast<ConstantInt>(StaticSizeVal)->getZExtValue());
-  return CI;
+    IRBuilder<> irBuilder(Val);
+    Value *ArgSizeVal = Val->getArgOperand(ArgNo);
+    ArgSizeVal = irBuilder.CreateZExtOrBitCast(ArgSizeVal, irBuilder.getInt64Ty());
+    Value *StaticSizeVal = irBuilder.getInt64(StaticSize);
+    ConstantInt* CI = irBuilder.getInt64(dyn_cast<ConstantInt>(ArgSizeVal)->getZExtValue() + dyn_cast<ConstantInt>(StaticSizeVal)->getZExtValue());
+    return CI;
 }
 
-HAKCMultiplyArgumentSize::HAKCMultiplyArgumentSize(
-    Function *AllocationFunction, StringRef NObjsString,
-    StringRef ArgSizePerObjString)
+HAKCMultiplyArgumentSize::HAKCMultiplyArgumentSize(Function *AllocationFunction, const StringRef NObjsString,
+    const StringRef ArgSizePerObjString)
     : HAKCAllocationSize(AllocationFunction), NObjs(0), ArgSizePerObj(0) {
   if (NObjsString.empty() || ArgSizePerObjString.empty()) {
     CommonHAKCAnalysis::getLogger(Fatal)
@@ -112,8 +107,8 @@ ConstantInt *HAKCMultiplyArgumentSize::GetSize(CallInst *Val) {
 //};
 
 HAKCArgumentGEP::HAKCArgumentGEP(Function *AllocationFunction,
-                                 StringRef ArgAccessNoString,
-                                 ArrayRef<StringRef> IndicesString)
+                                 const StringRef ArgAccessNoString,
+                                 const ArrayRef<StringRef> IndicesString)
     : HAKCAllocationSize(AllocationFunction) {
   if (ArgAccessNoString.empty() || IndicesString.empty()) {
     CommonHAKCAnalysis::getLogger(Fatal)
@@ -144,8 +139,8 @@ HAKCAllocationSize::HAKCAllocationSize(Function *AllocationFunction)
     : AllocationFunction(AllocationFunction) {}
 
 std::shared_ptr<HAKCAllocationSize>
-HAKCAllocationSize::FromYaml(const hakc::HAKCYAMLAllocationType &YamlAllocation,
-                             Module &M) {
+HAKCAllocationSize::FromYaml(const HAKCYAMLAllocationType &YamlAllocation,
+                             const Module &M) {
   auto *F = M.getFunction(YamlAllocation.SymbolName);
   if (!F) {
     return nullptr;

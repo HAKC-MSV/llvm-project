@@ -21,8 +21,7 @@
 #include "llvm/Transforms/Compartmentalization/hakc/HAKC-defs.h"
 #include <llvm/Transforms/Compartmentalization/hakc/HAKCFunctionDefinition/HAKCFunctionDefinition.h>
 
-namespace llvm {
-namespace hakc {
+namespace llvm::hakc {
 class HAKCActionArgument {
 public:
   HAKCActionArgument(unsigned Idx, const std::string &Label)
@@ -40,7 +39,7 @@ class HAKCTransferAction {
 public:
   HAKCTransferAction(HAKCFunctionDefinition &HAKCActionFunction,
                      StringRef Label,
-                     SmallVector<HAKCActionArgument> Arguments);
+                     const SmallVector<HAKCActionArgument> &Arguments);
 
   HAKCTransferAction(HAKCFunctionDefinition &HAKCActionFunction,
                      StringRef Label);
@@ -62,7 +61,6 @@ protected:
 };
 
 typedef std::shared_ptr<HAKCTransferAction> transfer_action_def_t;
-} // namespace hakc
-} // namespace llvm
+} // namespace llvm::hakc
 
 #endif // HAKCTRANSFERACTION_H

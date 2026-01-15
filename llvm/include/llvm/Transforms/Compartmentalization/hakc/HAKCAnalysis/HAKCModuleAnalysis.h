@@ -18,7 +18,6 @@
 #define HAKC_HAKCMODULEANALYSIS_H
 
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/CommonHAKCAnalysis.h"
-#include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCTransformer.h"
 
 namespace llvm::hakc {
 class HAKCModuleAnalysis {
@@ -28,35 +27,42 @@ public:
   FunctionList AnalysisFunctions;
   HAKCTypeIdentifier &TypeIdentifier;
 
-  GlobalValue *ExtractGlobalFromKernelParam(GlobalVariable *GV);
+  GlobalValue *ExtractGlobalFromKernelParam(GlobalVariable *GV) const;
 
-  bool functionEscapes(Function *F);
+  bool functionEscapes(Function *F) const;
 
   bool FunctionNeedsAnalysis(Function *F) const;
 
-  bool ConstantStructTransferIsNeeded(ConstantStruct *ConstStruct);
+  static bool useEscapes(const Use &U);
 
-  bool AliasShouldBeCreated(Function *F);
-
-  bool useEscapes(Use &U);
+  HAKCModuleAnalysis();
 
   HAKCModuleAnalysis(CommonHAKCAnalysis &CommonAnalysis);
 
-  StructType *GetKernelParamType();
+  StructType *GetKernelParamType() const;
 
   Module &GetModule() const;
 
-  bool FunctionDefinedInAssembly(Function *F);
+  HAKCSystemInformation &GetSystemInformation() const;
+
+  bool FunctionDefinedInAssembly(Function *F) const;
 
   CommonHAKCAnalysis &GetCommonAnalysis() const;
 
-  Function *GetFunctionByName(StringRef Name, FunctionType *FuncTy);
+  Function *GetFunctionByName(StringRef Name, FunctionType *FuncTy) const;
 
   HAKCTypeIdentifier &GetTypeIdentifier() const;
 
   bool FunctionIsInAnalysisSet(Function *F);
 
   void OutputYAML(raw_ostream &out) const;
+
+  void runAnalysis();
+
+  void runEnforcement(bool UseSimulatedClient);
+
+  std::unique_ptr<HAKCServerClientBase> ConstructClient(bool UseSimulatedClient);
+
 };
 
 } // namespace llvm::hakc

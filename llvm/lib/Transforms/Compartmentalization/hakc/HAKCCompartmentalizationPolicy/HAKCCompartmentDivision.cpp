@@ -13,8 +13,9 @@ HAKCCompartmentDivision::HAKCCompartmentDivision(
       DivisionID(ConstantInt::get(
           IntegerType::get(Context, DIVISION_ID_BIT_LENGTH), DivisionID)) {}
 
-HAKCCompartmentDivision::HAKCCompartmentDivision()
-    : ParentCompartment(), AccessToken(nullptr), DivisionID(nullptr) {}
+    HAKCCompartmentDivision::HAKCCompartmentDivision() {
+    }
+
 
 const HAKCCompartment &HAKCCompartmentDivision::GetHAKCCompartment() const {
   return ParentCompartment;

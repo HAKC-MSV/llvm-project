@@ -60,49 +60,33 @@ bool ShouldSendSymbolsToServer(HAKCTypeIdentifier &TypeIdentifier) {
   return FunctionCount + GlobalCount > 0;
 }
 
-std::unique_ptr<HAKCServerClientBase>
-ConstructClient(HAKCModuleAnalysis &ModuleAnalysis) {
-  std::unique_ptr<HAKCServerClientBase> Client;
-  if (UseSimulatedClient) {
-    Client = std::make_unique<FakeServerClient>(ModuleAnalysis, NecOnly);
-  } else {
-    Client = std::make_unique<HAKCServerClient>(ModuleAnalysis);
-  }
-  return Client;
-}
-
 static bool runEnforcement(CommonHAKCAnalysis &HAKCAnalysis) {
-  if (skip_current_file(HAKCAnalysis)) {
+  if (HAKCAnalysis.GetSystemInfo().GetSkipCurrentFile()) {
     return false;
   }
   CommonHAKCAnalysis::getLogger(Info) << "Running Enforcement Pass Mode!\n";
   HAKCModuleAnalysis ModuleAnalysis(HAKCAnalysis);
-
-  auto Client = ConstructClient(ModuleAnalysis);
-  HAKCTransformer Transformer(ModuleAnalysis, *Client);
-
-  Transformer.performTransformations();
-
+  ModuleAnalysis.runEnforcement(UseSimulatedClient);
   return true;
 }
 
-static bool runAnalysis(CommonHAKCAnalysis &HAKCAnalysis) {
+static void runAnalysis(CommonHAKCAnalysis &HAKCAnalysis) {
   if (skip_current_file(HAKCAnalysis)) {
-    return false;
+    return;
   }
   CommonHAKCAnalysis::getLogger(Info) << "Running Analysis Pass Mode!\n";
   HAKCModuleAnalysis ModuleAnalysis(HAKCAnalysis);
 
   if (ShouldSendSymbolsToServer(ModuleAnalysis.GetTypeIdentifier())) {
     // Only ever connect to server if symbols need to be sent
-    auto Client = ConstructClient(ModuleAnalysis);
+    auto Client = ModuleAnalysis.ConstructClient(UseSimulatedClient);
+    // Symbols gathered are sent on connection termination
     Client->CloseConnection();
   } else {
-    CommonHAKCAnalysis::getLogger(Info)
+    CommonHAKCAnalysis::getLogger(Debug)
         << "Skipping file " << HAKCAnalysis.GetModule().getSourceFileName()
         << "with 0 symbols\n";
   }
-  return false;
 }
 
 static bool RunHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM) {
@@ -111,23 +95,24 @@ static bool RunHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM) {
     throw std::exception();
   }
 
-  const auto PassMode =
-      CommonHAKCAnalysis::ParsePassMode(PassModeArg.getValue());
-  CommonHAKCAnalysis HAKCAnalysis(M, MAM, HAKCConfigPath.getValue(),
-                                  HAKCServerPath.getValue(), PassMode);
-  switch (PassMode) {
-  case Analysis:
-    return runAnalysis(HAKCAnalysis);
-  case Enforcement:
-    return runEnforcement(HAKCAnalysis);
-  case RunConfigAndExit:
-    return false;
-  default:
-    CommonHAKCAnalysis::getLogger(Fatal) << "Invalid HAKC build mode!\n";
-    throw std::exception();
-  }
-}
-} // namespace hakc
+            const auto PassMode = CommonHAKCAnalysis::ParsePassMode(PassModeArg.getValue());
+            CommonHAKCAnalysis HAKCAnalysis(M, MAM, HAKCConfigPath.getValue(),
+                                            HAKCServerPath.getValue(), PassMode);
+            switch (PassMode) {
+                case Analysis:
+                    runAnalysis(HAKCAnalysis);
+                    return false;
+                case Enforcement:
+                    runEnforcement(HAKCAnalysis);
+                    return true;
+                case RunConfigAndExit:
+                    return false;
+                default:
+                    CommonHAKCAnalysis::getLogger(Fatal) << "Invalid HAKC build mode!\n";
+                    throw std::exception();
+            }
+        }
+    } // namespace hakc
 
 PreservedAnalyses HAKCPass::run(Module &M, ModuleAnalysisManager &MAM) {
   return hakc::RunHAKCAnalysis(M, MAM) ? PreservedAnalyses::none()

@@ -4,5 +4,5 @@
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCPreTransferAction.h"
 
 hakc::HAKCPreTransferAction::HAKCPreTransferAction(
-    HAKCFunctionDefinition &HAKCActionFunction, StringRef Label)
+    HAKCFunctionDefinition &HAKCActionFunction, const StringRef Label)
     : HAKCTransferAction(HAKCActionFunction, Label) {}

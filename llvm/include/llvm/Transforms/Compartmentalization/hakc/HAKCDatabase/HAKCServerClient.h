@@ -29,9 +29,11 @@ class HAKCModuleAnalysis;
 class HAKCModuleTransform;
 class HAKCSystemInformation;
 
-class HAKCServerClientBase {
-public:
-  explicit HAKCServerClientBase(HAKCModuleAnalysis &ModuleAnalysis);
+    class HAKCServerClientBase {
+    public:
+        explicit HAKCServerClientBase(LLVMContext &context);
+
+        explicit HAKCServerClientBase(unsigned default_compartment_id, unsigned default_division_id, unsigned default_division_id_bit_count, LLVMContext &context);
 
   virtual ~HAKCServerClientBase();
 
@@ -51,11 +53,13 @@ public:
 
   virtual HAKCCompartmentDivision &GetDefaultDivision();
 
-protected:
-  HAKCModuleAnalysis &ModuleAnalysis;
-  HAKCSystemInformation &SystemInformation;
-  std::vector<HAKCCompartmentP> Compartments;
-  std::vector<HAKCDivisionP> Divisions;
+    protected:
+        LLVMContext &ctx;
+        std::vector<HAKCCompartmentP> Compartments;
+        std::vector<HAKCDivisionP> Divisions;
+        unsigned default_compartment_id;
+        unsigned default_division_id;
+        unsigned division_id_bit_count;
 
   virtual HAKCDivisionP GetDivision(hakc_compartment_id_t CompartmentID,
                                     hakc_compartment_division_t DivisionID);
@@ -92,10 +96,12 @@ public:
 
   void GetValidTargets(HAKCCompartment &Compartment) override;
 
-protected:
-  HAKCDatabaseConnection Client;
-  std::map<HAKCSymbolP, HAKCDivisionP> SymbolDivisionMap;
-  std::set<hakc_compartment_id_t> RetrievedTargetCompartments;
+    protected:
+        HAKCModuleAnalysis &ModuleAnalysis;
+        HAKCSystemInformation &SystemInformation;
+        HAKCDatabaseConnection Client;
+        std::map<HAKCSymbolP, HAKCDivisionP> SymbolDivisionMap;
+        std::set<hakc_compartment_id_t> RetrievedTargetCompartments;
 
   void CheckConnection() const;
 
@@ -117,9 +123,11 @@ protected:
   HAKCDivisionP FindCachedSymbolDivision(HAKCSymbolP Symbol) const;
 };
 
-class FakeServerClient : public HAKCServerClientBase {
-public:
-  explicit FakeServerClient(HAKCModuleAnalysis &ModuleAnalysis, bool NecOnly);
+    class FakeServerClient : public HAKCServerClientBase {
+    public:
+        explicit FakeServerClient();
+        // FakeServerClient needs the actual module context to properly create compartments, I suppose
+        explicit FakeServerClient(LLVMContext &context);
 
   void add_symbols(ArrayRef<std::shared_ptr<HAKCFunctionInfo>> FIs,
                    ArrayRef<std::shared_ptr<HAKCGlobalInfo>> GIs) override;
@@ -128,7 +136,9 @@ public:
 
   void CloseConnection() override;
 
-  HAKCCompartmentDivision &GetDivision(GlobalValue *GV) override;
+        void UpdateValidTargets();
+
+        HAKCCompartmentDivision &GetDivision(GlobalValue *GV) override;
 
   void GetValidTargets(HAKCCompartment &Compartment) override;
 
@@ -136,7 +146,9 @@ protected:
   unsigned CurrentComaprtmentID;
   bool NecOnly;
   std::map<GlobalValue *, HAKCDivisionP> SymbolDivisionMap;
-};
+  // need to store context object
+  LLVMContext &context;
+    };
 } // namespace llvm::hakc
 
 #endif // HAKC_HAKCSERVERCLIENT_H
