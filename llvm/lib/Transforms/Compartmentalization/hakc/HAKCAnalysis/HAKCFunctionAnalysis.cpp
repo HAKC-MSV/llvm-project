@@ -2104,7 +2104,8 @@ bool HAKCFunctionEnforcement::BaseDefinitionShouldBeTransferred(
   // TODO: Look here, maybe negate isuncompartmentalizedsymbol
   GetLogger(Verbose, !DebugActive)
       << "Calling BaseDefinitionShouldBeTransferred\n";
-  if (!IsUncompartmentalizedSymbol() || ManagedPtr->GetManuallyTransferred() ||
+  if (CommonHAKCAnalysis::IsNECSymbol(&GetFunction(), Client) ||
+      ManagedPtr->GetManuallyTransferred() ||
       ManagedPtr->GetPurposefullyIgnored()) {
     return false;
   }

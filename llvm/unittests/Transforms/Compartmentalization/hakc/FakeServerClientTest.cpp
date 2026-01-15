@@ -9,14 +9,14 @@
 namespace llvm {
 namespace {
 
-TEST(HAKC_UNIT_TESTS, HAKC_UNIT_TEST_0) {
+TEST(HAKCUnitTests, FakeClientTest0) {
   LLVMContext Context;
   // Construct FakeServerClient and test behavior
   // Default policy allows all compartments to access any other compartment
   // (i.e., a valid target)
   auto Client = std::make_unique<hakc::FakeServerClient>(Context);
   std::vector<hakc::HAKCCompartmentP> Compartments;
-  for (int i = 0; i < 4; ++i) {
+  for (unsigned i = 0; i < 4; ++i) {
     Compartments.push_back(Client->GetCompartment(i));
     EXPECT_EQ(Compartments[i]->GetCompartmentIDValue(), i);
   }
