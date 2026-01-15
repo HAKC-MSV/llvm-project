@@ -4,17 +4,26 @@
 
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCDatabase/HAKCServerClient.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKC-defs.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/CommonHAKCAnalysis.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/HAKCModuleAnalysis.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCSystemInformation.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTypeIdentifier/HAKCFunctionInfo.h"
 
 namespace llvm::hakc {
-    HAKCServerClientBase::HAKCServerClientBase(LLVMContext &context) : ctx(context), default_compartment_id(0), default_division_id(13), division_id_bit_count(16) {}
+HAKCServerClientBase::HAKCServerClientBase(LLVMContext &context)
+    : ctx(context), default_compartment_id(0), default_division_id(13),
+      division_id_bit_count(16) {}
 
-    HAKCServerClientBase::HAKCServerClientBase(unsigned default_compartment_id, unsigned default_division_id, unsigned division_id_bit_count, LLVMContext &context) : ctx(context), default_compartment_id(default_compartment_id), default_division_id(default_division_id), division_id_bit_count(division_id_bit_count) {}
+HAKCServerClientBase::HAKCServerClientBase(unsigned default_compartment_id,
+                                           unsigned default_division_id,
+                                           unsigned division_id_bit_count,
+                                           LLVMContext &context)
+    : ctx(context), default_compartment_id(default_compartment_id),
+      default_division_id(default_division_id),
+      division_id_bit_count(division_id_bit_count) {}
 
-    HAKCServerClientBase::~HAKCServerClientBase() {}
+HAKCServerClientBase::~HAKCServerClientBase() {}
 
 HAKCCompartmentP
 HAKCServerClientBase::GetCompartment(hakc_compartment_id_t CompartmentID) {
@@ -23,9 +32,9 @@ HAKCServerClientBase::GetCompartment(hakc_compartment_id_t CompartmentID) {
   return CreateCompartment(CompartmentID, 0);
 }
 
-    HAKCCompartmentDivision &HAKCServerClientBase::GetDefaultDivision() {
-        return *GetDivision(default_compartment_id, default_division_id);
-    }
+HAKCCompartmentDivision &HAKCServerClientBase::GetDefaultDivision() {
+  return *GetDivision(default_compartment_id, default_division_id);
+}
 
 HAKCDivisionP
 HAKCServerClientBase::GetDivision(hakc_compartment_id_t CompartmentID,
@@ -33,17 +42,21 @@ HAKCServerClientBase::GetDivision(hakc_compartment_id_t CompartmentID,
   if (auto Division = FindCachedDivision(CompartmentID, DivisionID))
     return Division;
 
-        return CreateDivision(CompartmentID, DivisionID, CommonHAKCAnalysis::GetDefaultDivisionAccessToken(CompartmentID, DivisionID, division_id_bit_count));
-    }
+  return CreateDivision(CompartmentID, DivisionID,
+                        CommonHAKCAnalysis::GetDefaultDivisionAccessToken(
+                            CompartmentID, DivisionID, division_id_bit_count));
+}
 
-    HAKCDivisionP HAKCServerClientBase::CreateDivision(hakc_compartment_id_t CompartmentID,
-                                                       hakc_compartment_division_t DivisionID,
-                                                       hakc_access_token_t AccessToken) {
-        auto compartment = GetCompartment(CompartmentID);
-        auto Division = std::make_shared<HAKCCompartmentDivision>(*compartment, DivisionID, AccessToken, ctx);
-        Divisions.push_back(Division);
-        return Division;
-    }
+HAKCDivisionP
+HAKCServerClientBase::CreateDivision(hakc_compartment_id_t CompartmentID,
+                                     hakc_compartment_division_t DivisionID,
+                                     hakc_access_token_t AccessToken) {
+  auto compartment = GetCompartment(CompartmentID);
+  auto Division = std::make_shared<HAKCCompartmentDivision>(
+      *compartment, DivisionID, AccessToken, ctx);
+  Divisions.push_back(Division);
+  return Division;
+}
 
 HAKCDivisionP HAKCServerClientBase::FindCachedDivision(
     hakc_compartment_id_t CompartmentID,
@@ -68,23 +81,33 @@ HAKCCompartmentP HAKCServerClientBase::FindCachedCompartment(
   return nullptr;
 }
 
-    HAKCCompartmentP HAKCServerClientBase::CreateCompartment(hakc_compartment_id_t CompartmentID,
-                                                             hakc_access_token_t EntryToken) {
-        auto Compartment = std::make_shared<HAKCCompartment>(CompartmentID, EntryToken, ctx);
-        GetValidTargets(*Compartment);
-        Compartments.push_back(Compartment);
-        return Compartment;
-    }
+HAKCCompartmentP
+HAKCServerClientBase::CreateCompartment(hakc_compartment_id_t CompartmentID,
+                                        hakc_access_token_t EntryToken) {
+  auto Compartment =
+      std::make_shared<HAKCCompartment>(CompartmentID, EntryToken, ctx);
+  GetValidTargets(*Compartment);
+  Compartments.push_back(Compartment);
+  return Compartment;
+}
 
-    HAKCServerClient::HAKCServerClient(HAKCModuleAnalysis &ModuleAnalysis)
-        : HAKCServerClientBase(ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().GetDefaultCompartmentID(),
-                                ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().GetDefaultDivisionID(),
-                                ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().GetDivisionIDBitCount(),
-                                ModuleAnalysis.GetCommonAnalysis().GetModule().getContext()), ModuleAnalysis(ModuleAnalysis),
-                                SystemInformation(ModuleAnalysis.GetCommonAnalysis().GetSystemInfo()),
-                                Client(ModuleAnalysis.GetCommonAnalysis().GetSystemInfo(), false){
-        ConnectToDatabase();
-    }
+HAKCServerClient::HAKCServerClient(HAKCModuleAnalysis &ModuleAnalysis)
+    : HAKCServerClientBase(
+          ModuleAnalysis.GetCommonAnalysis()
+              .GetSystemInfo()
+              .GetDefaultCompartmentID(),
+          ModuleAnalysis.GetCommonAnalysis()
+              .GetSystemInfo()
+              .GetDefaultDivisionID(),
+          ModuleAnalysis.GetCommonAnalysis()
+              .GetSystemInfo()
+              .GetDivisionIDBitCount(),
+          ModuleAnalysis.GetCommonAnalysis().GetModule().getContext()),
+      ModuleAnalysis(ModuleAnalysis),
+      SystemInformation(ModuleAnalysis.GetCommonAnalysis().GetSystemInfo()),
+      Client(ModuleAnalysis.GetCommonAnalysis().GetSystemInfo(), false) {
+  ConnectToDatabase();
+}
 
 HAKCServerClient::~HAKCServerClient() { DisconnectFromDatabase(); }
 
@@ -152,12 +175,12 @@ void HAKCServerClient::add_symbols(
 
   json::Object Parameters({{"allSymbols", AllSymbols}});
 
-        auto result = Execute(SystemInformation.GetAddSymbolsEndpoint(), Parameters);
-        if (!result.success) {
-            CommonHAKCAnalysis::getLogger(Fatal) << "Invalid Response for AllSymbols\n";
-            throw std::exception();
-        }
-    }
+  auto result = Execute(SystemInformation.GetAddSymbolsEndpoint(), Parameters);
+  if (!result.success) {
+    CommonHAKCAnalysis::getLogger(Fatal) << "Invalid Response for AllSymbols\n";
+    throw std::exception();
+  }
+}
 
 void HAKCServerClient::SendSymbolsToAnalysisServer(
     HAKCTypeIdentifier &TypeIdentifier) {
@@ -211,32 +234,31 @@ HAKCServerClient::FindCachedSymbolDivision(HAKCSymbolP Symbol) const {
   return nullptr;
 }
 
-    hakc::HAKCCompartmentDivision &HAKCServerClient::GetDivision(GlobalValue *GV) {
-        // Get Division from Global Value -> query for (division_id, access_token,
-        // compartment_id, entry_token)
-        auto HAKCSymbol = SystemInformation.GetTypeIdentifier().FindSymbol(GV, true);
-        if (!HAKCSymbol) {
-            CommonHAKCAnalysis::getLogger(Debug)
-                    << "Could not find HAKCSymbol for " << GV << "\n";
-            return GetDefaultDivision();
-        }
-        if (auto CachedDivision = FindCachedSymbolDivision(HAKCSymbol)) {
-            return *CachedDivision;
-        }
+hakc::HAKCCompartmentDivision &HAKCServerClient::GetDivision(GlobalValue *GV) {
+  // Get Division from Global Value -> query for (division_id, access_token,
+  // compartment_id, entry_token)
+  auto HAKCSymbol = SystemInformation.GetTypeIdentifier().FindSymbol(GV, true);
+  if (!HAKCSymbol) {
+    CommonHAKCAnalysis::getLogger(Debug)
+        << "Could not find HAKCSymbol for " << GV << "\n";
+    return GetDefaultDivision();
+  }
+  if (auto CachedDivision = FindCachedSymbolDivision(HAKCSymbol)) {
+    return *CachedDivision;
+  }
 
-        std::string ObjectYaml;
-        raw_string_ostream os(ObjectYaml);
-      os << *HAKCSymbol;
-        json::Object Parameters({{"object", ObjectYaml}});
-      HAKCResult result =
-          Execute(SystemInformation.GetSymbolDivisionEndpoint(), Parameters);
-      if (!result.success) {
-        CommonHAKCAnalysis::getLogger(Fatal)
-            << "Failed request to "
-            << SystemInformation.GetSymbolDivisionEndpoint() << " on GV " << *GV
-            << " with error " << result.error << "\n";
-        throw std::exception();
-      }
+  std::string ObjectYaml;
+  raw_string_ostream os(ObjectYaml);
+  os << *HAKCSymbol;
+  json::Object Parameters({{"object", ObjectYaml}});
+  HAKCResult result =
+      Execute(SystemInformation.GetSymbolDivisionEndpoint(), Parameters);
+  if (!result.success) {
+    CommonHAKCAnalysis::getLogger(Fatal)
+        << "Failed request to " << SystemInformation.GetSymbolDivisionEndpoint()
+        << " on GV " << *GV << " with error " << result.error << "\n";
+    throw std::exception();
+  }
 
   std::shared_ptr<HAKCDivisionCompartmentPayload> division_compartment_payload =
       std::dynamic_pointer_cast<HAKCDivisionCompartmentPayload>(
@@ -251,13 +273,13 @@ HAKCServerClient::FindCachedSymbolDivision(HAKCSymbolP Symbol) const {
   hakc_compartment_division_t entry_token =
       division_compartment_payload->EntryToken;
 
-        auto compartment = CreateCompartment(compartment_id, entry_token, false);
-        auto division = std::make_shared<HAKCCompartmentDivision>(
-            *compartment, division_id, access_token, ctx);
-        Divisions.push_back(division);
-        SymbolDivisionMap[HAKCSymbol] = division;
-        return *division;
-    }
+  auto compartment = CreateCompartment(compartment_id, entry_token, false);
+  auto division = std::make_shared<HAKCCompartmentDivision>(
+      *compartment, division_id, access_token, ctx);
+  Divisions.push_back(division);
+  SymbolDivisionMap[HAKCSymbol] = division;
+  return *division;
+}
 
 HAKCDivisionP
 HAKCServerClient::GetDivision(hakc_compartment_id_t CompartmentID,
@@ -367,10 +389,6 @@ HAKCServerClient::CreateCompartment(hakc_compartment_id_t CompartmentID,
   return HAKCServerClientBase::CreateCompartment(CompartmentID, EntryToken);
 }
 
-    FakeServerClient::FakeServerClient() : HAKCServerClientBase(context), CurrentCompartmentID(default_compartment_id + 1) {}
-
-    FakeServerClient::FakeServerClient(LLVMContext &context) : HAKCServerClientBase(context), CurrentCompartmentID(default_compartment_id + 1) {}
-
 void FakeServerClient::add_symbols(
     ArrayRef<std::shared_ptr<HAKCFunctionInfo>> FIs,
     ArrayRef<std::shared_ptr<HAKCGlobalInfo>> GIs) {
@@ -381,38 +399,44 @@ void FakeServerClient::SendSymbolsToAnalysisServer(
     HAKCTypeIdentifier &TypeIdentifier) {
   return;
 }
+FakeServerClient::FakeServerClient(LLVMContext &context)
+    : HAKCServerClientBase(context),
+      CurrentCompartmentID(KERNEL_COMPARTMENT + 1), NecOnly(false),
+      context(context) {}
 
-    void FakeServerClient::UpdateValidTargets() {
-      // refresh all valid targets
-      for (auto &src_comp: Compartments) {
-        for (auto &dst_comp: Compartments) {
-          // if (src_comp != dst_comp) {
-            src_comp->AddTarget(dst_comp->GetCompartmentID());
-          // }
-        }
-      }
+void FakeServerClient::CloseConnection() {}
+
+void FakeServerClient::UpdateValidTargets() {
+  // refresh all valid targets
+  for (auto &src_comp : Compartments) {
+    for (auto &dst_comp : Compartments) {
+      src_comp->AddTarget(dst_comp->GetCompartmentID());
     }
+  }
+}
 
-    HAKCCompartmentDivision &FakeServerClient::GetDivision(GlobalValue *GV) {
-        HAKCDivisionP Division = nullptr;
-        UpdateValidTargets();
-        if (SymbolDivisionMap.contains(GV)) {
-            Division = SymbolDivisionMap[GV];
-        }
-        else {
-          auto CompartmentID = CurrentCompartmentID++;
-          auto DivisionID = default_division_id;
-          Division = CreateDivision(CompartmentID, DivisionID, CommonHAKCAnalysis::GetDefaultDivisionAccessToken(CompartmentID, DivisionID, division_id_bit_count));
-          SymbolDivisionMap[GV] = Division;
-        }
+HAKCCompartmentDivision &FakeServerClient::GetDivision(GlobalValue *GV) {
+  HAKCDivisionP Division = nullptr;
+  UpdateValidTargets();
+  if (SymbolDivisionMap.contains(GV)) {
+    Division = SymbolDivisionMap[GV];
+  } else {
+    auto CompartmentID = CurrentCompartmentID++;
+    auto DivisionID = default_division_id;
+    Division =
+        CreateDivision(CompartmentID, DivisionID,
+                       CommonHAKCAnalysis::GetDefaultDivisionAccessToken(
+                           CompartmentID, DivisionID, division_id_bit_count));
+    SymbolDivisionMap[GV] = Division;
+  }
 
-        return *Division;
-    }
+  return *Division;
+}
 
-    void FakeServerClient::GetValidTargets(HAKCCompartment &Compartment) {
-        UpdateValidTargets();
-        for (auto &ExistingCompartment: Compartments) {
-            Compartment.AddTarget(ExistingCompartment->GetCompartmentID());
-        }
-    }
+void FakeServerClient::GetValidTargets(HAKCCompartment &Compartment) {
+  UpdateValidTargets();
+  for (auto &ExistingCompartment : Compartments) {
+    Compartment.AddTarget(ExistingCompartment->GetCompartmentID());
+  }
+}
 } // namespace llvm::hakc
