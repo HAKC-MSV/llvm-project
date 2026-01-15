@@ -128,8 +128,6 @@ protected:
 
 class FakeServerClient : public HAKCServerClientBase {
 public:
-  // FakeServerClient needs the actual module context to properly create
-  // compartments, I suppose
   explicit FakeServerClient(LLVMContext &context);
 
   void add_symbols(ArrayRef<std::shared_ptr<HAKCFunctionInfo>> FIs,
@@ -149,7 +147,6 @@ protected:
   unsigned CurrentCompartmentID;
   bool NecOnly;
   std::map<GlobalValue *, HAKCDivisionP> SymbolDivisionMap;
-  // need to store context object
   LLVMContext &context;
 };
 } // namespace llvm::hakc

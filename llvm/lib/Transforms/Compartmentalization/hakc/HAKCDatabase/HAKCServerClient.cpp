@@ -391,14 +391,11 @@ HAKCServerClient::CreateCompartment(hakc_compartment_id_t CompartmentID,
 
 void FakeServerClient::add_symbols(
     ArrayRef<std::shared_ptr<HAKCFunctionInfo>> FIs,
-    ArrayRef<std::shared_ptr<HAKCGlobalInfo>> GIs) {
-  return;
-}
+    ArrayRef<std::shared_ptr<HAKCGlobalInfo>> GIs) {}
 
 void FakeServerClient::SendSymbolsToAnalysisServer(
-    HAKCTypeIdentifier &TypeIdentifier) {
-  return;
-}
+    HAKCTypeIdentifier &TypeIdentifier) {}
+
 FakeServerClient::FakeServerClient(LLVMContext &context)
     : HAKCServerClientBase(context),
       CurrentCompartmentID(KERNEL_COMPARTMENT + 1), NecOnly(false),
