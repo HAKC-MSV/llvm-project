@@ -13,8 +13,7 @@
 #include <utility>
 
 hakc::HAKCSymbolInfo::HAKCSymbolInfo(CommonHAKCAnalysis &Analysis,
-                                     StringRef Name,
-                                     bool DebugActive)
+                                     StringRef Name, bool DebugActive)
     : HAKCInfo(Analysis, Name, DebugActive) {}
 
 void hakc::HAKCSymbolInfo::SetType(std::shared_ptr<HAKCTypeInfo> HAKCType) {
@@ -148,8 +147,7 @@ void hakc::HAKCSymbolInfo::SetLocalScope(const DIScope *Scope) {
   }
 }
 
-bool hakc::HAKCSymbolInfo::Matches(
-    const HAKCYamlSymbol &YamlSymbol) const {
+bool hakc::HAKCSymbolInfo::Matches(const HAKCYamlSymbol &YamlSymbol) const {
   const hakc_scope_t SymbolInfoScope =
       (LocalScope ? hakc_local_scope : hakc_global_scope);
   bool ScopesMatch = SymbolInfoScope == YamlSymbol.Scope.Scope;

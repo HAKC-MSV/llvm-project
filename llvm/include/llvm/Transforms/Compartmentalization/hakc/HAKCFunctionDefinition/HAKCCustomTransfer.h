@@ -5,8 +5,8 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// This file contains the information needed to create a custom transfer function
-/// i.e., allowing data to be transferred correctly outside a boundary.
+/// This file contains the information needed to create a custom transfer
+/// function i.e., allowing data to be transferred correctly outside a boundary.
 ///
 //===----------------------------------------------------------------------===//
 //

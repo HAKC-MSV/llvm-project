@@ -6,6 +6,7 @@
 
 using namespace llvm;
 
-hakc::HAKCPostTargetAction::HAKCPostTargetAction(HAKCFunctionDefinition &HAKCActionFunction, const StringRef Label,
-    const SmallVector<HAKCActionArgument> &Arguments) : HAKCTransferAction(HAKCActionFunction, Label, Arguments) {
-}
+hakc::HAKCPostTargetAction::HAKCPostTargetAction(
+    HAKCFunctionDefinition &HAKCActionFunction, const StringRef Label,
+    const SmallVector<HAKCActionArgument> &Arguments)
+    : HAKCTransferAction(HAKCActionFunction, Label, Arguments) {}

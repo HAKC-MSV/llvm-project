@@ -39,10 +39,10 @@ namespace llvm::hakc {
  */
 class HAKCTransformer {
 public:
-  HAKCTransformer(HAKCModuleAnalysis &ModuleAnalysis, HAKCServerClientBase &Client);
+  HAKCTransformer(HAKCModuleAnalysis &ModuleAnalysis,
+                  HAKCServerClientBase &Client);
 
   virtual ~HAKCTransformer() = default;
-
 
   void runEnforcement();
 
@@ -202,7 +202,7 @@ public:
 
   Function *GetFunctionByName(StringRef Name, FunctionType *FuncTy) const;
 
-  HAKCModuleAnalysis& GetModuleAnalysis() const;
+  HAKCModuleAnalysis &GetModuleAnalysis() const;
 
   bool FunctionIsInAnalysisSet(Function *F) const;
 

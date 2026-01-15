@@ -45,7 +45,7 @@ typedef std::vector<ManagedHAKCPointerUseP> ManagedHAKCPointerUseListType;
 
 class HAKCPointerManager {
 public:
-  explicit HAKCPointerManager(Function* Function, HAKCModuleAnalysis &Analysis);
+  explicit HAKCPointerManager(Function *Function, HAKCModuleAnalysis &Analysis);
 
   virtual ~HAKCPointerManager() = default;
 
@@ -77,11 +77,15 @@ public:
 
   Value *FindProtectedValue(const ManagedHAKCPointerUse &PointerUse);
 
-  static Value *FindManagedValue(const std::map<ManagedHAKCPointerUseP, Value *> &Storage, const ManagedHAKCPointerUse &PointerUse);
+  static Value *
+  FindManagedValue(const std::map<ManagedHAKCPointerUseP, Value *> &Storage,
+                   const ManagedHAKCPointerUse &PointerUse);
 
-  void AddAuthenticatedPointer(const ManagedHAKCPointerUseP &PointerUse, Value *Replacement);
+  void AddAuthenticatedPointer(const ManagedHAKCPointerUseP &PointerUse,
+                               Value *Replacement);
 
-  void AddProtectedPointer(const ManagedHAKCPointerUseP &PointerUse, Value *Replacement);
+  void AddProtectedPointer(const ManagedHAKCPointerUseP &PointerUse,
+                           Value *Replacement);
 
   bool ValueWillBeAuthenticated(Value *V);
 
@@ -99,7 +103,7 @@ public:
 
   unsigned GetClonesAdded() const;
 
-  std::map<Instruction *, Instruction *>& GetClones() { return Clones; }
+  std::map<Instruction *, Instruction *> &GetClones() { return Clones; }
 
   unsigned GetTotalAdditions() const;
 
@@ -120,7 +124,9 @@ public:
   bool IsIntrinsicNeedingAuthentication(CallBase *Call) const;
 
   // Q: Should functions always be in the same compartment during analysis?
-  virtual bool FunctionsAreInSameCompartment(Function *F, Function *G) {return true;}
+  virtual bool FunctionsAreInSameCompartment(Function *F, Function *G) {
+    return true;
+  }
 
 protected:
   /**
@@ -134,7 +140,7 @@ protected:
 
   ManagedHAKCPointerUseListType AnalyzedUses;
 
-  Function* CurrentFunction;
+  Function *CurrentFunction;
   HAKCModuleAnalysis &ModuleAnalysis;
 
   unsigned DataAuthenticationsAdded = 0;
@@ -149,11 +155,14 @@ protected:
                                  Value *Replacement,
                                  bool AddingAuthenticatedReplacements);
 
-  static Value *FindManagedValue(const std::map<ManagedHAKCPointerUseP, Value *> &Storage, const Value *Target);
+  static Value *
+  FindManagedValue(const std::map<ManagedHAKCPointerUseP, Value *> &Storage,
+                   const Value *Target);
 
   bool ManageNewPointer(Use &U);
 
-  void ClassifyAllUsesOfDefinition(Value *Definition, ManagedHAKCPointer &ManagedPointer);
+  void ClassifyAllUsesOfDefinition(Value *Definition,
+                                   ManagedHAKCPointer &ManagedPointer);
 
   bool UseIsAnalyzed(ManagedHAKCPointerUse &MangedPtrUse);
 
@@ -167,11 +176,15 @@ protected:
 
   bool IsClonedUseNeedingAdditionalClassification(const Use &U);
 
-  static void PrintManagedValues(const std::map<ManagedHAKCPointerUseP, Value *> &Storage);
+  static void
+  PrintManagedValues(const std::map<ManagedHAKCPointerUseP, Value *> &Storage);
 
-  Value *FindManagedPointerReplacement(Value *Target, bool ReturnAuthenticatedPointer);
+  Value *FindManagedPointerReplacement(Value *Target,
+                                       bool ReturnAuthenticatedPointer);
 
-  ManagedHAKCPointerUseP CreateManagedPointerUse(ManagedHAKCPointer &ManagedPointer, User *U, unsigned OperandNo);
+  ManagedHAKCPointerUseP
+  CreateManagedPointerUse(ManagedHAKCPointer &ManagedPointer, User *U,
+                          unsigned OperandNo);
 
   bool IsConstantExprUsedInKernelCall(User *U) const;
 

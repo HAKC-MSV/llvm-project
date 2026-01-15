@@ -5,19 +5,19 @@
 #ifndef HAKC_HAKCYAMLSCOPE_H
 #define HAKC_HAKCYAMLSCOPE_H
 
-#include <string>
 #include "llvm/Transforms/Compartmentalization/hakc/HAKC-defs.h"
+#include <string>
 
 namespace llvm::hakc {
-    class HAKCYamlScope {
-    public:
-        HAKCYamlScope(hakc_scope_t Scope, std::string LocalScope);
+class HAKCYamlScope {
+public:
+  HAKCYamlScope(hakc_scope_t Scope, std::string LocalScope);
 
-        HAKCYamlScope() = default;
+  HAKCYamlScope() = default;
 
-        std::string LocalScope;
-        hakc_scope_t Scope;
-    };
-} // hakc
+  std::string LocalScope;
+  hakc_scope_t Scope;
+};
+} // namespace llvm::hakc
 
-#endif //HAKC_HAKCYAMLSCOPE_H
+#endif // HAKC_HAKCYAMLSCOPE_H

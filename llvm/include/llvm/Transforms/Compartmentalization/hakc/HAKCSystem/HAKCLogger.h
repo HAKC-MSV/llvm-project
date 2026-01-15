@@ -42,13 +42,15 @@ public:
 
 template <
     typename T,
-    std::enable_if_t<!std::is_integral_v<T> && !std::is_same_v<T, StringRef> && !std::is_same_v<T, const StringRef>&&
+    std::enable_if_t<!std::is_integral_v<T> && !std::is_same_v<T, StringRef> &&
+                     !std::is_same_v<T, const StringRef> &&
                      !std::is_same_v<T, std::string> &&
                      !std::is_same_v<T, const std::string>> * = nullptr>
 HAKCLogger &operator<<(HAKCLogger &Logger, T &T_) {
   if (!Logger.IsDisabled()) {
     for (std::shared_ptr<HAKCWriter> &stream : Logger.Streams()) {
-      if (!stream->IsDisabled() && Logger.GetLogLevel() >= stream->GetConfiguredLogLevel()) {
+      if (!stream->IsDisabled() &&
+          Logger.GetLogLevel() >= stream->GetConfiguredLogLevel()) {
         *stream << T_;
       }
     }
@@ -59,7 +61,8 @@ HAKCLogger &operator<<(HAKCLogger &Logger, T &T_) {
 template <typename T> HAKCLogger &operator<<(HAKCLogger &Logger, T *T_) {
   if (!Logger.IsDisabled()) {
     for (std::shared_ptr<HAKCWriter> &stream : Logger.Streams()) {
-      if (!stream->IsDisabled() && Logger.GetLogLevel() >= stream->GetConfiguredLogLevel()) {
+      if (!stream->IsDisabled() &&
+          Logger.GetLogLevel() >= stream->GetConfiguredLogLevel()) {
         *stream << T_;
       }
     }
@@ -69,13 +72,15 @@ template <typename T> HAKCLogger &operator<<(HAKCLogger &Logger, T *T_) {
 
 template <
     typename T,
-    std::enable_if_t<std::is_integral_v<T> || std::is_same_v<T, StringRef> || std::is_same_v<T, const StringRef> ||
+    std::enable_if_t<std::is_integral_v<T> || std::is_same_v<T, StringRef> ||
+                     std::is_same_v<T, const StringRef> ||
                      std::is_same_v<T, std::string> ||
                      std::is_same_v<T, const std::string>> * = nullptr>
 HAKCLogger &operator<<(HAKCLogger &Logger, T T_) {
   if (!Logger.IsDisabled()) {
     for (std::shared_ptr<HAKCWriter> &stream : Logger.Streams()) {
-      if (!stream->IsDisabled() && Logger.GetLogLevel() >= stream->GetConfiguredLogLevel()) {
+      if (!stream->IsDisabled() &&
+          Logger.GetLogLevel() >= stream->GetConfiguredLogLevel()) {
         *stream << T_;
       }
     }

@@ -15,9 +15,9 @@
 #include "llvm/IR/PassManager.h"
 
 namespace llvm {
-    class HAKCPass : public PassInfoMixin<HAKCPass> {
-    public:
-        PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM);
-    };
+class HAKCPass : public PassInfoMixin<HAKCPass> {
+public:
+  PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM);
+};
 } // namespace llvm
 #endif // PMC_HAKCPASS_H

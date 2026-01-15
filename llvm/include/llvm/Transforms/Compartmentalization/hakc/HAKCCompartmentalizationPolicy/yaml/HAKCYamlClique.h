@@ -11,14 +11,14 @@
 
 namespace llvm::hakc {
 
-    class HAKCYamlClique {
-    public:
-        HAKCYamlClique() = default;
+class HAKCYamlClique {
+public:
+  HAKCYamlClique() = default;
 
-        hakc_access_token_t AccessToken;
-        hakc_compartment_division_t DivisionID;
-    };
+  hakc_access_token_t AccessToken;
+  hakc_compartment_division_t DivisionID;
+};
 
-} // hakc
+} // namespace llvm::hakc
 
-#endif //HAKC_HAKCYAMLCLIQUE_H
+#endif // HAKC_HAKCYAMLCLIQUE_H

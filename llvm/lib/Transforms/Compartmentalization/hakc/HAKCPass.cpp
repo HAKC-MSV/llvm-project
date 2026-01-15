@@ -95,24 +95,25 @@ static bool RunHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM) {
     throw std::exception();
   }
 
-            const auto PassMode = CommonHAKCAnalysis::ParsePassMode(PassModeArg.getValue());
-            CommonHAKCAnalysis HAKCAnalysis(M, MAM, HAKCConfigPath.getValue(),
-                                            HAKCServerPath.getValue(), PassMode);
-            switch (PassMode) {
-                case Analysis:
-                    runAnalysis(HAKCAnalysis);
-                    return false;
-                case Enforcement:
-                    runEnforcement(HAKCAnalysis);
-                    return true;
-                case RunConfigAndExit:
-                    return false;
-                default:
-                    CommonHAKCAnalysis::getLogger(Fatal) << "Invalid HAKC build mode!\n";
-                    throw std::exception();
-            }
-        }
-    } // namespace hakc
+  const auto PassMode =
+      CommonHAKCAnalysis::ParsePassMode(PassModeArg.getValue());
+  CommonHAKCAnalysis HAKCAnalysis(M, MAM, HAKCConfigPath.getValue(),
+                                  HAKCServerPath.getValue(), PassMode);
+  switch (PassMode) {
+  case Analysis:
+    runAnalysis(HAKCAnalysis);
+    return false;
+  case Enforcement:
+    runEnforcement(HAKCAnalysis);
+    return true;
+  case RunConfigAndExit:
+    return false;
+  default:
+    CommonHAKCAnalysis::getLogger(Fatal) << "Invalid HAKC build mode!\n";
+    throw std::exception();
+  }
+}
+} // namespace hakc
 
 PreservedAnalyses HAKCPass::run(Module &M, ModuleAnalysisManager &MAM) {
   return hakc::RunHAKCAnalysis(M, MAM) ? PreservedAnalyses::none()

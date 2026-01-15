@@ -43,180 +43,180 @@ typedef SmallVector<hakc::transfer_action_def_t> HAKCTransferActionList;
 typedef SmallVector<std::string, 16> HAKCStringList;
 
 namespace llvm::hakc {
-    class CommonHAKCAnalysis;
+class CommonHAKCAnalysis;
 
-    class HAKCSystemInformation {
-    public:
-        explicit HAKCSystemInformation(CommonHAKCAnalysis &CommonAnalysis);
+class HAKCSystemInformation {
+public:
+  explicit HAKCSystemInformation(CommonHAKCAnalysis &CommonAnalysis);
 
-        HAKCLogLevel GetConsoleLogLevel() const;
+  HAKCLogLevel GetConsoleLogLevel() const;
 
-        HAKCLogLevel GetFileLogLevel() const;
+  HAKCLogLevel GetFileLogLevel() const;
 
-        HAKCStructList GetStructList() const;
+  HAKCStructList GetStructList() const;
 
-        HAKCTypeIdentifier &GetTypeIdentifier();
+  HAKCTypeIdentifier &GetTypeIdentifier();
 
-        Module &GetModule() const;
+  Module &GetModule() const;
 
-        StringRef GetAddFunctionEndpoint() const;
+  StringRef GetAddFunctionEndpoint() const;
 
-        StringRef GetAddGlobalVariableEndpoint() const;
+  StringRef GetAddGlobalVariableEndpoint() const;
 
-        StringRef GetAddSymbolsEndpoint() const;
+  StringRef GetAddSymbolsEndpoint() const;
 
-        StringRef GetArch() const;
+  StringRef GetArch() const;
 
-        StringRef GetBuildPath() const;
+  StringRef GetBuildPath() const;
 
-        StringRef GetCompartmentEndpoint() const;
+  StringRef GetCompartmentEndpoint() const;
 
-        StringRef GetDivisionEndpoint() const;
+  StringRef GetDivisionEndpoint() const;
 
-        StringRef GetSymbolTypeUseDivisionEndpoint() const;
+  StringRef GetSymbolTypeUseDivisionEndpoint() const;
 
-        StringRef GetPlatform() const;
+  StringRef GetPlatform() const;
 
-        StringRef GetRootPath() const;
+  StringRef GetRootPath() const;
 
-        StringRef GetSocketPath() const;
+  StringRef GetSocketPath() const;
 
-        unsigned GetDefaultDivisionID() const;
+  unsigned GetDefaultDivisionID() const;
 
-        unsigned GetDefaultCompartmentID() const;
+  unsigned GetDefaultCompartmentID() const;
 
-        unsigned GetDefaultEntryToken() const;
+  unsigned GetDefaultEntryToken() const;
 
-        unsigned GetDefaultAccessToken() const;
+  unsigned GetDefaultAccessToken() const;
 
-        StringRef GetLogPath() const;
+  StringRef GetLogPath() const;
 
-        StringRef GetSetDagFilenameEndpoint() const;
+  StringRef GetSetDagFilenameEndpoint() const;
 
-        StringRef GetSingleSourceFile();
+  StringRef GetSingleSourceFile();
 
-        StringRef GetSymbolDivisionEndpoint() const;
+  StringRef GetSymbolDivisionEndpoint() const;
 
-        StringRef GetTerminateConnectionEndpoint() const;
+  StringRef GetTerminateConnectionEndpoint() const;
 
-        StringRef GetValidTargetsEndpoint() const;
+  StringRef GetValidTargetsEndpoint() const;
 
-        bool GetDebugDatabase() const;
+  bool GetDebugDatabase() const;
 
-        bool OutputDebugInfo(GlobalValue *GV) const;
+  bool OutputDebugInfo(GlobalValue *GV) const;
 
-        bool OutputDebugInfo(StringRef SymbolName) const;
+  bool OutputDebugInfo(StringRef SymbolName) const;
 
-        function_def_t CodeValidation() const;
+  function_def_t CodeValidation() const;
 
-        function_def_t CompartmentTransfer(bool PerCPU) const;
+  function_def_t CompartmentTransfer(bool PerCPU) const;
 
-        function_def_t DataValidation() const;
+  function_def_t DataValidation() const;
 
-        function_def_t SignWithDivision() const;
+  function_def_t SignWithDivision() const;
 
-        iterator_range<FunctionList::iterator> NoTransferFunctions();
+  iterator_range<FunctionList::iterator> NoTransferFunctions();
 
-        iterator_range<FunctionList::iterator> SafeTransitionFunctions();
+  iterator_range<FunctionList::iterator> SafeTransitionFunctions();
 
-        iterator_range<HAKCCustomAllocationList::iterator> AllocationFunctions();
+  iterator_range<HAKCCustomAllocationList::iterator> AllocationFunctions();
 
-        iterator_range<HAKCCustomTransferList::iterator> HAKCCustomTransfers();
+  iterator_range<HAKCCustomTransferList::iterator> HAKCCustomTransfers();
 
-        iterator_range<HAKCFunctionList::iterator>
-        CompartmentalizationSupportFunctions();
+  iterator_range<HAKCFunctionList::iterator>
+  CompartmentalizationSupportFunctions();
 
-        iterator_range<HAKCGlobalVariableList::iterator> IgnoredGlobals();
+  iterator_range<HAKCGlobalVariableList::iterator> IgnoredGlobals();
 
-        iterator_range<HAKCPostTargetActionList::iterator> PostTargetActions();
+  iterator_range<HAKCPostTargetActionList::iterator> PostTargetActions();
 
-        iterator_range<HAKCPreTransferActionList::iterator> PreTransferActions();
+  iterator_range<HAKCPreTransferActionList::iterator> PreTransferActions();
 
-        iterator_range<HAKCStringList::iterator> HAKCSourcePaths();
+  iterator_range<HAKCStringList::iterator> HAKCSourcePaths();
 
-        iterator_range<HAKCStringList::iterator> IncludePaths();
+  iterator_range<HAKCStringList::iterator> IncludePaths();
 
-        iterator_range<HAKCStringList::iterator> SeparateNamespacePaths();
+  iterator_range<HAKCStringList::iterator> SeparateNamespacePaths();
 
-        iterator_range<HAKCTransferList::iterator> CompartmentTransferFunctions();
+  iterator_range<HAKCTransferList::iterator> CompartmentTransferFunctions();
 
-        unsigned GetMaxRetries() const;
+  unsigned GetMaxRetries() const;
 
-        unsigned GetServerCoreCount() const;
+  unsigned GetServerCoreCount() const;
 
-        void operator<<(HAKCYAMLConfig &Config);
+  void operator<<(HAKCYAMLConfig &Config);
 
-      bool GetSkipCurrentFile() const;
+  bool GetSkipCurrentFile() const;
 
-        void SetSocketPath(StringRef SocketPath);
+  void SetSocketPath(StringRef SocketPath);
 
-        unsigned GetDivisionIDBitCount() const;
+  unsigned GetDivisionIDBitCount() const;
 
-    protected:
-        function_def_t
-        CreateHAKCFunction(HAKCYAMLFunctionDefinition &YAMLFunctionDef) const;
+protected:
+  function_def_t
+  CreateHAKCFunction(HAKCYAMLFunctionDefinition &YAMLFunctionDef) const;
 
-        custom_transfer_def_t
-        CreateCustomTransferFunction(HAKCYAMLCustomTransferType &YAMLCustomTransfer,
-                                     HAKCTypeP HAKCTy) const;
+  custom_transfer_def_t
+  CreateCustomTransferFunction(HAKCYAMLCustomTransferType &YAMLCustomTransfer,
+                               HAKCTypeP HAKCTy) const;
 
-        void PopulateHAKCFunctionArgs(
-            SmallVectorImpl<HAKCFunctionArgumentDefinition> &Args,
-            HAKCYAMLFunctionDefinition &YAMLFunctionDef) const;
+  void PopulateHAKCFunctionArgs(
+      SmallVectorImpl<HAKCFunctionArgumentDefinition> &Args,
+      HAKCYAMLFunctionDefinition &YAMLFunctionDef) const;
 
-        void GetAllDefinedHAKCFunctions(SmallVectorImpl<function_def_t> &Results);
-        bool ShouldSkipCurrentFile();
+  void GetAllDefinedHAKCFunctions(SmallVectorImpl<function_def_t> &Results);
+  bool ShouldSkipCurrentFile();
 
-        CommonHAKCAnalysis &CommonAnalysis;
-        FunctionList NoTransferFunctionList;
-        FunctionList SafeTransitionFunctionList;
-        HAKCCustomAllocationList AllocationFunctionList;
-        HAKCCustomTransferList CustomTransferList;
-        HAKCFunctionList CompartmentalizationSupportFunctionList;
-        HAKCGlobalVariableList IgnoredGlobalList;
-        HAKCLogLevel ConsoleLogLevel;
-        HAKCLogLevel FileLogLevel;
-        HAKCPostTargetActionList PostTargetActionList;
-        HAKCPreTransferActionList PreTransferActionList;
-        HAKCStringList HAKCSourcePathList;
-        HAKCStringList IncludePathsList;
-        HAKCStringList SeparateNamespacePathList;
-        HAKCStructList StructList;
-        HAKCSymbolList SymbolsToOutputDebugInfo;
-        HAKCTransferList CompartmentTransferFunctionList;
-        HAKCTypeIdentifier TypeIdentifier;
-        bool DebugDatabase;
-        function_def_t CodeValidationFunction = nullptr;
-        function_def_t DataValidationFunction = nullptr;
-        function_def_t DefaultCompartmentTransfer = nullptr;
-        function_def_t PerCPUCompartmentTransfer = nullptr;
-        function_def_t SignWithDivisionFunction = nullptr;
-        std::string AddFunctionEndpoint;
-        std::string AddGlobalVariableEndpoint;
-        std::string AddSymbolsEndpoint;
-        std::string Arch;
-        std::string BuildPath;
-        std::string CompartmentEndpoint;
-        std::string DivisionEndpoint;
-        std::string Platform;
-        std::string RootPath;
-        std::string SetDagFilenameEndpoint;
-        std::string SingleSourceFile;
-        std::string SocketPath;
-        std::string LogPath;
-        std::string SymbolDivisionEndpoint;
-        std::string SymbolTypeUseDivisionEndpoint;
-        std::string TerminateConnectionEndpoint;
-        std::string ValidTargetsEndpoint;
-        unsigned DefaultAccessToken;
-        unsigned DefaultEntryToken;
-        unsigned DefaultCompartmentID;
-        unsigned DefaultDivisionID;
-        unsigned MaxConnectionRetries;
-        unsigned ServerCoreCount;
-        unsigned DivisionIDBitCount;
-        bool skip_current_file = false;
-    };
+  CommonHAKCAnalysis &CommonAnalysis;
+  FunctionList NoTransferFunctionList;
+  FunctionList SafeTransitionFunctionList;
+  HAKCCustomAllocationList AllocationFunctionList;
+  HAKCCustomTransferList CustomTransferList;
+  HAKCFunctionList CompartmentalizationSupportFunctionList;
+  HAKCGlobalVariableList IgnoredGlobalList;
+  HAKCLogLevel ConsoleLogLevel;
+  HAKCLogLevel FileLogLevel;
+  HAKCPostTargetActionList PostTargetActionList;
+  HAKCPreTransferActionList PreTransferActionList;
+  HAKCStringList HAKCSourcePathList;
+  HAKCStringList IncludePathsList;
+  HAKCStringList SeparateNamespacePathList;
+  HAKCStructList StructList;
+  HAKCSymbolList SymbolsToOutputDebugInfo;
+  HAKCTransferList CompartmentTransferFunctionList;
+  HAKCTypeIdentifier TypeIdentifier;
+  bool DebugDatabase;
+  function_def_t CodeValidationFunction = nullptr;
+  function_def_t DataValidationFunction = nullptr;
+  function_def_t DefaultCompartmentTransfer = nullptr;
+  function_def_t PerCPUCompartmentTransfer = nullptr;
+  function_def_t SignWithDivisionFunction = nullptr;
+  std::string AddFunctionEndpoint;
+  std::string AddGlobalVariableEndpoint;
+  std::string AddSymbolsEndpoint;
+  std::string Arch;
+  std::string BuildPath;
+  std::string CompartmentEndpoint;
+  std::string DivisionEndpoint;
+  std::string Platform;
+  std::string RootPath;
+  std::string SetDagFilenameEndpoint;
+  std::string SingleSourceFile;
+  std::string SocketPath;
+  std::string LogPath;
+  std::string SymbolDivisionEndpoint;
+  std::string SymbolTypeUseDivisionEndpoint;
+  std::string TerminateConnectionEndpoint;
+  std::string ValidTargetsEndpoint;
+  unsigned DefaultAccessToken;
+  unsigned DefaultEntryToken;
+  unsigned DefaultCompartmentID;
+  unsigned DefaultDivisionID;
+  unsigned MaxConnectionRetries;
+  unsigned ServerCoreCount;
+  unsigned DivisionIDBitCount;
+  bool skip_current_file = false;
+};
 } // namespace llvm::hakc
 
 #endif // HAKC_HAKCSYSTEMINFORMATION_H

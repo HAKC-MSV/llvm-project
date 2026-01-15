@@ -5,20 +5,20 @@
 #ifndef HAKC_HAKCYAMLCOMPARTMENTALIZATIONPOLICY_H
 #define HAKC_HAKCYAMLCOMPARTMENTALIZATIONPOLICY_H
 
-#include <vector>
 #include "HAKCYamlCompartment.h"
 #include "HAKCYamlSymbol.h"
+#include <vector>
 
 namespace llvm::hakc {
 
-    class HAKCYamlCompartmentalizationPolicy {
-    public:
-        HAKCYamlCompartmentalizationPolicy() = default;
+class HAKCYamlCompartmentalizationPolicy {
+public:
+  HAKCYamlCompartmentalizationPolicy() = default;
 
-        std::vector<HAKCYamlCompartment> Compartments;
-        std::vector<HAKCYamlSymbol> Symbols;
-    };
+  std::vector<HAKCYamlCompartment> Compartments;
+  std::vector<HAKCYamlSymbol> Symbols;
+};
 
-} // hakc
+} // namespace llvm::hakc
 
-#endif //HAKC_HAKCYAMLCOMPARTMENTALIZATIONPOLICY_H
+#endif // HAKC_HAKCYAMLCOMPARTMENTALIZATIONPOLICY_H

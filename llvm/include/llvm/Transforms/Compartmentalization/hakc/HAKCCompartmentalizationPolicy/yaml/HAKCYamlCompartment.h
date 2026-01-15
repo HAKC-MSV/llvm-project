@@ -10,16 +10,16 @@
 
 namespace llvm::hakc {
 
-    class HAKCYamlCompartment {
-    public:
-        HAKCYamlCompartment();
+class HAKCYamlCompartment {
+public:
+  HAKCYamlCompartment();
 
-        std::vector<HAKCYamlClique> Cliques;
-        hakc_access_token_t EntryToken;
-        hakc_compartment_id_t CompartmentID;
-        std::vector<hakc_compartment_id_t> Targets;
-    };
+  std::vector<HAKCYamlClique> Cliques;
+  hakc_access_token_t EntryToken;
+  hakc_compartment_id_t CompartmentID;
+  std::vector<hakc_compartment_id_t> Targets;
+};
 
-} // hakc
+} // namespace llvm::hakc
 
-#endif //HAKC_HAKCYAMLCOMPARTMENT_H
+#endif // HAKC_HAKCYAMLCOMPARTMENT_H

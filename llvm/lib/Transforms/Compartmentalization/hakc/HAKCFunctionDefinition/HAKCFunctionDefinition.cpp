@@ -51,8 +51,7 @@ ConstantInt *HAKCFunctionDefinition::GetEpochIdx() const {
   return GetArgLLVMByUse(Div);
 }
 
-ConstantInt *
-HAKCFunctionDefinition::GetArgLLVMByUse(
+ConstantInt *HAKCFunctionDefinition::GetArgLLVMByUse(
     const HAKCFunctionArgumentUse Use) const {
   unsigned Idx;
   if (GetArgIdxByUse(Use, &Idx)) {

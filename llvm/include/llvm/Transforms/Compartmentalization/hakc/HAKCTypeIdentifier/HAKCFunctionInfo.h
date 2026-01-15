@@ -16,8 +16,8 @@
 #ifndef HAKC_HAKCFUNCTIONINFO_H
 #define HAKC_HAKCFUNCTIONINFO_H
 
-#include "HAKCSymbolInfo.h"
 #include "HAKCIndirectCallSource.h"
+#include "HAKCSymbolInfo.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKC-defs.h"
 #include <bitset>
 
@@ -25,33 +25,35 @@ using namespace llvm;
 
 namespace llvm::hakc {
 
-    class HAKCFunctionInfo : public HAKCSymbolInfo {
-    public:
-        HAKCFunctionInfo(CommonHAKCAnalysis &Analysis, StringRef Name, bool DebugActive);
+class HAKCFunctionInfo : public HAKCSymbolInfo {
+public:
+  HAKCFunctionInfo(CommonHAKCAnalysis &Analysis, StringRef Name,
+                   bool DebugActive);
 
-        void SetFunction(Function *F);
+  void SetFunction(Function *F);
 
-        Function *GetFunction() const;
+  Function *GetFunction() const;
 
-        void AddTypeUse(const std::shared_ptr<HAKCTypeInfo> &Ty);
+  void AddTypeUse(const std::shared_ptr<HAKCTypeInfo> &Ty);
 
-        unsigned GetTypeUse(const std::shared_ptr<HAKCTypeInfo> &Ty);
+  unsigned GetTypeUse(const std::shared_ptr<HAKCTypeInfo> &Ty);
 
-        void ModifyTypeUse(const std::shared_ptr<HAKCTypeInfo> &Ty, TypePerms perm);
+  void ModifyTypeUse(const std::shared_ptr<HAKCTypeInfo> &Ty, TypePerms perm);
 
-        void AddDirectCall(const std::shared_ptr<HAKCFunctionInfo> &DirectCall);
+  void AddDirectCall(const std::shared_ptr<HAKCFunctionInfo> &DirectCall);
 
-        void AddIndirectCall(const std::shared_ptr<HAKCIndirectCallSource> &Source);
+  void AddIndirectCall(const std::shared_ptr<HAKCIndirectCallSource> &Source);
 
-        std::string GetYaml(unsigned Indents) const override;
+  std::string GetYaml(unsigned Indents) const override;
 
-        StringRef GetYamlIdentifier() const override;
+  StringRef GetYamlIdentifier() const override;
 
-    std::map<std::shared_ptr<HAKCTypeInfo>, unsigned> TypesUsed;
-    protected:
-        std::set<std::shared_ptr<HAKCFunctionInfo> > DirectCalls;
-        std::set<std::shared_ptr<HAKCIndirectCallSource> > IndirectCalls;
-    };
-} // hakc
+  std::map<std::shared_ptr<HAKCTypeInfo>, unsigned> TypesUsed;
 
-#endif //HAKC_HAKCFUNCTIONINFO_H
+protected:
+  std::set<std::shared_ptr<HAKCFunctionInfo>> DirectCalls;
+  std::set<std::shared_ptr<HAKCIndirectCallSource>> IndirectCalls;
+};
+} // namespace llvm::hakc
+
+#endif // HAKC_HAKCFUNCTIONINFO_H

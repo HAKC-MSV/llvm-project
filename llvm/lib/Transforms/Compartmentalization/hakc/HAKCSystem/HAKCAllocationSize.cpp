@@ -27,7 +27,8 @@ ConstantInt *HAKCSimpleArgumentSize::GetSize(CallInst *Val) {
   return CI;
 }
 
-// e.g., - { name: neigh_parms_alloc, type: SimpleStaticSize, arguments: [ 144 ] }
+// e.g., - { name: neigh_parms_alloc, type: SimpleStaticSize, arguments: [ 144 ]
+// }
 HAKCSimpleStaticSize::HAKCSimpleStaticSize(Function *AllocationFunction,
                                            const StringRef StaticSizeString)
     : HAKCAllocationSize(AllocationFunction), StaticSize(0) {
@@ -60,15 +61,19 @@ HAKCStaticPlusArgument::HAKCStaticPlusArgument(Function *AllocationFunction,
   ArgNoString.getAsInteger(10, ArgNo);
 }
 ConstantInt *HAKCStaticPlusArgument::GetSize(CallInst *Val) {
-    IRBuilder<> irBuilder(Val);
-    Value *ArgSizeVal = Val->getArgOperand(ArgNo);
-    ArgSizeVal = irBuilder.CreateZExtOrBitCast(ArgSizeVal, irBuilder.getInt64Ty());
-    Value *StaticSizeVal = irBuilder.getInt64(StaticSize);
-    ConstantInt* CI = irBuilder.getInt64(dyn_cast<ConstantInt>(ArgSizeVal)->getZExtValue() + dyn_cast<ConstantInt>(StaticSizeVal)->getZExtValue());
-    return CI;
+  IRBuilder<> irBuilder(Val);
+  Value *ArgSizeVal = Val->getArgOperand(ArgNo);
+  ArgSizeVal =
+      irBuilder.CreateZExtOrBitCast(ArgSizeVal, irBuilder.getInt64Ty());
+  Value *StaticSizeVal = irBuilder.getInt64(StaticSize);
+  ConstantInt *CI =
+      irBuilder.getInt64(dyn_cast<ConstantInt>(ArgSizeVal)->getZExtValue() +
+                         dyn_cast<ConstantInt>(StaticSizeVal)->getZExtValue());
+  return CI;
 }
 
-HAKCMultiplyArgumentSize::HAKCMultiplyArgumentSize(Function *AllocationFunction, const StringRef NObjsString,
+HAKCMultiplyArgumentSize::HAKCMultiplyArgumentSize(
+    Function *AllocationFunction, const StringRef NObjsString,
     const StringRef ArgSizePerObjString)
     : HAKCAllocationSize(AllocationFunction), NObjs(0), ArgSizePerObj(0) {
   if (NObjsString.empty() || ArgSizePerObjString.empty()) {

@@ -5,8 +5,8 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// This file contains code which finds the allocation size of a memory allocation
-/// function call, e.g., to malloc
+/// This file contains code which finds the allocation size of a memory
+/// allocation function call, e.g., to malloc
 ///
 //===----------------------------------------------------------------------===//
 //
@@ -58,7 +58,8 @@ class HAKCSimpleStaticSize : public HAKCAllocationSize {
   friend class HAKCAllocationSize;
 
 public:
-  HAKCSimpleStaticSize(Function *AllocationFunction, StringRef StaticSizeString);
+  HAKCSimpleStaticSize(Function *AllocationFunction,
+                       StringRef StaticSizeString);
 
   ConstantInt *GetSize(CallInst *Val) override;
 
@@ -70,7 +71,8 @@ class HAKCStaticPlusArgument : public HAKCAllocationSize {
   friend class HAKCAllocationSize;
 
 public:
-  HAKCStaticPlusArgument(Function *AllocationFunction, StringRef StaticSizeString, StringRef ArgNoString);
+  HAKCStaticPlusArgument(Function *AllocationFunction,
+                         StringRef StaticSizeString, StringRef ArgNoString);
 
   ConstantInt *GetSize(CallInst *Val) override;
 
@@ -79,11 +81,11 @@ protected:
   unsigned ArgNo;
 };
 
-
 class HAKCMultiplyArgumentSize : public HAKCAllocationSize {
 public:
   // eg alloc n args of size s
-  HAKCMultiplyArgumentSize(Function *AllocationFunction, StringRef NObjsString, StringRef ArgSizePerObjString);
+  HAKCMultiplyArgumentSize(Function *AllocationFunction, StringRef NObjsString,
+                           StringRef ArgSizePerObjString);
   ConstantInt *GetSize(CallInst *Val) override;
 
 protected:
@@ -91,14 +93,14 @@ protected:
   unsigned ArgSizePerObj;
 };
 
-
 class HAKCArgumentGEP : public HAKCAllocationSize {
   friend class HAKCAllocationSize;
 
 public:
   // abc->index0->index1->index2
   // ArgAccessNo is the arg of the struct
-  HAKCArgumentGEP(Function *AllocationFunction, StringRef ArgAccessNoString, ArrayRef<StringRef> IndicesString);
+  HAKCArgumentGEP(Function *AllocationFunction, StringRef ArgAccessNoString,
+                  ArrayRef<StringRef> IndicesString);
 
   ConstantInt *GetSize(CallInst *Val) override;
 

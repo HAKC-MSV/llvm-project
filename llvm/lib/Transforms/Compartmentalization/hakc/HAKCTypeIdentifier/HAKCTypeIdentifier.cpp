@@ -30,10 +30,14 @@ std::shared_ptr<HAKCTypeInfo> HAKCTypeIdentifier::FindType(const DIType *type) {
     CommonHAKCAnalysis::getLogger(Verbose) << " with base type ";
     if (Derived->getBaseType()) {
       CommonHAKCAnalysis::getLogger(Verbose) << Derived->getBaseType();
-    } else { CommonHAKCAnalysis::getLogger(Verbose) << "void"; }
+    } else {
+      CommonHAKCAnalysis::getLogger(Verbose) << "void";
+    }
     CommonHAKCAnalysis::getLogger(Verbose) << "\n";
   }
-  if (!TypesWithDebugInfo.contains(type)) { return nullptr; }
+  if (!TypesWithDebugInfo.contains(type)) {
+    return nullptr;
+  }
   return TypesWithDebugInfo.find(type)->second;
 }
 
@@ -80,7 +84,7 @@ bool hakc::HAKCTypeIdentifier::IsPointerLikeType(const DIType *DIType) {
 
   if (auto *BasicTy = dyn_cast<DIBasicType>(StrippedTy)) {
     const std::set<unsigned> PointerLike_Encodings = {dwarf::DW_ATE_unsigned,
-                                                dwarf::DW_ATE_address};
+                                                      dwarf::DW_ATE_address};
     return PointerLike_Encodings.contains(BasicTy->getEncoding()) &&
            BasicTy->getSizeInBits() == 64;
   }
@@ -1097,8 +1101,10 @@ HAKCTypeP HAKCTypeIdentifier::FindPointeeType(HAKCPointerBase &HAKCPointer) {
   return PointeeType;
 }
 
-    HAKCTypeP HAKCTypeIdentifier::FindPointeeType(HAKCTypeP &BaseType) {
-        if (!BaseType) { return nullptr; }
+HAKCTypeP HAKCTypeIdentifier::FindPointeeType(HAKCTypeP &BaseType) {
+  if (!BaseType) {
+    return nullptr;
+  }
 
   CommonHAKCAnalysis::getLogger(Verbose)
       << "Finding Pointee Type for " << *BaseType << "\n";
@@ -1510,25 +1516,26 @@ exit:
   return FoundType;
 }
 
-    DIDerivedType *
-    HAKCTypeIdentifier::FindUnionMember(const DICompositeType *UnionDef, unsigned MemberOffset) {
-        for (auto *UnionMember: UnionDef->getElements()) {
-            const auto *MemberTy = HAKCTypeInfo::StripTypeModifiers(
-                dyn_cast<DIDerivedType>(UnionMember)->getBaseType());
-            if (isa_and_nonnull<DICompositeType>(MemberTy)) {
-                auto *MemberStruct = dyn_cast<DICompositeType>(MemberTy);
-                for (auto *Element: MemberStruct->getElements()) {
-                    if (Element->getTag() == dwarf::DW_TAG_member) {
-                        auto *Member = dyn_cast<DIDerivedType>(Element);
-                        if (Member->getOffsetInBits() / BITS_PER_BYTE == MemberOffset) {
-                            return Member;
-                        }
-                    }
-                }
-            }
+DIDerivedType *
+HAKCTypeIdentifier::FindUnionMember(const DICompositeType *UnionDef,
+                                    unsigned MemberOffset) {
+  for (auto *UnionMember : UnionDef->getElements()) {
+    const auto *MemberTy = HAKCTypeInfo::StripTypeModifiers(
+        dyn_cast<DIDerivedType>(UnionMember)->getBaseType());
+    if (isa_and_nonnull<DICompositeType>(MemberTy)) {
+      auto *MemberStruct = dyn_cast<DICompositeType>(MemberTy);
+      for (auto *Element : MemberStruct->getElements()) {
+        if (Element->getTag() == dwarf::DW_TAG_member) {
+          auto *Member = dyn_cast<DIDerivedType>(Element);
+          if (Member->getOffsetInBits() / BITS_PER_BYTE == MemberOffset) {
+            return Member;
+          }
         }
-        return nullptr;
+      }
     }
+  }
+  return nullptr;
+}
 
 hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
   // TODO: handle ptrtoint, phi ptr

@@ -10,13 +10,13 @@
 #include "llvm/Support/YAMLTraits.h"
 
 namespace llvm::hakc {
-    class HAKCYamlType {
-    public:
-        HAKCYamlType() = default;
+class HAKCYamlType {
+public:
+  HAKCYamlType() = default;
 
-        std::string DebugType;
-        std::string LLVMType;
-    };
-} // hakc
+  std::string DebugType;
+  std::string LLVMType;
+};
+} // namespace llvm::hakc
 
-#endif //HAKC_HAKCYAMLTYPE_H
+#endif // HAKC_HAKCYAMLTYPE_H

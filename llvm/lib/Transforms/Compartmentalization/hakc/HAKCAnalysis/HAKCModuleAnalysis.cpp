@@ -14,18 +14,18 @@
 // call it module transformation
 namespace llvm::hakc {
 HAKCModuleAnalysis::HAKCModuleAnalysis(CommonHAKCAnalysis &CommonAnalysis)
-  : CommonAnalysis(CommonAnalysis),
-    TypeIdentifier(CommonAnalysis.GetSystemInfo().GetTypeIdentifier()) {
+    : CommonAnalysis(CommonAnalysis),
+      TypeIdentifier(CommonAnalysis.GetSystemInfo().GetTypeIdentifier()) {
   runAnalysis();
 }
 
 void HAKCModuleAnalysis::runAnalysis() {
-  // create managed pointers (essentially what is being done at the beginning of the compartmentalization code)
+  // create managed pointers (essentially what is being done at the beginning of
+  // the compartmentalization code)
   for (auto *F : AnalysisFunctions) {
     HAKCFunctionAnalysis FunctionAnalysis(F, *this);
     // perform type use analysis after all types are known
     FunctionAnalysis.TypeUseAnalysis();
-
   }
 }
 
@@ -35,7 +35,8 @@ void HAKCModuleAnalysis::runEnforcement(bool UseSimulatedClient) {
   Transformer.runEnforcement();
 }
 
-std::unique_ptr<HAKCServerClientBase> HAKCModuleAnalysis::ConstructClient(bool UseSimulatedClient) {
+std::unique_ptr<HAKCServerClientBase>
+HAKCModuleAnalysis::ConstructClient(bool UseSimulatedClient) {
   std::unique_ptr<HAKCServerClientBase> Client;
   if (UseSimulatedClient) {
     Client = std::make_unique<FakeServerClient>(GetModule().getContext());
@@ -53,7 +54,6 @@ HAKCSystemInformation &HAKCModuleAnalysis::GetSystemInformation() const {
   return CommonAnalysis.GetSystemInfo();
 }
 
-
 HAKCTypeIdentifier &HAKCModuleAnalysis::GetTypeIdentifier() const {
   return TypeIdentifier;
 }
@@ -63,8 +63,11 @@ bool HAKCModuleAnalysis::FunctionNeedsAnalysis(Function *F) const {
                        F->getSubprogram() != nullptr &&
                        !CommonHAKCAnalysis::IsOutsideTransferFunc(F) &&
                        !CommonAnalysis.IsHAKCFunction(F);
-  const bool SuppressOutput = !CommonAnalysis.GetSystemInfo().OutputDebugInfo(F);
-  if (!needsAnalysis) { goto out; }
+  const bool SuppressOutput =
+      !CommonAnalysis.GetSystemInfo().OutputDebugInfo(F);
+  if (!needsAnalysis) {
+    goto out;
+  }
   for (auto *user : F->users()) {
     if (!isa<CallInst>(user)) {
       /* Function is passed into a global variable */
@@ -98,7 +101,8 @@ bool HAKCModuleAnalysis::FunctionDefinedInAssembly(Function *F) const {
   SearchTerm += ":";
   const Regex NameRegex(SearchTerm);
   SmallVector<StringRef, 2> Matches;
-  const bool SuppressOutput = !CommonAnalysis.GetSystemInfo().OutputDebugInfo(F);
+  const bool SuppressOutput =
+      !CommonAnalysis.GetSystemInfo().OutputDebugInfo(F);
   const auto NameInAssembly = NameRegex.match(ModuleAsm, &Matches, nullptr);
   if (NameInAssembly) {
     CommonHAKCAnalysis::getLogger(Debug, SuppressOutput)
@@ -114,8 +118,7 @@ bool HAKCModuleAnalysis::FunctionDefinedInAssembly(Function *F) const {
 
 bool _useEscapes(const Use &U, std::set<Value *> &expected) {
   /* If F is used in a global variable */
-  if (const auto *gv = dyn_cast<
-    GlobalVariable>(U.getUser())) {
+  if (const auto *gv = dyn_cast<GlobalVariable>(U.getUser())) {
     return gv->getSection() != ".discard.addressable";
   }
   if (isa<ConstantStruct>(U.getUser()) || isa<SelectInst>(U.getUser())) {
@@ -174,12 +177,16 @@ bool HAKCModuleAnalysis::useEscapes(const Use &U) {
 }
 
 bool HAKCModuleAnalysis::functionEscapes(Function *F) const {
-  if (F->isIntrinsic()) { return false; }
+  if (F->isIntrinsic()) {
+    return false;
+  }
   for (auto &U : F->uses()) {
-    if (useEscapes(U)) { return true; }
+    if (useEscapes(U)) {
+      return true;
+    }
 
     CommonHAKCAnalysis::getLogger(
-            Debug, !CommonAnalysis.GetSystemInfo().OutputDebugInfo(F))
+        Debug, !CommonAnalysis.GetSystemInfo().OutputDebugInfo(F))
         << "Use " << U.getUser() << " does not escape\n";
   }
   const Function *transfer =
@@ -199,8 +206,8 @@ CommonHAKCAnalysis &HAKCModuleAnalysis::GetCommonAnalysis() const {
 // Get the StructType representing a kernel (module) parameter
 StructType *HAKCModuleAnalysis::GetKernelParamType() const {
   // linux
-  return StructType::getTypeByName(
-      GetModule().getContext(), StringRef("struct.kernel_param"));
+  return StructType::getTypeByName(GetModule().getContext(),
+                                   StringRef("struct.kernel_param"));
 }
 
 GlobalValue *
@@ -212,7 +219,9 @@ HAKCModuleAnalysis::ExtractGlobalFromKernelParam(GlobalVariable *GV) const {
 
   const auto *KernelParamType = GetKernelParamType();
   // type not found, just do nothing
-  if (!KernelParamType) { return nullptr; }
+  if (!KernelParamType) {
+    return nullptr;
+  }
 
   // trying to find globals of type GetKernelParamType()
   if (const auto *StructTy = dyn_cast<StructType>(GV->getValueType())) {
@@ -255,18 +264,28 @@ HAKCModuleAnalysis::ExtractGlobalFromKernelParam(GlobalVariable *GV) const {
           // now we have kp->arg
         }
         // the thing in the union isn't a BitCastOperator, that's bad
-        else { return nullptr; }
+        else {
+          return nullptr;
+        }
       }
       // we couldn't get the union out of the union struct, that's bad
-      else { return nullptr; }
+      else {
+        return nullptr;
+      }
     }
     // we couldn't get the union struct at all out of the param struct, that's
     // bad
-    else { return nullptr; }
+    else {
+      return nullptr;
+    }
   }
   // we couldn't even get the kernel param struct as a struct, that's bad
-  else { return nullptr; }
-  CommonHAKCAnalysis::getLogger(Debug, !CommonAnalysis.GetSystemInfo().OutputDebugInfo(GV)) <<"processing kernel param\n"
+  else {
+    return nullptr;
+  }
+  CommonHAKCAnalysis::getLogger(
+      Debug, !CommonAnalysis.GetSystemInfo().OutputDebugInfo(GV))
+      << "processing kernel param\n"
       << *kernparam << "\n";
 
   return kernparam;
@@ -285,10 +304,10 @@ void HAKCModuleAnalysis::OutputYAML(raw_ostream &out) const {
   out << "---\n";
 
   const auto GlobalCount = TypeIdentifier.GetGlobals().size() +
-                     TypeIdentifier.GetUnmappedGlobals().size();
+                           TypeIdentifier.GetUnmappedGlobals().size();
   if (GlobalCount > 0) {
     out << "globals:\n";
-    std::vector<std::shared_ptr<HAKCGlobalInfo> > SortedGlobals;
+    std::vector<std::shared_ptr<HAKCGlobalInfo>> SortedGlobals;
     SortedGlobals.reserve(GlobalCount);
     for (auto &[key, val] : TypeIdentifier.GetGlobals()) {
       SortedGlobals.push_back(val);
@@ -308,10 +327,10 @@ void HAKCModuleAnalysis::OutputYAML(raw_ostream &out) const {
   }
 
   const auto FunctionCount = TypeIdentifier.GetFunctions().size() +
-                       TypeIdentifier.GetUnmappedFunctions().size();
+                             TypeIdentifier.GetUnmappedFunctions().size();
   if (FunctionCount > 0) {
     out << "functions:\n";
-    std::vector<std::shared_ptr<HAKCFunctionInfo> > SortedFunctions;
+    std::vector<std::shared_ptr<HAKCFunctionInfo>> SortedFunctions;
     SortedFunctions.reserve(FunctionCount);
     for (auto &[key, val] : TypeIdentifier.GetFunctions()) {
       SortedFunctions.push_back(val);

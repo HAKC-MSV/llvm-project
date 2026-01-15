@@ -5,8 +5,8 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// This file contains the pre transfer action class, e.g., what needs to be saved
-/// before a transfer is called, e.g., what was the previous compartment.
+/// This file contains the pre transfer action class, e.g., what needs to be
+/// saved before a transfer is called, e.g., what was the previous compartment.
 ///
 //===----------------------------------------------------------------------===//
 //

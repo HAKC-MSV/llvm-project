@@ -5,7 +5,8 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// This file tracks the information associated with a specific function definition.
+/// This file tracks the information associated with a specific function
+/// definition.
 ///
 //===----------------------------------------------------------------------===//
 //
@@ -22,61 +23,64 @@
 using namespace llvm;
 
 namespace llvm::hakc {
-    enum HAKCFunctionArgumentUse {
-        Other,
-        SignedPtr,
-        Comp,
-        Div,
-        Size,
-        IsCode,
-        AccessToken,
-        ValidTargets,
-        ValidTargetSize,
-        Epoch
-    };
+enum HAKCFunctionArgumentUse {
+  Other,
+  SignedPtr,
+  Comp,
+  Div,
+  Size,
+  IsCode,
+  AccessToken,
+  ValidTargets,
+  ValidTargetSize,
+  Epoch
+};
 
-    std::map<HAKCFunctionArgumentUse, const char *> HAKCArgumentArgumentUseStringMap();
+std::map<HAKCFunctionArgumentUse, const char *>
+HAKCArgumentArgumentUseStringMap();
 
-    struct HAKCFunctionArgumentDefinition {
-        HAKCFunctionArgumentDefinition(Type *ArgTy, unsigned Idx, HAKCFunctionArgumentUse Use);
+struct HAKCFunctionArgumentDefinition {
+  HAKCFunctionArgumentDefinition(Type *ArgTy, unsigned Idx,
+                                 HAKCFunctionArgumentUse Use);
 
-        Type *ArgTy;
-        unsigned Idx;
-        HAKCFunctionArgumentUse ArgUse;
-    };
+  Type *ArgTy;
+  unsigned Idx;
+  HAKCFunctionArgumentUse ArgUse;
+};
 
-    class HAKCFunctionDefinition {
-    public:
-        virtual ~HAKCFunctionDefinition() = default;
+class HAKCFunctionDefinition {
+public:
+  virtual ~HAKCFunctionDefinition() = default;
 
-        explicit HAKCFunctionDefinition(Function *F, SmallVectorImpl<HAKCFunctionArgumentDefinition> &Args);
+  explicit HAKCFunctionDefinition(
+      Function *F, SmallVectorImpl<HAKCFunctionArgumentDefinition> &Args);
 
-        StringRef GetName() const;
+  StringRef GetName() const;
 
-        Function *GetFunction() const;
+  Function *GetFunction() const;
 
-        ConstantInt *GetSignedPtrIdx() const;
+  ConstantInt *GetSignedPtrIdx() const;
 
-        ConstantInt *GetCompartmentIdIdx() const;
+  ConstantInt *GetCompartmentIdIdx() const;
 
-        ConstantInt *GetDivisionIdIdx() const;
+  ConstantInt *GetDivisionIdIdx() const;
 
-        ConstantInt *GetEpochIdx() const;
+  ConstantInt *GetEpochIdx() const;
 
-        iterator_range<SmallVector<HAKCFunctionArgumentDefinition>::iterator> Args();
+  iterator_range<SmallVector<HAKCFunctionArgumentDefinition>::iterator> Args();
 
-    protected:
-        Function *F;
-        int EpochIdx;
-        SmallVector<HAKCFunctionArgumentDefinition> ArgList;
+protected:
+  Function *F;
+  int EpochIdx;
+  SmallVector<HAKCFunctionArgumentDefinition> ArgList;
 
-        bool GetArgIdxByUse(HAKCFunctionArgumentUse Use, unsigned *Idx) const;
+  bool GetArgIdxByUse(HAKCFunctionArgumentUse Use, unsigned *Idx) const;
 
-        ConstantInt *GetArgLLVMByUse(HAKCFunctionArgumentUse Use) const;
-    };
+  ConstantInt *GetArgLLVMByUse(HAKCFunctionArgumentUse Use) const;
+};
 
-    typedef std::shared_ptr<HAKCFunctionDefinition> function_def_t;
-    typedef HAKCFunctionDefinition arg_def_t;
-} // hakc
+typedef std::shared_ptr<HAKCFunctionDefinition> function_def_t;
+typedef HAKCFunctionDefinition arg_def_t;
+} // namespace llvm::hakc
 
-#endif //HAKC_HAKCFUNCTIONDEFINITION_H
+#endif // HAKC_HAKCFUNCTIONDEFINITION_H

@@ -147,7 +147,8 @@ public:
 
   static FunctionType *GetIndirectCallFunctionType(const CallInst *CallI);
 
-  static bool IsStructTypeThatStartsWithPointerLikeType(const HAKCTypeInfo &HAKCTy);
+  static bool
+  IsStructTypeThatStartsWithPointerLikeType(const HAKCTypeInfo &HAKCTy);
 
   static bool IsPointerLikeType(const DIType *DIType);
 
@@ -165,11 +166,10 @@ public:
 
   void FindIndirectCallSource(
       CallInst *CallI,
-      std::vector<std::shared_ptr<HAKCIndirectCallSourceLink> > &Path);
+      std::vector<std::shared_ptr<HAKCIndirectCallSourceLink>> &Path);
 
   void CreateIndirectCallSourceLink(
-      Value *V,
-      std::vector<std::shared_ptr<HAKCIndirectCallSourceLink> > &Path);
+      Value *V, std::vector<std::shared_ptr<HAKCIndirectCallSourceLink>> &Path);
 
   HAKCTypeP GetArgumentHAKCType(Argument *Arg);
 
@@ -191,7 +191,7 @@ public:
   HAKCTypeP CheckCallUses(Value *V);
 
   static DIDerivedType *FindUnionMember(const DICompositeType *UnionDef,
-                                 unsigned MemberOffset);
+                                        unsigned MemberOffset);
 
   bool IsLocalGlobal(GlobalObject *GO) const;
 

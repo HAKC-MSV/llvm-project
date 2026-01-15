@@ -17,7 +17,6 @@
 #ifndef HAKC_MANAGEDHAKCPOINTER_H
 #define HAKC_MANAGEDHAKCPOINTER_H
 
-
 #include "llvm/IR/Value.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTypeIdentifier/HAKCTypeInfo.h"
 
@@ -26,7 +25,6 @@ using namespace llvm;
 namespace llvm::hakc {
 
 class HAKCFunctionEnforcement;
-
 
 class HAKCPointerBase {
 protected:
@@ -196,11 +194,13 @@ public:
 
   bool PointerSetsShouldBeEqual() const;
 
-  bool UseIsManagedAndHasUsers(const ManagedHAKCPointerUse &PointerUse, bool CountAuthenticatedUsers) const;
+  bool UseIsManagedAndHasUsers(const ManagedHAKCPointerUse &PointerUse,
+                               bool CountAuthenticatedUsers) const;
 
   bool ValueIsManagedAndHasUsers(Value *V, bool CountAuthenticatedUsers) const;
 
-  void CheckPointerReplacement(Value *Old, Value *New, StringRef TypeName) const;
+  void CheckPointerReplacement(Value *Old, Value *New,
+                               StringRef TypeName) const;
 
   void AddAuthenticatedUse(const ManagedHAKCPointerUseP &UPtr);
 
@@ -210,26 +210,32 @@ public:
 
   void SetProtectedPointer(Value *NewProtectedPointer);
 
-  void SetAuthenticatedIsCopyOfBase(bool val){AuthenticatedIsCopyOfBase=val;}
+  void SetAuthenticatedIsCopyOfBase(bool val) {
+    AuthenticatedIsCopyOfBase = val;
+  }
 
   // bool GetBaseIsAuthenticated() const {return BaseIsAuthenticated;}
 
-  bool GetManuallyTransferred() const {return ManuallyTransferred;}
+  bool GetManuallyTransferred() const { return ManuallyTransferred; }
 
-  bool GetPurposefullyIgnored() const {return PurposefullyIgnored;}
+  bool GetPurposefullyIgnored() const { return PurposefullyIgnored; }
 
-  // bool GetAuthenticatedIsCopyOfBase() const {return AuthenticatedIsCopyOfBase;}
+  // bool GetAuthenticatedIsCopyOfBase() const {return
+  // AuthenticatedIsCopyOfBase;}
   //
-  SmallVector<ManagedHAKCPointerUseP>& GetAuthenticatedUses() {return AuthenticatedUses;}
+  SmallVector<ManagedHAKCPointerUseP> &GetAuthenticatedUses() {
+    return AuthenticatedUses;
+  }
 
-  SmallVector<ManagedHAKCPointerUseP>& GetProtectedUses() {return ProtectedUses;}
+  SmallVector<ManagedHAKCPointerUseP> &GetProtectedUses() {
+    return ProtectedUses;
+  }
 
-  SmallVector<ManagedHAKCPointerUseP>& GetCloneUses() {return CloneUses;}
+  SmallVector<ManagedHAKCPointerUseP> &GetCloneUses() { return CloneUses; }
 
-  void setPurposefullyIgnored(bool val) {PurposefullyIgnored=val;}
+  void setPurposefullyIgnored(bool val) { PurposefullyIgnored = val; }
 
   void AddProtectedUse(const ManagedHAKCPointerUseP &UPtr);
-
 
 protected:
   /**
@@ -254,12 +260,9 @@ protected:
   SmallVector<ManagedHAKCPointerUseP> ProtectedUses;
   SmallVector<ManagedHAKCPointerUseP> CloneUses;
 
-
 private:
   void InitBaseDefinitionInfo();
-
 };
-
 
 } // namespace llvm::hakc
 

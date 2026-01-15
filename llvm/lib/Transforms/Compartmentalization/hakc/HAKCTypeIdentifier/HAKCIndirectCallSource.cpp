@@ -5,12 +5,11 @@
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTypeIdentifier/HAKCIndirectCallSource.h"
 
 namespace llvm::hakc {
-    HAKCIndirectCallSource::HAKCIndirectCallSource(
-    const std::vector<std::shared_ptr<HAKCIndirectCallSourceLink> > &SourcePath,
-                                                   const std::shared_ptr<HAKCTypeInfo> &HAKCType, const bool debug) : HAKCInfo(HAKCType->GetCommonHAKCAnalysis(),
-                                                                          HAKCType->GetName(), debug),
-                                                                 HAKCType(HAKCType), SourcePath(SourcePath) {
-    }
+HAKCIndirectCallSource::HAKCIndirectCallSource(
+    const std::vector<std::shared_ptr<HAKCIndirectCallSourceLink>> &SourcePath,
+    const std::shared_ptr<HAKCTypeInfo> &HAKCType, const bool debug)
+    : HAKCInfo(HAKCType->GetCommonHAKCAnalysis(), HAKCType->GetName(), debug),
+      HAKCType(HAKCType), SourcePath(SourcePath) {}
 
 std::string HAKCIndirectCallSource::GetYaml(unsigned Indents) const {
   std::string Yaml = HAKCInfo::GetYamlHeader(Indents);

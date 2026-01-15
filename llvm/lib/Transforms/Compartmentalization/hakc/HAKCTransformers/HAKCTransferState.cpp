@@ -7,8 +7,7 @@
 
 hakc::HAKCTransferState::HAKCTransferState(
     const HAKCCompartmentDivision &TargetDivision, HAKCPointerBase &HAKCPointer)
-    : TargetDivision(TargetDivision), HAKCPointer(HAKCPointer) {
-}
+    : TargetDivision(TargetDivision), HAKCPointer(HAKCPointer) {}
 
 Value *hakc::HAKCTransferState::GetLabeledValue(const StringRef Label) const {
   for (const auto &[key, val] : ActionValues) {

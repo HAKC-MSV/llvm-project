@@ -16,22 +16,23 @@
 #ifndef HAKC_HAKCGLOBALINFO_H
 #define HAKC_HAKCGLOBALINFO_H
 
-#include "llvm/IR/GlobalVariable.h"
 #include "HAKCSymbolInfo.h"
+#include "llvm/IR/GlobalVariable.h"
 
 namespace llvm::hakc {
 
-    class HAKCGlobalInfo : public HAKCSymbolInfo {
-    public:
-        HAKCGlobalInfo(CommonHAKCAnalysis &Analysis, StringRef Name, bool DebugActive);
+class HAKCGlobalInfo : public HAKCSymbolInfo {
+public:
+  HAKCGlobalInfo(CommonHAKCAnalysis &Analysis, StringRef Name,
+                 bool DebugActive);
 
-        void SetGlobalVariable(GlobalVariable *GV);
+  void SetGlobalVariable(GlobalVariable *GV);
 
-        GlobalVariable *GetGlobalVariable() const;
+  GlobalVariable *GetGlobalVariable() const;
 
-        StringRef GetYamlIdentifier() const override;
-    };
+  StringRef GetYamlIdentifier() const override;
+};
 
-} // hakc
+} // namespace llvm::hakc
 
-#endif //HAKC_HAKCGLOBALINFO_H
+#endif // HAKC_HAKCGLOBALINFO_H

@@ -51,7 +51,7 @@ protected:
 
   HAKCSystemInformation SystemInfo;
 
-        HAKCLogger &_HAKCLog;
+  HAKCLogger &_HAKCLog;
 
   static bool IsFunctionInHAKCTransferFunctionList(
       Function *F, iterator_range<HAKCTransferList::iterator> Range);
@@ -64,10 +64,11 @@ protected:
 public:
   virtual ~CommonHAKCAnalysis() = default;
 
-        explicit CommonHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM);
+  explicit CommonHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM);
 
-        explicit CommonHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM,
-                                    StringRef ConfigPath, StringRef ServerSocketPath, HAKCPassModeEnum PassMode);
+  explicit CommonHAKCAnalysis(Module &M, ModuleAnalysisManager &MAM,
+                              StringRef ConfigPath, StringRef ServerSocketPath,
+                              HAKCPassModeEnum PassMode);
 
   HAKCSystemInformation &GetSystemInfo();
 
@@ -102,7 +103,8 @@ public:
 
   static HAKCPassModeEnum ParsePassMode(StringRef mode);
 
-        bool ValueShouldBeReplacedWithTransfer(Value *V, HAKCServerClientBase &Client);
+  bool ValueShouldBeReplacedWithTransfer(Value *V,
+                                         HAKCServerClientBase &Client);
 
   bool IsSafeTransitionFunction(Function *F);
 
@@ -120,11 +122,12 @@ public:
 
   bool IsAllocationFunction(Function *F);
 
-        bool functionIsTransferCandidate(Function *F, HAKCServerClientBase &Client);
+  bool functionIsTransferCandidate(Function *F, HAKCServerClientBase &Client);
 
   HAKCLogger &getHAKCLoggerObject() const;
 
-        static HAKCLogger &getLogger(HAKCLogLevel log_level, bool suppress_output = false);
+  static HAKCLogger &getLogger(HAKCLogLevel log_level,
+                               bool suppress_output = false);
 
   FunctionType *GetDataAuthenticationFunctionType(unsigned AddrSpace = 0);
 
@@ -172,9 +175,7 @@ public:
 
   static void SortFunctionList(FunctionList &FuncList);
 
-        static bool
-        IsNECSymbol(GlobalValue *GV,
-                                    HAKCServerClientBase &Client);
+  static bool IsNECSymbol(GlobalValue *GV, HAKCServerClientBase &Client);
 
   static void VerifyFunction(Function *F);
 
@@ -190,9 +191,9 @@ public:
   IsFunctionInFunctionList(Function *F,
                            iterator_range<FunctionList::iterator> Range);
 
-        static bool
-        IsFunctionInFunctionList(Function *F,
-                                 iterator_range<HAKCFunctionList::iterator> Range);
+  static bool
+  IsFunctionInFunctionList(Function *F,
+                           iterator_range<HAKCFunctionList::iterator> Range);
 
   static bool
   PointerShouldBeConsideredCode(const ManagedHAKCPointer &ManagedPointer);
@@ -206,12 +207,14 @@ public:
   GetDefaultDivisionAccessToken(hakc_compartment_id_t CompartmentID,
                                 hakc_compartment_division_t DivisionID) const;
 
-        static hakc_access_token_t GetDefaultDivisionAccessToken(hakc_compartment_id_t CompartmentID,
-                                                                      hakc_compartment_division_t DivisionID, unsigned DivisionIDBitCount);
+  static hakc_access_token_t
+  GetDefaultDivisionAccessToken(hakc_compartment_id_t CompartmentID,
+                                hakc_compartment_division_t DivisionID,
+                                unsigned DivisionIDBitCount);
 
-    private:
-        static bool valueHasAttribute(Value *v, Attribute::AttrKind Kind);
-    };
+private:
+  static bool valueHasAttribute(Value *v, Attribute::AttrKind Kind);
+};
 } // namespace llvm::hakc
 
 #endif // HAKC_COMMONHAKCANALYSIS_H

@@ -5,8 +5,8 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// This file contains the HAKC Writer, which is a class that can print to either
-/// the console or a specified file.
+/// This file contains the HAKC Writer, which is a class that can print to
+/// either the console or a specified file.
 ///
 //===----------------------------------------------------------------------===//
 //
@@ -62,13 +62,15 @@ public:
 
   ~HAKCWriter() {}
 
-  void Disable() { disabled=true; }
+  void Disable() { disabled = true; }
 
-  void Enable() { disabled=false; }
+  void Enable() { disabled = false; }
 
   bool IsDisabled() const { return disabled; }
 
-  void SetConfiguredLogLevel(HAKCLogLevel log_level) { ConfiguredLogLevel = log_level; }
+  void SetConfiguredLogLevel(HAKCLogLevel log_level) {
+    ConfiguredLogLevel = log_level;
+  }
 
   HAKCLogLevel GetConfiguredLogLevel() const { return ConfiguredLogLevel; }
 
