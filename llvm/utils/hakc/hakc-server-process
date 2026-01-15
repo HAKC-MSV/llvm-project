@@ -123,15 +123,12 @@ def get_error_log_dir_path(config: HAKCConfig, server_mode: HAKCBuildMode):
     return os.path.join(config.log_dir, 'error-logs', server_mode.value)
 
 
-def do_compilation_tasks(task_id: int, config: HAKCConfig, logger_to_use: HAKCLogger, files_to_analyze: set[str],
+def do_compilation_tasks(task_id: int, config: HAKCConfig, logger_to_use: HAKCLogger, compilation_entries_to_use: set[dict],
                          server_mode: HAKCBuildMode):
     logger_to_use.debug(f'Starting compilation tasks')
 
     if config.server_config.compilation_database is None:
         raise RuntimeError(f'Compilation Database is required')
-
-    with open(config.server_config.compilation_database, 'r') as f:
-        compilation_database = json.load(f)
 
     try:
         server, server_thread = start_hakc_server(task_id, server_mode, config, logger_to_use)
@@ -139,25 +136,24 @@ def do_compilation_tasks(task_id: int, config: HAKCConfig, logger_to_use: HAKCLo
         logger_to_use.error(f'Failed to start server {task_id}: {e}')
         return None
 
-    logger_to_use.debug(f'Compiling {len(files_to_analyze)} files')
+    logger_to_use.debug(f'Compiling {len(compilation_entries_to_use)} files')
 
-    for database_entry in compilation_database:
+    for database_entry in compilation_entries_to_use:
         compilation_file = database_entry['file']
-        if compilation_file in files_to_analyze:
-            try:
-                run_compilation_target(database_entry, logger_to_use, str(server.socket_path),
-                                       str(config.root_config_path), server_mode.output_ir,
-                                       'analysis' if server_mode.is_analysis_mode else 'enforcement')
-                logger_to_use.debug(f'Compilation task completed')
-            except subprocess.CalledProcessError as e:
-                err_file = os.path.join(get_error_log_dir_path(config, server_mode),
-                                        os.path.basename(compilation_file) + "." + str(int(time.time())) + ".err")
-                os.makedirs(os.path.dirname(err_file), exist_ok=True)
-                with open(err_file, 'w') as f:
-                    logger_to_use.info(f'Failed to compile {compilation_file}. Output logged to {err_file}')
-                    print(f'Command: {" ".join(e.cmd)}', file=f)
-                    print(f'Directory: {database_entry["directory"]}', file=f)
-                    print(e.stdout, file=f)
+        try:
+            run_compilation_target(database_entry, logger_to_use, str(server.socket_path),
+                                   str(config.root_config_path), server_mode.output_ir,
+                                   'analysis' if server_mode.is_analysis_mode else 'enforcement')
+            logger_to_use.debug(f'Compilation task completed')
+        except subprocess.CalledProcessError as e:
+            err_file = os.path.join(get_error_log_dir_path(config, server_mode),
+                                    os.path.basename(compilation_file) + "." + str(int(time.time())) + ".err")
+            os.makedirs(os.path.dirname(err_file), exist_ok=True)
+            with open(err_file, 'w') as f:
+                logger_to_use.info(f'Failed to compile {compilation_file}. Output logged to {err_file}')
+                print(f'Command: {" ".join(e.cmd)}', file=f)
+                print(f'Directory: {database_entry["directory"]}', file=f)
+                print(e.stdout, file=f)
 
     logger_to_use.debug(f'Shutting down everything')
     if not server_thread.is_alive():
@@ -199,22 +195,22 @@ def make_worker_logger(name: str, task_id: int, log_level: LoggingLevelEnum) -> 
     return logger
 
 
-def create_logger_and_compile_files(task_id: int, config: HAKCConfig, files: set[str], server_mode: HAKCBuildMode):
+def create_logger_and_compile_files(task_id: int, config: HAKCConfig, compilation_entries: set[dict], server_mode: HAKCBuildMode):
     logger_to_use = cast(HAKCLogger, make_worker_logger(f'hakc.server-worker-{task_id}', task_id, config.log_level))
-    result = do_compilation_tasks(task_id, config, logger_to_use, files, server_mode)
+    result = do_compilation_tasks(task_id, config, logger_to_use, compilation_entries, server_mode)
     return result
 
 
-def get_batched_files(compilation_database: dict, batch_size: int, file_set: set[str]):
+def get_batched_compilation_entries(compilation_database: dict, batch_size: int, file_set: set[str]):
     files = set()
     for db_entry in compilation_database:
         if os.path.exists(db_entry['file']):
             if len(file_set) > 0 and db_entry['file'] not in file_set:
                 continue
-            files.add(db_entry['file'])
+            files.add(db_entry)
 
-    for batched_files in batched(files, batch_size):
-        yield batched_files
+    for batched_compilation_entries in batched(files, batch_size):
+        yield batched_compilation_entries
 
 
 def create_enforcement_obj_files(compilation_database: dict, batch_size: int, config: HAKCConfig,
@@ -225,8 +221,8 @@ def create_enforcement_obj_files(compilation_database: dict, batch_size: int, co
     with concurrent.futures.ProcessPoolExecutor(max_workers=worker_count) as executor:
         futures = dict()
         task_id = 0
-        for batched_files in get_batched_files(compilation_database, batch_size, file_set):
-            future = executor.submit(create_logger_and_compile_files, task_id, config, set(batched_files), server_mode)
+        for batched_compilation_entries in get_batched_compilation_entries(compilation_database, batch_size, file_set):
+            future = executor.submit(create_logger_and_compile_files, task_id, config, set(batched_compilation_entries), server_mode)
             futures[future] = task_id
             task_id += 1
 
@@ -259,8 +255,8 @@ def perform_analysis_with_compilation_database(config: HAKCConfig, compilation_d
     with concurrent.futures.ProcessPoolExecutor(max_workers=worker_count) as executor:
         futures = dict()
         task_id = 0
-        for batched_files in get_batched_files(compilation_database, batch_size, file_set):
-            future = executor.submit(create_logger_and_compile_files, task_id, config, set(batched_files), server_mode)
+        for batched_compilation_entries in get_batched_compilation_entries(compilation_database, batch_size, file_set):
+            future = executor.submit(create_logger_and_compile_files, task_id, config, set(batched_compilation_entries), server_mode)
             futures[future] = task_id
             task_id += 1
 
