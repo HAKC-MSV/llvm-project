@@ -221,7 +221,7 @@ def create_enforcement_obj_files(compilation_database: dict, batch_size: int, co
         futures = dict()
         task_id = 0
         for batched_compilation_entries in get_batched_compilation_entries(compilation_database, batch_size, file_set):
-            future = executor.submit(create_logger_and_compile_files, task_id, config, set(batched_compilation_entries),
+            future = executor.submit(create_logger_and_compile_files, task_id, config, batched_compilation_entries,
                                      server_mode)
             futures[future] = task_id
             task_id += 1
