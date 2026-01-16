@@ -23,6 +23,9 @@
 
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCDatabase/HAKCDatabase.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCSystemInformation.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCTypeIdentifier/HAKCFunctionInfo.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCTypeIdentifier/HAKCGlobalInfo.h"
+#include "llvm/Transforms/Compartmentalization/hakc/HAKCTypeIdentifier/HAKCTypeIdentifier.h"
 
 namespace llvm::hakc {
 class HAKCModuleAnalysis;
@@ -128,7 +131,7 @@ protected:
 
 class FakeServerClient : public HAKCServerClientBase {
 public:
-  explicit FakeServerClient(LLVMContext &context);
+  explicit FakeServerClient(LLVMContext &context, bool NecOnly);
 
   void add_symbols(ArrayRef<std::shared_ptr<HAKCFunctionInfo>> FIs,
                    ArrayRef<std::shared_ptr<HAKCGlobalInfo>> GIs) override;

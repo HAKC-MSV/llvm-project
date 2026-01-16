@@ -124,6 +124,26 @@ def get_error_log_dir_path(config: HAKCConfig, server_mode: HAKCBuildMode):
     return os.path.join(config.log_dir, 'error-logs', server_mode.value)
 
 
+def do_compilation_task(database_entry: dict, logger_to_use: HAKCLogger, server: HAKCServer):
+    compilation_file = database_entry['file']
+    try:
+        run_compilation_target(database_entry, logger_to_use, str(server.socket_path),
+                               str(server.config.root_config_path), server.server_mode.output_ir,
+                               'analysis' if server.server_mode.is_analysis_mode else 'enforcement')
+        logger_to_use.debug(f'Compilation task completed')
+        return True
+    except subprocess.CalledProcessError as e:
+        err_file = os.path.join(get_error_log_dir_path(server.config, server.server_mode),
+                                os.path.basename(compilation_file) + "." + str(int(time.time())) + ".err")
+        os.makedirs(os.path.dirname(err_file), exist_ok=True)
+        with open(err_file, 'w') as f:
+            logger_to_use.error(f'Failed to compile {compilation_file}. Output logged to {err_file}')
+            print(f'Command: {" ".join(e.cmd)}', file=f)
+            print(f'Directory: {database_entry["directory"]}', file=f)
+            print(e.stdout, file=f)
+        return False
+
+
 def do_compilation_tasks(task_id: int, config: HAKCConfig, logger_to_use: HAKCLogger,
                          compilation_entries_to_use: list[dict],
                          server_mode: HAKCBuildMode):
@@ -136,23 +156,12 @@ def do_compilation_tasks(task_id: int, config: HAKCConfig, logger_to_use: HAKCLo
         return None
 
     logger_to_use.debug(f'Compiling {len(compilation_entries_to_use)} files')
+    all_successful = True
 
     for database_entry in compilation_entries_to_use:
-        compilation_file = database_entry['file']
-        try:
-            run_compilation_target(database_entry, logger_to_use, str(server.socket_path),
-                                   str(config.root_config_path), server_mode.output_ir,
-                                   'analysis' if server_mode.is_analysis_mode else 'enforcement')
-            logger_to_use.debug(f'Compilation task completed')
-        except subprocess.CalledProcessError as e:
-            err_file = os.path.join(get_error_log_dir_path(config, server_mode),
-                                    os.path.basename(compilation_file) + "." + str(int(time.time())) + ".err")
-            os.makedirs(os.path.dirname(err_file), exist_ok=True)
-            with open(err_file, 'w') as f:
-                logger_to_use.info(f'Failed to compile {compilation_file}. Output logged to {err_file}')
-                print(f'Command: {" ".join(e.cmd)}', file=f)
-                print(f'Directory: {database_entry["directory"]}', file=f)
-                print(e.stdout, file=f)
+        if not do_compilation_task(database_entry, logger_to_use, server):
+            all_successful = False
+            break
 
     logger_to_use.debug(f'Shutting down everything')
     if not server_thread.is_alive():
@@ -174,6 +183,8 @@ def do_compilation_tasks(task_id: int, config: HAKCConfig, logger_to_use: HAKCLo
     except Exception as e:
         logger_to_use.error(f'Failed to join server thread: {e}')
 
+    if not all_successful:
+        raise RuntimeError(f'Unsuccessful compilation')
     logger_to_use.debug(f'returning')
     return result
 
@@ -243,21 +254,8 @@ def create_logger_and_start_server(server_mode: HAKCBuildMode, config: HAKCConfi
 
 def compile_database_entry(database_entry: dict):
     global agent
-    compilation_file = database_entry['file']
-    try:
-        run_compilation_target(database_entry, agent.logger, str(agent.server.socket_path),
-                               str(agent.config.root_config_path), agent.server_mode.output_ir,
-                               'analysis' if agent.server_mode.is_analysis_mode else 'enforcement')
-        agent.logger.debug(f'Compilation task completed')
-    except subprocess.CalledProcessError as e:
-        err_file = os.path.join(get_error_log_dir_path(agent.config, agent.server_mode),
-                                os.path.basename(compilation_file) + "." + str(int(time.time())) + ".err")
-        os.makedirs(os.path.dirname(err_file), exist_ok=True)
-        with open(err_file, 'w') as f:
-            agent.logger.info(f'Failed to compile {compilation_file}. Output logged to {err_file}')
-            print(f'Command: {" ".join(e.cmd)}', file=f)
-            print(f'Directory: {database_entry["directory"]}', file=f)
-            print(e.stdout, file=f)
+    if do_compilation_task(database_entry, agent.logger, agent.server):
+        raise RuntimeError(f'Failed to compile {database_entry["file"]}')
 
 
 def create_logger_and_compile_files(task_id: int, config: HAKCConfig, compilation_entries: list[dict],
@@ -302,7 +300,7 @@ def create_enforcement_obj_files(compilation_database: dict, batch_size: int, co
                     future.result()
                 except Exception as e:
                     successful_enforcement = False
-                    server_main_logger.exception(f'Error in task {task_id}: {e}')
+                    server_main_logger.error(f'Error in task {task_id}: {e}')
 
     if not successful_enforcement:
         server_main_logger.error(f'Failed to successfully add enforcement. Quitting')

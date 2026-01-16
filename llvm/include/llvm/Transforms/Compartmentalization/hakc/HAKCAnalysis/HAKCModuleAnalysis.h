@@ -59,10 +59,10 @@ public:
 
   void runAnalysis();
 
-  void runEnforcement(bool UseSimulatedClient);
+  void runEnforcement(bool UseSimulatedClient, bool NecOnly);
 
   std::unique_ptr<HAKCServerClientBase>
-  ConstructClient(bool UseSimulatedClient);
+  ConstructClient(bool UseSimulatedClient, bool NecOnly = false);
 };
 
 } // namespace llvm::hakc

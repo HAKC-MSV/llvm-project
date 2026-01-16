@@ -25,6 +25,7 @@ using namespace llvm;
 namespace llvm::hakc {
 
 class HAKCFunctionEnforcement;
+class HAKCServerClientBase;
 
 class HAKCPointerBase {
 protected:
@@ -198,6 +199,7 @@ public:
                                bool CountAuthenticatedUsers) const;
 
   bool ValueIsManagedAndHasUsers(Value *V, bool CountAuthenticatedUsers) const;
+  bool ProtectedPointerShouldBeCreated(HAKCServerClientBase &Client) const;
 
   void CheckPointerReplacement(Value *Old, Value *New,
                                StringRef TypeName) const;
@@ -214,15 +216,10 @@ public:
     AuthenticatedIsCopyOfBase = val;
   }
 
-  // bool GetBaseIsAuthenticated() const {return BaseIsAuthenticated;}
-
   bool GetManuallyTransferred() const { return ManuallyTransferred; }
 
   bool GetPurposefullyIgnored() const { return PurposefullyIgnored; }
 
-  // bool GetAuthenticatedIsCopyOfBase() const {return
-  // AuthenticatedIsCopyOfBase;}
-  //
   SmallVector<ManagedHAKCPointerUseP> &GetAuthenticatedUses() {
     return AuthenticatedUses;
   }

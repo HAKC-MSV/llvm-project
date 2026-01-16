@@ -115,7 +115,7 @@ BasicBlock *HAKCFunctionEnforcement::findDominatorUseBlock(
   return Dominator;
 }
 
-bool HAKCFunctionAnalysis::AddManagedPointer(Use &PointerUse) {
+bool HAKCFunctionAnalysis::AddManagedPointer(Use &PointerUse) const {
   if (!CommonHAKCAnalysis::IsPointerLikeType(PointerUse->getType())) {
     getLogger(Fatal) << "Trying to add an invalid ManagedHAKCPointer: "
                      << PointerUse << "\n"
@@ -138,7 +138,7 @@ bool HAKCFunctionAnalysis::AddManagedPointer(Use &PointerUse) {
  * @param arg The function argument to check
  * @return
  */
-bool HAKCFunctionAnalysis::argNeedsAuthentication(Use &arg) {
+bool HAKCFunctionAnalysis::argNeedsAuthentication(Use &arg) const {
   if (auto *call = dyn_cast<CallInst>(arg.getUser())) {
     if (auto *inlineAsm = dyn_cast<InlineAsm>(call->getCalledOperand())) {
       HAKCFunctionAnalysis::getLogger(Verbose)
@@ -270,7 +270,7 @@ Value *HAKCFunctionAnalysis::getDef(Value *V, bool followLoad) const {
  * @brief Process a LoadInst for analysis
  * @param load
  */
-void HAKCFunctionAnalysis::handleLoad(LoadInst *load) {
+void HAKCFunctionAnalysis::handleLoad(LoadInst *load) const {
   GetLogger(Verbose, !DebugActive)
       << "Handling " << *load->getOperandUse(LoadInst::getPointerOperandIndex())
       << " from Load " << *load << "\n";
@@ -295,7 +295,7 @@ void HAKCFunctionAnalysis::handleStore(StoreInst *Store) {
  * @brief BinaryOperators (like bitwise OR) should use authenticated values
  * @param binOp
  */
-void HAKCFunctionAnalysis::handleBinaryOperator(BinaryOperator *binOp) {
+void HAKCFunctionAnalysis::handleBinaryOperator(BinaryOperator *binOp) const {
   GetLogger(Verbose, !DebugActive) << "Checking binary op " << binOp << "\n";
   /* Both operators need to be pointers to skip operations like
    * ptr | 0xFFFF
@@ -551,7 +551,7 @@ HAKCTypeIdentifier &HAKCFunctionAnalysis::GetTypeIdentifier() const {
   return ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().GetTypeIdentifier();
 }
 
-void HAKCFunctionAnalysis::TypeUseAnalysis() {
+void HAKCFunctionAnalysis::TypeUseAnalysis() const {
   GetLogger(Debug, !DebugActive)
       << "!!!! Starting Function Temporal Analysis !!!!\n";
 
@@ -774,7 +774,7 @@ void HAKCFunctionEnforcement::UpdateHAKCFunctionParameters(
 }
 
 void HAKCFunctionEnforcement::
-    CheckForValidCompartmentTransitionAndUpdateIntraCompartmentCalls() {
+    CheckForValidCompartmentTransitionAndUpdateIntraCompartmentCalls() const {
   auto CurrentDivision = Client.GetDivision(CurrentFunction);
   Client.GetValidTargets(CurrentDivision.GetHAKCCompartment());
   for (auto *call : DirectFunctionCallSet) {
@@ -849,7 +849,7 @@ void HAKCFunctionEnforcement::MaybeAddCompareToDirectUsers(CmpInst *CmpI) {
   CheckCompareOperandForDirectFunctionUse(CmpI, 1);
 }
 
-void HAKCFunctionEnforcement::ReplaceDirectFunctionUsesWithTransfers() {
+void HAKCFunctionEnforcement::ReplaceDirectFunctionUsesWithTransfers() const {
   for (auto *I : directFunctionUsers) {
     for (unsigned i = 0; i < I->getNumOperands(); i++) {
       if (isa<CallInst>(I)) {
@@ -874,7 +874,7 @@ void HAKCFunctionEnforcement::ReplaceDirectFunctionUsesWithTransfers() {
 /**
  * @brief Replace signed pointer dereferences with authenticated dereferences
  */
-void HAKCFunctionEnforcement::transformPointerDereferences() {
+void HAKCFunctionEnforcement::transformPointerDereferences() const {
   GetLogger(Verbose, !DebugActive)
       << "Function prior to transforming pointer dereferences\n"
       << *CurrentFunction << "\n";
@@ -986,7 +986,7 @@ void HAKCFunctionEnforcement::CreateAllTransfers() {
 }
 
 Value *HAKCFunctionEnforcement::CreateSafePointerAtLocation(
-    Value *Pointer, Instruction *InsertLocation) {
+    Value *Pointer, Instruction *InsertLocation) const {
   if (auto *Managed = PointerManager.FindAuthenticatedValue(Pointer)) {
     return Managed;
   }
@@ -996,7 +996,7 @@ Value *HAKCFunctionEnforcement::CreateSafePointerAtLocation(
 }
 
 Value *HAKCFunctionEnforcement::CreateAuthenticationAtLocation(
-    Value *Pointer, Instruction *InsertLocation) {
+    Value *Pointer, Instruction *InsertLocation) const {
   if (auto *Managed = PointerManager.FindAuthenticatedValue(Pointer)) {
     return Managed;
   }
@@ -1079,9 +1079,8 @@ bool HAKCFunctionEnforcement::FunctionsAreInSameCompartment(Function *F,
  * @param location The location at which to place the check
  * @return The result of the transfer
  */
-Value *
-HAKCFunctionEnforcement::AddDataAuthCheckAtLocation(Value *SignedPtr,
-                                                    Instruction *location) {
+Value *HAKCFunctionEnforcement::AddDataAuthCheckAtLocation(
+    Value *SignedPtr, Instruction *location) const {
   const auto HAKCPointer = PointerManager.GetManagedPointer(SignedPtr);
   if (!HAKCPointer) {
     GetLogger(Fatal, !DebugActive)
@@ -1093,9 +1092,8 @@ HAKCFunctionEnforcement::AddDataAuthCheckAtLocation(Value *SignedPtr,
   return bitcast;
 }
 
-Value *
-HAKCFunctionEnforcement::AddCodeAuthCheckAtLocation(Value *SignedPtr,
-                                                    Instruction *Location) {
+Value *HAKCFunctionEnforcement::AddCodeAuthCheckAtLocation(
+    Value *SignedPtr, Instruction *Location) const {
   const auto HAKCPointer = PointerManager.GetManagedPointer(SignedPtr);
   if (!HAKCPointer) {
     GetLogger(Fatal, !DebugActive)
@@ -1108,7 +1106,7 @@ HAKCFunctionEnforcement::AddCodeAuthCheckAtLocation(Value *SignedPtr,
 }
 
 Value *HAKCFunctionEnforcement::AddSafePointerCreationAtLocation(
-    Value *SignedPtr, Instruction *Location) {
+    Value *SignedPtr, Instruction *Location) const {
   const auto HAKCPointer = PointerManager.GetManagedPointer(SignedPtr);
   if (!HAKCPointer) {
     GetLogger(Fatal, !DebugActive)
@@ -1180,7 +1178,7 @@ void HAKCFunctionEnforcement::AddInstrumentation() {
                                    << CurrentFunction->getName() << "\n";
 }
 
-void HAKCFunctionEnforcement::WriteBuggyFunctionToFile() {
+void HAKCFunctionEnforcement::WriteBuggyFunctionToFile() const {
 
   SmallString<256> Path;
   SmallString<256> ModulePath;
@@ -1286,8 +1284,8 @@ Instruction *HAKCFunctionEnforcement::CreateMissingTransfer(
                                     InsertionPoint, Size);
 }
 
-Instruction *
-HAKCFunctionEnforcement::SignGlobalPointerWithColor(GlobalValue *GlobalVar) {
+Instruction *HAKCFunctionEnforcement::SignGlobalPointerWithColor(
+    GlobalValue *GlobalVar) const {
   std::set<Instruction *> UserInstructions;
   for (auto *U : GlobalVar->users()) {
     if (auto *I = dyn_cast<Instruction>(U)) {
@@ -1311,7 +1309,7 @@ HAKCFunctionEnforcement::SignGlobalPointerWithColor(GlobalValue *GlobalVar) {
 void HAKCFunctionEnforcement::ReplaceInstructionOperand(Instruction *I,
                                                         const unsigned ArgNo,
                                                         Value *OldValue,
-                                                        Value *NewValue) {
+                                                        Value *NewValue) const {
   auto *V = I->getOperand(ArgNo);
   Value *Replacement;
   if (auto *Oper = dyn_cast<BitCastOperator>(V)) {
@@ -1339,7 +1337,7 @@ void HAKCFunctionEnforcement::ReplaceInstructionOperand(Instruction *I,
 }
 
 void HAKCFunctionEnforcement::CheckAndReplaceArgument(
-    Value *V, Instruction *I, const unsigned int ArgNo) {
+    Value *V, Instruction *I, const unsigned int ArgNo) const {
   if (auto *Func = dyn_cast<Function>(V)) {
     const auto name =
         ModuleAnalysis.GetCommonAnalysis().GetOutsideTransferName(Func);
@@ -1446,7 +1444,7 @@ void HAKCFunctionEnforcement::CreateBaseAuthenticatedPointer(
       I = CreateSafePointerAtLocation(PointerToAuthenticate,
                                       AuthenticationInsertPoint);
     }
-    // TODO: look here next
+
     if (!I) {
       I = CreateAuthenticationAtLocation(PointerToAuthenticate,
                                          AuthenticationInsertPoint);
@@ -1464,14 +1462,14 @@ void HAKCFunctionEnforcement::CreateBaseAuthenticatedPointer(
   }
 }
 
-void HAKCFunctionEnforcement::TransformPointers() {
+void HAKCFunctionEnforcement::TransformPointers() const {
   for (const auto &ManagedPointer : PointerManager.ManagedPointers()) {
     TransformUses(ManagedPointer);
   }
 }
 
 void HAKCFunctionEnforcement::SetPointerSetsToBeEqual(
-    const ManagedHAKCPointerP &ManagedPtr) {
+    const ManagedHAKCPointerP &ManagedPtr) const {
   GetLogger(Verbose, !DebugActive)
       << ManagedPtr << " setting pointer sets to be equal\n";
 
@@ -1515,6 +1513,13 @@ void HAKCFunctionEnforcement::MaybeCreateProtectedPointer(
         << " transfer creation is not needed\n";
     return;
   }
+
+  if (!ManagedPtr->ProtectedPointerShouldBeCreated(Client)) {
+    GetLogger(Verbose, !DebugActive)
+        << "Protected pointer of " << *ManagedPtr << " should not be created\n";
+    return;
+  }
+
   // this is returning false
   const auto BaseShouldBeTransferred =
       BaseDefinitionShouldBeTransferred(ManagedPtr);
@@ -1558,7 +1563,7 @@ void HAKCFunctionEnforcement::MaybeCreateProtectedPointer(
     }
   }
 
-  if (!ProtectedValue && ManagedPtr->GetProtectedUserCount() > 0) {
+  if (!ProtectedValue && ManagedPtr->ProtectedPointerShouldBeCreated(Client)) {
     getLogger(Fatal) << "The protected pointer of " << *ManagedPtr << " is "
                      << ManagedPtr->GetProtectedPointer()
                      << " but is not manually transferred\n";
@@ -1588,7 +1593,7 @@ void HAKCFunctionEnforcement::MaybeCreateProtectedPointer(
 }
 
 void HAKCFunctionEnforcement::MaybeCreateBaseCopyPointer(
-    const ManagedHAKCPointerP &ManagedPtr) {
+    const ManagedHAKCPointerP &ManagedPtr) const {
   GetLogger(Verbose, !DebugActive)
       << __FUNCTION__ << " called for " << *ManagedPtr << "\n";
 
@@ -1615,7 +1620,8 @@ void HAKCFunctionEnforcement::CreatePointerReplacements(
     const ManagedHAKCPointerP &ManagedPtr) {
   const bool CreateAuthenticatedCopies =
       ManagedPtr->GetAuthenticatedUserCount() > 0;
-  const bool CreateProtectedCopies = ManagedPtr->GetProtectedUserCount() > 0;
+  const bool CreateProtectedCopies =
+      ManagedPtr->ProtectedPointerShouldBeCreated(Client);
 
   if (!CreateAuthenticatedCopies) {
     GetLogger(Verbose, !DebugActive)
@@ -1625,7 +1631,7 @@ void HAKCFunctionEnforcement::CreatePointerReplacements(
 
   if (!CreateProtectedCopies) {
     GetLogger(Verbose, !DebugActive)
-        << "No Protected Users of " << *ManagedPtr
+        << "CreateProtectedCopies is false for " << *ManagedPtr
         << " so no protected clones will be created\n";
   }
 
@@ -1749,7 +1755,7 @@ void HAKCFunctionEnforcement::CreatePointerUseClones(
 }
 
 void HAKCFunctionEnforcement::TransformUses(
-    const ManagedHAKCPointerP &ManagedPtr) {
+    const ManagedHAKCPointerP &ManagedPtr) const {
   GetLogger(Verbose, !DebugActive)
       << __FUNCTION__ << " called for " << *ManagedPtr << "\n";
 
@@ -1763,7 +1769,7 @@ void HAKCFunctionEnforcement::TransformUses(
            "count of "
         << *ManagedPtr << " is 0\n";
   }
-  if (ManagedPtr->GetProtectedUserCount() > 0) {
+  if (ManagedPtr->ProtectedPointerShouldBeCreated(Client)) {
     TransformUseSet(ManagedPtr, ManagedPtr->GetProtectedUses());
   } else {
     GetLogger(Verbose, !DebugActive) << "Not transforming Protected Pointer "
@@ -1775,7 +1781,8 @@ void HAKCFunctionEnforcement::TransformUses(
 
 void HAKCFunctionEnforcement::SetUseOperand(
     const ManagedHAKCPointerP &ManagedPtr, User *U, Value *Replacement,
-    const ManagedHAKCPointerUse &PointerUse, const bool IsAuthenticatedUse) {
+    const ManagedHAKCPointerUse &PointerUse,
+    const bool IsAuthenticatedUse) const {
   if (ManagedPtr->GetPurposefullyIgnored()) {
     getLogger(Fatal) << "Trying to set operand of purposefully ignored pointer "
                      << *ManagedPtr << "\n";
@@ -1805,7 +1812,7 @@ void HAKCFunctionEnforcement::SetUseOperand(
 }
 
 void HAKCFunctionEnforcement::UpdateUserCounts(
-    const ManagedHAKCPointerP &ManagedPtr) {
+    const ManagedHAKCPointerP &ManagedPtr) const {
   GetLogger(Verbose, !DebugActive)
       << *ManagedPtr << " updating user counts of "
       << std::to_string(ManagedPtr->GetCloneUses().size()) << " uses\n";
@@ -1821,7 +1828,7 @@ void HAKCFunctionEnforcement::UpdateUserCounts(
 }
 
 void HAKCFunctionEnforcement::TransformClones(
-    const ManagedHAKCPointerP &ManagedPtr) {
+    const ManagedHAKCPointerP &ManagedPtr) const {
   if (ManagedPtr->GetPurposefullyIgnored()) {
     GetLogger(Verbose, !DebugActive)
         << "Not transforming clones since " << *ManagedPtr
@@ -1876,7 +1883,7 @@ void HAKCFunctionEnforcement::TransformClones(
                       true);
       }
     }
-    if (ManagedPtr->GetProtectedUserCount() > 0) {
+    if (ManagedPtr->ProtectedPointerShouldBeCreated(Client)) {
       GetLogger(Verbose, !DebugActive)
           << "Handling Protected Use of " << *CloneUse << "\n";
       auto *ProtectedVersion =
@@ -1892,7 +1899,10 @@ void HAKCFunctionEnforcement::TransformClones(
         if (PointerManager.GetManagedPointer(CloneUse->get()) == nullptr ||
             ManagedPtr->UseIsManagedAndHasUsers(*CloneUse, false)) {
           getLogger(Fatal) << "Unable to find Protected replacement of "
-                           << *CloneUse << "\n";
+                           << *CloneUse << "\n"
+                           << CommonHAKCAnalysis::IsNECSymbol(&GetFunction(),
+                                                              Client)
+                           << "\n";
           PointerManager.PrintProtectedValues();
           throw std::exception();
         }
@@ -1914,7 +1924,7 @@ void HAKCFunctionEnforcement::TransformClones(
 
 void HAKCFunctionEnforcement::TransformUseSet(
     const ManagedHAKCPointerP &ManagedPtr,
-    SmallVectorImpl<ManagedHAKCPointerUseP> &UseSet) {
+    SmallVectorImpl<ManagedHAKCPointerUseP> &UseSet) const {
   if (ManagedPtr->GetPurposefullyIgnored()) {
     GetLogger(Verbose, !DebugActive)
         << "Not transforming uses since " << *ManagedPtr
@@ -1983,7 +1993,7 @@ void HAKCFunctionEnforcement::TransformUseSet(
 }
 
 Value *HAKCFunctionEnforcement::CreateAuthenticatedValueHelper(
-    ManagedHAKCPointerUse &use) {
+    ManagedHAKCPointerUse &use) const {
   auto *Pointer = use.get();
 
   if (auto *AuthenticatedCopy = PointerManager.FindAuthenticatedValue(use)) {
@@ -2003,7 +2013,7 @@ Value *HAKCFunctionEnforcement::CreateAuthenticatedValueHelper(
 }
 
 Value *HAKCFunctionEnforcement::CreateAuthenticatedValue(
-    const ManagedHAKCPointerP &ManagedPtr, ManagedHAKCPointerUse &use) {
+    const ManagedHAKCPointerP &ManagedPtr, ManagedHAKCPointerUse &use) const {
   if (ManagedPtr->GetPurposefullyIgnored()) {
     return use.get();
   }
@@ -2033,7 +2043,7 @@ Value *HAKCFunctionEnforcement::CreateAuthenticatedValue(
 }
 
 Value *HAKCFunctionEnforcement::CreateProtectedValueHelper(
-    ManagedHAKCPointerUse &PointerUse) {
+    ManagedHAKCPointerUse &PointerUse) const {
   auto *Pointer = PointerUse.get();
 
   if (auto *ProtectedValue = PointerManager.FindProtectedValue(PointerUse)) {
@@ -2058,7 +2068,8 @@ Value *HAKCFunctionEnforcement::CreateProtectedValueHelper(
 }
 
 Value *HAKCFunctionEnforcement::CreateProtectedValue(
-    const ManagedHAKCPointerP &ManagedPtr, ManagedHAKCPointerUse &HAKCUse) {
+    const ManagedHAKCPointerP &ManagedPtr,
+    ManagedHAKCPointerUse &HAKCUse) const {
   if (ManagedPtr->GetPurposefullyIgnored()) {
     return HAKCUse.get();
   }
@@ -2086,7 +2097,7 @@ Value *HAKCFunctionEnforcement::CreateProtectedValue(
   return Protected;
 }
 
-Instruction *HAKCFunctionEnforcement::CloneInstruction(Instruction *I) {
+Instruction *HAKCFunctionEnforcement::CloneInstruction(Instruction *I) const {
   Instruction *Clone;
   if (!PointerManager.GetClones().contains(I)) {
     Clone = I->clone();
@@ -2111,6 +2122,9 @@ bool HAKCFunctionEnforcement::BaseDefinitionShouldBeTransferred(
   }
 
   if (const auto *Call = dyn_cast<CallInst>(ManagedPtr->GetBaseDefinition())) {
+    if (Call->isInlineAsm()) {
+      return false;
+    }
     if (!Call->getCalledFunction()) {
       return true;
     }
@@ -2120,7 +2134,7 @@ bool HAKCFunctionEnforcement::BaseDefinitionShouldBeTransferred(
            !FunctionsAreInSameCompartment(CurrentFunction, Callee);
   }
   if (ManagedPtr->BaseIsAuthenticatedPointer()) {
-    return ManagedPtr->GetProtectedUserCount() > 0;
+    return ManagedPtr->ProtectedPointerShouldBeCreated(Client);
   }
 
   return false;

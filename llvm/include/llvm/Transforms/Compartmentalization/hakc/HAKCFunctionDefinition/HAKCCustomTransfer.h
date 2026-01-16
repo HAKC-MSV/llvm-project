@@ -21,12 +21,13 @@
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTypeIdentifier/HAKCTypeInfo.h"
 
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/ManagedHAKCPointer.h"
-
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartmentDivision.h"
 
 using namespace llvm;
 
 namespace llvm::hakc {
+class HAKCPointerBase;
+
 class HAKCCustomTransfer : public HAKCFunctionDefinition {
 public:
   HAKCCustomTransfer(Function *CustomFunction, const HAKCTypeP &TargetType,

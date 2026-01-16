@@ -396,9 +396,9 @@ void FakeServerClient::add_symbols(
 void FakeServerClient::SendSymbolsToAnalysisServer(
     HAKCTypeIdentifier &TypeIdentifier) {}
 
-FakeServerClient::FakeServerClient(LLVMContext &context)
+FakeServerClient::FakeServerClient(LLVMContext &context, bool NecOnly)
     : HAKCServerClientBase(context),
-      CurrentCompartmentID(KERNEL_COMPARTMENT + 1), NecOnly(false),
+      CurrentCompartmentID(KERNEL_COMPARTMENT + 1), NecOnly(NecOnly),
       context(context) {}
 
 void FakeServerClient::CloseConnection() {}
@@ -419,6 +419,9 @@ HAKCCompartmentDivision &FakeServerClient::GetDivision(GlobalValue *GV) {
     Division = SymbolDivisionMap[GV];
   } else {
     auto CompartmentID = CurrentCompartmentID++;
+    if (NecOnly) {
+      CompartmentID = KERNEL_COMPARTMENT;
+    }
     auto DivisionID = default_division_id;
     Division =
         CreateDivision(CompartmentID, DivisionID,

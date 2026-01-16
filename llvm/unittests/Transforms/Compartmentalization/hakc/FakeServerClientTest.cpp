@@ -14,7 +14,7 @@ TEST(HAKCUnitTests, FakeClientTest0) {
   // Construct FakeServerClient and test behavior
   // Default policy allows all compartments to access any other compartment
   // (i.e., a valid target)
-  auto Client = std::make_unique<hakc::FakeServerClient>(Context);
+  auto Client = std::make_unique<hakc::FakeServerClient>(Context, false);
   std::vector<hakc::HAKCCompartmentP> Compartments;
   for (unsigned i = 0; i < 4; ++i) {
     Compartments.push_back(Client->GetCompartment(i));

@@ -22,8 +22,6 @@
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartment.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCCompartmentalizationPolicy/HAKCCompartmentDivision.h"
 
-#include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCSystemInformation.h"
-
 namespace llvm::hakc {
 
 class HAKCModuleAnalysis;
@@ -50,10 +48,6 @@ public:
   HAKCPayload(json::Object *payload) : payload(*payload) {};
 
   virtual ~HAKCPayload() = default;
-
-  // template <typename T> T GetValue(StringRef key);
-  // unsigned GetInteger(StringRef key);
-  // std::vector<unsigned> GetIntegerArray(StringRef key);
 
 protected:
   json::Object payload;

@@ -32,7 +32,7 @@ using namespace llvm::hakc;
 
 namespace llvm {
 namespace hakc {
-bool skip_current_file(CommonHAKCAnalysis &HAKCAnalysis) {
+static bool skip_current_file(CommonHAKCAnalysis &HAKCAnalysis) {
   StringRef CurrentSourceName(HAKCAnalysis.GetModule().getSourceFileName());
   for (auto &path : HAKCAnalysis.GetSystemInfo().HAKCSourcePaths()) {
     if (CurrentSourceName.contains(path)) {
@@ -66,7 +66,7 @@ static bool runEnforcement(CommonHAKCAnalysis &HAKCAnalysis) {
   }
   CommonHAKCAnalysis::getLogger(Info) << "Running Enforcement Pass Mode!\n";
   HAKCModuleAnalysis ModuleAnalysis(HAKCAnalysis);
-  ModuleAnalysis.runEnforcement(UseSimulatedClient);
+  ModuleAnalysis.runEnforcement(UseSimulatedClient, NecOnly);
   return true;
 }
 
@@ -79,7 +79,7 @@ static void runAnalysis(CommonHAKCAnalysis &HAKCAnalysis) {
 
   if (ShouldSendSymbolsToServer(ModuleAnalysis.GetTypeIdentifier())) {
     // Only ever connect to server if symbols need to be sent
-    auto Client = ModuleAnalysis.ConstructClient(UseSimulatedClient);
+    auto Client = ModuleAnalysis.ConstructClient(UseSimulatedClient, NecOnly);
     // Symbols gathered are sent on connection termination
     Client->CloseConnection();
   } else {

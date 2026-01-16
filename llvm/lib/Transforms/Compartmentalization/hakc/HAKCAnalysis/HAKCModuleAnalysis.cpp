@@ -29,17 +29,17 @@ void HAKCModuleAnalysis::runAnalysis() {
   }
 }
 
-void HAKCModuleAnalysis::runEnforcement(bool UseSimulatedClient) {
-  auto Client = ConstructClient(UseSimulatedClient);
+void HAKCModuleAnalysis::runEnforcement(bool UseSimulatedClient, bool NecOnly) {
+  auto Client = ConstructClient(UseSimulatedClient, NecOnly);
   HAKCTransformer Transformer(*this, *Client);
   Transformer.runEnforcement();
 }
 
 std::unique_ptr<HAKCServerClientBase>
-HAKCModuleAnalysis::ConstructClient(bool UseSimulatedClient) {
+HAKCModuleAnalysis::ConstructClient(bool UseSimulatedClient, bool NecOnly) {
   std::unique_ptr<HAKCServerClientBase> Client;
   if (UseSimulatedClient) {
-    Client = std::make_unique<FakeServerClient>(GetModule().getContext());
+    Client = std::make_unique<FakeServerClient>(GetModule().getContext(), NecOnly);
   } else {
     Client = std::make_unique<HAKCServerClient>(*this);
   }

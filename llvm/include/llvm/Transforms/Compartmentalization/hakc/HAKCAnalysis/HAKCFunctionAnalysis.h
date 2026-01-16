@@ -70,7 +70,7 @@ public:
     return CommonHAKCAnalysis::getLogger(log_level, suppress_output);
   }
 
-  void TypeUseAnalysis();
+  void TypeUseAnalysis() const;
 
   void TypeUseHandleCall(const ManagedHAKCPointerUseP &CallUse) const;
 
@@ -116,7 +116,7 @@ protected:
 
   unsigned CompartmentTransferCount;
 
-  bool argNeedsAuthentication(Use &arg);
+  bool argNeedsAuthentication(Use &arg) const;
 
   bool phiNodeUsesValue(PHINode *phiNode, Value *target,
                         std::set<PHINode *> &visited);
@@ -125,17 +125,17 @@ protected:
 
   Instruction *getUserInst(User *user);
 
-  void handleLoad(LoadInst *load);
+  void handleLoad(LoadInst *load) const;
 
   void handleCall(CallInst *call);
 
   void handleStore(StoreInst *Store);
 
-  void handleBinaryOperator(BinaryOperator *binOp);
+  void handleBinaryOperator(BinaryOperator *binOp) const;
 
   bool globalShouldBeTransferred(Use &globalValueArg) const;
 
-  bool AddManagedPointer(Use &PointerUse);
+  bool AddManagedPointer(Use &PointerUse) const;
 };
 
 class HAKCFunctionEnforcement : public HAKCFunctionAnalysis {
@@ -161,7 +161,7 @@ public:
 
   void CheckCompareOperandForDirectFunctionUse(CmpInst *CmpI, unsigned OpNo);
 
-  void CheckForValidCompartmentTransitionAndUpdateIntraCompartmentCalls();
+  void CheckForValidCompartmentTransitionAndUpdateIntraCompartmentCalls() const;
 
   void MaybeAddCompareToDirectUsers(CmpInst *CmpI);
 
@@ -174,9 +174,9 @@ public:
                                           const DebugLoc &DebugLoc,
                                           Instruction *I, ConstantInt *Size);
 
-  void ReplaceDirectFunctionUsesWithTransfers();
+  void ReplaceDirectFunctionUsesWithTransfers() const;
 
-  void transformPointerDereferences();
+  void transformPointerDereferences() const;
 
   void createMissingTransfers();
 
@@ -190,13 +190,13 @@ public:
 
   Instruction *CreateMissingTransfer(Instruction *PointerNeedingTransfer);
 
-  Instruction *SignGlobalPointerWithColor(GlobalValue *GlobalVar);
+  Instruction *SignGlobalPointerWithColor(GlobalValue *GlobalVar) const;
 
   void ReplaceInstructionOperand(Instruction *I, unsigned ArgNo,
-                                 Value *OldValue, Value *NewValue);
+                                 Value *OldValue, Value *NewValue) const;
 
   void CheckAndReplaceArgument(Value *V, Instruction *I,
-                               const unsigned int ArgNo);
+                               const unsigned int ArgNo) const;
 
 protected:
   HAKCTransformer &Transformer;
@@ -223,15 +223,15 @@ protected:
 
   void CreatePointerUseClones(const ManagedHAKCPointerP &ManagedPtr);
 
-  void TransformPointers();
+  void TransformPointers() const;
 
-  void TransformUses(const ManagedHAKCPointerP &Use);
+  void TransformUses(const ManagedHAKCPointerP &Use) const;
 
   void MaybeCreateProtectedPointer(const ManagedHAKCPointerP &ManagedPtr);
 
-  void MaybeCreateBaseCopyPointer(const ManagedHAKCPointerP &ManagedPtr);
+  void MaybeCreateBaseCopyPointer(const ManagedHAKCPointerP &ManagedPtr) const;
 
-  void UpdateUserCounts(const ManagedHAKCPointerP &ManagedPtr);
+  void UpdateUserCounts(const ManagedHAKCPointerP &ManagedPtr) const;
 
   // void SetAuthenticatedPointer(Value *NewAuthenticatedPointer);
 
@@ -241,8 +241,8 @@ protected:
    * @return
    */
   Value *CreateAuthenticatedValue(const ManagedHAKCPointerP &ManagedPtr,
-                                  ManagedHAKCPointerUse &use);
-  Value *CreateAuthenticatedValueHelper(ManagedHAKCPointerUse &use);
+                                  ManagedHAKCPointerUse &use) const;
+  Value *CreateAuthenticatedValueHelper(ManagedHAKCPointerUse &use) const;
 
   /**
    * Return the Signed version of HAKCUse
@@ -250,29 +250,29 @@ protected:
    * @return
    */
   Value *CreateProtectedValue(const ManagedHAKCPointerP &ManagedPtr,
-                              ManagedHAKCPointerUse &use);
-  Value *CreateProtectedValueHelper(ManagedHAKCPointerUse &HAKCUse);
+                              ManagedHAKCPointerUse &use) const;
+  Value *CreateProtectedValueHelper(ManagedHAKCPointerUse &HAKCUse) const;
 
   void TransformUseSet(const ManagedHAKCPointerP &ManagedPtr,
-                       SmallVectorImpl<ManagedHAKCPointerUseP> &UseSet);
+                       SmallVectorImpl<ManagedHAKCPointerUseP> &UseSet) const;
 
-  void TransformClones(const ManagedHAKCPointerP &ManagedPtr);
+  void TransformClones(const ManagedHAKCPointerP &ManagedPtr) const;
 
   void CreatePointerReplacements(const ManagedHAKCPointerP &ManagedPtr);
 
   void SetUseOperand(const ManagedHAKCPointerP &ManagedPtr, User *U,
                      Value *Replacement,
                      const ManagedHAKCPointerUse &PointerUse,
-                     bool IsAuthenticatedUse);
+                     bool IsAuthenticatedUse) const;
 
-  void SetPointerSetsToBeEqual(const ManagedHAKCPointerP &ManagedPtr);
+  void SetPointerSetsToBeEqual(const ManagedHAKCPointerP &ManagedPtr) const;
 
-  Value *AddDataAuthCheckAtLocation(Value *SignedPtr, Instruction *location);
+  Value *AddDataAuthCheckAtLocation(Value *SignedPtr, Instruction *location) const;
 
-  Value *AddCodeAuthCheckAtLocation(Value *SignedPtr, Instruction *Location);
+  Value *AddCodeAuthCheckAtLocation(Value *SignedPtr, Instruction *Location) const;
 
   Value *AddSafePointerCreationAtLocation(Value *SignedPtr,
-                                          Instruction *Location);
+                                          Instruction *Location) const;
 
   BasicBlock *findDominatorUseBlock(Value *Ptr,
                                     const std::set<Instruction *> &Users) const;
@@ -284,19 +284,19 @@ protected:
   void CreateAllTransfers();
 
   Value *CreateSafePointerAtLocation(Value *Pointer,
-                                     Instruction *InsertLocation);
+                                     Instruction *InsertLocation) const;
 
   Value *CreateAuthenticationAtLocation(Value *Pointer,
-                                        Instruction *InsertLocation);
+                                        Instruction *InsertLocation) const;
 
   bool FunctionsAreInSameCompartment(Function *F, Function *G) const;
 
-  Instruction *CloneInstruction(Instruction *I);
+  Instruction *CloneInstruction(Instruction *I) const;
 
   bool BaseDefinitionShouldBeTransferred(
       const ManagedHAKCPointerP &ManagedPtr) const;
 
-  void WriteBuggyFunctionToFile();
+  void WriteBuggyFunctionToFile() const;
 };
 
 } // namespace llvm::hakc

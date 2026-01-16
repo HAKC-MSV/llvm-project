@@ -160,6 +160,12 @@ bool ManagedHAKCPointer::PointerSetsShouldBeEqual() const {
   return PointerSetsCanBeEqual();
 }
 
+bool ManagedHAKCPointer::ProtectedPointerShouldBeCreated(
+    HAKCServerClientBase &Client) const {
+  return GetProtectedUserCount() > 0 &&
+         !CommonHAKCAnalysis::IsNECSymbol(&Manager.GetFunction(), Client);
+}
+
 void ManagedHAKCPointer::GetAllIncomingValues(
     SmallVectorImpl<Value *> &Results) const {
   std::set<Value *> ValuesToCheck;
