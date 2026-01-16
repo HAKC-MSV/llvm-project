@@ -4,7 +4,6 @@
 
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/HAKCSystemInformation.h"
 
-#include "llvm/Support/Threading.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/CommonHAKCAnalysis.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCSystem/yaml/HAKCYaml.h"
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCTransformers/HAKCPostTargetAction.h"
@@ -16,8 +15,10 @@ namespace llvm::hakc {
 HAKCSystemInformation::HAKCSystemInformation(CommonHAKCAnalysis &CommonAnalysis)
     : CommonAnalysis(CommonAnalysis), ConsoleLogLevel(Verbose),
       FileLogLevel(Verbose), TypeIdentifier(CommonAnalysis), DebugDatabase(),
-      DefaultCompartmentID(), DefaultDivisionID(), MaxConnectionRetries(),
-      ServerCoreCount() {}
+      DefaultAccessToken(KERNEL_ACCESS_TOKEN),
+      DefaultEntryToken(KERNEL_ACCESS_TOKEN), DefaultCompartmentID(),
+      DefaultDivisionID(), MaxConnectionRetries(), ServerCoreCount(),
+      DivisionIDBitCount(HAKC_CONTEXT_COMPARTMENT_SHIFT) {}
 
 StringRef HAKCSystemInformation::GetRootPath() const { return RootPath; }
 

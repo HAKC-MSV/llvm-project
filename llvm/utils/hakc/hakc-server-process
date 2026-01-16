@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import atexit
 import cProfile
 import concurrent.futures
 import io
@@ -193,6 +194,72 @@ def make_worker_logger(name: str, task_id: int, log_level: LoggingLevelEnum) -> 
     return logger
 
 
+class HAKCCompilationAgent:
+    def __init__(self, server_mode: HAKCBuildMode, config: HAKCConfig):
+        self.agent_id = os.getpid()
+        self.config = config
+        self.server_mode = server_mode
+        self.logger = cast(HAKCLogger,
+                           make_worker_logger(f'hakc.server-worker-{self.agent_id}', self.agent_id, config.log_level))
+        self.server, self.server_thread = start_hakc_server(self.agent_id, self.server_mode, self.config, self.logger)
+
+    def stop(self):
+        if not self.server_thread.is_alive():
+            return
+
+        try:
+            self.server.shutdown()
+        except Exception as e:
+            self.logger.error(f'Failed to shutdown server: {e}')
+
+        try:
+            self.server.server_close()
+        except Exception as e:
+            self.logger.error(f'Failed to close server: {e}')
+
+        try:
+            self.server_thread.join()
+        except Exception as e:
+            self.logger.error(f'Failed to join server thread: {e}')
+
+    def __del__(self):
+        self.stop()
+
+
+agent: Optional[HAKCCompilationAgent] = None
+
+
+def stop_compilation_agent():
+    global agent
+    if agent is not None:
+        agent.stop()
+
+
+def create_logger_and_start_server(server_mode: HAKCBuildMode, config: HAKCConfig):
+    global agent
+    agent = HAKCCompilationAgent(server_mode, config)
+    atexit.register(stop_compilation_agent)
+
+
+def compile_database_entry(database_entry: dict):
+    global agent
+    compilation_file = database_entry['file']
+    try:
+        run_compilation_target(database_entry, agent.logger, str(agent.server.socket_path),
+                               str(agent.config.root_config_path), agent.server_mode.output_ir,
+                               'analysis' if agent.server_mode.is_analysis_mode else 'enforcement')
+        agent.logger.debug(f'Compilation task completed')
+    except subprocess.CalledProcessError as e:
+        err_file = os.path.join(get_error_log_dir_path(agent.config, agent.server_mode),
+                                os.path.basename(compilation_file) + "." + str(int(time.time())) + ".err")
+        os.makedirs(os.path.dirname(err_file), exist_ok=True)
+        with open(err_file, 'w') as f:
+            agent.logger.info(f'Failed to compile {compilation_file}. Output logged to {err_file}')
+            print(f'Command: {" ".join(e.cmd)}', file=f)
+            print(f'Directory: {database_entry["directory"]}', file=f)
+            print(e.stdout, file=f)
+
+
 def create_logger_and_compile_files(task_id: int, config: HAKCConfig, compilation_entries: list[dict],
                                     server_mode: HAKCBuildMode):
     logger_to_use = cast(HAKCLogger, make_worker_logger(f'hakc.server-worker-{task_id}', task_id, config.log_level))
@@ -217,14 +284,15 @@ def create_enforcement_obj_files(compilation_database: dict, batch_size: int, co
     assert server_mode.is_enforcement_mode
     worker_count = max(1, config.server_config.analysis_core_count // 2)
     successful_enforcement = True
-    with concurrent.futures.ProcessPoolExecutor(max_workers=worker_count) as executor:
+    with concurrent.futures.ProcessPoolExecutor(max_workers=worker_count, initializer=create_logger_and_start_server,
+                                                initargs=(server_mode, config)) as executor:
         futures = dict()
         task_id = 0
         for batched_compilation_entries in get_batched_compilation_entries(compilation_database, batch_size, file_set):
-            future = executor.submit(create_logger_and_compile_files, task_id, config, batched_compilation_entries,
-                                     server_mode)
-            futures[future] = task_id
-            task_id += 1
+            for database_entry in batched_compilation_entries:
+                future = executor.submit(compile_database_entry, database_entry)
+                futures[future] = task_id
+                task_id += 1
 
         with server_main_logger.progress_bar(desc="Processing results", total=len(futures)) as pbar:
             for future in concurrent.futures.as_completed(futures):
