@@ -45,9 +45,9 @@ class HAKCLogger(logging.Logger):
         kwargs['file'] = self.console_handler.stream
         # print(f"Log level: {self.level}")
         # disable progress bar printing if only errors or higher should be printed
-        if self.level >= LoggingLevelEnum.INFO.value:
-            kwargs['file'] = open(os.devnull, 'w')
-            kwargs['disable'] = True
+        # if self.level >= LoggingLevelEnum.INFO.value:
+        #     kwargs['file'] = open(os.devnull, 'w')
+        #     kwargs['disable'] = True
 
         return tqdm.tqdm(**kwargs)
 

@@ -277,6 +277,9 @@ class HAKCServer(socketserver.ThreadingUnixStreamServer):
     def __del__(self):
         self.logger.debug(f"Closing HAKCServer")
 
+    def reset_compartmentalization(self):
+        self.compartmentalization = HAKCCompartmentalization()
+
     def add_compartmentalization(self, compartmentalization: HAKCCompartmentalization):
         if self.compartmentalization is None:
             self.compartmentalization = HAKCCompartmentalization()

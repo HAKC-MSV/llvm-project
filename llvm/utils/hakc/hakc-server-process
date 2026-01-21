@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import argparse
-import atexit
 import cProfile
 import concurrent.futures
 import io
@@ -144,51 +143,6 @@ def do_compilation_task(database_entry: dict, logger_to_use: HAKCLogger, server:
         return False
 
 
-def do_compilation_tasks(task_id: int, config: HAKCConfig, logger_to_use: HAKCLogger,
-                         compilation_entries_to_use: list[dict],
-                         server_mode: HAKCBuildMode):
-    logger_to_use.debug(f'Starting compilation tasks')
-
-    try:
-        server, server_thread = start_hakc_server(task_id, server_mode, config, logger_to_use)
-    except Exception as e:
-        logger_to_use.error(f'Failed to start server {task_id}: {e}')
-        return None
-
-    logger_to_use.debug(f'Compiling {len(compilation_entries_to_use)} files')
-    all_successful = True
-
-    for database_entry in compilation_entries_to_use:
-        if not do_compilation_task(database_entry, logger_to_use, server):
-            all_successful = False
-            break
-
-    logger_to_use.debug(f'Shutting down everything')
-    if not server_thread.is_alive():
-        raise RuntimeError(f'{task_id} server thread is dead')
-
-    result = server.compartmentalization
-    try:
-        server.shutdown()
-    except Exception as e:
-        logger_to_use.error(f'Failed to shutdown server: {e}')
-
-    try:
-        server.server_close()
-    except Exception as e:
-        logger_to_use.error(f'Failed to close server: {e}')
-
-    try:
-        server_thread.join()
-    except Exception as e:
-        logger_to_use.error(f'Failed to join server thread: {e}')
-
-    if not all_successful:
-        raise RuntimeError(f'Unsuccessful compilation')
-    logger_to_use.debug(f'returning')
-    return result
-
-
 def make_worker_logger(name: str, task_id: int, log_level: LoggingLevelEnum) -> logging.Logger:
     logger = logging.getLogger(name)
     logger.setLevel(log_level.value)
@@ -249,20 +203,38 @@ def stop_compilation_agent():
 def create_logger_and_start_server(server_mode: HAKCBuildMode, config: HAKCConfig):
     global agent
     agent = HAKCCompilationAgent(server_mode, config)
-    atexit.register(stop_compilation_agent)
 
 
 def compile_database_entry(database_entry: dict):
     global agent
-    if do_compilation_task(database_entry, agent.logger, agent.server):
+    if not do_compilation_task(database_entry, agent.logger, agent.server):
         raise RuntimeError(f'Failed to compile {database_entry["file"]}')
 
 
-def create_logger_and_compile_files(task_id: int, config: HAKCConfig, compilation_entries: list[dict],
-                                    server_mode: HAKCBuildMode):
-    logger_to_use = cast(HAKCLogger, make_worker_logger(f'hakc.server-worker-{task_id}', task_id, config.log_level))
-    result = do_compilation_tasks(task_id, config, logger_to_use, compilation_entries, server_mode)
-    return result
+def merge_two_compartmentalizations(a_graph: HAKCCompartmentalization, b_graph: HAKCCompartmentalization):
+    if len(a_graph) > len(b_graph):
+        small_graph = b_graph
+        large_graph = a_graph
+    else:
+        small_graph = a_graph
+        large_graph = b_graph
+
+    large_graph.update(edges=small_graph.edges(data=True, keys=True),
+                       nodes=small_graph.nodes(data=True))
+    return large_graph
+
+
+def analyze_one_entry(database_entry: dict):
+    global agent
+    agent.server.compartmentalization = HAKCCompartmentalization()
+    compile_database_entry(database_entry)
+    return agent.server.compartmentalization
+
+
+def shutdown_server():
+    global agent
+    agent.logger.debug(f'Shutting down server at {agent.server.socket_path}')
+    stop_compilation_agent()
 
 
 def get_batched_compilation_entries(compilation_database: dict, batch_size: int, file_set: set[str]):
@@ -277,10 +249,14 @@ def get_batched_compilation_entries(compilation_database: dict, batch_size: int,
         yield batched_compilation_entries
 
 
+def get_worker_count(core_count: int):
+    return max(1, core_count // 2)
+
+
 def create_enforcement_obj_files(compilation_database: dict, batch_size: int, config: HAKCConfig,
                                  server_main_logger: HAKCLogger, server_mode: HAKCBuildMode, file_set: set[str]):
     assert server_mode.is_enforcement_mode
-    worker_count = max(1, config.server_config.analysis_core_count // 2)
+    worker_count = get_worker_count(config.server_config.analysis_core_count)
     successful_enforcement = True
     with concurrent.futures.ProcessPoolExecutor(max_workers=worker_count, initializer=create_logger_and_start_server,
                                                 initargs=(server_mode, config)) as executor:
@@ -313,37 +289,70 @@ def perform_analysis_with_compilation_database(config: HAKCConfig, compilation_d
     HAKCCompartmentalization]:
     assert server_mode.is_analysis_mode
     db_dir = config.server_config.backing_config.path if config.server_config.backing_config.type == HAKCBackingType.KUZU else ''
-    compartmentalization = HAKCCompartmentalization(db_dir=db_dir)
 
     successful_creation = True
+    subgraphs = list()
 
-    worker_count = max(1, config.server_config.analysis_core_count // 2)
-    with concurrent.futures.ProcessPoolExecutor(max_workers=worker_count) as executor:
+    worker_count = get_worker_count(config.server_config.analysis_core_count)
+    with concurrent.futures.ProcessPoolExecutor(max_workers=worker_count, initializer=create_logger_and_start_server,
+                                                initargs=(server_mode, config)) as executor:
         futures = dict()
         task_id = 0
         for batched_compilation_entries in get_batched_compilation_entries(compilation_database, batch_size, file_set):
-            future = executor.submit(create_logger_and_compile_files, task_id, config, batched_compilation_entries,
-                                     server_mode)
-            futures[future] = task_id
-            task_id += 1
+            for database_entry in batched_compilation_entries:
+                future = executor.submit(analyze_one_entry, database_entry)
+                futures[future] = task_id
+                task_id += 1
 
         with server_main_logger.progress_bar(desc="Processing results", total=len(futures)) as pbar:
             for future in concurrent.futures.as_completed(futures):
                 pbar.update(1)
                 try:
                     task_id = futures[future]
-                    result = future.result()
-                    if result:
-                        subcompartmentalization = result
-                        compartmentalization.update(edges=subcompartmentalization.edges(data=True, keys=True),
-                                                    nodes=subcompartmentalization.nodes(data=True))
+                    dag_subgraph = future.result()
+                    subgraphs.append(dag_subgraph)
                 except Exception as e:
                     successful_creation = False
-                    server_main_logger.exception(f'Error in task {task_id} creating sub compartmentalizations: {e}')
+                    server_main_logger.error(f'Error in task {task_id} creating sub compartmentalizations: {e}')
+        futures = dict()
+
+        for worker in range(worker_count):
+            futures[executor.submit(shutdown_server)] = worker
+
+        with server_main_logger.progress_bar(desc="Shutting down servers", total=len(futures)) as pbar:
+            for future in concurrent.futures.as_completed(futures):
+                pbar.update(1)
+                try:
+                    worker_id = futures[future]
+                    future.result()
+                except Exception as e:
+                    server_main_logger.error(f'Error shutting down {worker_id}: {e}')
+
+        task_id = 0
+        while len(subgraphs) > 1:
+            merge_futures = dict()
+            while len(subgraphs) > 1:
+                subgraph_a = subgraphs.pop()
+                subgraph_b = subgraphs.pop()
+                merge_futures[executor.submit(merge_two_compartmentalizations, subgraph_a, subgraph_b)] = task_id
+                task_id += 1
+
+            with server_main_logger.progress_bar(desc='Collecting merged graphs', total=len(merge_futures)) as pbar:
+                for future in concurrent.futures.as_completed(merge_futures):
+                    pbar.update(1)
+                    try:
+                        merged_graph = future.result()
+                        subgraphs.append(merged_graph)
+                    except Exception as e:
+                        server_main_logger.error(f'Error merging compartmentalization: {e}')
+
+        compartmentalization = subgraphs.pop()
+
     if not successful_creation:
         server_main_logger.error(f'Failed to create compartmentalization. Please try again.')
         return None
 
+    compartmentalization.db_dir = db_dir
     server_main_logger.info(f'Finished creating initial {compartmentalization}')
     return compartmentalization
 
