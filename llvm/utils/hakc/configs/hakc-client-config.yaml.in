@@ -1,7 +1,7 @@
 arch: X86
 platform: Linux
-console-log-level: Verbose
-file-log-level: Verbose
+console-log-level: Error
+file-log-level: Error
 max-connection-retries: @hakc_max_connection_retries@
 PreTargetActions:
   - { name: "get_hakc_address_color", label: "saved-color" }

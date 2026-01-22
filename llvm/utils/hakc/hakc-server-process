@@ -278,6 +278,19 @@ def create_enforcement_obj_files(compilation_database: dict, batch_size: int, co
                     successful_enforcement = False
                     server_main_logger.error(f'Error in task {task_id}: {e}')
 
+        futures = dict()
+        for worker in range(worker_count):
+            futures[executor.submit(shutdown_server)] = worker
+
+        with server_main_logger.progress_bar(desc="Shutting down servers", total=len(futures)) as pbar:
+            for future in concurrent.futures.as_completed(futures):
+                pbar.update(1)
+                try:
+                    worker_id = futures[future]
+                    future.result()
+                except Exception as e:
+                    server_main_logger.error(f'Error shutting down {worker_id}: {e}')
+
     if not successful_enforcement:
         server_main_logger.error(f'Failed to successfully add enforcement. Quitting')
         sys.exit(1)
@@ -328,6 +341,7 @@ def perform_analysis_with_compilation_database(config: HAKCConfig, compilation_d
                 except Exception as e:
                     server_main_logger.error(f'Error shutting down {worker_id}: {e}')
 
+    with concurrent.futures.ProcessPoolExecutor(max_workers=config.server_config.analysis_core_count) as executor:
         task_id = 0
         while len(subgraphs) > 1:
             merge_futures = dict()
