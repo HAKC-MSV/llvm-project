@@ -795,7 +795,7 @@ void HAKCFunctionEnforcement::
        */
       auto TransformedName = CommonHAKCAnalysis::getOriginalTransformedName(
           call->getCalledFunction());
-      const auto TransformedFunction = ModuleAnalysis.GetFunctionByName(
+      auto *const TransformedFunction = ModuleAnalysis.GetFunctionByName(
           TransformedName, call->getCalledFunction()->getFunctionType());
       call->setCalledFunction(TransformedFunction);
     } else {

@@ -107,7 +107,8 @@ protected:
   HAKCSystemInformation &SystemInformation;
   HAKCDatabaseConnection Client;
   std::map<HAKCSymbolP, HAKCDivisionP> SymbolDivisionMap;
-  std::set<hakc_compartment_id_t> RetrievedTargetCompartments;
+  std::map<hakc_compartment_id_t, std::vector<HAKC_Compartment_ID>>
+      RetrievedTargetCompartments;
 
   void CheckConnection() const;
 

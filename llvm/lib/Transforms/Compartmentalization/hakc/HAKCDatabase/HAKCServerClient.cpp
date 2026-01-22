@@ -339,8 +339,13 @@ HAKCServerClient::GetCompartment(hakc_compartment_id_t CompartmentID) {
 }
 
 void HAKCServerClient::GetValidTargets(HAKCCompartment &Compartment) {
+  CommonHAKCAnalysis::getLogger(Debug)
+      << "Retrieving targets for Compartment " << Compartment << "\n";
   hakc_compartment_id_t CompartmentID = Compartment.GetCompartmentIDValue();
   if (RetrievedTargetCompartments.contains(CompartmentID)) {
+    for (auto *Target : RetrievedTargetCompartments[CompartmentID]) {
+      Compartment.AddTarget(Target);
+    }
     return;
   }
 
@@ -362,18 +367,23 @@ void HAKCServerClient::GetValidTargets(HAKCCompartment &Compartment) {
       std::dynamic_pointer_cast<HAKCValidTargetsPayload>(result.GetData());
   auto valid_targets = valid_targets_payload->ValidTargets;
 
-  RetrievedTargetCompartments.insert(CompartmentID);
   if (valid_targets.size() == 0) {
     CommonHAKCAnalysis::getLogger(Debug)
         << "No ValidTargets found for CompartmentID: " << CompartmentID << "\n";
     return;
   }
-  for (auto target = valid_targets.begin(); target != valid_targets.end();
-       ++target) {
+  std::vector<HAKC_Compartment_ID> CachedTargets;
+  for (auto Target : valid_targets) {
+    CommonHAKCAnalysis::getLogger(Debug)
+        << "Received Target " << Target << " for Compartment " << CompartmentID
+        << "\n";
     auto *TargetCompartment =
-        HAKCCompartment::CreateID(*target, SystemInformation.GetModule());
+        HAKCCompartment::CreateID(Target, SystemInformation.GetModule());
     Compartment.AddTarget(TargetCompartment);
+    CachedTargets.push_back(TargetCompartment);
   }
+
+  RetrievedTargetCompartments[CompartmentID] = CachedTargets;
 }
 
 HAKCCompartmentP
