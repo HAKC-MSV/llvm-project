@@ -51,8 +51,6 @@ public:
   /// found
   HAKCSymbolP FindSymbol(Value *V, bool SearchSymbolsMissingDebug = false);
 
-  HAKCSymbolP FindYamlSymbol(const HAKCYamlSymbol &YamlSymbol);
-
   /// Attempts to find the HAKCType associated with the HAKCPointer if
   /// it has not been found already.  Sets both the pointee type of the
   /// newly found type and the type of HAKCPointer to the newly found
@@ -93,8 +91,6 @@ public:
   DebugInfoFinder GetDbgInfoFinder();
 
   HAKCTypeP FindType(Type *Ty) const;
-
-  HAKCTypeP FindType(StringRef TypeName);
 
   void FindAllTypes(Type *Ty, SmallVectorImpl<HAKCTypeP> &Results) const;
 
@@ -186,7 +182,10 @@ public:
 
   Type *FindAnonymousType(const DICompositeType *CompositeTy);
 
+  HAKCTypeP FindTypeFromDebug(Value *V);
   HAKCTypeP FindTypeFromDebug(const DbgVariableRecord &DVR, Value *V);
+
+  HAKCTypeP FindTypeFromPHI(PHINode *PHI);
 
   HAKCTypeP CheckCallUses(Value *V);
 

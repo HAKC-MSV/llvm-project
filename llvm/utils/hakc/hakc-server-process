@@ -341,17 +341,19 @@ def perform_analysis_with_compilation_database(config: HAKCConfig, compilation_d
                 except Exception as e:
                     server_main_logger.error(f'Error shutting down {worker_id}: {e}')
 
+    merge_count = max(0, len(subgraphs) - 1)
+
     with concurrent.futures.ProcessPoolExecutor(max_workers=config.server_config.analysis_core_count) as executor:
         task_id = 0
-        while len(subgraphs) > 1:
-            merge_futures = dict()
+        with server_main_logger.progress_bar(desc='Collecting merged graphs', total=merge_count) as pbar:
             while len(subgraphs) > 1:
-                subgraph_a = subgraphs.pop()
-                subgraph_b = subgraphs.pop()
-                merge_futures[executor.submit(merge_two_compartmentalizations, subgraph_a, subgraph_b)] = task_id
-                task_id += 1
+                merge_futures = dict()
+                while len(subgraphs) > 1:
+                    subgraph_a = subgraphs.pop()
+                    subgraph_b = subgraphs.pop()
+                    merge_futures[executor.submit(merge_two_compartmentalizations, subgraph_a, subgraph_b)] = task_id
+                    task_id += 1
 
-            with server_main_logger.progress_bar(desc='Collecting merged graphs', total=len(merge_futures)) as pbar:
                 for future in concurrent.futures.as_completed(merge_futures):
                     pbar.update(1)
                     try:

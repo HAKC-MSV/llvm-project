@@ -1389,6 +1389,36 @@ HAKCTypeP HAKCTypeIdentifier::FindPointerType(const HAKCTypeInfo &BaseType) {
   return nullptr;
 }
 
+HAKCTypeP HAKCTypeIdentifier::FindTypeFromDebug(Value *V) {
+  SmallVector<DbgVariableIntrinsic *> DbgUsers;
+  SmallVector<DbgVariableRecord *> DVRUsers;
+  findDbgUsers(DbgUsers, V, &DVRUsers);
+  HAKCTypeP Result = nullptr;
+  for (const auto *DVI : DbgUsers) {
+    CommonHAKCAnalysis::getLogger(Verbose)
+        << "Examining Debug Intrinsic " << *DVI << "\n";
+    if (isa<DbgDeclareInst>(DVI) ||
+        (isa<DbgValueInst>(DVI) && !isa<DbgAssignIntrinsic>(DVI))) {
+      Result = FindTypeFromDebug(DVI, V);
+      if (Result) {
+        goto exit;
+      }
+    }
+  }
+  for (auto *DVR : DVRUsers) {
+    CommonHAKCAnalysis::getLogger(Verbose)
+        << "Examining Debug Record " << *DVR << "\n";
+    Result = FindTypeFromDebug(*DVR, V);
+
+    if (Result) {
+      goto exit;
+    }
+  }
+
+exit:
+  return Result;
+}
+
 HAKCTypeP HAKCTypeIdentifier::FindTypeFromDebug(const DbgVariableRecord &DVR,
                                                 Value *V) {
   if (DVR.hasArgList()) {
@@ -1537,11 +1567,39 @@ HAKCTypeIdentifier::FindUnionMember(const DICompositeType *UnionDef,
   return nullptr;
 }
 
+HAKCTypeP HAKCTypeIdentifier::FindTypeFromPHI(PHINode *PHI) {
+  DominatorTree DomTree(*PHI->getFunction());
+  HAKCTypeP Result = nullptr;
+  for (auto &IncomingV : PHI->incoming_values()) {
+    auto *Def = AnalysisHelper.getDef(IncomingV.get(), false);
+    CommonHAKCAnalysis::getLogger(Debug)
+        << "Checking if " << *Def << " dominates " << *PHI << "\n";
+    if (DomTree.dominates(Def, PHI)) {
+      CommonHAKCAnalysis::getLogger(Debug)
+          << *Def << " dominates " << *PHI << "\n";
+      Result = FindHAKCType(Def);
+      if (Result) {
+        goto exit;
+      }
+    }
+  }
+  if (PHI->getType()->isPointerTy()) {
+    Result = GetVoidPointerType();
+  }
+
+exit:
+  return Result;
+}
+
 hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
   // TODO: handle ptrtoint, phi ptr
   HAKCTypeP FoundType = nullptr;
-  SmallVector<DbgVariableIntrinsic *> DbgUsers;
-  SmallVector<DbgVariableRecord *> DVRUsers;
+
+  if (!V) {
+    CommonHAKCAnalysis::getLogger(Error)
+        << "Tried to find HAKCType for null V\n";
+    throw std::exception();
+  }
 
   CommonHAKCAnalysis::getLogger(Verbose)
       << "Attempting to find HAKCTypeInfo for " << *V << "\n";
@@ -1561,26 +1619,9 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
       }
     }
   } else if (isa<Instruction>(V) || isa<Argument>(V)) {
-    findDbgUsers(DbgUsers, V, &DVRUsers);
-    for (const auto *DVI : DbgUsers) {
-      CommonHAKCAnalysis::getLogger(Verbose)
-          << "Examining Debug Intrinsic " << *DVI << "\n";
-      if (isa<DbgDeclareInst>(DVI) ||
-          (isa<DbgValueInst>(DVI) && !isa<DbgAssignIntrinsic>(DVI))) {
-        FoundType = FindTypeFromDebug(DVI, V);
-        if (FoundType) {
-          goto exit;
-        }
-      }
-    }
-    for (auto *DVR : DVRUsers) {
-      CommonHAKCAnalysis::getLogger(Verbose)
-          << "Examining Debug Record " << *DVR << "\n";
-      FoundType = FindTypeFromDebug(*DVR, V);
-
-      if (FoundType) {
-        goto exit;
-      }
+    FoundType = FindTypeFromDebug(V);
+    if (FoundType) {
+      goto exit;
     }
   }
 
@@ -1616,19 +1657,9 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
       }
     }
     if (auto *PHI = dyn_cast<PHINode>(LoadI->getPointerOperand())) {
-      for (auto &IncomingV : PHI->incoming_values()) {
-        auto *Def = AnalysisHelper.getDef(IncomingV.get(), false);
-        if (Def != LoadI) {
-          if (auto PointeeType = FindHAKCType(Def)) {
-            FoundType = FindPointeeType(PointeeType);
-            if (FoundType) {
-              goto exit;
-            }
-          }
-        }
-      }
-      if (V->getType()->isPointerTy()) {
-        FoundType = GetVoidPointerType();
+      FoundType = FindTypeFromPHI(PHI);
+      if (FoundType) {
+        goto exit;
       }
     } else {
       if (auto PointeeType = FindHAKCType(LoadI->getPointerOperand())) {
@@ -1763,17 +1794,9 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
       FoundType = AddMissingPointerType(ElementType);
     }
   } else if (auto *PHI = dyn_cast<PHINode>(V)) {
-    for (auto &IncomingV : PHI->incoming_values()) {
-      auto *Def = AnalysisHelper.getDef(IncomingV, false);
-
-      if (isa<PHINode>(Def) || isa<ConstantPointerNull>(Def)) {
-        continue;
-      }
-
-      FoundType = FindHAKCType(IncomingV);
-      if (FoundType) {
-        goto exit;
-      }
+    FoundType = FindTypeFromPHI(PHI);
+    if (FoundType) {
+      goto exit;
     }
   }
 
