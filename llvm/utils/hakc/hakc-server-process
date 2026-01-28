@@ -292,6 +292,8 @@ def create_enforcement_obj_files(compilation_database: dict, batch_size: int, co
                 except Exception as e:
                     server_main_logger.error(f'Error shutting down {worker_id}: {e}')
 
+        executor.shutdown(wait=False)
+
     if not successful_enforcement:
         server_main_logger.error(f'Failed to successfully add enforcement. Quitting')
         sys.exit(1)
