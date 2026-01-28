@@ -59,7 +59,7 @@ void HAKCTransformer::RegisterUsedCompartment(
 /**
  * @brief Moves all global values to the specified HAKC ELF section
  */
-void HAKCTransformer::MoveGlobalsToHAKCSection() {
+void HAKCTransformer::MoveGlobalsToHAKCSection() const {
   std::set<GlobalVariable *> globalsToChange;
 
   for (auto *pGlobal : globalsToChange) {

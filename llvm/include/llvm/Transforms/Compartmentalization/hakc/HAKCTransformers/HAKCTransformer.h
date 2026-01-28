@@ -237,7 +237,7 @@ protected:
 
   bool isModuleCompartmentalized() const;
 
-  void MoveGlobalsToHAKCSection();
+  void MoveGlobalsToHAKCSection() const;
 
   void AddTransferFunctions();
 
