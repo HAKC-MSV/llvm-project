@@ -793,11 +793,14 @@ void HAKCFunctionEnforcement::
        * name. Otherwise, do not change the function name, because the
        * transfer function will be used through the alias.
        */
-      auto TransformedName = CommonHAKCAnalysis::getOriginalTransformedName(
-          call->getCalledFunction());
-      auto *const TransformedFunction = ModuleAnalysis.GetFunctionByName(
-          TransformedName, call->getCalledFunction()->getFunctionType());
-      call->setCalledFunction(TransformedFunction);
+      if (ModuleAnalysis.GetCommonAnalysis().SymbolNeedsTransferFunction(
+              call->getCalledFunction(), Client)) {
+        auto TransformedName = CommonHAKCAnalysis::getOriginalTransformedName(
+            call->getCalledFunction());
+        auto *const TransformedFunction = ModuleAnalysis.GetFunctionByName(
+            TransformedName, call->getCalledFunction()->getFunctionType());
+        call->setCalledFunction(TransformedFunction);
+      }
     } else {
 
       // Fixing https://github.mit.edu/inherently-secure/ARM-MTE/issues/40

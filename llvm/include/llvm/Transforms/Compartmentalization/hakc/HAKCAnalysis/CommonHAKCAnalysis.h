@@ -191,6 +191,8 @@ public:
 
   bool FunctionIsAnalysisCandidate(Function *F);
 
+  bool SymbolNeedsTransferFunction(Function *F, HAKCServerClientBase &Client);
+
   static bool
   IsFunctionInFunctionList(Function *F,
                            iterator_range<FunctionList::iterator> Range);

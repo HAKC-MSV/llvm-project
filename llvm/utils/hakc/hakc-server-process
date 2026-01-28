@@ -82,7 +82,7 @@ def run_compilation_target(database_entry: dict, logger_to_use: HAKCLogger, sock
     if skip_compile_task:
         return
 
-    add_argument_to_command_list(cmd, f'--enable-hakc')
+    add_argument_to_command_list(cmd, f'-enable-hakc')
 
     add_argument_to_command_list(cmd, '--hakc-config', config_path)
 
@@ -269,7 +269,7 @@ def create_enforcement_obj_files(compilation_database: dict, batch_size: int, co
                 futures[future] = task_id
                 task_id += 1
 
-        with server_main_logger.progress_bar(desc="Processing results", total=len(futures)) as pbar:
+        with server_main_logger.progress_bar(desc="Generating hardened object files", total=len(futures)) as pbar:
             for future in cf.as_completed(futures):
                 pbar.update(1)
                 try:

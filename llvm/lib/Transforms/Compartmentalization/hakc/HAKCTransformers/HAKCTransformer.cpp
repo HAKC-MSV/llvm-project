@@ -168,9 +168,7 @@ void HAKCTransformer::AddTransferFunctions() {
     CommonHAKCAnalysis::getLogger(Debug)
         << "Considering adding function " << F.getName()
         << " to FuncsNeedingTransfers\n";
-    if (!CommonHAKCAnalysis::IsNECSymbol(&F, Client) &&
-        getCommonAnalysis().functionIsTransferCandidate(&F, Client) &&
-        !CommonHAKCAnalysis::IsOutsideTransferFunc(&F)) {
+    if (getCommonAnalysis().SymbolNeedsTransferFunction(&F, Client)) {
       CommonHAKCAnalysis::getLogger(Debug)
           << "Adding function " << F.getName() << " to FuncsNeedingTransfers\n";
       FuncsNeedingTransfers.push_back(&F);
@@ -273,7 +271,7 @@ void HAKCTransformer::AddTransferFunctions() {
                            dyn_cast<ConstantStruct>(key)) {
               ReplacementInitializer = ConstantStruct::get(
                   ConstStruct->getType(), ReplacementValues);
-            } else if (dyn_cast<ConstantVector>(key)) {
+            } else if (isa<ConstantVector>(key)) {
               ReplacementInitializer = ConstantVector::get(ReplacementValues);
             } else {
               getLogger(Fatal)

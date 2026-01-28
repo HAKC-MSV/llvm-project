@@ -19,6 +19,12 @@ bool CommonHAKCAnalysis::IsNoTransferFunction(Function *F) {
   return IsFunctionInFunctionList(F, SystemInfo.NoTransferFunctions());
 }
 
+bool CommonHAKCAnalysis::SymbolNeedsTransferFunction(
+    Function *F, HAKCServerClientBase &Client) {
+  return !IsNECSymbol(F, Client) && functionIsTransferCandidate(F, Client) &&
+         !IsOutsideTransferFunc(F);
+}
+
 hakc_access_token_t CommonHAKCAnalysis::GetDefaultDivisionAccessToken(
     hakc_compartment_id_t CompartmentID,
     hakc_compartment_division_t DivisionID) const {

@@ -161,19 +161,6 @@ NoTransferFunctions:
   - { name: "raid6_int8_xor_syndrome" }
   - { name: "raid6_int1_xor_syndrome" }
 SeparateNamespacePaths:
-  - { path_root: arch/x86/kernel/, file_names: [ idt.c, irq.c, ftrace.c, machine_kexec_64.c, module.c, x86_init.c, pci-swiotlb.c, paravirt.c, kvm.c, signal_64.c, signal.c ] }
-  - { path_root: arch/x86/kernel/acpi, file_names: [ boot.c ] }
-  - { path_root: arch/x86/kernel/cpu, file_names: [ vmware.c ] }
-  - { path_root: arch/x86/kvm/, file_names: [ emulate.c, x86.c ] }
-  - { path_root: arch/x86/net/, file_names: [ bpf_jit_comp.c ] }
-  - { path_root: arch/x86/xen/, file_names: [ apic.c, efi.c, enlighten_hvm.c, enlighten.c, enlighten_pv.c, grant-table.c, irq.c, mmu_hvm.c , mmu.c , mmu_pv.c , multicalls.c , p2m.c , pci-swiotlb-xen.c , platform-pci-unplug.c , pmu.c , setup.c , smp_hvm.c , smp.c , smp_pv.c , suspend_hvm.c , suspend.c , suspend_pv.c , time.c , trace.c , vga.c , xen-asm.c ] }
-  - { path_root: drivers/firmware/efi/libstub/, file_names: [ fdt.c ] }
-  - { path_root: fs/, file_names: [ readdir.c ] }
-  - { path_root: kernel/, file_names: [ rseq.c ] }
-  - { path_root: kernel/entry/, file_names: [ common.c ] }
-  - { path_root: lib/, file_names: [ idr.c, xarray.c ] }
-  - { path_root: mm/, file_names: [ maccess.c, gup.c ] }
-  - { path_root: net/core/, file_names: [ scm.c, filter.c ] }
   - { path_root: arch/x86/realmode/rm/, file_names: [ wakemain.c ] }
 HAKCSourcePaths:
   - { path_root: arch/x86/kernel/hakc/, file_names: [ hakc_ni.c, hakc.c, hakc_btree.c, hakc_memory.c ] }
@@ -234,6 +221,7 @@ SafeTransitionFunctions:
   - { name: "__ashlti3" }
   - { name: "__ashrti3" }
   - { name: "__lshrti3" }
+  - { name: "__arch_chacha20_blocks_nostack" }
 IgnoredGlobals:
   - { name: kmalloc_caches }
 AllocationFunctions:
