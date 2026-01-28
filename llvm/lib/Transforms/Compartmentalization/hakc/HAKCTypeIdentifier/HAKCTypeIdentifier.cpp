@@ -1678,6 +1678,11 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
           goto exit;
         }
       }
+
+      if (AnalysisHelper.IsLoadOfConstantInt(LoadI)) {
+        FoundType = GetVoidPointerType();
+        goto exit;
+      }
     }
   }
 
@@ -1856,6 +1861,8 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
     if (!FoundType) {
       FoundType = FindHAKCType(SelectI->getFalseValue());
     }
+  } else if (auto *CI = dyn_cast<ConstantInt>(V)) {
+    FoundType = FindType(CI->getIntegerType());
   }
 
 exit:

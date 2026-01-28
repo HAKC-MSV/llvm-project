@@ -147,17 +147,8 @@ bool HAKCPointerManager::PointerIsEligibleForManagement(const Use &U) {
       return false;
     }
   } else if (auto *ConstExpr = dyn_cast<ConstantExpr>(Pointer)) {
-    if (ConstExpr->isCast()) {
-      // auto *Operand = GetFunctionAnalysis().getDef(ConstExpr->getOperand(0),
-      // false);
-      auto *Operand = ModuleAnalysis.GetCommonAnalysis().getDef(
-          ConstExpr->getOperand(0), false);
-      GetLogger(Verbose, !DebugActive)
-          << *ConstExpr << " operand def is " << *Operand << "\n";
-      if (isa<ConstantInt>(Operand)) {
-        GetLogger(Verbose, !DebugActive) << "ConstExpr is from ConstantInt\n";
-        return false;
-      }
+    if (ModuleAnalysis.GetCommonAnalysis().IsConstantIntCast(ConstExpr)) {
+      return false;
     }
   } else if (isa<Constant>(Pointer) && Pointer->getType()->isIntegerTy()) {
     GetLogger(Verbose, !DebugActive) << *Pointer << " is a constant int\n";
@@ -181,7 +172,8 @@ bool HAKCPointerManager::PointerIsEligibleForManagement(const Use &U) {
     return false;
   } else if (auto *LoadI = dyn_cast<LoadInst>(Pointer)) {
     GetLogger(Verbose, !DebugActive) << *Pointer << " is used in a LoadInst\n";
-    return !ModuleAnalysis.GetCommonAnalysis().IsIgnoredGlobal(
+    return !ModuleAnalysis.GetCommonAnalysis().IsLoadOfConstantInt(LoadI) &&
+           !ModuleAnalysis.GetCommonAnalysis().IsIgnoredGlobal(
                LoadI->getPointerOperand()) &&
            ModuleAnalysis.GetCommonAnalysis().ValueIsUsedAsPointer(Pointer);
   } else if (auto *StoreI = dyn_cast<StoreInst>(U.getUser())) {
@@ -221,6 +213,9 @@ bool HAKCPointerManager::PointerIsEligibleForManagement(const Use &U) {
     // Check if use is a load (load -> GEP -> load pattern)
     if (!GetManagedPointer(GEP->getPointerOperand())) {
       if (isa<StoreInst>(U.getUser()) || isa<LoadInst>(U.getUser())) {
+        if (auto *LoadI = dyn_cast<LoadInst>(U.getUser())) {
+          return !ModuleAnalysis.GetCommonAnalysis().IsLoadOfConstantInt(LoadI);
+        }
         GetLogger(Verbose, !DebugActive)
             << "Pointer of " << *Pointer
             << " is used in a load or store and must be managed\n";

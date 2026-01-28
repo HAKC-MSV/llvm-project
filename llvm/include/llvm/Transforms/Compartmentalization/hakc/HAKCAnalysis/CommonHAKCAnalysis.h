@@ -181,6 +181,10 @@ public:
 
   bool ValueIsUsedAsPointer(Value *V);
 
+  bool IsLoadOfConstantInt(LoadInst *LoadI);
+
+  bool IsConstantIntCast(ConstantExpr *);
+
   function_def_t GetHAKCTransferDefinition(const Function *F);
 
   HAKCCustomAllocation GetAllocationDefinition(const Function *F);

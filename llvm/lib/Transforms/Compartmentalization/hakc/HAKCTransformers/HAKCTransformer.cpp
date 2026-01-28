@@ -576,7 +576,8 @@ void HAKCTransformer::ValidateHAKCPointer(const HAKCPointerBase &HAKCPointer) {
       const auto DebugLoc = I->getDebugLoc();
       getLogger(Fatal) << "in Function " << I->getFunction()->getName();
       if (DebugLoc && DebugLoc.get()) {
-        CommonHAKCAnalysis::getLogger(Fatal) << " at " << DebugLoc.get();
+        CommonHAKCAnalysis::getLogger(Fatal)
+            << " at " << DebugLoc->getFilename() << ":" << DebugLoc->getLine();
       }
       CommonHAKCAnalysis::getLogger(Fatal) << "\n";
     }

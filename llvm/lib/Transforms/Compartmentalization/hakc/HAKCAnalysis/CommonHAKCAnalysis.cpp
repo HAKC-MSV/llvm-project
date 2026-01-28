@@ -7,7 +7,7 @@
 
 #include "llvm/IR/DerivedTypes.h"
 
-#include <llvm/IR/Verifier.h>
+#include "llvm/IR/Verifier.h"
 
 namespace llvm::hakc {
 std::error_code EC;
@@ -782,6 +782,24 @@ void CommonHAKCAnalysis::GetModuleFullPath(const Module &M,
                      << ": " << Err.message() << "\n";
     throw std::exception();
   }
+}
+
+bool CommonHAKCAnalysis::IsLoadOfConstantInt(LoadInst *LoadI) {
+  if (auto *ConstExpr = dyn_cast<ConstantExpr>(LoadI->getPointerOperand())) {
+    return IsConstantIntCast(ConstExpr);
+  }
+
+  return false;
+}
+
+bool CommonHAKCAnalysis::IsConstantIntCast(ConstantExpr *ConstExpr) {
+  if (ConstExpr->isCast()) {
+    auto *Operand = getDef(ConstExpr->getOperand(0), false);
+    if (isa<ConstantInt>(Operand)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 bool CommonHAKCAnalysis::ValueIsUsedAsPointer(Value *V) {
