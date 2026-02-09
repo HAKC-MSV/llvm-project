@@ -11,9 +11,7 @@
 
 namespace llvm::hakc {
 std::error_code EC;
-auto HAKCLog = std::make_shared<HAKCLogger>(
-    Verbose); // setting configured log level for errs(), which by default is
-              // the highest mode
+auto HAKCLog = std::make_shared<HAKCLogger>(Verbose);
 
 bool CommonHAKCAnalysis::IsNoTransferFunction(Function *F) {
   return IsFunctionInFunctionList(F, SystemInfo.NoTransferFunctions());
