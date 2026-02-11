@@ -183,7 +183,7 @@ public:
 
   bool IsLoadOfConstantInt(LoadInst *LoadI);
 
-  bool IsConstantIntCast(ConstantExpr *);
+  bool IsConstantIntCast(const ConstantExpr *);
 
   function_def_t GetHAKCTransferDefinition(const Function *F);
 

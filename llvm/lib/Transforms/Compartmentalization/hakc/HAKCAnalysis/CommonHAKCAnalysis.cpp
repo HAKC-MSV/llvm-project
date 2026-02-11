@@ -10,8 +10,7 @@
 #include "llvm/IR/Verifier.h"
 
 namespace llvm::hakc {
-std::error_code EC;
-auto HAKCLog = std::make_shared<HAKCLogger>(Verbose);
+static auto HAKCLog = std::make_shared<HAKCLogger>(Verbose);
 
 bool CommonHAKCAnalysis::IsNoTransferFunction(Function *F) {
   return IsFunctionInFunctionList(F, SystemInfo.NoTransferFunctions());
@@ -42,7 +41,9 @@ bool CommonHAKCAnalysis::IsFunctionInFunctionList(
     return false;
   }
 
-  auto Search = [F](function_def_t &Func) { return F == Func->GetFunction(); };
+  auto Search = [F](const function_def_t &Func) {
+    return F == Func->GetFunction();
+  };
   return llvm::any_of(Range, Search);
 }
 
@@ -796,7 +797,7 @@ bool CommonHAKCAnalysis::IsLoadOfConstantInt(LoadInst *LoadI) {
   return false;
 }
 
-bool CommonHAKCAnalysis::IsConstantIntCast(ConstantExpr *ConstExpr) {
+bool CommonHAKCAnalysis::IsConstantIntCast(const ConstantExpr *ConstExpr) {
   if (ConstExpr->isCast()) {
     auto *Operand = getDef(ConstExpr->getOperand(0), false);
     if (isa<ConstantInt>(Operand)) {

@@ -39,7 +39,8 @@ std::unique_ptr<HAKCServerClientBase>
 HAKCModuleAnalysis::ConstructClient(bool UseSimulatedClient, bool NecOnly) {
   std::unique_ptr<HAKCServerClientBase> Client;
   if (UseSimulatedClient) {
-    Client = std::make_unique<FakeServerClient>(GetModule().getContext(), NecOnly);
+    Client =
+        std::make_unique<FakeServerClient>(GetModule().getContext(), NecOnly);
   } else {
     Client = std::make_unique<HAKCServerClient>(*this);
   }
@@ -116,7 +117,7 @@ bool HAKCModuleAnalysis::FunctionDefinedInAssembly(Function *F) const {
   return NameInAssembly;
 }
 
-bool _useEscapes(const Use &U, std::set<Value *> &expected) {
+static bool _useEscapes(const Use &U, std::set<Value *> &expected) {
   /* If F is used in a global variable */
   if (const auto *gv = dyn_cast<GlobalVariable>(U.getUser())) {
     return gv->getSection() != ".discard.addressable";
@@ -208,87 +209,6 @@ StructType *HAKCModuleAnalysis::GetKernelParamType() const {
   // linux
   return StructType::getTypeByName(GetModule().getContext(),
                                    StringRef("struct.kernel_param"));
-}
-
-GlobalValue *
-HAKCModuleAnalysis::ExtractGlobalFromKernelParam(GlobalVariable *GV) const {
-  // the result of walking through the kernel param struct
-  // until we get to the actual global value backing the parameter
-  // Q: why is kernparam not initialized / really used but then returned?
-  GlobalValue *kernparam = nullptr;
-
-  const auto *KernelParamType = GetKernelParamType();
-  // type not found, just do nothing
-  if (!KernelParamType) {
-    return nullptr;
-  }
-
-  // trying to find globals of type GetKernelParamType()
-  if (const auto *StructTy = dyn_cast<StructType>(GV->getValueType())) {
-    if (StructTy->getName() != KernelParamType->getName()) {
-      return nullptr; // someone passed us a struct that wasn't a kernel param
-      // struct
-    }
-  } else {
-    return nullptr; // this is not good, don't give non-structs to this function
-  }
-
-  // we know it is a kernel param now, moving on
-
-  // cast the value into a ConstantStruct so we can pick it apart
-
-  // do we have struct kernel_param kp now
-  if (const auto *kp_struct = dyn_cast<ConstantStruct>(GV->getInitializer())) {
-    // the anonymous union that holds the Value we actually want
-    // is the last element of the struct
-    const auto num_ops = kp_struct->getNumOperands();
-
-    // this holds kp->arg
-    if (Constant *last_op = kp_struct->getOperand(num_ops - 1)) {
-      // cast the union into a ConstantStruct so we can pick it apart
-
-      if (const auto *kparg_union = dyn_cast<ConstantStruct>(last_op)) {
-        // get the only thing in the struct, that's how unions work?
-        // this constant is kp->arg, sort of
-        Constant *kparg_val = kparg_union->getOperand(0);
-        // check that the value in there is a BitCastOperator
-        // it is bit-casting the global that backs the parameter
-        if (const auto *kparg_val_bco = dyn_cast<BitCastOperator>(kparg_val)) {
-          // extract the pointer from the BitCastOperator
-
-          if (!dyn_cast<GlobalValue>(kparg_val_bco->getOperand(0))) {
-            // if it isn't a global value, that's bad
-            return nullptr;
-          }
-
-          // now we have kp->arg
-        }
-        // the thing in the union isn't a BitCastOperator, that's bad
-        else {
-          return nullptr;
-        }
-      }
-      // we couldn't get the union out of the union struct, that's bad
-      else {
-        return nullptr;
-      }
-    }
-    // we couldn't get the union struct at all out of the param struct, that's
-    // bad
-    else {
-      return nullptr;
-    }
-  }
-  // we couldn't even get the kernel param struct as a struct, that's bad
-  else {
-    return nullptr;
-  }
-  CommonHAKCAnalysis::getLogger(
-      Debug, !CommonAnalysis.GetSystemInfo().OutputDebugInfo(GV))
-      << "processing kernel param\n"
-      << *kernparam << "\n";
-
-  return kernparam;
 }
 
 bool HAKCModuleAnalysis::FunctionIsInAnalysisSet(Function *F) {

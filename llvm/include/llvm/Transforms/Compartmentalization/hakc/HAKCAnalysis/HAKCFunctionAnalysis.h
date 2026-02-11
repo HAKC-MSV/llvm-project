@@ -221,7 +221,7 @@ protected:
 
   void CreateBaseAuthenticatedPointer(const ManagedHAKCPointerP &ManagedPtr);
 
-  void CreatePointerUseClones(const ManagedHAKCPointerP &ManagedPtr);
+  void CreatePointerUseClones(const ManagedHAKCPointerP &ManagedPtr) const;
 
   void TransformPointers() const;
 
@@ -258,7 +258,7 @@ protected:
 
   void TransformClones(const ManagedHAKCPointerP &ManagedPtr) const;
 
-  void CreatePointerReplacements(const ManagedHAKCPointerP &ManagedPtr);
+  void CreatePointerReplacements(const ManagedHAKCPointerP &ManagedPtr) const;
 
   void SetUseOperand(const ManagedHAKCPointerP &ManagedPtr, User *U,
                      Value *Replacement,

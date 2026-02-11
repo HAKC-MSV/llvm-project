@@ -127,7 +127,7 @@ bool HAKCPointerManager::PointerIsEligibleForManagement(const Use &U) {
     GetLogger(Verbose, !DebugActive)
         << "Value " << *Pointer << " is a CallInst\n";
 
-    if (bool IsInline = call->isInlineAsm()) {
+    if (call->isInlineAsm()) {
       GetLogger(Verbose, !DebugActive) << "Call is Inline Assembly\n";
       /* These are usually the result of reading a register value */
       return ModuleAnalysis.GetCommonAnalysis().ValueIsUsedAsPointer(call);
@@ -213,8 +213,9 @@ bool HAKCPointerManager::PointerIsEligibleForManagement(const Use &U) {
     // Check if use is a load (load -> GEP -> load pattern)
     if (!GetManagedPointer(GEP->getPointerOperand())) {
       if (isa<StoreInst>(U.getUser()) || isa<LoadInst>(U.getUser())) {
-        if (auto *LoadI = dyn_cast<LoadInst>(U.getUser())) {
-          return !ModuleAnalysis.GetCommonAnalysis().IsLoadOfConstantInt(LoadI);
+        if (auto *UserLoadI = dyn_cast<LoadInst>(U.getUser())) {
+          return !ModuleAnalysis.GetCommonAnalysis().IsLoadOfConstantInt(
+              UserLoadI);
         }
         GetLogger(Verbose, !DebugActive)
             << "Pointer of " << *Pointer
@@ -238,9 +239,8 @@ bool HAKCPointerManager::ManageNewPointer(Use &U) {
     throw std::exception();
   }
   if (isa<IntToPtrInst>(U.get())) {
-    bool is_percpu_ptr = ModuleAnalysis.GetCommonAnalysis().IsPerCPUPointer(U);
 
-    if (is_percpu_ptr) {
+    if (ModuleAnalysis.GetCommonAnalysis().IsPerCPUPointer(U)) {
       GetLogger(Verbose, !DebugActive)
           << "Detected per-cpu pointer: " << U << "\n";
       BaseDefinition = U.get();

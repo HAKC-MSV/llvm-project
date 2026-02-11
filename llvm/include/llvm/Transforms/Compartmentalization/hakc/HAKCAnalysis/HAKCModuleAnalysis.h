@@ -27,8 +27,6 @@ public:
   FunctionList AnalysisFunctions;
   HAKCTypeIdentifier &TypeIdentifier;
 
-  GlobalValue *ExtractGlobalFromKernelParam(GlobalVariable *GV) const;
-
   bool functionEscapes(Function *F) const;
 
   bool FunctionNeedsAnalysis(Function *F) const;

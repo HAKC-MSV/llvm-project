@@ -1620,7 +1620,7 @@ void HAKCFunctionEnforcement::MaybeCreateBaseCopyPointer(
 }
 
 void HAKCFunctionEnforcement::CreatePointerReplacements(
-    const ManagedHAKCPointerP &ManagedPtr) {
+    const ManagedHAKCPointerP &ManagedPtr) const {
   const bool CreateAuthenticatedCopies =
       ManagedPtr->GetAuthenticatedUserCount() > 0;
   const bool CreateProtectedCopies =
@@ -1725,7 +1725,7 @@ void HAKCFunctionEnforcement::CreatePointerReplacements(
 }
 
 void HAKCFunctionEnforcement::CreatePointerUseClones(
-    const ManagedHAKCPointerP &ManagedPtr) {
+    const ManagedHAKCPointerP &ManagedPtr) const {
   // look here
   GetLogger(Verbose, !DebugActive)
       << "\n\n"
