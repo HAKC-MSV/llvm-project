@@ -99,7 +99,7 @@ class HAKCDivision(HashedHAKCDBNode, yaml.YAMLObject):
 
     @staticmethod
     def compute_access_token(compartment_id: int, division_ids: set[int]) -> int:
-        return compute_static_access_token(compartment_id, division_ids)
+        return HAKCAccessToken.compute_static_access_token(compartment_id, division_ids)
 
     @staticmethod
     def get_attrs():

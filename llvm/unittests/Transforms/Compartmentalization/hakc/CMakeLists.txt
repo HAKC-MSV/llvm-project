@@ -12,6 +12,7 @@ add_llvm_unittest(HAKCUnitTests
         FakeServerClientTest.cpp
         AccessTokenTest.cpp
         HAKCTypeIdentifierTest.cpp
+        AccessTokenTest.cpp
 )
 
 target_link_libraries(HAKCUnitTests PRIVATE LLVMTestingSupport)
