@@ -2,58 +2,16 @@ import logging
 import unittest
 from typing import cast
 
+from hakc.HAKCServer import KUZUHAKCEnforcementDataStore
+from .HAKCTestUtils import get_random_function, get_random_string, get_random_global_variable
 from ..HAKCCompartmentalization import HAKCCompartmentalization
-from ..HAKCLogger import HAKCLogger
-from ..HAKCObjects import HAKCDefinitionLocation, HAKCFunction, HAKCType, HAKCScope, HAKCGlobalVariable, \
-    HAKCAdjustments
+from ..HAKCLogger import HAKCLogger, setup_logging
+from ..HAKCObjects import HAKCDefinitionLocation, HAKCType, HAKCAdjustments, HAKCCompartment, compute_static_access_token
+from ..HAKCConfig import HAKCConfig, HAKCDataRequest
 
 logging.setLoggerClass(HAKCLogger)
 
 logger: HAKCLogger = cast(HAKCLogger, logging.getLogger('hakc.spatial-tests'))
-
-import random
-import string
-
-# must prevent collisions
-dl_count = 1
-random_strings = set()
-
-
-def get_random_string(length: int = 8) -> str:
-    global random_strings
-    while True:
-        random_string = ''.join(random.choices(string.ascii_letters + string.digits, k=length))
-        if random_string not in random_strings:
-            random_strings.add(random_string)
-            return random_string
-
-
-def get_random_function(Name: str,
-                        Type: HAKCType = HAKCType(LLVMType='int'),
-                        Scope: HAKCScope = HAKCScope(Scope='local'),
-                        DefinitionLocation: HAKCDefinitionLocation = HAKCDefinitionLocation(DefiningFile='null.c',
-                                                                                            DefiningLine=dl_count),
-                        **kwargs):
-    global dl_count
-    dl_count += 1
-    return HAKCFunction(Name=Name,
-                        Type=Type,
-                        Scope=Scope,
-                        DefinitionLocation=DefinitionLocation, **kwargs)
-
-
-def get_random_global_variable(Name: str,
-                               Type: HAKCType = HAKCType(LLVMType='int'),
-                               Scope: HAKCScope = HAKCScope(Scope='local'),
-                               DefinitionLocation: HAKCDefinitionLocation = HAKCDefinitionLocation(
-                                   DefiningFile='null.c', DefiningLine=dl_count),
-                               **kwargs):
-    global dl_count
-    dl_count += 1
-    return HAKCGlobalVariable(Name=Name,
-                              Type=Type,
-                              Scope=Scope,
-                              DefinitionLocation=DefinitionLocation, **kwargs)
 
 
 class HAKCDatabaseTests(unittest.TestCase):
@@ -87,6 +45,43 @@ class HAKCDatabaseTests(unittest.TestCase):
         self.assertEqual(len(compartmentalization.get_scopes()), len(compartmentalization.conn.get_scopes()))
         self.assertEqual(len(compartmentalization.get_definition_locations()),
                          len(compartmentalization.conn.get_definition_locations()))
+
+    def test1(self):
+        # testing construction of access tokens
+        print()
+        logger.info(f"!!!\t\t\tStarting {self._testMethodName}\t\t\t!!!")
+
+        # test valid compartment and division_ids
+        self.assertEqual(compute_static_access_token(compartment_id=0, division_ids={0, 1, 2, 3}), 0b01111)
+        self.assertEqual(compute_static_access_token(compartment_id=1, division_ids={0, 1, 2, 3}), 0b10000000000001111)
+        self.assertEqual(compute_static_access_token(compartment_id=16, division_ids={0, 1, 2, 3}), 0b100000000000000001111)
+        self.assertEqual(compute_static_access_token(compartment_id=16, division_ids={division_id for division_id in range(16)}),
+                         0b100001111111111111111)
+        self.assertEqual(compute_static_access_token(compartment_id=((1 << 48) - 1), division_ids={division_id for division_id in range(16)}),
+                         (1 << 64) - 1)
+
+        # test valid compartment and invalid division_ids
+        try:
+            compute_static_access_token(compartment_id=0, division_ids={17})
+        except AssertionError as e:
+            self.assertEqual(str(e), "Invalid access 0 <= 17 < 16")
+        try:
+            compute_static_access_token(compartment_id=0, division_ids={-1})
+        except AssertionError as e:
+            self.assertEqual(str(e), "Invalid access 0 <= -1 < 16")
+
+        # test invalid compartment and valid division_ids
+        try:
+            compute_static_access_token(compartment_id=(1 << 48), division_ids={0})
+        except AssertionError as e:
+            self.assertEqual(str(e), f"Invalid v0: 0 <= {1 << 48} <= {(1 << 48) - 1}")
+        try:
+            compute_static_access_token(compartment_id=-1, division_ids={0})
+        except AssertionError as e:
+            self.assertEqual(str(e), f"Invalid v0: 0 <= -1 <= {(1 << 48) - 1}")
+
+        logger.info(f"!!!\t\t\tEnding {self._testMethodName}\t\t\t!!!")
+        print()
 
 
 if __name__ == '__main__':
