@@ -410,7 +410,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             attr[HAKCCompartmentalization.persisted_attr] = already_persisted
             self.add_edge(u_for_edge, v_for_edge, key, **attr)
         else:
-            self.edges[u_for_edge][v_for_edge][key][HAKCCompartmentalization.persisted_attr] = already_persisted
+            self.edges[u_for_edge, v_for_edge, key][HAKCCompartmentalization.persisted_attr] = already_persisted
 
     def _get_neighbors(self, symbol: HAKCSymbol, edge_key: str) -> list:
         nbrs = list()
@@ -579,25 +579,6 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
             return int((rwx["R"] << 2) + (rwx["W"] << 1) + rwx["X"])
         return None
 
-    def get_types_used(self, func: HAKCFunction = None):
-        types_used = set()
-        for n0, ty0, data in self.edges(func, data=True):
-            if isinstance(ty0, HAKCType) and 'R' in data and 'W' in data and 'X' in data:
-                if n0 == func or func == None:
-                    type_perm = HAKCTypePerm(ty0, self.convert_rwx(**data))
-                    types_used.add(type_perm)
-        return types_used
-
-    def get_common_type_perms(self, sym0, sym1, debug=False):
-        # return the intersection of the types used / permissions for two symbols
-        type_perms0 = self.get_types_used(sym0)
-        type_perms1 = self.get_types_used(sym1)
-        common_perms = type_perms0.intersection(type_perms1)
-        if debug and len(common_perms) > 0:
-            logger.debug(f"symbol {sym0} and {sym1}:")
-            logger.debug(f"{type_perms0} ∩ {type_perms1} \n\t= {common_perms}")
-        return common_perms
-
     def get_perm(self, func, ty):
         types_used_data = self.get_edge_data(func, ty)
         assert types_used_data, f"Unable to get RWX data"
@@ -681,7 +662,7 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
         for head, tail, table_name, attrs in self.edges(data=True, keys=True):
             if HAKCCompartmentalization.persisted_attr not in attrs:
                 attrs[HAKCCompartmentalization.persisted_attr] = False
-                self.edges[head][tail][table_name][HAKCCompartmentalization.persisted_attr] = False
+                self.edges[head, tail, table_name][HAKCCompartmentalization.persisted_attr] = False
 
             if not attrs.get(HAKCCompartmentalization.persisted_attr, False):
                 edge_attributes = {}
