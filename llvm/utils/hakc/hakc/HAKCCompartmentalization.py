@@ -406,9 +406,11 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
 
     def __add_persistent_edge(self, u_for_edge: HAKCDBNode, v_for_edge: HAKCDBNode, key,
                               already_persisted: bool = False, **attr) -> None:
-        if not (self.has_edge(u_for_edge, v_for_edge, key)):
+        if not self.has_edge(u_for_edge, v_for_edge, key):
             attr[HAKCCompartmentalization.persisted_attr] = already_persisted
             self.add_edge(u_for_edge, v_for_edge, key, **attr)
+        else:
+            self.edges[u_for_edge][v_for_edge][key][HAKCCompartmentalization.persisted_attr] = already_persisted
 
     def _get_neighbors(self, symbol: HAKCSymbol, edge_key: str) -> list:
         nbrs = list()
@@ -677,7 +679,11 @@ class HAKCCompartmentalization(yaml.YAMLObject, nx.MultiDiGraph):
     def get_unpersisted_edges(self) -> dict[str, list[tuple[HAKCDBNode, HAKCDBNode, dict]]]:
         result = dict()
         for head, tail, table_name, attrs in self.edges(data=True, keys=True):
-            if not attrs[HAKCCompartmentalization.persisted_attr]:
+            if HAKCCompartmentalization.persisted_attr not in attrs:
+                attrs[HAKCCompartmentalization.persisted_attr] = False
+                self.edges[head][tail][table_name][HAKCCompartmentalization.persisted_attr] = False
+
+            if not attrs.get(HAKCCompartmentalization.persisted_attr, False):
                 edge_attributes = {}
                 for key, val in attrs.items():
                     if key != HAKCCompartmentalization.persisted_attr:
