@@ -4,13 +4,16 @@
 
 #include "llvm/Transforms/Compartmentalization/hakc/HAKCAnalysis/CommonHAKCAnalysis.h"
 #include "llvm/AsmParser/Parser.h"
+#include "llvm/IR/InstIterator.h"
+
 #include "gtest/gtest.h"
 
 namespace llvm {
 namespace {
 
-TEST(HAKCUnitTests, GetDefTest) {
+TEST(HAKCUnitTests, IndirectCallGetDefTest) {
   LLVMContext Ctx;
+  ModuleAnalysisManager MAM;
 
   SMDiagnostic Error;
   StringRef Text = R"(
@@ -317,6 +320,33 @@ declare dso_local i32 @security_file_permission(ptr noundef, i32 noundef) local_
   std::unique_ptr<Module> M = parseAssemblyString(Text, Error, Ctx);
   if (!M) {
     FAIL() << "Failed to parse assembly string: " << Error.getMessage();
+  }
+
+  auto *F = M->getFunction("vfs_read");
+  ASSERT_TRUE(F);
+
+  hakc::CommonHAKCAnalysis CommonHAKCAnalysis(*M, MAM);
+
+  for (auto it = inst_begin(F); it != inst_end(F); ++it) {
+    Instruction *I = &*it;
+    if (auto *CallI = dyn_cast<CallInst>(I)) {
+      if (CallI->isIndirectCall()) {
+        SmallVector<Value *> DefChain;
+        auto *IndirectCallOp = CallI->getCalledOperand();
+        CommonHAKCAnalysis.findDefChain(IndirectCallOp, true, DefChain);
+
+        int LoadInstCount = 0;
+        for (Value *V : DefChain) {
+          if (isa<LoadInst>(V)) {
+            LoadInstCount++;
+          }
+        }
+        ASSERT_EQ(LoadInstCount, 2);
+
+        ASSERT_TRUE(isa_and_nonnull<Argument>(
+            CommonHAKCAnalysis.getDef(IndirectCallOp, true)));
+      }
+    }
   }
 }
 
