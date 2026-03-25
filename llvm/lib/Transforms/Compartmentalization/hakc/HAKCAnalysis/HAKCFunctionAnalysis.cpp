@@ -15,8 +15,10 @@ namespace llvm::hakc {
 HAKCFunctionAnalysis::HAKCFunctionAnalysis(Function *F,
                                            HAKCModuleAnalysis &ModuleAnalysis)
     : ModuleAnalysis(ModuleAnalysis), _PointerManager(F, ModuleAnalysis),
-      // DebugActive(ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().OutputDebugInfo(F)),
-      DebugActive(true), CurrentFunction(F), CompartmentTransferCount(0) {
+      DebugActive(
+          ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().OutputDebugInfo(
+              F)),
+      CurrentFunction(F), CompartmentTransferCount(0) {
   HAKCFunctionAnalysis::setup();
 }
 
