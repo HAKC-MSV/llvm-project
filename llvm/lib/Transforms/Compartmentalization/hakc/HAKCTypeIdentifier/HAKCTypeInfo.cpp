@@ -110,7 +110,7 @@ bool HAKCTypeInfo::IsFunctionType() const {
 
 bool HAKCTypeInfo::IsStructType() const {
   if (DbgType) {
-    return IsTag(dwarf::DW_TAG_array_type);
+    return IsTag(dwarf::DW_TAG_structure_type);
   }
 
   if (LLVMType) {
