@@ -5269,7 +5269,7 @@ attributes #5 = { noredzone nounwind }
         ASSERT_TRUE(HAKCTy->IsPointerType());
         ASSERT_TRUE(HAKCTy->GetPointeeType());
         ASSERT_TRUE(HAKCTy->GetPointeeType()->IsStructType());
-        ASSERT_EQ(HAKCTy->GetPointeeType()->GetSizeInBits(), 1472);
+        ASSERT_EQ(HAKCTy->GetPointeeType()->GetSizeInBits(), 1472U);
       }
     }
   }
