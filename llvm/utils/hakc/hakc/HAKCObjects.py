@@ -71,6 +71,20 @@ class HAKCDefinitionLocation(HAKCDBNode, yaml.YAMLObject):
         }
 
 
+def compute_access_token_2_val(v0: int, v0_ls: int, v1_allowable_access: set[int]) -> int:
+    assert 0 < v0_ls < 64, f"Invalid v0_ls: 0 < {v0_ls} < 64"
+    assert 0 <= v0 <= ((1 << (64 - v0_ls)) - 1), f"Invalid v0: 0 <= {v0} <= {((1 << (64 - v0_ls)) - 1)}"
+    token = v0 << v0_ls
+    for access in v1_allowable_access:
+        assert 0 <= access < v0_ls, f"Invalid access 0 <= {access} < {v0_ls}"
+        token |= (1 << access)
+    return token
+
+
+def compute_static_access_token(compartment_id: int, division_ids: set[int]):
+    return compute_access_token_2_val(compartment_id, 16, division_ids)
+
+
 class HAKCDivision(HashedHAKCDBNode, yaml.YAMLObject):
     yaml_tag = "!HAKCDivision"
     relation_compartment = "has_compartment"
@@ -85,11 +99,7 @@ class HAKCDivision(HashedHAKCDBNode, yaml.YAMLObject):
 
     @staticmethod
     def compute_access_token(compartment_id: int, division_ids: set[int]) -> int:
-        token = compartment_id << HAKCCompartment.max_compartments
-        for division_id in division_ids:
-            assert 0 <= division_id < HAKCCompartment.max_compartments, f"Invalid division ID {division_id}"
-            token |= (1 << division_id)
-        return token
+        return compute_static_access_token(compartment_id, division_ids)
 
     @staticmethod
     def get_attrs():

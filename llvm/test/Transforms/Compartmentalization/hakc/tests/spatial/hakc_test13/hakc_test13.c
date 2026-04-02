@@ -15,8 +15,8 @@ int bar(struct data_struct __percpu *);
 int foo(struct data_struct __percpu *a) {
   if (a) {
 // CHECK-LABEL: if.then
-// CHECK: call ptr @check_hakc_data_access(ptr %1, i64 1, i64 65549)
-// CHECK: call ptr @check_hakc_data_access(ptr %5, i64 1, i64 65549)
+// CHECK: call ptr @check_hakc_data_access(ptr %1, i64 1, i64 73728)
+// CHECK: call ptr @check_hakc_data_access(ptr %5, i64 1, i64 73728)
     (a->a)++;
 // Kernel user pointers are not checked
 // CHECK-NOT: call ptr @check_hakc_data_access

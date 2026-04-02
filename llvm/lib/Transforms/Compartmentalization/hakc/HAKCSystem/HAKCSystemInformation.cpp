@@ -37,13 +37,14 @@ unsigned HAKCSystemInformation::GetDefaultCompartmentID() const {
 unsigned HAKCSystemInformation::GetDefaultEntryToken() const {
   // Yes, the default entry token is the same as the default division access
   // token
-  return CommonAnalysis.GetDefaultDivisionAccessToken(GetDefaultCompartmentID(),
-                                                      GetDefaultDivisionID());
+  return CommonAnalysis.ComputeAccessToken(GetDefaultCompartmentID(),
+                                           GetDefaultDivisionID(),
+                                           GetDivisionIDBitCount());
 }
 
 unsigned HAKCSystemInformation::GetDefaultAccessToken() const {
-  return CommonAnalysis.GetDefaultDivisionAccessToken(GetDefaultCompartmentID(),
-                                                      GetDefaultDivisionID());
+  return CommonAnalysis.ComputeAccessToken(GetDefaultCompartmentID(),
+                                           GetDefaultDivisionID(), GetDivisionIDBitCount());
 }
 
 unsigned HAKCSystemInformation::GetServerCoreCount() const {

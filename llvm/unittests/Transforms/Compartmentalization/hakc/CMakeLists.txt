@@ -10,6 +10,7 @@ set(LLVM_LINK_COMPONENTS
 add_llvm_unittest(HAKCUnitTests
         CommonHAKCAnalysisTest.cpp
         FakeServerClientTest.cpp
+        AccessTokenTest.cpp
         HAKCTypeIdentifierTest.cpp
 )
 
