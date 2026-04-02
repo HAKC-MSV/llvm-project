@@ -1394,28 +1394,39 @@ HAKCTypeP HAKCTypeIdentifier::FindTypeFromDebug(Value *V) {
   SmallVector<DbgVariableRecord *> DVRUsers;
   findDbgUsers(DbgUsers, V, &DVRUsers);
   HAKCTypeP Result = nullptr;
+  SmallVector<HAKCTypeP> PossibleTypes;
   for (const auto *DVI : DbgUsers) {
     CommonHAKCAnalysis::getLogger(Verbose)
         << "Examining Debug Intrinsic " << *DVI << "\n";
     if (isa<DbgDeclareInst>(DVI) ||
         (isa<DbgValueInst>(DVI) && !isa<DbgAssignIntrinsic>(DVI))) {
-      Result = FindTypeFromDebug(DVI, V);
-      if (Result) {
-        goto exit;
+      if (auto PossibleType = FindTypeFromDebug(DVI, V)) {
+        PossibleTypes.push_back(PossibleType);
       }
     }
   }
   for (auto *DVR : DVRUsers) {
     CommonHAKCAnalysis::getLogger(Verbose)
         << "Examining Debug Record " << *DVR << "\n";
-    Result = FindTypeFromDebug(*DVR, V);
 
-    if (Result) {
-      goto exit;
+    if (auto PossibleType = FindTypeFromDebug(*DVR, V)) {
+      PossibleTypes.push_back(PossibleType);
     }
   }
 
-exit:
+  /* Return the largest size type we found, or the largest pointee type if   *
+   * it is a pointer.  This is to avoid returning void* if there is a more
+   * specific type available */
+  unsigned MaxSize = 0;
+  for (auto PossibleType : PossibleTypes) {
+    auto Size = PossibleType->GetSizeInBytes()->getZExtValue();
+    if (PossibleType->IsPointerType() && PossibleType->GetPointeeType()) {
+      Size = PossibleType->GetPointeeType()->GetSizeInBytes()->getZExtValue();
+    }
+    if (Size > MaxSize) {
+      Result = PossibleType;
+    }
+  }
   return Result;
 }
 
