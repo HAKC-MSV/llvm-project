@@ -241,8 +241,8 @@ class HAKCDatabase:
 
     def get_compartment_entry_token(self, compartment_id: int) -> int:
         cmd = f"""
-        MATCH (:{HAKCSymbol.get_table_name()})-[:{HAKCSymbol.relation_dag}]->(:{HAKCSymbol.get_table_name()})-[:{HAKCSymbol.relation_division}]->(d:{HAKCDivision.get_table_name()})-[:{HAKCDivision.relation_compartment}]->(c:{HAKCCompartment.get_table_name()})
-        WHERE c.{str(HAKCCompartment.get_primary_key())} = $compartment_id
+        MATCH (:{HAKCSymbol.get_table_name()})-[:{HAKCSymbol.relation_dag}]->(s:{HAKCSymbol.get_table_name()})-[:{HAKCSymbol.relation_division}]->(d:{HAKCDivision.get_table_name()})-[:{HAKCDivision.relation_compartment}]->(c:{HAKCCompartment.get_table_name()})
+        WHERE c.{str(HAKCCompartment.get_primary_key())} = $compartment_id AND s.IsFunction = true
         RETURN DISTINCT d.{HAKCDivision.DivisionIDColumnName()} AS DivisionID
         """
         division_ids = set(self.execute(cmd, compartment_id=compartment_id)['DivisionID'].tolist())
