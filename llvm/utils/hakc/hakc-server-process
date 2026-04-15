@@ -184,7 +184,7 @@ class HAKCCompilationAgent:
             self.logger.error(f'Failed to close server: {e}')
 
         try:
-            self.server_thread.join()
+            self.server_thread.join(timeout=1.0)
         except Exception as e:
             self.logger.error(f'Failed to join server thread: {e}')
 
@@ -234,8 +234,15 @@ def analyze_one_entry(database_entry: dict):
 
 def shutdown_server():
     global agent
-    agent.logger.debug(f'Shutting down server at {agent.server.socket_path}')
-    stop_compilation_agent()
+    if agent is None:
+        return
+    try:
+        agent.logger.debug(f'Shutting down server at {agent.server.socket_path}')
+        stop_compilation_agent()
+    except Exception as e:
+        # Log but don't propagate - we want all workers to attempt shutdown
+        if agent and agent.logger:
+            agent.logger.error(f"Error during shutdown: {e}")
 
 
 def get_batched_compilation_entries(compilation_database: dict, batch_size: int, file_set: set[str]):
@@ -320,7 +327,6 @@ def perform_analysis_with_compilation_database(config: HAKCConfig, compilation_d
     ) as analyze_pool, cf.ProcessPoolExecutor(
         max_workers=config.server_config.analysis_core_count
     ) as merge_pool:
-
         # Submit all analysis work (or you can make this incremental; see note below)
         for batched_entries in get_batched_compilation_entries(
                 compilation_database, batch_size, file_set
