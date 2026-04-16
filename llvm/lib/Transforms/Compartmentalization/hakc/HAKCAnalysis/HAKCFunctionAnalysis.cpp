@@ -1223,9 +1223,9 @@ HAKCTransformer &HAKCFunctionEnforcement::GetTransformer() const {
 Instruction *HAKCFunctionEnforcement::addCompartmentTransferCall(
     Value *Operand, const DebugLoc &DebugLoc, Instruction *I,
     ConstantInt *Size) {
-  if (!Operand->getType()->isPointerTy() && !isa<PtrToIntInst>(Operand) &&
-      !Operand->getType()->isIntegerTy(
-          HAKCCompartment::CompartmentIDBitCount)) {
+  if (!GetModuleAnalysis().GetCommonAnalysis().IsPointerLikeType(
+          Operand->getType()) &&
+      !isa<PtrToIntInst>(Operand)) {
     getLogger(Fatal) << "Compartment transfer target " << *Operand
                      << " is not a pointer but of type " << *Operand->getType()
                      << " in function\n"

@@ -1858,7 +1858,10 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
   } else if (isa<AllocaInst>(V)) {
     FoundType = CheckCallUses(V);
   } else if (isa<IntToPtrInst>(V)) {
-    FoundType = GetVoidPointerType();
+    FoundType = FindHAKCType(dyn_cast<IntToPtrInst>(V)->getOperand(0));
+    if (!FoundType) {
+      FoundType = GetVoidPointerType();
+    }
   } else if (auto *FreezeI = dyn_cast<FreezeInst>(V)) {
     FoundType = FindHAKCType(FreezeI->getOperand(0));
   } else if (auto *CastExpr = dyn_cast<ConstantExpr>(V)) {
@@ -1874,6 +1877,19 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
     }
   } else if (auto *CI = dyn_cast<ConstantInt>(V)) {
     FoundType = FindType(CI->getIntegerType());
+  } else if (auto *BinOp = dyn_cast<BinaryOperator>(V)) {
+    /* This is to handle arrays, and in particular per-cpu pointers,
+     * which take the form,
+     * struct foo **global; ... struct foo *f = global[per_cpu_idx];
+     */
+    auto LHSType = FindHAKCType(BinOp->getOperand(0));
+    auto RHSType = FindHAKCType(BinOp->getOperand(1));
+    FoundType = LHSType ? LHSType : RHSType;
+    if (LHSType && RHSType) {
+      if (FoundType->IsIntegerType()) {
+        FoundType = RHSType;
+      }
+    }
   }
 
 exit:

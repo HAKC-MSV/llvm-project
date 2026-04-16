@@ -266,38 +266,38 @@ def create_enforcement_obj_files(compilation_database: dict, batch_size: int, co
     assert server_mode.is_enforcement_mode
     worker_count = get_worker_count(config.server_config.analysis_core_count)
     successful_enforcement = True
-    with cf.ProcessPoolExecutor(max_workers=worker_count, initializer=create_logger_and_start_server,
-                                initargs=(server_mode, config)) as executor:
-        futures = dict()
-        task_id = 0
-        for batched_compilation_entries in get_batched_compilation_entries(compilation_database, batch_size, file_set):
-            for database_entry in batched_compilation_entries:
-                future = executor.submit(compile_database_entry, database_entry)
-                futures[future] = task_id
-                task_id += 1
+    executor = cf.ProcessPoolExecutor(max_workers=worker_count, initializer=create_logger_and_start_server,
+                                      initargs=(server_mode, config))
+    futures = dict()
+    task_id = 0
+    for batched_compilation_entries in get_batched_compilation_entries(compilation_database, batch_size, file_set):
+        for database_entry in batched_compilation_entries:
+            future = executor.submit(compile_database_entry, database_entry)
+            futures[future] = task_id
+            task_id += 1
 
-        with server_main_logger.progress_bar(desc="Generating hardened object files", total=len(futures)) as pbar:
-            for future in cf.as_completed(futures):
-                pbar.update(1)
-                try:
-                    task_id = futures[future]
-                    future.result()
-                except Exception as e:
-                    successful_enforcement = False
-                    server_main_logger.error(f'Error in task {task_id}: {e}')
+    with server_main_logger.progress_bar(desc="Generating hardened object files", total=len(futures)) as pbar:
+        for future in cf.as_completed(futures):
+            pbar.update(1)
+            try:
+                task_id = futures[future]
+                future.result()
+            except Exception as e:
+                successful_enforcement = False
+                server_main_logger.error(f'Error in task {task_id}: {e}')
 
-        futures = dict()
-        for worker in range(worker_count):
-            futures[executor.submit(shutdown_server)] = worker
+    futures = dict()
+    for worker in range(worker_count):
+        futures[executor.submit(shutdown_server)] = worker
 
-        with server_main_logger.progress_bar(desc="Shutting down servers", total=len(futures)) as pbar:
-            for future in cf.as_completed(futures):
-                pbar.update(1)
-                try:
-                    worker_id = futures[future]
-                    future.result()
-                except Exception as e:
-                    server_main_logger.error(f'Error shutting down {worker_id}: {e}')
+    with server_main_logger.progress_bar(desc="Shutting down servers", total=len(futures)) as pbar:
+        for future in cf.as_completed(futures):
+            pbar.update(1)
+            try:
+                worker_id = futures[future]
+                future.result()
+            except Exception as e:
+                server_main_logger.error(f'Error shutting down {worker_id}: {e}')
 
         executor.shutdown(wait=False)
 

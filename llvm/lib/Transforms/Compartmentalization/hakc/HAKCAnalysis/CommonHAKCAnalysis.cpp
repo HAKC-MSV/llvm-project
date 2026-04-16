@@ -548,6 +548,12 @@ bool CommonHAKCAnalysis::CheckPointerForAttribute(Value *V,
 }
 
 bool CommonHAKCAnalysis::IsPerCPUPointer(Value *V) {
+  if (auto *BinOp = dyn_cast<BinaryOperator>(V)) {
+    if (IsPerCPUPointer(getDef(BinOp->getOperand(0), false)) ||
+        IsPerCPUPointer(getDef(BinOp->getOperand(1), false))) {
+      return true;
+    }
+  }
   return CheckPointerForAttribute(V, Attribute::PerCPUPtr);
 }
 

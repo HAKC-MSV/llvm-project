@@ -310,6 +310,11 @@ unsigned ManagedHAKCPointer::GetProtectedUserCount() const {
 }
 
 void ManagedHAKCPointer::AddCloneUse(const ManagedHAKCPointerUseP &UPtr) {
+  for (auto &P : CloneUses) {
+    if (P->getID() == UPtr->getID()) {
+      return;
+    }
+  }
   CommonHAKCAnalysis::getLogger(Verbose)
       << *this << " adding Clone Use " << *UPtr << "\n";
   CloneUses.push_back(UPtr);
@@ -317,6 +322,11 @@ void ManagedHAKCPointer::AddCloneUse(const ManagedHAKCPointerUseP &UPtr) {
 
 void ManagedHAKCPointer::AddAuthenticatedUse(
     const ManagedHAKCPointerUseP &UPtr) {
+  for (auto &P : AuthenticatedUses) {
+    if (P->getID() == UPtr->getID()) {
+      return;
+    }
+  }
   CommonHAKCAnalysis::getLogger(Verbose)
       << *this << " adding Authenticated Use " << *UPtr << "\n";
   AuthenticatedUses.push_back(UPtr);
@@ -376,6 +386,11 @@ void ManagedHAKCPointer::AddProtectedUse(const ManagedHAKCPointerUseP &UPtr) {
         << *this << " is not managing protected uses since "
         << Manager.GetFunction().getName() << " is not compartmentalized\n";
     return;
+  }
+  for (auto &P : ProtectedUses) {
+    if (P->getID() == UPtr->getID()) {
+      return;
+    }
   }
   CommonHAKCAnalysis::getLogger(Verbose)
       << *this << " adding Protected Use " << *UPtr << "\n";
