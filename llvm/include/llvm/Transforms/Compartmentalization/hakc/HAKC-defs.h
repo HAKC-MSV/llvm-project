@@ -28,8 +28,6 @@
 #define ENTRY_TOKEN_BIT_LENGTH 64
 #define EPOCH_ID_LENGTH 64
 
-#define MAX_DIVISION_ID_BIT_LENGTH 16
-
 constexpr size_t BITS_PER_BYTE = 8;
 
 namespace llvm::hakc {

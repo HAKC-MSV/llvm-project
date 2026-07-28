@@ -209,15 +209,14 @@ public:
   std::string createLogPath(StringRef BuildPath,
                             HAKCPassModeEnum PassMode) const;
 
-  static hakc_access_token_t
-  ComputeAccessToken(hakc_compartment_id_t CompartmentID,
-                     std::set<hakc_compartment_division_t> DivisionIDs,
-                     unsigned DivisionIDBitCount);
+  hakc_access_token_t
+  GetDefaultDivisionAccessToken(hakc_compartment_id_t CompartmentID,
+                                hakc_compartment_division_t DivisionID) const;
 
   static hakc_access_token_t
-  ComputeAccessToken(hakc_compartment_id_t CompartmentID,
-                     hakc_compartment_division_t DivisionID,
-                     unsigned DivisionIDBitCount);
+  GetDefaultDivisionAccessToken(hakc_compartment_id_t CompartmentID,
+                                hakc_compartment_division_t DivisionID,
+                                unsigned DivisionIDBitCount);
 
 private:
   static bool valueHasAttribute(Value *v, Attribute::AttrKind Kind);

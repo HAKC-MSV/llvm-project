@@ -43,7 +43,7 @@ HAKCServerClientBase::GetDivision(hakc_compartment_id_t CompartmentID,
     return Division;
 
   return CreateDivision(CompartmentID, DivisionID,
-                        CommonHAKCAnalysis::ComputeAccessToken(
+                        CommonHAKCAnalysis::GetDefaultDivisionAccessToken(
                             CompartmentID, DivisionID, division_id_bit_count));
 }
 
@@ -435,7 +435,7 @@ HAKCCompartmentDivision &FakeServerClient::GetDivision(GlobalValue *GV) {
     auto DivisionID = default_division_id;
     Division =
         CreateDivision(CompartmentID, DivisionID,
-                       CommonHAKCAnalysis::ComputeAccessToken(
+                       CommonHAKCAnalysis::GetDefaultDivisionAccessToken(
                            CompartmentID, DivisionID, division_id_bit_count));
     SymbolDivisionMap[GV] = Division;
   }

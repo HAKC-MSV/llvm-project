@@ -15,10 +15,8 @@ namespace llvm::hakc {
 HAKCFunctionAnalysis::HAKCFunctionAnalysis(Function *F,
                                            HAKCModuleAnalysis &ModuleAnalysis)
     : ModuleAnalysis(ModuleAnalysis), _PointerManager(F, ModuleAnalysis),
-      DebugActive(
-          ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().OutputDebugInfo(
-              F)),
-      CurrentFunction(F), CompartmentTransferCount(0) {
+      // DebugActive(ModuleAnalysis.GetCommonAnalysis().GetSystemInfo().OutputDebugInfo(F)),
+      DebugActive(true), CurrentFunction(F), CompartmentTransferCount(0) {
   HAKCFunctionAnalysis::setup();
 }
 
@@ -1223,9 +1221,9 @@ HAKCTransformer &HAKCFunctionEnforcement::GetTransformer() const {
 Instruction *HAKCFunctionEnforcement::addCompartmentTransferCall(
     Value *Operand, const DebugLoc &DebugLoc, Instruction *I,
     ConstantInt *Size) {
-  if (!GetModuleAnalysis().GetCommonAnalysis().IsPointerLikeType(
-          Operand->getType()) &&
-      !isa<PtrToIntInst>(Operand)) {
+  if (!Operand->getType()->isPointerTy() && !isa<PtrToIntInst>(Operand) &&
+      !Operand->getType()->isIntegerTy(
+          HAKCCompartment::CompartmentIDBitCount)) {
     getLogger(Fatal) << "Compartment transfer target " << *Operand
                      << " is not a pointer but of type " << *Operand->getType()
                      << " in function\n"

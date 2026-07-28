@@ -22,49 +22,17 @@ bool CommonHAKCAnalysis::SymbolNeedsTransferFunction(
          !IsOutsideTransferFunc(F);
 }
 
-hakc_access_token_t
-CommonHAKCAnalysis::ComputeAccessToken(hakc_compartment_id_t CompartmentID,
-                                       hakc_compartment_division_t DivisionID,
-                                       unsigned DivisionIDBitCount) {
-  std::set<hakc_compartment_division_t> DivisionIDs = {DivisionID};
-  return ComputeAccessToken(CompartmentID, DivisionIDs, DivisionIDBitCount);
+hakc_access_token_t CommonHAKCAnalysis::GetDefaultDivisionAccessToken(
+    hakc_compartment_id_t CompartmentID,
+    hakc_compartment_division_t DivisionID) const {
+  return GetDefaultDivisionAccessToken(CompartmentID, DivisionID,
+                                       SystemInfo.GetDivisionIDBitCount());
 }
 
-hakc_access_token_t CommonHAKCAnalysis::ComputeAccessToken(
-    hakc_compartment_id_t CompartmentID,
-    std::set<hakc_compartment_division_t> DivisionIDs,
+hakc_access_token_t CommonHAKCAnalysis::GetDefaultDivisionAccessToken(
+    hakc_compartment_id_t CompartmentID, hakc_compartment_division_t DivisionID,
     unsigned DivisionIDBitCount) {
-  if (DivisionIDs.size() == 0) {
-    getLogger(Fatal) << "DivisionIDs must not be empty!\n";
-    throw std::exception();
-  }
-  if (DivisionIDBitCount > MAX_DIVISION_ID_BIT_LENGTH) {
-    getLogger(Fatal) << "DivisionIDBitCount (" << DivisionIDBitCount
-                     << ") must be < "
-                     << static_cast<unsigned>(MAX_DIVISION_ID_BIT_LENGTH)
-                     << " bits! (Other values are possible, but are currently "
-                        "unsupported).\n";
-    throw std::exception();
-  }
-  unsigned long MAX_COMPARTMENT_ID = (1ULL << (64 - DivisionIDBitCount)) - 1;
-  if (CompartmentID > MAX_COMPARTMENT_ID) {
-    getLogger(Fatal) << "CompartmentID (" << CompartmentID << ") must be < "
-                     << MAX_COMPARTMENT_ID
-                     << " (DivisionIDBitCount = " << DivisionIDBitCount
-                     << ")\n";
-    throw std::exception();
-  }
-
-  hakc_compartment_division_t DivisionIDBV = 0;
-  for (auto DivisionID : DivisionIDs) {
-    if (DivisionID >= DivisionIDBitCount) {
-      getLogger(Fatal) << "0 < DivisionID (" << DivisionID << ") < "
-                       << DivisionIDBitCount << " Failed!\n";
-      throw std::exception();
-    }
-    DivisionIDBV |= (1 << DivisionID);
-  }
-  return CompartmentID << DivisionIDBitCount | DivisionIDBV;
+  return CompartmentID << DivisionIDBitCount | DivisionID;
 }
 
 bool CommonHAKCAnalysis::IsFunctionInFunctionList(
@@ -548,12 +516,6 @@ bool CommonHAKCAnalysis::CheckPointerForAttribute(Value *V,
 }
 
 bool CommonHAKCAnalysis::IsPerCPUPointer(Value *V) {
-  if (auto *BinOp = dyn_cast<BinaryOperator>(V)) {
-    if (IsPerCPUPointer(getDef(BinOp->getOperand(0), false)) ||
-        IsPerCPUPointer(getDef(BinOp->getOperand(1), false))) {
-      return true;
-    }
-  }
   return CheckPointerForAttribute(V, Attribute::PerCPUPtr);
 }
 

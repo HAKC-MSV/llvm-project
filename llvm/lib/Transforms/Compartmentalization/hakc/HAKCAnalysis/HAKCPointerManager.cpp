@@ -228,8 +228,7 @@ bool HAKCPointerManager::PointerIsEligibleForManagement(const Use &U) {
     }
   }
   return Pointer->getType()->isPointerTy() &&
-         !ModuleAnalysis.GetCommonAnalysis().IsKernelUserPointer(Pointer) &&
-         !ModuleAnalysis.GetCommonAnalysis().IsPerCPUPointer(Pointer);
+         !ModuleAnalysis.GetCommonAnalysis().IsKernelUserPointer(Pointer);
 }
 
 bool HAKCPointerManager::ManageNewPointer(Use &U) {
@@ -240,10 +239,11 @@ bool HAKCPointerManager::ManageNewPointer(Use &U) {
     throw std::exception();
   }
   if (isa<IntToPtrInst>(U.get())) {
-    if (ModuleAnalysis.GetCommonAnalysis().IsPerCPUPointer(BaseDefinition)) {
+
+    if (ModuleAnalysis.GetCommonAnalysis().IsPerCPUPointer(U)) {
       GetLogger(Verbose, !DebugActive)
           << "Detected per-cpu pointer: " << U << "\n";
-      return false;
+      BaseDefinition = U.get();
     }
   }
   auto NextID = CurrentPointerID + 1;

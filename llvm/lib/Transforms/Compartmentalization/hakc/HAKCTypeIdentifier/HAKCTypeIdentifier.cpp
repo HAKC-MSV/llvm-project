@@ -1394,39 +1394,28 @@ HAKCTypeP HAKCTypeIdentifier::FindTypeFromDebug(Value *V) {
   SmallVector<DbgVariableRecord *> DVRUsers;
   findDbgUsers(DbgUsers, V, &DVRUsers);
   HAKCTypeP Result = nullptr;
-  SmallVector<HAKCTypeP> PossibleTypes;
   for (const auto *DVI : DbgUsers) {
     CommonHAKCAnalysis::getLogger(Verbose)
         << "Examining Debug Intrinsic " << *DVI << "\n";
     if (isa<DbgDeclareInst>(DVI) ||
         (isa<DbgValueInst>(DVI) && !isa<DbgAssignIntrinsic>(DVI))) {
-      if (auto PossibleType = FindTypeFromDebug(DVI, V)) {
-        PossibleTypes.push_back(PossibleType);
+      Result = FindTypeFromDebug(DVI, V);
+      if (Result) {
+        goto exit;
       }
     }
   }
   for (auto *DVR : DVRUsers) {
     CommonHAKCAnalysis::getLogger(Verbose)
         << "Examining Debug Record " << *DVR << "\n";
+    Result = FindTypeFromDebug(*DVR, V);
 
-    if (auto PossibleType = FindTypeFromDebug(*DVR, V)) {
-      PossibleTypes.push_back(PossibleType);
+    if (Result) {
+      goto exit;
     }
   }
 
-  /* Return the largest size type we found, or the largest pointee type if   *
-   * it is a pointer.  This is to avoid returning void* if there is a more
-   * specific type available */
-  unsigned MaxSize = 0;
-  for (auto PossibleType : PossibleTypes) {
-    auto Size = PossibleType->GetSizeInBytes()->getZExtValue();
-    if (PossibleType->IsPointerType() && PossibleType->GetPointeeType()) {
-      Size = PossibleType->GetPointeeType()->GetSizeInBytes()->getZExtValue();
-    }
-    if (Size > MaxSize) {
-      Result = PossibleType;
-    }
-  }
+exit:
   return Result;
 }
 
@@ -1858,10 +1847,7 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
   } else if (isa<AllocaInst>(V)) {
     FoundType = CheckCallUses(V);
   } else if (isa<IntToPtrInst>(V)) {
-    FoundType = FindHAKCType(dyn_cast<IntToPtrInst>(V)->getOperand(0));
-    if (!FoundType) {
-      FoundType = GetVoidPointerType();
-    }
+    FoundType = GetVoidPointerType();
   } else if (auto *FreezeI = dyn_cast<FreezeInst>(V)) {
     FoundType = FindHAKCType(FreezeI->getOperand(0));
   } else if (auto *CastExpr = dyn_cast<ConstantExpr>(V)) {
@@ -1877,19 +1863,6 @@ hakc::HAKCTypeP hakc::HAKCTypeIdentifier::FindHAKCType(Value *V) {
     }
   } else if (auto *CI = dyn_cast<ConstantInt>(V)) {
     FoundType = FindType(CI->getIntegerType());
-  } else if (auto *BinOp = dyn_cast<BinaryOperator>(V)) {
-    /* This is to handle arrays, and in particular per-cpu pointers,
-     * which take the form,
-     * struct foo **global; ... struct foo *f = global[per_cpu_idx];
-     */
-    auto LHSType = FindHAKCType(BinOp->getOperand(0));
-    auto RHSType = FindHAKCType(BinOp->getOperand(1));
-    FoundType = LHSType ? LHSType : RHSType;
-    if (LHSType && RHSType) {
-      if (FoundType->IsIntegerType()) {
-        FoundType = RHSType;
-      }
-    }
   }
 
 exit:

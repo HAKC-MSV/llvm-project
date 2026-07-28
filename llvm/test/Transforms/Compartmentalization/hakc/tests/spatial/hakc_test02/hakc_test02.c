@@ -11,9 +11,9 @@ struct data {
 };
 
 void init_data(struct data *data) {
-// CHECK: call ptr @check_hakc_data_access(ptr %0, i64 1, i64 73728)
+// CHECK: call ptr @check_hakc_data_access(ptr %0, i64 1, i64 65549)
     data->data = 0;
-// CHECK: call ptr @check_hakc_data_access(ptr %4, i64 1, i64 73728)
+// CHECK: call ptr @check_hakc_data_access(ptr %4, i64 1, i64 65549)
 // CHECK: store ptr %list, ptr %7
     data->list.next = &data->list;
 }

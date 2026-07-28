@@ -184,7 +184,7 @@ class HAKCCompilationAgent:
             self.logger.error(f'Failed to close server: {e}')
 
         try:
-            self.server_thread.join(timeout=1.0)
+            self.server_thread.join()
         except Exception as e:
             self.logger.error(f'Failed to join server thread: {e}')
 
@@ -234,15 +234,8 @@ def analyze_one_entry(database_entry: dict):
 
 def shutdown_server():
     global agent
-    if agent is None:
-        return
-    try:
-        agent.logger.debug(f'Shutting down server at {agent.server.socket_path}')
-        stop_compilation_agent()
-    except Exception as e:
-        # Log but don't propagate - we want all workers to attempt shutdown
-        if agent and agent.logger:
-            agent.logger.error(f"Error during shutdown: {e}")
+    agent.logger.debug(f'Shutting down server at {agent.server.socket_path}')
+    stop_compilation_agent()
 
 
 def get_batched_compilation_entries(compilation_database: dict, batch_size: int, file_set: set[str]):
@@ -266,38 +259,38 @@ def create_enforcement_obj_files(compilation_database: dict, batch_size: int, co
     assert server_mode.is_enforcement_mode
     worker_count = get_worker_count(config.server_config.analysis_core_count)
     successful_enforcement = True
-    executor = cf.ProcessPoolExecutor(max_workers=worker_count, initializer=create_logger_and_start_server,
-                                      initargs=(server_mode, config))
-    futures = dict()
-    task_id = 0
-    for batched_compilation_entries in get_batched_compilation_entries(compilation_database, batch_size, file_set):
-        for database_entry in batched_compilation_entries:
-            future = executor.submit(compile_database_entry, database_entry)
-            futures[future] = task_id
-            task_id += 1
+    with cf.ProcessPoolExecutor(max_workers=worker_count, initializer=create_logger_and_start_server,
+                                initargs=(server_mode, config)) as executor:
+        futures = dict()
+        task_id = 0
+        for batched_compilation_entries in get_batched_compilation_entries(compilation_database, batch_size, file_set):
+            for database_entry in batched_compilation_entries:
+                future = executor.submit(compile_database_entry, database_entry)
+                futures[future] = task_id
+                task_id += 1
 
-    with server_main_logger.progress_bar(desc="Generating hardened object files", total=len(futures)) as pbar:
-        for future in cf.as_completed(futures):
-            pbar.update(1)
-            try:
-                task_id = futures[future]
-                future.result()
-            except Exception as e:
-                successful_enforcement = False
-                server_main_logger.error(f'Error in task {task_id}: {e}')
+        with server_main_logger.progress_bar(desc="Generating hardened object files", total=len(futures)) as pbar:
+            for future in cf.as_completed(futures):
+                pbar.update(1)
+                try:
+                    task_id = futures[future]
+                    future.result()
+                except Exception as e:
+                    successful_enforcement = False
+                    server_main_logger.error(f'Error in task {task_id}: {e}')
 
-    futures = dict()
-    for worker in range(worker_count):
-        futures[executor.submit(shutdown_server)] = worker
+        futures = dict()
+        for worker in range(worker_count):
+            futures[executor.submit(shutdown_server)] = worker
 
-    with server_main_logger.progress_bar(desc="Shutting down servers", total=len(futures)) as pbar:
-        for future in cf.as_completed(futures):
-            pbar.update(1)
-            try:
-                worker_id = futures[future]
-                future.result()
-            except Exception as e:
-                server_main_logger.error(f'Error shutting down {worker_id}: {e}')
+        with server_main_logger.progress_bar(desc="Shutting down servers", total=len(futures)) as pbar:
+            for future in cf.as_completed(futures):
+                pbar.update(1)
+                try:
+                    worker_id = futures[future]
+                    future.result()
+                except Exception as e:
+                    server_main_logger.error(f'Error shutting down {worker_id}: {e}')
 
         executor.shutdown(wait=False)
 
@@ -320,73 +313,73 @@ def perform_analysis_with_compilation_database(config: HAKCConfig, compilation_d
     successful_creation = True
 
     # Create both pools at the same time so merge can run while analysis continues.
-    analyze_pool = cf.ProcessPoolExecutor(
-        max_workers=worker_count,
-        initializer=create_logger_and_start_server,
-        initargs=(server_mode, config),
-    )
-    merge_pool = cf.ProcessPoolExecutor(
+    with cf.ProcessPoolExecutor(
+            max_workers=worker_count,
+            initializer=create_logger_and_start_server,
+            initargs=(server_mode, config),
+    ) as analyze_pool, cf.ProcessPoolExecutor(
         max_workers=config.server_config.analysis_core_count
-    )
-    # Submit all analysis work (or you can make this incremental; see note below)
-    for batched_entries in get_batched_compilation_entries(
-            compilation_database, batch_size, file_set
-    ):
-        for database_entry in batched_entries:
-            analyze_futures.add(analyze_pool.submit(analyze_one_entry, database_entry))
+    ) as merge_pool:
 
-    total_analyze = len(analyze_futures)
-    # Upper bound on merges is N-1
-    total_merge = max(0, total_analyze - 1)
+        # Submit all analysis work (or you can make this incremental; see note below)
+        for batched_entries in get_batched_compilation_entries(
+                compilation_database, batch_size, file_set
+        ):
+            for database_entry in batched_entries:
+                analyze_futures.add(analyze_pool.submit(analyze_one_entry, database_entry))
 
-    with server_main_logger.progress_bar(desc="Analyzing", total=total_analyze) as p_an, \
-            server_main_logger.progress_bar(desc="Merging", total=total_merge) as p_mg:
+        total_analyze = len(analyze_futures)
+        # Upper bound on merges is N-1
+        total_merge = max(0, total_analyze - 1)
 
-        # Helper: schedule merges while possible (and while we have merge worker capacity)
-        def schedule_merges():
-            while len(ready) >= 2:
-                a = ready.pop()
-                b = ready.pop()
-                merge_futures.add(merge_pool.submit(merge_two_compartmentalizations, a, b))
+        with server_main_logger.progress_bar(desc="Analyzing", total=total_analyze) as p_an, \
+                server_main_logger.progress_bar(desc="Merging", total=total_merge) as p_mg:
 
-        # Initial attempt (probably no-op at start)
-        schedule_merges()
+            # Helper: schedule merges while possible (and while we have merge worker capacity)
+            def schedule_merges():
+                while len(ready) >= 2:
+                    a = ready.pop()
+                    b = ready.pop()
+                    merge_futures.add(merge_pool.submit(merge_two_compartmentalizations, a, b))
 
-        # Drive both sets of futures until everything is reduced
-        while analyze_futures or merge_futures:
-            # If we can schedule merges from already-ready graphs, do it.
+            # Initial attempt (probably no-op at start)
             schedule_merges()
 
-            # Choose what to wait on:
-            # - if there are analysis futures, always include them
-            # - include merge futures too so we can keep reduction moving
-            wait_set = set()
-            if analyze_futures:
-                wait_set |= analyze_futures
-            if merge_futures:
-                wait_set |= merge_futures
+            # Drive both sets of futures until everything is reduced
+            while analyze_futures or merge_futures:
+                # If we can schedule merges from already-ready graphs, do it.
+                schedule_merges()
 
-            done, _ = cf.wait(wait_set, return_when=cf.FIRST_COMPLETED)
+                # Choose what to wait on:
+                # - if there are analysis futures, always include them
+                # - include merge futures too so we can keep reduction moving
+                wait_set = set()
+                if analyze_futures:
+                    wait_set |= analyze_futures
+                if merge_futures:
+                    wait_set |= merge_futures
 
-            for fut in done:
-                if fut in analyze_futures:
-                    analyze_futures.remove(fut)
-                    p_an.update(1)
-                    try:
-                        g = fut.result()
-                        ready.append(g)
-                    except Exception as e:
-                        successful_creation = False
-                        server_main_logger.error(f"Error analyzing entry: {e}")
-                else:
-                    merge_futures.remove(fut)
-                    p_mg.update(1)
-                    try:
-                        g = fut.result()
-                        ready.append(g)
-                    except Exception as e:
-                        successful_creation = False
-                        server_main_logger.error(f"Error merging compartmentalization: {e}")
+                done, _ = cf.wait(wait_set, return_when=cf.FIRST_COMPLETED)
+
+                for fut in done:
+                    if fut in analyze_futures:
+                        analyze_futures.remove(fut)
+                        p_an.update(1)
+                        try:
+                            g = fut.result()
+                            ready.append(g)
+                        except Exception as e:
+                            successful_creation = False
+                            server_main_logger.error(f"Error analyzing entry: {e}")
+                    else:
+                        merge_futures.remove(fut)
+                        p_mg.update(1)
+                        try:
+                            g = fut.result()
+                            ready.append(g)
+                        except Exception as e:
+                            successful_creation = False
+                            server_main_logger.error(f"Error merging compartmentalization: {e}")
 
             if not ready:
                 raise RuntimeError("No graph produced (all tasks failed?)")
@@ -395,23 +388,19 @@ def perform_analysis_with_compilation_database(config: HAKCConfig, compilation_d
                 a = ready.pop()
                 b = ready.pop()
                 merged = merge_two_compartmentalizations(a, b)
-                p_mg.update(1)
                 ready.append(merged)
 
-        compartmentalization = ready.pop()
+            compartmentalization = ready.pop()
 
-    # Now shut down servers (analysis pool is still alive here; submit shutdown tasks to it)
-    shutdown_futs = [analyze_pool.submit(shutdown_server) for _ in range(worker_count)]
-    with server_main_logger.progress_bar(desc="Shutting down servers", total=len(shutdown_futs)) as pbar:
-        for fut in cf.as_completed(shutdown_futs):
-            pbar.update(1)
-            try:
-                fut.result()
-            except Exception as e:
-                server_main_logger.error(f"Error shutting down server: {e}")
-
-    analyze_pool.shutdown(wait=False)
-    merge_pool.shutdown(wait=False)
+        # Now shut down servers (analysis pool is still alive here; submit shutdown tasks to it)
+        shutdown_futs = [analyze_pool.submit(shutdown_server) for _ in range(worker_count)]
+        with server_main_logger.progress_bar(desc="Shutting down servers", total=len(shutdown_futs)) as pbar:
+            for fut in cf.as_completed(shutdown_futs):
+                pbar.update(1)
+                try:
+                    fut.result()
+                except Exception as e:
+                    server_main_logger.error(f"Error shutting down server: {e}")
 
     if not successful_creation:
         server_main_logger.error("Completed with errors.")
